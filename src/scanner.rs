@@ -237,20 +237,4 @@ impl<'a> Scanner<'a> {
         }
         string
     }
-
-    // Unused
-    //
-    // fn peek_char_is(&mut self, c: char) -> bool {
-    //     match self.peek_char() {
-    //         Some(p) if p == &c => true,
-    //         _ => false,
-    //     }
-    // }
-    //
-    // fn peek_char_is_whitespace(&mut self) -> bool {
-    //     match self.peek_char() {
-    //         Some(c) if c.is_whitespace() => true,
-    //         _ => false,
-    //     }
-    // }
 }

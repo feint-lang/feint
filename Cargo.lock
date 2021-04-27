@@ -110,6 +110,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c34f04666d835ff5d62e058c3995147c06f42fe86ff053337632bca83e42702d"
 
 [[package]]
+name = "feint"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "dirs",
+ "rand",
+ "regex",
+ "rustyline",
+]
+
+[[package]]
 name = "fs2"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -137,17 +148,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "322f4de77956e22ed0e5032c359a0f1273f1f7f0d79bfa3b8ffbc730d7fbcc5c"
 dependencies = [
  "libc",
-]
-
-[[package]]
-name = "interpreter"
-version = "0.1.0"
-dependencies = [
- "clap",
- "dirs",
- "rand",
- "regex",
- "rustyline",
 ]
 
 [[package]]

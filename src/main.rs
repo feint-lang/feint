@@ -52,7 +52,7 @@ Loops
 
 use clap::{App, Arg};
 
-use interpreter::run::Runner;
+use feint::run::Runner;
 
 fn main() {
     let app = App::new("Interpreter")

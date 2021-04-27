@@ -53,7 +53,7 @@ impl Runner {
         let history_path_buf = base_path.join(".interpreter_history");
         let history_path = history_path_buf.as_path();
 
-        println!("Welcome to the interpreter REPL (read/eval/print loop)");
+        println!("Welcome to the FeInt REPL (read/eval/print loop)");
         println!("Type a line of code, then hit Enter to evaluate it");
         println!("Type 'exit' or 'quit' to exit (without quotes)");
         println!("REPL history will be saved to {}", history_path.to_string_lossy());
