@@ -10,13 +10,12 @@ pub enum Token {
     BlockStart,  // No symbol (implied by newline in specific cases)
     BlockEnd,    // No symbol (implied by newline in specific cases)
 
+    // Fundamental types
     True,   // true
     False,  // false
-
     Int(String),
     Float(String),
     String(String),
-    Comment(String),
 
     // Single-character symbols
     Equal,   // =
@@ -28,7 +27,8 @@ pub enum Token {
     Dot,     // .
 
     // Multi-character Symbols
-    Exponentiation,      // **
+    EqualEqual,          // ==
+    DoubleStar,          // **
     MulEqual,            // *=
     DivEqual,            // /=
     PlusEqual,           // +=
@@ -39,6 +39,8 @@ pub enum Token {
     LoopFeed,            // <-
     Range,               // ..
 
+
+    Comment(String),                  // # ... (to end of line)
     TypeIdentifier(String),           // Name
     TypeMethodIdentifier(String),     // @name (called via type)
     SpecialMethodIdentifier(String),  // $name (e.g., $bool on a type)

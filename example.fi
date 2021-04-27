@@ -6,6 +6,7 @@ string_with_embedded_quotes = "\"x y \" z"
 string_with_embedded_comment_char = "x # y # z"
 
 x != y
+x == y
 
 hello ()
     print("hello")

@@ -6,7 +6,10 @@ use crate::tokens::Token;
 use std::process::id;
 
 pub struct Scanner<'a> {
+    /// Stream of input characters from input string
     stream: Peekable<Chars<'a>>,
+    /// The same stream but one character ahead for easier lookaheads
+    peek_stream: Peekable<Chars<'a>>,
     line_no: usize,
     col_no: usize,
 }
@@ -27,11 +30,12 @@ impl fmt::Display for TokenWithPosition {
 
 impl<'a> Scanner<'a> {
     pub fn new(source: &str) -> Scanner {
-        Scanner {
-            stream: source.chars().peekable(),
-            line_no: 1,
-            col_no: 1,
-        }
+        let stream = source.chars().peekable();
+        let mut peek_stream = source.chars().peekable();
+        let line_no = 1;
+        let col_no = 1;
+        peek_stream.next();
+        Scanner { stream, peek_stream, line_no, col_no }
     }
 
     pub fn scan(&mut self) -> Vec<TokenWithPosition> {
@@ -60,20 +64,23 @@ impl<'a> Scanner<'a> {
             Some(')') => Token::RightParen,
             Some('[') => Token::LeftSquareBracket,
             Some(']') => Token::RightSquareBracket,
-            Some('<') => Token::LeftAngleBracket,
-            Some('>') => Token::RightAngleBracket,
-            Some('=') => Token::Equal,
-            Some('*') => Token::Star,
-            Some('/') => Token::Slash,
-            Some('+') => Token::Plus,
-            Some('-') => Token::Minus,
-            Some('!') => self.token_if_next_char('=', Token::NotEqual, Token::Not),
-            Some('.') => {
-                match self.next_char_if(|&c| c == '.') {
-                    Some(_) => Token::Range,
-                    None => Token::Dot,
+            Some('<') => {
+                // XXX: This is gnarly
+                let token = self.token_if_next_char('=', Token::LeftAngleBracket, Token::LessThanOrEqual);
+                if token == Token::LeftAngleBracket {
+                    self.token_if_next_char('-', Token::LeftAngleBracket, Token::LoopFeed);
+                } else {
+                    token
                 }
-            }
+            },
+            Some('>') => self.token_if_next_char('=', Token::RightAngleBracket, Token::GreaterThanOrEqual),
+            Some('=') => self.token_if_next_char('=', Token::Equal, Token::EqualEqual),
+            Some('*') => self.token_if_next_char('=', Token::Star, Token::MulEqual),
+            Some('/') => self.token_if_next_char('=', Token::Slash, Token::DivEqual),
+            Some('+') => self.token_if_next_char('=', Token::Plus, Token::PlusEqual),
+            Some('-') => self.token_if_next_char('=', Token::Minus, Token::MinusEqual),
+            Some('!') => self.token_if_next_char('=', Token::Not, Token::NotEqual),
+            Some('.') => self.token_if_next_char('.', Token::Dot, Token::Range),
             Some(c) if c.is_digit(10) => {
                 let string = self.read_number(c);
                 if string.contains(".") {
@@ -103,7 +110,7 @@ impl<'a> Scanner<'a> {
 
     /// Return token if next char is the specified char. Otherwise,
     /// return the default token.
-    fn token_if_next_char(&mut self, c: char, token: Token, default: Token) -> Token {
+    fn token_if_next_char(&mut self, c: char, default: Token, token: Token) -> Token {
         match self.next_char_if(|&next| next == c) {
             Some(_) => token,
             None => default,
@@ -115,6 +122,7 @@ impl<'a> Scanner<'a> {
         match self.stream.next() {
             Some(c) => {
                 self.update_line_and_col_no(c);
+                self.peek_stream.next();
                 Some(c)
             }
             _ => None,
@@ -127,6 +135,7 @@ impl<'a> Scanner<'a> {
         match self.stream.next_if(func) {
             Some(c) => {
                 self.update_line_and_col_no(c);
+                self.peek_stream.next();
                 Some(c)
             }
             _ => None,
@@ -160,7 +169,9 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    /// Read contiguous digits into a new string.
+    /// Read contiguous digits and an optional decimal point into a new
+    /// string. If a dot is encountered, it will be included only if the
+    /// char following the dot is not another dot.
     fn read_number(&mut self, first_digit: char) -> String {
         let mut string = String::new();
         string.push(first_digit);
@@ -168,6 +179,23 @@ impl<'a> Scanner<'a> {
             match self.next_char_if(|&c| c.is_digit(10)) {
                 Some(c) => string.push(c),
                 None => break,
+            }
+        }
+        match self.next_char_if(|&c| c == '.') {
+            Some(c) => string.push(c),
+            None => (),
+        }
+        match self.next_char_if(|&c| c == '.') {
+            Some(_) => {
+                string.pop();
+            }
+            None => {
+                loop {
+                    match self.next_char_if(|&c| c.is_digit(10)) {
+                        Some(c) => string.push(c),
+                        None => break,
+                    }
+                }
             }
         }
         string
@@ -206,7 +234,6 @@ impl<'a> Scanner<'a> {
     /// stripped.
     fn read_comment(&mut self, comment_char: char) -> String {
         let mut string = String::new();
-        string.push(comment_char);
         loop {
             match self.next_char_if(|&c| c != '\n') {
                 Some(c) => string.push(c),
