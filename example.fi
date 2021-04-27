@@ -8,26 +8,41 @@ string_with_embedded_comment_char = "x # y # z"
 x != y
 x == y
 
-hello ()
+1.  # Syntax error
+1.times_do((n) ->
+    print(n)
+)
+
+Type () ->
+    @new () ->
+        print("Create new instance Type")
+
+    !! () ->
+        true
+
+hello () ->
+    "Python-style docstring for hello function"
     print("hello")
     print("\"hello\"")
 
-#loop ()
-#    i = 0
-#
-#    <- true
-#        print(i)
-#        i += 1
-#        break if i == 10
-#
-#    j = 0
-#    go = true
-#    <- go
-#        print(i)
-#        j += 1
-#        go = false if j == 10
-#
-#loop_over_range ()
-#    i <- 0..10
-#        print(i)
-#
+func_with_return () -> String
+    "abc"
+
+loop () ->
+    i = 0
+
+    <- true
+        print(i)
+        i += 1
+        break if i == 10
+
+    j = 0
+    go = true
+    <- go
+        print(i)
+        j += 1
+        go = false if j == 10
+
+loop_over_range () ->
+    i <- 0..10
+        print(i)

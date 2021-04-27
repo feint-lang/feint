@@ -1,0 +1,64 @@
+expr :
+    | bool
+    | int
+    | float
+    | string
+    | block
+    | binding
+    | function
+    | type
+    | binary_operator
+    | binary_operation
+
+atoms :
+    | identifier
+    | type_identifier
+    | type_method_identifier
+    | bool
+    | int
+    | float
+
+identifier :
+    | [a-z]
+    | [a-z][a-z0-9_]*[a-z0-9]
+
+type_identifier :
+    | [A-Z]
+    | [A-Z][A-Za-z0-9_]*[A-Za-z0-9]
+
+type_method_identifier :
+    | "$"identifier
+
+bool :
+    | "true"
+    | "false"
+
+int :
+    | [0-9]+
+
+float :
+    | [0-9]+ "." [0-9]+
+
+block :
+    | expr+
+
+type :
+    | type_identifier "(" parameter_list? ")" "->" "\n" block
+
+parameter_list :
+    | identifier
+
+binary_operator :
+    | "*"
+    | "/"
+    | "+"
+    | "-"
+
+binary_operation :
+    | expr binary_operator expr
+
+comment :
+    | "#" comment_character*
+
+comment_character:
+    | any character except newline

@@ -7,17 +7,12 @@ pub enum Token {
     LeftAngleBracket,    // <
     RightAngleBracket,   // >
 
-    BlockStart,  // No symbol (implied by newline in specific cases)
-    BlockEnd,    // No symbol (implied by newline in specific cases)
-
     // Fundamental types
-    True,   // true
-    False,  // false
-    Int(String),
-    Float(String),
-    String(String),
+    Int(String),     // 1
+    Float(String),   // 1.0
+    String(String),  // "1"
 
-    // Single-character symbols
+    // Single-character operators
     Equal,   // =
     Star,    // *
     Slash,   // /
@@ -26,7 +21,7 @@ pub enum Token {
     Not,     // !
     Dot,     // .
 
-    // Multi-character Symbols
+    // Multi-character operators
     EqualEqual,          // ==
     DoubleStar,          // **
     MulEqual,            // *=
@@ -38,13 +33,20 @@ pub enum Token {
     LessThanOrEqual,     // <=
     LoopFeed,            // <-
     Range,               // ..
+    AsBool,              // !! (the boolean evaluation of an object)
 
-    Comment(String),                  // # ... (to end of line)
+    // This indicates the start of a block.
+    // For functions and methods it can also be followed by a return
+    // type.
+    ReturnType,          // ->
+
+    // Identifiers
+    Identifier(String),               // name
     TypeIdentifier(String),           // Name
     TypeMethodIdentifier(String),     // @name (called via type)
     SpecialMethodIdentifier(String),  // $name (e.g., $bool on a type)
-    Identifier(String),               // name
 
+    Comment(String),  // # ... (to end of line)
     Unknown(char),
     Eof,
 }

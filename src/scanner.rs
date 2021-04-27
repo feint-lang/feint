@@ -64,59 +64,40 @@ impl<'a> Scanner<'a> {
             Some((')', _)) => Token::RightParen,
             Some(('[', _)) => Token::LeftSquareBracket,
             Some((']', _)) => Token::RightSquareBracket,
-            Some(('<', d)) => match d {
-                Some('=') => Token::LessThanOrEqual,
-                Some('-') => Token::LoopFeed,
-                _ => Token::LeftAngleBracket,
+            Some(('<', Some('='))) => self.next_and_token(Token::LessThanOrEqual),
+            Some(('<', Some('-'))) => self.next_and_token(Token::LoopFeed),
+            Some(('<', _)) => Token::LeftAngleBracket,
+            Some(('>', Some('='))) => self.next_and_token(Token::GreaterThanOrEqual),
+            Some(('>', _)) => Token::RightAngleBracket,
+            Some(('=', Some('='))) => self.next_and_token(Token::EqualEqual),
+            Some(('=', _)) => Token::Equal,
+            Some(('*', Some('='))) => self.next_and_token(Token::MulEqual),
+            Some(('*', _)) => Token::Star,
+            Some(('/', Some('='))) => self.next_and_token(Token::DivEqual),
+            Some(('/', _)) => Token::Slash,
+            Some(('+', Some('='))) => self.next_and_token(Token::PlusEqual),
+            Some(('+', _)) => Token::Plus,
+            Some(('-', Some('='))) => self.next_and_token(Token::MinusEqual),
+            Some(('-', Some('>'))) => self.next_and_token(Token::ReturnType),
+            Some(('-', _)) => Token::Minus,
+            Some(('!', Some('='))) => self.next_and_token(Token::NotEqual),
+            Some(('!', Some('!'))) => self.next_and_token(Token::AsBool),
+            Some(('!', _)) => Token::Not,
+            Some(('.', Some('.'))) => self.next_and_token(Token::Range),
+            Some(('.', _)) => Token::Dot,
+            Some((c @ '0'..='9', _)) => match self.read_number(c) {
+                string if string.contains(".") => Token::Float(string),
+                string => Token::Int(string),
             },
-            Some(('>', d)) => match d {
-                Some('=') => Token::GreaterThanOrEqual,
-                _ => Token::RightAngleBracket,
-            },
-            Some(('=', d)) => match d {
-                Some('=') => Token::EqualEqual,
-                _ => Token::Equal,
-            },
-            Some(('*', d)) => match d {
-                Some('=') => Token::MulEqual,
-                _ => Token::Star,
-            },
-            Some(('/', d)) => match d {
-                Some('=') => Token::DivEqual,
-                _ => Token::Slash,
-            },
-            Some(('+', d)) => match d {
-                Some('=') => Token::PlusEqual,
-                _ => Token::Plus,
-            },
-            Some(('-', d)) => match d {
-                Some('=') => Token::MinusEqual,
-                _ => Token::Minus,
-            },
-            Some(('!', d)) => match d {
-                Some('=') => Token::NotEqual,
-                _ => Token::Not,
-            },
-            Some(('.', d)) => match d {
-                Some('.') => Token::Range,
-                _ => Token::Dot,
-            },
-            Some((c, _)) if c.is_digit(10) => {
-                let string = self.read_number(c);
-                if string.contains(".") {
-                    Token::Float(string)
-                } else {
-                    Token::Int(string)
-                }
+            Some((c @ 'a'..='z', _)) => Token::Identifier(self.read_identifier(c)),
+            Some((c @ 'A'..='Z', _)) => Token::TypeIdentifier(self.read_type_identifier(c)),
+            Some((c @ '@', Some('a'..='z'))) => {
+                Token::TypeMethodIdentifier(self.read_identifier(c))
             }
-            Some((c, _)) if c.is_ascii_lowercase() => {
-                Token::Identifier(self.read_identifier(c))
+            Some((c @ '$', Some('a'..='z'))) => {
+                Token::SpecialMethodIdentifier(self.read_identifier(c))
             }
-            Some(('@', _)) => Token::True,
-
-            // XXX: Temporary
-            Some((c, _)) => Token::Unknown(c),
-
+            Some((c, _)) => Token::Unknown(c),  // XXX: Temporary
             None => Token::Eof,
         };
 
@@ -137,6 +118,13 @@ impl<'a> Scanner<'a> {
             }
             _ => None,
         }
+    }
+
+    /// Consume the next char in the stream and return the specified
+    /// token.
+    fn next_and_token(&mut self, token: Token) -> Token {
+        self.next();
+        token
     }
 
     /// Consume and return the next char and next lookahead char if the
@@ -205,8 +193,7 @@ impl<'a> Scanner<'a> {
 
     /// Read contiguous digits and an optional decimal point into a new
     /// string. If a dot is encountered, it will be included only if the
-    /// char following the dot is not another dot (because two dots are
-    /// used for the range operator).
+    /// char following the dot is another digit.
     fn read_number(&mut self, first_digit: char) -> String {
         let mut string = String::new();
         string.push(first_digit);
@@ -216,9 +203,10 @@ impl<'a> Scanner<'a> {
                 None => break,
             }
         }
-        match self.next_if_both(|&c| c == '.', |&d| d != '.') {
-            // Number is followed by a dot and some other char; consume
-            // the dot and any following digits.
+        match self.next_if_both(|&c| c == '.', |&d| d.is_digit(10)) {
+            // If the number is followed by a dot and at least one
+            // digit consume the dot, the digit, and any following
+            // digits.
             Some((dot, _)) => {
                 string.push(dot);
                 loop {
@@ -272,9 +260,11 @@ impl<'a> Scanner<'a> {
 
     /// Read variable/function identifier.
     ///
-    /// - Start with a lower case ASCII letter (a-z)
-    /// - Contain only lower case ASCII letters, numbers, and underscores
-    /// - End with a lower case ASCII letter or number
+    /// Identifiers:
+    ///
+    /// - start with a lower case ASCII letter (a-z)
+    /// - contain lower case ASCII letters, numbers, and underscores
+    /// - end with a lower case ASCII letter or number
     ///
     /// NOTE: Identifiers that don't end with a char as noted above will
     ///       cause an error later.
@@ -285,6 +275,24 @@ impl<'a> Scanner<'a> {
             match self.next_if(
                 |&c| c.is_ascii_lowercase() || c.is_digit(10) || c == '_'
             ) {
+                Some((c, _)) => string.push(c),
+                None => break,
+            }
+        }
+        string
+    }
+
+    /// Read type identifier.
+    ///
+    /// Type identifiers:
+    ///
+    /// - start with an upper case ASCII letter (A-Z)
+    /// - contain ASCII letters and numbers
+    fn read_type_identifier(&mut self, first_char: char) -> String {
+        let mut string = String::new();
+        string.push(first_char);
+        loop {
+            match self.next_if(|&c| c.is_ascii_alphabetic() || c.is_digit(10)) {
                 Some((c, _)) => string.push(c),
                 None => break,
             }
