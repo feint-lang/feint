@@ -39,7 +39,6 @@ pub enum Token {
     LoopFeed,            // <-
     Range,               // ..
 
-
     Comment(String),                  // # ... (to end of line)
     TypeIdentifier(String),           // Name
     TypeMethodIdentifier(String),     // @name (called via type)
