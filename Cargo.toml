@@ -1,0 +1,12 @@
+[package]
+name = "interpreter"
+version = "0.1.0"
+authors = ["Wyatt Baldwin"]
+edition = "2018"
+
+[dependencies]
+clap = "^2.33.3"
+dirs = "*"
+rand = "^0.8.3"
+regex = "^1.4.6"
+rustyline = "*"

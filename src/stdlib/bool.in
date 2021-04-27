@@ -1,0 +1,6 @@
+Bool ()
+    @new (value: Int)
+        this.value = value
+
+true = Bool.new(1)
+false = Bool.new(0)

@@ -13,32 +13,14 @@ use crate::scanner::Scanner;
 use crate::types::Type;
 use crate::vm::VM;
 
-#[allow(non_snake_case)]
-pub struct Builtins {
-    pub Object: Type,
-    pub Bool: Type,
-    pub Int: Type,
+pub struct Runner {
+    pub vm: VM<OpCode>,
 }
 
-pub struct Interpreter {
-    pub builtins: Builtins,
-    pub vm: VM,
-}
-
-impl Interpreter {
-    pub fn new() -> Interpreter {
-        let object_slots = HashMap::new();
-        let bool_slots = HashMap::new();
-        let integer_slots = HashMap::new();
-        let builtins = Builtins {
-            Object: Type::create("Object", object_slots),
-            Bool: Type::create("Bool", bool_slots),
-            Int: Type::create("Int", integer_slots),
-        };
-        Interpreter {
-            builtins,
-            vm: VM::new(),
-        }
+// Facade for running code on VM
+impl Runner {
+    pub fn new() -> Runner {
+        Runner { vm: VM::new() }
     }
 
     pub fn run(&mut self, file_name: &str) {
@@ -46,16 +28,21 @@ impl Interpreter {
 
         if result.is_err() {
             eprintln!("Could not read source file");
-            return
+            return;
         };
 
         let source = result.unwrap();
+        println!("{}", source);
+        println!();
         let mut scanner = Scanner::new(source.as_str());
         let tokens = scanner.scan();
 
         for token in tokens {
-            println!("{:?}", token);
+            println!("{}", token);
         }
+
+        // TODO: Send parsed code to VM and run
+        //self.vm.run(Vec::new());
     }
 
     pub fn repl(&self) {
@@ -84,7 +71,8 @@ impl Interpreter {
                     if input == "exit" || input == "quit" {
                         break;
                     }
-                    self.print(self.eval(input.as_str()))
+                    let result = self.eval(input.as_str());
+                    self.print(result);
                 }
                 Err(ReadlineError::Interrupted) |
                 Err(ReadlineError::Eof) => {
@@ -107,8 +95,9 @@ impl Interpreter {
         let mut scanner = Scanner::new(input);
         let tokens = scanner.scan();
         for token in tokens {
-            println!("{:?}", token);
+            println!("{}", token);
         }
+        //self.vm.run(Vec::new());
         ""
     }
 

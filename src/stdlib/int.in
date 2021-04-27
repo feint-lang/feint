@@ -1,0 +1,32 @@
+Int ()
+
+    @new (value=0)
+        this.value = value
+
+    + (value: Int) -> Int
+        return this.value + other.value
+
+    += (value: Int) -> Int
+        this.value = this.value + other.value
+        return this.value
+
+    - (other: Int) -> Int
+        return this.value - other.value
+
+    * (other: Int) -> Int
+        return this.value * other.value
+
+    / (other: Int) -> Int
+        return this.value / other.value
+
+    == (other: Int) -> Bool
+        return this.value == other.value
+
+    $bool () -> Bool
+        return this.value != 0
+
+    .. (end: Int) -> Iter[Int]
+        "Range excluding end"
+
+    ... (end: Int) -> Iter[Int]
+        "Range including end"

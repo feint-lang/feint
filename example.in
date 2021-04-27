@@ -1,24 +1,32 @@
-1 + 2
+x = 1 + 2
+y = 1.0 + 2.0  # Add floats
+
+s = "a" + "b" + "c"
+string_with_embedded_quotes = "\"x y \" z"
+string_with_embedded_comment_char = "x # y # z"
+
+x != y
 
 hello ()
     print("hello")
     print("\"hello\"")
 
-loop ()
-    i = 0
-
-    <- true
-        print(i)
-        i += 1
-        break if i == 10
-
-    j = 0
-    go = true
-    <- go
-        print(i)
-        j += 1
-        go = false if j == 10
-
-loop_over_range ()
-    i <- 0..10
-        print(i)
+#loop ()
+#    i = 0
+#
+#    <- true
+#        print(i)
+#        i += 1
+#        break if i == 10
+#
+#    j = 0
+#    go = true
+#    <- go
+#        print(i)
+#        j += 1
+#        go = false if j == 10
+#
+#loop_over_range ()
+#    i <- 0..10
+#        print(i)
+#
