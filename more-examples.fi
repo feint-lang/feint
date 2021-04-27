@@ -1,13 +1,14 @@
 # ideas
 f (x: Int): Int -> x * x
 
-g (h: (Function(): <T>)): <T> ->
-  h()
+g (h: Function()) ->
+    h()
 
 g((x) -> x)
 
 # main.fi
-# "package" is a special name referring to the current package
+# "package" is a special name referring to the current package. It's the
+# *only* way to access objects in the package.
 import package
 import from package: Type
 
@@ -20,14 +21,23 @@ main (argv: List<String>) ->
 Type ()
     "A type definition"
 
-  @new (x) ->
-    this.x = x
+    @new (x) ->
+        this.x = x
 
-  meth (x) ->
-    this.x + x
+    meth (x) ->
+        this.x + x
 
-  + (x) ->
-    this.x + x
+    # The $ prefix indicates a computed field (like @property in Python)
+    $computed () ->
+        result
+        # alternatively, do some complex stuff and cache the result
+        # this.computed = result
+
+    $computed.set (value) ->
+        this.computed = value
+
+    + (x) ->
+        this.x + x
 
 # Package layout
 #
