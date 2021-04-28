@@ -2,12 +2,13 @@ use crate::frame::Frame;
 use crate::opcodes::OpCode;
 use crate::stack::Stack;
 
+type ExitData = (i32, String);
 type ExitResult = Result<String, (i32, String)>;
 
 pub struct VM<'a> {
     // Items are pushed onto or popped from the stack as op codes are
     // encountered in the instruction list.
-    instruction_stack: Stack<usize>,
+    stack: Stack<usize>,
 
     // A new stack frame is pushed for each call
     frame_stack: Stack<&'a Frame<'a>>,
@@ -16,52 +17,91 @@ pub struct VM<'a> {
 impl<'a> VM<'a> {
     pub fn new() -> VM<'a> {
         VM {
-            instruction_stack: Stack::new(),
+            stack: Stack::new(),
             frame_stack: Stack::new(),
         }
     }
 
     pub fn run(
-        &self,
-        instructions: &Vec<OpCode>,
+        &mut self,
+        instructions: &Vec<OpCode<'a>>,
         mut program_counter: usize,
     ) -> ExitResult {
         if instructions.len() == 0 {
             return Err((1, "At least one instruction is required".to_string()));
         }
-
         loop {
-            let instruction = instructions.get(program_counter);
-            program_counter += 1;
-
-            match instruction {
-                Some(OpCode::Halt(0, message)) => {
-                    return Ok(message.to_string());
+            match instructions.get(program_counter) {
+                Some(OpCode::Halt(code)) => {
+                    return match code {
+                        0 => Ok(message),
+                        code => Err((*code, message))
+                    }
                 },
-                Some(OpCode::Halt(exit_code, message)) => {
-                    return Err((exit_code.clone(), message.to_string()));
-                },
-                Some(op) => {
-                    #[cfg(debug_assertions)]
-                    println!("{:?}", op);
+                Some(instruction) => {
+                    let exit_data = self.step((*instruction).clone());
+                    match exit_data {
+                        Some((code, message)) => {
+                            return match code {
+                                0 => Ok(message),
+                                code => Err((code, message))
+                            }
+                        },
+                        None => (),
+                    }
                 },
                 None => {
-                    // XXX: Should only happen in REPL. Otherwise, this
-                    //      would only be reached when a list of
-                    //      instructions doesn't include HALT at the
-                    //      end.
-                    return Err((i32::MAX, "Unexpected exit".to_string()));
-                },
+                    return Err((i32::MAX, "Reached end of instructions".to_string()))
+                }
             }
+            program_counter += 1;
+        }
+    }
+
+    /// Run the specified instruction. If the instruction is HALT, the
+    /// exit code is returned.
+    fn execute_instruction(&mut self, instruction: OpCode) {
+        match instruction {
+            OpCode::Halt(code) => (),
+            OpCode::Push(v) => self.stack.push(v),
+            OpCode::Add => {
+                match self.pop_top_two() {
+                    Some((a, b)) => self.stack.push(a + b),
+                    None => (),
+                };
+            },
+            op => {
+                #[cfg(debug_assertions)]
+                println!("{:?}", op);
+            },
+            _ => (),
         }
     }
 
     fn push(&mut self, item: usize) {
-        self.instruction_stack.push(item);
+        self.stack.push(item);
     }
 
     fn pop(&mut self) -> Option<usize> {
-        self.instruction_stack.pop()
+        self.stack.pop()
+    }
+
+    /// Pop top two items from stack *if* the stack has at least two
+    /// items.
+    fn pop_top_two(&mut self) -> Option<(usize, usize)> {
+        let stack = &mut self.stack;
+        match (stack.pop(), stack.pop()) {
+            (Some(top), Some(next)) => Some((top, next)),
+            (Some(top), None) => {
+                stack.push(top);
+                None
+            },
+            _ => None
+        }
+    }
+
+    pub fn peek(&self) -> Option<&usize> {
+        self.stack.peek()
     }
 
     fn push_frame(&mut self, frame: &'a Frame) {

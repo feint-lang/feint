@@ -81,11 +81,11 @@ fn main() {
             }
             exit(0);
         },
-        Err((exit_code, message)) => {
+        Err((code, message)) => {
             if message.len() > 0 {
                 eprintln!("{}", message);
             }
-            exit(exit_code);
+            exit(code);
         }
     }
 }

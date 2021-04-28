@@ -16,7 +16,7 @@ pub struct Scanner<'a> {
 
 #[derive(Debug)]
 pub struct TokenWithPosition {
-    token: Token,
+    pub token: Token,
     line_no: usize,
     col_no: usize,
     length: usize,

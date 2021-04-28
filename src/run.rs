@@ -12,6 +12,7 @@ use crate::opcodes::OpCode;
 use crate::scanner::{Scanner, TokenWithPosition};
 use crate::types::Type;
 use crate::vm::VM;
+use crate::tokens::Token;
 
 type ExitResult = Result<String, (i32, String)>;
 
@@ -38,12 +39,23 @@ impl<'a> Runner<'a> {
         };
 
         // XXX: TEMP
-        instructions.push(OpCode::Jump(usize::MAX));
+        instructions.clear();
+        instructions.push(OpCode::Push(1));
+        instructions.push(OpCode::Push(2));
+        instructions.push(OpCode::Add);
+        instructions.push(OpCode::Halt(0));
 
-        self.vm.run(&instructions, 0)
+        let result = self.vm.run(&instructions, 0);
+
+        match self.vm.peek() {
+            Some(a) => println!("Top of stack: {}", a),
+            None => (),
+        }
+
+        result
     }
 
-    pub fn repl(&self) -> ExitResult {
+    pub fn repl(&mut self) -> ExitResult {
         let mut rl = rustyline::Editor::<()>::new();
 
         let home = dirs::home_dir();
@@ -91,14 +103,15 @@ impl<'a> Runner<'a> {
                     return Ok("".to_string());
                 },
                 Err(err) => {
-                    return Err((1, format!("Could not read line: {}", err)));
+                    let message = format!("Could not read line: {}", err);
+                    return Err((1, message));
                 },
             }
         }
     }
 
     fn eval(
-        &self,
+        &mut self,
         source: &str,
         repl_instructions: &mut Vec<OpCode<'a>>,
     ) -> ExitResult {
@@ -133,7 +146,9 @@ impl<'a> Runner<'a> {
         let tokens = self.get_tokens(source);
         let mut instructions: Vec<OpCode> = vec!();
         for token in tokens {
-
+            if token.token == Token::Eof {
+                instructions.push(OpCode::Halt(0, ""));
+            }
         }
         instructions
     }

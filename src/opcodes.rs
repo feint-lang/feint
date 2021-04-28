@@ -1,7 +1,10 @@
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum OpCode<'a> {
-    Halt(i32, &'a str),
-    Constant,
-    Jump(usize),
-    Return,
+    Constant(usize),     // ???
+    Jump(usize),         // Jump uncoditionally
+    JumpIf(usize),       // Jump if top of stack is true
+    Return(usize),
+    Push(usize),
+    Add,                 // Add top items in stack; push result back
+    Halt(i32),
 }
