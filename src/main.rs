@@ -62,12 +62,21 @@ fn main() {
             Arg::with_name("FILE_NAME")
                 .index(1)
                 .required(false)
-                .help("Script")
+                .help("Script"),
+        )
+        .arg(
+            Arg::with_name("debug")
+                .short("d")
+                .long("debug")
+                .required(false)
+                .takes_value(false)
+                .help("Enable debug mode?"),
         );
 
     let matches = app.get_matches();
     let file_name = matches.value_of("FILE_NAME");
-    let mut interpreter = Runner::new();
+    let debug = matches.is_present("debug");
+    let mut interpreter = Runner::new(debug);
 
     let result = match file_name {
         Some(file_name) => interpreter.run(file_name),
@@ -75,17 +84,14 @@ fn main() {
     };
 
     match result {
-        Ok(message) => {
-            if message.len() > 0 {
-                println!("{}", message);
-            }
+        Ok(Some(message)) => {
+            println!("{}", message);
             exit(0);
-        },
+        }
+        Ok(None) => exit(0),
         Err((code, message)) => {
-            if message.len() > 0 {
-                eprintln!("{}", message);
-            }
-            exit(code);
+            eprintln!("{}", message);
+            exit(code)
         }
     }
 }

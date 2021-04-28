@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::fmt;
 
 use rand::Rng;
 
@@ -11,23 +10,21 @@ pub struct Type<'a> {
 }
 
 impl<'a> Type<'a> {
-    pub fn new(
-        name: &'a str,
-        methods: HashMap<&'a str, &'a Method>,
-    ) -> Type<'a> {
+    pub fn new(name: &'a str, methods: HashMap<&'a str, &'a Method>) -> Type<'a> {
         let mut rng = rand::thread_rng();
         let id: usize = rng.gen();
         Type { id, name, methods }
     }
 
-    pub fn new_instance(
-        &self,
-        name: String,
-        attributes: HashMap<&'a str, &'a Object>,
-    ) -> Object {
+    pub fn new_instance(&self, name: String, attributes: HashMap<&'a str, &'a Object>) -> Object {
         let mut rng = rand::thread_rng();
         let id: usize = rng.gen();
-        Object { id, name, type_: &self, attributes }
+        Object {
+            id,
+            name,
+            type_: &self,
+            attributes,
+        }
     }
 }
 

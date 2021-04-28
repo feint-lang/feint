@@ -1,6 +1,6 @@
 pub mod frame;
+pub mod instructions;
 pub mod keywords;
-pub mod opcodes;
 pub mod operators;
 pub mod run;
 pub mod scanner;

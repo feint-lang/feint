@@ -1,9 +1,11 @@
 use crate::frame::Frame;
-use crate::opcodes::OpCode;
+use crate::instructions::Instruction;
 use crate::stack::Stack;
 
-type ExitData = (i32, String);
-type ExitResult = Result<String, (i32, String)>;
+pub enum VMState {
+    Idle,
+    Halted(i32, Option<String>),
+}
 
 pub struct VM<'a> {
     // Items are pushed onto or popped from the stack as op codes are
@@ -22,60 +24,65 @@ impl<'a> VM<'a> {
         }
     }
 
-    pub fn run(
-        &mut self,
-        instructions: &Vec<OpCode<'a>>,
-        mut program_counter: usize,
-    ) -> ExitResult {
-        if instructions.len() == 0 {
-            return Err((1, "At least one instruction is required".to_string()));
-        }
-        loop {
-            match instructions.get(program_counter) {
-                Some(OpCode::Halt(code)) => {
-                    return match code {
-                        0 => Ok(message),
-                        code => Err((*code, message))
-                    }
-                },
-                Some(instruction) => {
-                    let exit_data = self.step((*instruction).clone());
-                    match exit_data {
-                        Some((code, message)) => {
-                            return match code {
-                                0 => Ok(message),
-                                code => Err((code, message))
-                            }
-                        },
-                        None => (),
-                    }
-                },
-                None => {
-                    return Err((i32::MAX, "Reached end of instructions".to_string()))
-                }
-            }
-            program_counter += 1;
-        }
+    pub fn halt(&mut self) {
+        self.stack.clear();
+        self.frame_stack.clear();
     }
 
-    /// Run the specified instruction. If the instruction is HALT, the
-    /// exit code is returned.
-    fn execute_instruction(&mut self, instruction: OpCode) {
+    /// Execute the specified instructions and return the VM's state.
+    pub fn execute(&mut self, instructions: &Vec<Instruction>) -> VMState {
+        let mut instruction_pointer = 0;
+
+        loop {
+            let instruction = instructions.get(instruction_pointer);
+            instruction_pointer += 1;
+            match instruction {
+                Some(instruction) => match self.execute_instruction(instruction) {
+                    VMState::Halted(code, message) => return VMState::Halted(code, message),
+                    _ => (),
+                },
+                // Go idle
+                None => break,
+            }
+        }
+
+        VMState::Idle
+    }
+
+    /// Run the specified instruction and return the VM's state.
+    fn execute_instruction(&mut self, instruction: &Instruction) -> VMState {
         match instruction {
-            OpCode::Halt(code) => (),
-            OpCode::Push(v) => self.stack.push(v),
-            OpCode::Add => {
+            Instruction::Push(v) => {
+                self.stack.push(*v);
+            }
+            Instruction::Add => {
                 match self.pop_top_two() {
                     Some((a, b)) => self.stack.push(a + b),
                     None => (),
                 };
+            }
+            Instruction::Print(n) => match self.stack.peek_n(*n) {
+                items if items.len() == 0 => println!("Stack is empty"),
+                items if items.len() == 1 => println!("{}", items.get(0).unwrap()),
+                items => {
+                    let mut iter = items.iter().rev();
+                    let item = iter.next().unwrap();
+                    println!("{} TOP", item);
+                    while let Some(item) = iter.next() {
+                        println!("{}", item);
+                    }
+                }
             },
-            op => {
+            Instruction::Halt(code) => {
+                self.halt();
+                return VMState::Halted(*code, None);
+            }
+            instruction => {
                 #[cfg(debug_assertions)]
-                println!("{:?}", op);
-            },
-            _ => (),
+                println!("{:?}", instruction);
+            }
         }
+        VMState::Idle
     }
 
     fn push(&mut self, item: usize) {
@@ -95,8 +102,8 @@ impl<'a> VM<'a> {
             (Some(top), None) => {
                 stack.push(top);
                 None
-            },
-            _ => None
+            }
+            _ => None,
         }
     }
 

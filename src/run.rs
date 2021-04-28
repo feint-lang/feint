@@ -2,57 +2,74 @@ use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::io;
-use std::io::Write;
 use std::path::Path;
 
 use dirs;
 use rustyline::error::ReadlineError;
 
-use crate::opcodes::OpCode;
+use crate::instructions::Instruction;
 use crate::scanner::{Scanner, TokenWithPosition};
-use crate::types::Type;
-use crate::vm::VM;
 use crate::tokens::Token;
+use crate::types::Type;
+use crate::vm::{VMState, VM};
 
-type ExitResult = Result<String, (i32, String)>;
+type ExitResult = Result<Option<String>, (i32, String)>;
 
 pub struct Runner<'a> {
     pub vm: VM<'a>,
+    pub debug: bool,
 }
 
 // Facade for running code on VM
 impl<'a> Runner<'a> {
-    pub fn new() -> Runner<'a> {
-        Runner { vm: VM::new() }
+    pub fn new(debug: bool) -> Runner<'a> {
+        Runner {
+            vm: VM::new(),
+            debug,
+        }
     }
 
     pub fn run(&mut self, file_name: &str) -> ExitResult {
         let mut instructions = match fs::read_to_string(file_name) {
             Ok(source) => {
-                #[cfg(debug_assertions)]
-                println!("{}", source);
+                if self.debug {
+                    println!("# Source from file: {}", file_name);
+                    println!("{}", source);
+                }
                 self.get_instructions(source.as_str())
-            },
-            Err(_) => {
-                return Err((1, "Could not read source file".to_string()))
+            }
+            Err(err) => {
+                self.vm.halt();
+                return Err((1, format!("Could not read source file: {}", err)));
             }
         };
 
         // XXX: TEMP
         instructions.clear();
-        instructions.push(OpCode::Push(1));
-        instructions.push(OpCode::Push(2));
-        instructions.push(OpCode::Add);
-        instructions.push(OpCode::Halt(0));
+        instructions.push(Instruction::Push(1));
+        instructions.push(Instruction::Push(2));
+        instructions.push(Instruction::Add);
+        instructions.push(Instruction::Halt(0));
 
-        let result = self.vm.run(&instructions, 0);
+        let state = self.vm.execute(&instructions);
 
-        match self.vm.peek() {
-            Some(a) => println!("Top of stack: {}", a),
-            None => (),
+        match self.get_exit_result(state, false) {
+            Some(result) => result,
+            None => panic!("This should never happen"),
         }
+    }
 
-        result
+    /// Get exit result based on VM state. If None is returned, that's
+    /// indication to not exit (used in REPL mode).
+    fn get_exit_result(&self, state: VMState, repl_mode: bool) -> Option<ExitResult> {
+        match state {
+            VMState::Halted(0, None) => Some(Ok(None)),
+            VMState::Halted(0, message) => Some(Ok(message)),
+            VMState::Halted(code, Some(message)) => Some(Err((code, message))),
+            VMState::Halted(code, None) => Some(Err((code, "Error".to_string()))),
+            VMState::Idle if repl_mode => None,
+            VMState::Idle => Some(Err((i32::MAX, "Execution never halted".to_string()))),
+        }
     }
 
     pub fn repl(&mut self) -> ExitResult {
@@ -63,26 +80,26 @@ impl<'a> Runner<'a> {
         let history_path_buf = base_path.join(".interpreter_history");
         let history_path = history_path_buf.as_path();
 
-        // There's one set of instructions for the REPL, which means we
-        // need to take care to start interpreting instructions at the
-        // right place.
-        let mut instructions: Vec<OpCode> = vec!();
-
         println!("Welcome to the FeInt REPL (read/eval/print loop)");
         println!("Type a line of code, then hit Enter to evaluate it");
         println!("Type 'exit' or 'quit' to exit (without quotes)");
-        println!("REPL history will be saved to {}", history_path.to_string_lossy());
+        println!(
+            "REPL history will be saved to {}",
+            history_path.to_string_lossy()
+        );
 
         match rl.load_history(history_path) {
             Ok(_) => (),
             Err(err) => eprintln!("Could not load REPL history: {}", err),
         }
 
+        let mut line = 1;
+
         loop {
             match rl.readline("→ ") {
                 Ok(input) if input.trim().len() == 0 => {
                     // Skip empty/blank lines
-                },
+                }
                 Ok(input) => {
                     let input = input.as_str();
 
@@ -93,61 +110,62 @@ impl<'a> Runner<'a> {
                         Err(err) => eprintln!("Could not save REPL history: {}", err),
                     }
 
-                    match self.eval(input, &mut instructions) {
-                        Ok(message) => return Ok(message),
-                        Err((i32::MAX, _)) => (),
-                        Err((exit_code, message)) => return Err((exit_code, message)),
+                    let state = self.eval(input, line);
+                    match self.get_exit_result(state, true) {
+                        Some(result) => return result,
+                        None => (),
                     }
                 }
                 Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => {
-                    return Ok("".to_string());
-                },
+                    self.vm.halt();
+                    return Ok(None);
+                }
                 Err(err) => {
-                    let message = format!("Could not read line: {}", err);
-                    return Err((1, message));
-                },
+                    self.vm.halt();
+                    return Err((1, format!("Could not read line: {}", err)));
+                }
             }
+            line += 1;
         }
     }
 
-    fn eval(
-        &mut self,
-        source: &str,
-        repl_instructions: &mut Vec<OpCode<'a>>,
-    ) -> ExitResult {
-        let start = repl_instructions.len();
-        match source.trim() {
+    fn eval(&mut self, source: &str, line: usize) -> VMState {
+        let instructions = match source.trim() {
             "exit" | "halt" | "quit" => {
-                // Explicitly instruct the VM to halt
-                repl_instructions.push(OpCode::Halt(0, ""));
-            },
+                vec![Instruction::Halt(0)]
+            }
+            "print" => {
+                vec![Instruction::Print(8)]
+            }
+            "push" => {
+                vec![Instruction::Push(line)]
+            }
             _ => {
-                let instructions = self.get_instructions(source);
-                repl_instructions.extend(instructions);
-
-                // XXX: TEMP
-                repl_instructions.push(OpCode::Jump(start));
-            },
-        }
-        self.vm.run(repl_instructions, start)
+                let mut instructions = self.get_instructions(source);
+                instructions.pop(); // Drop EOF halt instruction
+                instructions
+            }
+        };
+        self.vm.execute(&instructions)
     }
 
     fn get_tokens(&self, source: &str) -> Vec<TokenWithPosition> {
         let mut scanner = Scanner::new(source);
         let tokens = scanner.scan();
-        #[cfg(debug_assertions)]
-        for token in tokens.iter() {
-            println!("{}", token);
+        if self.debug {
+            for token in tokens.iter() {
+                println!("{}", token);
+            }
         }
         tokens
     }
 
-    fn get_instructions(&self, source: &str) -> Vec<OpCode<'a>> {
+    fn get_instructions(&self, source: &str) -> Vec<Instruction> {
         let tokens = self.get_tokens(source);
-        let mut instructions: Vec<OpCode> = vec!();
+        let mut instructions: Vec<Instruction> = vec![];
         for token in tokens {
             if token.token == Token::Eof {
-                instructions.push(OpCode::Halt(0, ""));
+                instructions.push(Instruction::Halt(0));
             }
         }
         instructions
