@@ -1,10 +1,10 @@
 pub struct Stack<T> {
-    storage: Vec<T>
+    storage: Vec<T>,
 }
 
 impl<T> Stack<T> {
     pub fn new() -> Stack<T> {
-        Stack{ storage: Vec::new() }
+        Stack { storage: Vec::new() }
     }
 
     pub fn push(&mut self, item: T) {

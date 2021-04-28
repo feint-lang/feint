@@ -9,49 +9,52 @@ use dirs;
 use rustyline::error::ReadlineError;
 
 use crate::opcodes::OpCode;
-use crate::scanner::Scanner;
+use crate::scanner::{Scanner, TokenWithPosition};
 use crate::types::Type;
 use crate::vm::VM;
 
-pub struct Runner {
-    pub vm: VM<OpCode>,
+type ExitResult = Result<String, (i32, String)>;
+
+pub struct Runner<'a> {
+    pub vm: VM<'a>,
 }
 
 // Facade for running code on VM
-impl Runner {
-    pub fn new() -> Runner {
+impl<'a> Runner<'a> {
+    pub fn new() -> Runner<'a> {
         Runner { vm: VM::new() }
     }
 
-    pub fn run(&mut self, file_name: &str) {
-        let result = fs::read_to_string(file_name);
-
-        if result.is_err() {
-            eprintln!("Could not read source file");
-            return;
+    pub fn run(&mut self, file_name: &str) -> ExitResult {
+        let mut instructions = match fs::read_to_string(file_name) {
+            Ok(source) => {
+                #[cfg(debug_assertions)]
+                println!("{}", source);
+                self.get_instructions(source.as_str())
+            },
+            Err(_) => {
+                return Err((1, "Could not read source file".to_string()))
+            }
         };
 
-        let source = result.unwrap();
-        println!("{}", source);
-        println!();
-        let mut scanner = Scanner::new(source.as_str());
-        let tokens = scanner.scan();
+        // XXX: TEMP
+        instructions.push(OpCode::Jump(usize::MAX));
 
-        for token in tokens {
-            println!("{}", token);
-        }
-
-        // TODO: Send parsed code to VM and run
-        //self.vm.run(Vec::new());
+        self.vm.run(&instructions, 0)
     }
 
-    pub fn repl(&self) {
+    pub fn repl(&self) -> ExitResult {
         let mut rl = rustyline::Editor::<()>::new();
 
         let home = dirs::home_dir();
         let base_path = home.unwrap_or_default();
         let history_path_buf = base_path.join(".interpreter_history");
         let history_path = history_path_buf.as_path();
+
+        // There's one set of instructions for the REPL, which means we
+        // need to take care to start interpreting instructions at the
+        // right place.
+        let mut instructions: Vec<OpCode> = vec!();
 
         println!("Welcome to the FeInt REPL (read/eval/print loop)");
         println!("Type a line of code, then hit Enter to evaluate it");
@@ -64,51 +67,74 @@ impl Runner {
         }
 
         loop {
-            let result = rl.readline("→ ");
-            match result {
+            match rl.readline("→ ") {
+                Ok(input) if input.trim().len() == 0 => {
+                    // Skip empty/blank lines
+                },
                 Ok(input) => {
-                    rl.add_history_entry(input.as_str());
-                    if input == "exit" || input == "quit" {
-                        break;
-                    }
-                    let result = self.eval(input.as_str());
-                    self.print(result);
-                }
-                Err(ReadlineError::Interrupted) |
-                Err(ReadlineError::Eof) => {
-                    break;
-                }
-                Err(err) => {
-                    eprintln!("Error: {:?}", err);
-                    break;
-                }
-            }
-        }
+                    let input = input.as_str();
 
-        match rl.save_history(history_path) {
-            Ok(_) => (),
-            Err(err) => eprintln!("Could not save REPL history: {}", err),
+                    // Save history before eval in case of exit
+                    rl.add_history_entry(input);
+                    match rl.save_history(history_path) {
+                        Ok(_) => (),
+                        Err(err) => eprintln!("Could not save REPL history: {}", err),
+                    }
+
+                    match self.eval(input, &mut instructions) {
+                        Ok(message) => return Ok(message),
+                        Err((i32::MAX, _)) => (),
+                        Err((exit_code, message)) => return Err((exit_code, message)),
+                    }
+                }
+                Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => {
+                    return Ok("".to_string());
+                },
+                Err(err) => {
+                    return Err((1, format!("Could not read line: {}", err)));
+                },
+            }
         }
     }
 
-    fn eval(&self, input: &str) -> &str {
-        let mut scanner = Scanner::new(input);
+    fn eval(
+        &self,
+        source: &str,
+        repl_instructions: &mut Vec<OpCode<'a>>,
+    ) -> ExitResult {
+        let start = repl_instructions.len();
+        match source.trim() {
+            "exit" | "halt" | "quit" => {
+                // Explicitly instruct the VM to halt
+                repl_instructions.push(OpCode::Halt(0, ""));
+            },
+            _ => {
+                let instructions = self.get_instructions(source);
+                repl_instructions.extend(instructions);
+
+                // XXX: TEMP
+                repl_instructions.push(OpCode::Jump(start));
+            },
+        }
+        self.vm.run(repl_instructions, start)
+    }
+
+    fn get_tokens(&self, source: &str) -> Vec<TokenWithPosition> {
+        let mut scanner = Scanner::new(source);
         let tokens = scanner.scan();
-        for token in tokens {
+        #[cfg(debug_assertions)]
+        for token in tokens.iter() {
             println!("{}", token);
         }
-        //self.vm.run(Vec::new());
-        ""
+        tokens
     }
 
-    fn print(&self, string: &str) {
-        if string.len() == 0 {
-            print!("{}", string);
-            if io::stdout().flush().is_err() {
-                eprintln!("Error while flushing")
-            }
-        } else {
-            println!("{}", string);
+    fn get_instructions(&self, source: &str) -> Vec<OpCode<'a>> {
+        let tokens = self.get_tokens(source);
+        let mut instructions: Vec<OpCode> = vec!();
+        for token in tokens {
+
         }
+        instructions
     }
 }

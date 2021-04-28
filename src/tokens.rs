@@ -7,6 +7,8 @@ pub enum Token {
     LeftAngleBracket,    // <
     RightAngleBracket,   // >
 
+    Comma,               // ,
+
     // Fundamental types
     Int(String),     // 1
     Float(String),   // 1.0
@@ -23,6 +25,8 @@ pub enum Token {
 
     // Multi-character operators
     EqualEqual,          // ==
+    And,                 // &&
+    Or,                  // ||
     DoubleStar,          // **
     MulEqual,            // *=
     DivEqual,            // /=

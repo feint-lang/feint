@@ -1,45 +1,46 @@
-use rand::Rng;
 use std::collections::HashMap;
 use std::fmt;
 
-type Name = &'static str;
-type Slots = HashMap<Name, Name>;
+use rand::Rng;
 
-pub struct Type {
-    pub id: u128,
-    pub name: Name,
-    pub slots: Slots,
+#[derive(Debug)]
+pub struct Type<'a> {
+    pub id: usize,
+    pub name: &'a str,
+    pub methods: HashMap<&'a str, &'a Method>,
 }
 
-impl Type {
-    // Create a new type
-    pub fn create(
-        name: Name,
-        slots: Slots,
-    ) -> Type {
+impl<'a> Type<'a> {
+    pub fn new(
+        name: &'a str,
+        methods: HashMap<&'a str, &'a Method>,
+    ) -> Type<'a> {
         let mut rng = rand::thread_rng();
-        let id: u128 = rng.gen();
-        Type { id, name, slots }
+        let id: usize = rng.gen();
+        Type { id, name, methods }
     }
 
-    // Create a new instance of this type
-    pub fn new(self) -> Instance {
-        Instance { class: self }
-    }
-}
-
-pub struct Instance {
-    pub class: Type,
-}
-
-impl Instance {
-    pub fn to_string(&self) -> String {
-        format!("{}: ", self.class.name)
+    pub fn new_instance(
+        &self,
+        name: String,
+        attributes: HashMap<&'a str, &'a Object>,
+    ) -> Object {
+        let mut rng = rand::thread_rng();
+        let id: usize = rng.gen();
+        Object { id, name, type_: &self, attributes }
     }
 }
 
-impl fmt::Display for Instance {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.to_string())
-    }
+#[derive(Debug)]
+pub struct Object<'a> {
+    pub id: usize,
+    pub name: String,
+    pub type_: &'a Type<'a>,
+    pub attributes: HashMap<&'a str, &'a Object<'a>>,
+}
+
+#[derive(Debug)]
+pub struct Method {
+    name: String,
+    // ???
 }

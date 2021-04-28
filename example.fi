@@ -7,6 +7,7 @@ string_with_embedded_comment_char = "x # y # z"
 
 x != y
 x == y
+list = [1, 2, 3]
 
 1.  # Syntax error
 1.times_do((n) ->
@@ -18,7 +19,7 @@ Type () ->
         print("Create new instance Type")
 
     !! () ->
-        true
+        true && false
 
 hello () ->
     "Python-style docstring for hello function"

@@ -1,7 +1,8 @@
-pub mod run;
+pub mod frame;
 pub mod keywords;
 pub mod opcodes;
 pub mod operators;
+pub mod run;
 pub mod scanner;
 pub mod stack;
 pub mod tokens;

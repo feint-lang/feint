@@ -49,6 +49,7 @@ Loops
         print(i)
 
 */
+use std::process::exit;
 
 use clap::{App, Arg};
 
@@ -68,8 +69,23 @@ fn main() {
     let file_name = matches.value_of("FILE_NAME");
     let mut interpreter = Runner::new();
 
-    match file_name {
+    let result = match file_name {
         Some(file_name) => interpreter.run(file_name),
         None => interpreter.repl(),
+    };
+
+    match result {
+        Ok(message) => {
+            if message.len() > 0 {
+                println!("{}", message);
+            }
+            exit(0);
+        },
+        Err((exit_code, message)) => {
+            if message.len() > 0 {
+                eprintln!("{}", message);
+            }
+            exit(exit_code);
+        }
     }
 }

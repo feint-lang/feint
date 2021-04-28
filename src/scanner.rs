@@ -60,6 +60,7 @@ impl<'a> Scanner<'a> {
         let token = match self.next() {
             Some(('"', _)) => Token::String(self.read_string('"')),
             Some(('#', _)) => Token::Comment(self.read_comment()),
+            Some((',', _)) => Token::Comma,
             Some(('(', _)) => Token::LeftParen,
             Some((')', _)) => Token::RightParen,
             Some(('[', _)) => Token::LeftSquareBracket,
@@ -71,6 +72,8 @@ impl<'a> Scanner<'a> {
             Some(('>', _)) => Token::RightAngleBracket,
             Some(('=', Some('='))) => self.next_and_token(Token::EqualEqual),
             Some(('=', _)) => Token::Equal,
+            Some(('&', Some('&'))) => self.next_and_token(Token::And),
+            Some(('|', Some('|'))) => self.next_and_token(Token::Or),
             Some(('*', Some('='))) => self.next_and_token(Token::MulEqual),
             Some(('*', _)) => Token::Star,
             Some(('/', Some('='))) => self.next_and_token(Token::DivEqual),
