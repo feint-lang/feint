@@ -1,10 +1,14 @@
-pub mod frame;
-pub mod instructions;
-pub mod keywords;
-pub mod operators;
 pub mod run;
-pub mod scanner;
-pub mod stack;
-pub mod tokens;
-pub mod types;
-pub mod vm;
+
+mod frame;
+mod instructions;
+mod keywords;
+mod operators;
+mod scanner;
+mod stack;
+mod tokens;
+mod types;
+mod vm;
+
+#[cfg(test)]
+mod tests;

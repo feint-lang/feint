@@ -3,7 +3,6 @@ use std::iter::Peekable;
 use std::str::Chars;
 
 use crate::tokens::Token;
-use std::process::id;
 
 pub struct Scanner<'a> {
     /// Stream of input characters from input string

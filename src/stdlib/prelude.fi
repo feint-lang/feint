@@ -1,3 +1,6 @@
-import Bool std.bool
-import Int std.int
-import print from std.print
+import from std.print: print
+
+import from std.bool: true, false
+import from std.float: Float
+import from std.int: Int
+import from std.string: String

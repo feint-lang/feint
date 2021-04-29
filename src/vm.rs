@@ -8,28 +8,36 @@ pub enum VMState {
 }
 
 pub struct VM<'a> {
-    // Items are pushed onto or popped from the stack as op codes are
-    // encountered in the instruction list.
+    // Items are pushed onto or popped from the stack as instructions
+    // are executed in the instruction list.
     stack: Stack<usize>,
 
     // A new stack frame is pushed for each call
-    frame_stack: Stack<&'a Frame<'a>>,
+    call_stack: Stack<&'a Frame<'a>>,
 }
 
+/// The FeInt virtual machine. When it's created, it's initialized and
+/// then, implicitly, goes idle until it's passed some instructions to
+/// execute. After instructions are executed
 impl<'a> VM<'a> {
     pub fn new() -> VM<'a> {
         VM {
             stack: Stack::new(),
-            frame_stack: Stack::new(),
+            call_stack: Stack::new(),
         }
     }
 
     pub fn halt(&mut self) {
         self.stack.clear();
-        self.frame_stack.clear();
+        self.call_stack.clear();
     }
 
-    /// Execute the specified instructions and return the VM's state.
+    /// Execute the specified instructions and return the VM's state. If
+    /// a HALT instruction isn't encountered, the VM will go "idle"; it
+    /// will maintain its internal state and await further instructions.
+    /// When a HALT instruction is encountered, the VM's state will be
+    /// cleared; it can be "restarted" by passing more instructions to
+    /// execute.
     pub fn execute(&mut self, instructions: &Vec<Instruction>) -> VMState {
         let mut instruction_pointer = 0;
 
@@ -50,7 +58,7 @@ impl<'a> VM<'a> {
     }
 
     /// Run the specified instruction and return the VM's state.
-    fn execute_instruction(&mut self, instruction: &Instruction) -> VMState {
+    pub fn execute_instruction(&mut self, instruction: &Instruction) -> VMState {
         match instruction {
             Instruction::Push(v) => {
                 self.stack.push(*v);
@@ -94,7 +102,7 @@ impl<'a> VM<'a> {
     }
 
     /// Pop top two items from stack *if* the stack has at least two
-    /// items.
+    /// items. If it doesn't, the stack remains unmodified.
     fn pop_top_two(&mut self) -> Option<(usize, usize)> {
         let stack = &mut self.stack;
         match (stack.pop(), stack.pop()) {
@@ -112,10 +120,10 @@ impl<'a> VM<'a> {
     }
 
     fn push_frame(&mut self, frame: &'a Frame) {
-        self.frame_stack.push(frame);
+        self.call_stack.push(frame);
     }
 
     fn pop_frame(&mut self) -> Option<&Frame> {
-        self.frame_stack.pop()
+        self.call_stack.pop()
     }
 }

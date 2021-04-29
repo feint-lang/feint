@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use crate::types::Object;
 
+/// VM call stack frame.
 pub struct Frame<'a> {
     parameters: HashMap<&'a str, &'a Object<'a>>,
     locals: HashMap<&'a str, &'a Object<'a>>,

@@ -1,32 +1,32 @@
-Int ()
-    "Builtin integer type"
-    @new (value=0)
+Float ()
+    "Builtin floating point type"
+    @new (value=0.0)
         this.value = value
 
-    + (value: Int): Int ->
+    + (value: Float): Float ->
         this.value + other.value
 
-    += (value: Int): Int ->
+    += (value: Float): Float ->
         # XXX: If reassignment isn't allowed, this doesn't make sense
         this.value = this.value + other.value
 
-    - (other: Int): Int ->
+    - (other: Float): Float ->
         this.value - other.value
 
-    * (other: Int): Int ->
+    * (other: Float): Float ->
         this.value * other.value
 
-    / (other: Int): Int ->
+    / (other: Float): Float ->
         this.value / other.value
 
-    == (other: Int): Bool ->
+    == (other: Float): Bool ->
         this.value == other.value
 
     $bool (): Bool ->
         this.value != 0
 
-    .. (end: Int): Iter[Int] ->
+    .. (end: Float): Iter[Float] ->
         "Range excluding end"
 
-    ... (end: Int): Iter[Int] ->
+    ... (end: Float): Iter[Float] ->
         "Range including end"

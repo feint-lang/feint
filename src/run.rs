@@ -1,8 +1,4 @@
-use std::collections::HashMap;
-use std::env;
 use std::fs;
-use std::io;
-use std::path::Path;
 
 use dirs;
 use rustyline::error::ReadlineError;
@@ -10,7 +6,6 @@ use rustyline::error::ReadlineError;
 use crate::instructions::Instruction;
 use crate::scanner::{Scanner, TokenWithPosition};
 use crate::tokens::Token;
-use crate::types::Type;
 use crate::vm::{VMState, VM};
 
 type ExitResult = Result<Option<String>, (i32, String)>;

@@ -26,6 +26,9 @@ type_identifier :
     | [A-Z]
     | [A-Z][A-Za-z0-9_]*[A-Za-z0-9]
 
+type_name :
+    | type_identifier
+
 type_method_identifier :
     | "$"identifier
 
@@ -40,13 +43,20 @@ float :
     | [0-9]+ "." [0-9]+
 
 block :
-    | expr+
+    | expr+ "\n"
 
 type :
-    | type_identifier "(" parameter_list? ")" "->" "\n" block
+    | type_identifier "(" parameter_list? ")" "\n" block
+
+function :
+    | identifier "(" parameter_list? ")" [":" type_name ] "->" expr
+    | identifier "(" parameter_list? ")" [":" type_name ] "->" "\n" block
 
 parameter_list :
-    | identifier
+    | parameter ["," parameter]+
+
+parameter :
+    | identifier [":" type_name]
 
 binary_operator :
     | "*"

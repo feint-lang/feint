@@ -1,0 +1,10 @@
+String ()
+    "Builtin string type"
+    @new (value) ->
+        this.value = value
+
+    + (other) ->
+        this.value + other.value
+
+    == (other: Int) -> Bool
+        this.value == other.value

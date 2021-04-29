@@ -1,2 +1,2 @@
 print (string: String)
-    return
+    "Delegate to system printer somehow (???)"
