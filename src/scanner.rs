@@ -5,6 +5,8 @@ use std::str::Chars;
 use crate::tokens::Token;
 
 pub struct Scanner<'a> {
+    x: String,
+    source: &'a str,
     /// Stream of input characters from input string
     stream: Peekable<Chars<'a>>,
     /// The same stream but one character ahead for easier lookaheads
@@ -13,7 +15,7 @@ pub struct Scanner<'a> {
     col_no: usize,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct TokenWithPosition {
     pub token: Token,
     line_no: usize,
@@ -21,9 +23,24 @@ pub struct TokenWithPosition {
     length: usize,
 }
 
+impl TokenWithPosition {
+    pub fn new(token: Token, line_no: usize, col_no: usize, length: usize) -> TokenWithPosition {
+        TokenWithPosition {
+            token,
+            line_no,
+            col_no,
+            length,
+        }
+    }
+}
+
 impl fmt::Display for TokenWithPosition {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Token {}:{} {:?}", self.line_no, self.col_no, self.token)
+        write!(
+            f,
+            "Token {}:{}:{} {:?}",
+            self.line_no, self.col_no, self.length, self.token,
+        )
     }
 }
 
@@ -34,22 +51,63 @@ impl<'a> Scanner<'a> {
         let line_no = 1;
         let col_no = 1;
         peek_stream.next();
-        Scanner { stream, lookahead_stream: peek_stream, line_no, col_no }
+        Scanner {
+            x: String::new(),
+            source,
+            stream,
+            lookahead_stream: peek_stream,
+            line_no,
+            col_no,
+        }
     }
 
-    pub fn scan(&mut self) -> Vec<TokenWithPosition> {
-        let mut tokens: Vec<TokenWithPosition> = vec!();
+    pub fn add_source(&mut self, source: &'a str) {
+        self.source = &source;
+    }
+
+    pub fn scan(&mut self, finalize: bool) -> Result<Vec<TokenWithPosition>, String> {
+        let mut tokens: Vec<TokenWithPosition> = vec![];
         loop {
-            let token = self.next_token();
-            if token.token == Token::Eof {
-                tokens.push(token);
-                break;
-            } else {
-                tokens.push(token);
+            let token_with_position = self.next_token();
+            let length = token_with_position.length;
+            match token_with_position.token {
+                Token::EndOfInput => {
+                    tokens.push(token_with_position);
+                    break;
+                }
+                Token::Unknown(c) => {
+                    return Err(format!("Encountered unknown token: {}", c));
+                }
+                // The length of a string should be 2 less than the
+                // length of its token.
+                Token::String(s) if length - s.len() == 1 => {
+                    tokens.push(TokenWithPosition {
+                        token: Token::NeedsMoreInput(format!("\"{}", s)),
+                        line_no: token_with_position.line_no,
+                        col_no: token_with_position.col_no,
+                        length: token_with_position.length,
+                    });
+                    break;
+                }
+                _ => {
+                    tokens.push(token_with_position);
+                }
             }
             self.skip_whitespace();
         }
-        tokens
+        if finalize {
+            match tokens.get(tokens.len() - 1) {
+                Some(TokenWithPosition {
+                    token: Token::NeedsMoreInput(_),
+                    line_no: _,
+                    col_no: _,
+                    length: _,
+                }) => return Err("More input needed".to_string()),
+                Some(_) => (),
+                None => (),
+            }
+        }
+        Ok(tokens)
     }
 
     fn next_token(&mut self) -> TokenWithPosition {
@@ -99,16 +157,11 @@ impl<'a> Scanner<'a> {
             Some((c @ '$', Some('a'..='z'))) => {
                 Token::SpecialMethodIdentifier(self.read_identifier(c))
             }
-            Some((c, _)) => Token::Unknown(c),  // XXX: Temporary
-            None => Token::Eof,
+            Some((c, _)) => Token::Unknown(c),
+            None => Token::EndOfInput,
         };
 
-        TokenWithPosition {
-            token,
-            line_no,
-            col_no,
-            length: self.col_no - col_no,
-        }
+        TokenWithPosition::new(token, line_no, col_no, self.col_no - col_no)
     }
 
     /// Consume and return the next char in the stream.
@@ -131,10 +184,7 @@ impl<'a> Scanner<'a> {
 
     /// Consume and return the next char and next lookahead char if the
     /// next char matches the specified condition.
-    fn next_if(
-        &mut self,
-        func: impl FnOnce(&char) -> bool,
-    ) -> Option<(char, Option<char>)> {
+    fn next_if(&mut self, func: impl FnOnce(&char) -> bool) -> Option<(char, Option<char>)> {
         match self.stream.next_if(func) {
             Some(c) => {
                 self.update_line_and_col_no(c);
@@ -153,12 +203,10 @@ impl<'a> Scanner<'a> {
         d_func: impl FnOnce(&char) -> bool,
     ) -> Option<(char, Option<char>)> {
         match (self.stream.peek(), self.lookahead_stream.peek()) {
-            (Some(c), Some(d)) => {
-                match c_func(c) && d_func(d) {
-                    true => self.next(),
-                    false => None,
-                }
-            }
+            (Some(c), Some(d)) => match c_func(c) && d_func(d) {
+                true => self.next(),
+                false => None,
+            },
             _ => None,
         }
     }
@@ -274,9 +322,7 @@ impl<'a> Scanner<'a> {
         let mut string = String::new();
         string.push(first_char);
         loop {
-            match self.next_if(
-                |&c| c.is_ascii_lowercase() || c.is_digit(10) || c == '_'
-            ) {
+            match self.next_if(|&c| c.is_ascii_lowercase() || c.is_digit(10) || c == '_') {
                 Some((c, _)) => string.push(c),
                 None => break,
             }

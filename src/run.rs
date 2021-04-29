@@ -24,18 +24,25 @@ impl<'a> Runner<'a> {
         }
     }
 
+    fn halt_with_err(&mut self, code: i32, message: String) -> ExitResult {
+        self.vm.halt();
+        Err((code, message))
+    }
+
     pub fn run(&mut self, file_name: &str) -> ExitResult {
         let mut instructions = match fs::read_to_string(file_name) {
             Ok(source) => {
                 if self.debug {
                     println!("# Source from file: {}", file_name);
-                    println!("{}", source);
+                    println!("{}", source.trim_end());
                 }
-                self.get_instructions(source.as_str())
+                match self.get_instructions(source.as_str(), true) {
+                    Ok(instructions) => instructions,
+                    Err(message) => return self.halt_with_err(1, message),
+                }
             }
             Err(err) => {
-                self.vm.halt();
-                return Err((1, format!("Could not read source file: {}", err)));
+                return self.halt_with_err(1, format!("Could not read source file: {}", err))
             }
         };
 
@@ -136,7 +143,10 @@ impl<'a> Runner<'a> {
                 vec![Instruction::Push(line)]
             }
             _ => {
-                let mut instructions = self.get_instructions(source);
+                let mut instructions = match self.get_instructions(source, false) {
+                    Ok(instructions) => instructions,
+                    Err(message) => return VMState::Halted(1, Some(message)),
+                };
                 instructions.pop(); // Drop EOF halt instruction
                 instructions
             }
@@ -144,25 +154,31 @@ impl<'a> Runner<'a> {
         self.vm.execute(&instructions)
     }
 
-    fn get_tokens(&self, source: &str) -> Vec<TokenWithPosition> {
+    fn get_tokens(&self, source: &str, finalize: bool) -> Result<Vec<TokenWithPosition>, String> {
         let mut scanner = Scanner::new(source);
-        let tokens = scanner.scan();
+        let tokens = match scanner.scan(finalize) {
+            Ok(tokens) => tokens,
+            err => return err,
+        };
         if self.debug {
             for token in tokens.iter() {
                 println!("{}", token);
             }
         }
-        tokens
+        Ok(tokens)
     }
 
-    fn get_instructions(&self, source: &str) -> Vec<Instruction> {
-        let tokens = self.get_tokens(source);
+    fn get_instructions(&self, source: &str, finalize: bool) -> Result<Vec<Instruction>, String> {
+        let tokens = match self.get_tokens(source, finalize) {
+            Ok(tokens) => tokens,
+            Err(message) => return Err(message),
+        };
         let mut instructions: Vec<Instruction> = vec![];
         for token in tokens {
-            if token.token == Token::Eof {
+            if token.token == Token::EndOfInput {
                 instructions.push(Instruction::Halt(0));
             }
         }
-        instructions
+        Ok(instructions)
     }
 }
