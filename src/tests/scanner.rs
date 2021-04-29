@@ -27,9 +27,11 @@ fn scan_string_unclosed() {
         Ok(tokens) => tokens,
         _ => vec![],
     };
+    let actual = tokens.get(0).unwrap();
     let expected = Token::NeedsMoreInput("\"abc".to_string());
     assert_eq!(tokens.len(), 1);
-    check_token(tokens.get(0), expected, 1, 1, 4);
+    check_token(Some(actual), expected, 1, 1, 4);
+    scanner.add_source(format!("{}\"", actual.token.0).as_str());
     scanner.scan(true);
     // check_token(tokens.get(0), Token::String("abc".to_string()), 1, 1, 4);
     // check_end_of_input(source, tokens);
