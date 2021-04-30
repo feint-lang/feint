@@ -1,26 +1,25 @@
 use std::fmt;
-use std::iter::Peekable;
+use std::iter::{Chain, Peekable};
 use std::str::Chars;
 
 use crate::tokens::Token;
 
 pub struct Scanner<'a> {
-    x: String,
-    source: &'a str,
     /// Stream of input characters from input string
     stream: Peekable<Chars<'a>>,
     /// The same stream but one character ahead for easier lookaheads
     lookahead_stream: Peekable<Chars<'a>>,
     line_no: usize,
     col_no: usize,
+    remaining_source: String,
 }
 
 #[derive(Debug, PartialEq)]
 pub struct TokenWithPosition {
     pub token: Token,
-    line_no: usize,
-    col_no: usize,
-    length: usize,
+    pub line_no: usize,
+    pub col_no: usize,
+    pub length: usize,
 }
 
 impl TokenWithPosition {
@@ -45,28 +44,31 @@ impl fmt::Display for TokenWithPosition {
 }
 
 impl<'a> Scanner<'a> {
-    pub fn new(source: &str) -> Scanner {
-        let stream = source.chars().peekable();
-        let mut peek_stream = source.chars().peekable();
-        let line_no = 1;
-        let col_no = 1;
-        peek_stream.next();
+    pub fn new() -> Scanner<'a> {
         Scanner {
-            x: String::new(),
-            source,
-            stream,
-            lookahead_stream: peek_stream,
-            line_no,
-            col_no,
+            stream: "".chars().peekable(),
+            lookahead_stream: "".chars().peekable(),
+            line_no: 1,
+            col_no: 1,
+            remaining_source: "".to_string(),
         }
     }
 
-    pub fn add_source(&mut self, source: &'a str) {
-        self.source = &source;
-    }
-
-    pub fn scan(&mut self, finalize: bool) -> Result<Vec<TokenWithPosition>, String> {
+    pub fn scan(
+        &mut self,
+        source: String,
+        finalize: bool,
+    ) -> Result<Vec<TokenWithPosition>, String> {
         let mut tokens: Vec<TokenWithPosition> = vec![];
+
+        // if self.remaining_source.len() > 0 {
+        //     self.scan(self.remaining_source.clone(), false);
+        // }
+
+        self.stream = source.chars().peekable();
+        self.lookahead_stream = source.chars().peekable();
+        self.lookahead_stream.next();
+
         loop {
             let token_with_position = self.next_token();
             let length = token_with_position.length;
@@ -80,9 +82,10 @@ impl<'a> Scanner<'a> {
                 }
                 // The length of a string should be 2 less than the
                 // length of its token.
-                Token::String(s) if length - s.len() == 1 => {
+                Token::String(string) if length - string.len() == 1 => {
+                    self.col_no -= string.len() + 1;
                     tokens.push(TokenWithPosition {
-                        token: Token::NeedsMoreInput(format!("\"{}", s)),
+                        token: Token::NeedsMoreInput(format!("\"{}", string)),
                         line_no: token_with_position.line_no,
                         col_no: token_with_position.col_no,
                         length: token_with_position.length,
@@ -95,8 +98,9 @@ impl<'a> Scanner<'a> {
             }
             self.skip_whitespace();
         }
+
         if finalize {
-            match tokens.get(tokens.len() - 1) {
+            match tokens.last() {
                 Some(TokenWithPosition {
                     token: Token::NeedsMoreInput(_),
                     line_no: _,
@@ -107,6 +111,7 @@ impl<'a> Scanner<'a> {
                 None => (),
             }
         }
+
         Ok(tokens)
     }
 

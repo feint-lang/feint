@@ -22,7 +22,7 @@ impl<T> Stack<T> {
     pub fn peek(&self) -> Option<&T> {
         match self.size() {
             0 => None,
-            _ => self.storage.get(self.storage.len() - 1),
+            _ => self.storage.last(),
         }
     }
 
