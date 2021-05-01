@@ -27,7 +27,11 @@ list = [1, 2, 3]
     print(n)
 )
 
-Type () ->
+# Anonymous block (new scope)
+->
+    x = 2
+
+Type ()
     @new () ->
         print("Create new instance Type")
 

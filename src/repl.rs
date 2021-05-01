@@ -114,7 +114,7 @@ impl<'a> Runner<'a> {
                     Token::NeedsMoreInput(remaining_input) => loop {
                         match self.read_line("+ ", false) {
                             Ok(None) => {
-                                // Blank line
+                                // Blank line (can't happen?)
                                 let input = format!("{}\n", remaining_input);
                                 return self.eval(input.as_str());
                             }

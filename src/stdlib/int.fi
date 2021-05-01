@@ -1,6 +1,6 @@
 Int ()
     "Builtin integer type"
-    @new (value=0)
+    @new (value=0) ->
         this.value = value
 
     + (value: Int): Int ->

@@ -52,7 +52,28 @@ impl<'a> Runner<'a> {
                 }
                 tokens
             }
-            Err(token) => return Err((1, format!("{:?}", token))),
+            Err((error_token, _)) => {
+                return match error_token.token {
+                    Token::Unknown(c) => {
+                        let message = format!(
+                            "Syntax error: unknown token at line {} column {}: {}",
+                            error_token.line_no, error_token.col_no, c
+                        );
+                        Err((1, message))
+                    }
+                    Token::NeedsMoreInput(string) => {
+                        let message = format!(
+                            "{}\nIncomplete input starting on line {} at column {}",
+                            string, error_token.line_no, error_token.col_no
+                        );
+                        Err((1, message))
+                    }
+                    _ => {
+                        // This shouldn't happen.
+                        Err((1, format!("{:?}", error_token)))
+                    }
+                };
+            }
         };
 
         let mut instructions: Vec<Instruction> = vec![];

@@ -70,8 +70,8 @@ impl<'a> Scanner<'a> {
     /// something like this in the calling code, which is pretty clunky:
     ///
     /// ```
-    /// // In this example, the string doesn't have its closing
-    /// // quote.
+    /// // In this example, the string doesn't have a closing quote so
+    /// // more input is needed to complete the scan.
     /// let scanner = Scanner::new();
     /// let source = "s = \"abc";
     /// let tokens = match scanner.scan(source) {
@@ -90,10 +90,10 @@ impl<'a> Scanner<'a> {
     /// };
     /// ```
     ///
-    /// TODO: Find a better way to handle this^. E.g., figure out how to
-    ///       store the remaining, unparsed source internally or find
-    ///       some other way such that the caller doesn't need to deal
-    ///       with this in such a manual way.
+    /// TODO: Find a better way to handle this^. Figure out how to store
+    ///       the remaining, unparsed source internally or find some
+    ///       other way such that the caller doesn't need to deal with
+    ///       this in such a manual way.
     pub fn scan(
         &mut self,
         source: &'a str,
@@ -105,7 +105,6 @@ impl<'a> Scanner<'a> {
         self.lookahead_stream.next();
 
         loop {
-            self.skip_whitespace();
             let token_with_position = self.next_token();
             match token_with_position.token {
                 Token::Unknown(_) => {
@@ -168,13 +167,15 @@ impl<'a> Scanner<'a> {
             Some(('+', Some('='))) => self.next_and_token(Token::PlusEqual),
             Some(('+', _)) => Token::Plus,
             Some(('-', Some('='))) => self.next_and_token(Token::MinusEqual),
-            Some(('-', Some('>'))) => self.next_and_token(Token::ReturnType),
+            Some(('-', Some('>'))) => self.next_and_token(Token::BlockStart),
             Some(('-', _)) => Token::Minus,
             Some(('!', Some('='))) => self.next_and_token(Token::NotEqual),
             Some(('!', Some('!'))) => self.next_and_token(Token::AsBool),
             Some(('!', _)) => Token::Not,
             Some(('.', Some('.'))) => self.next_and_token(Token::Range),
             Some(('.', _)) => Token::Dot,
+            Some(('%', _)) => Token::Percent,
+            Some(('^', _)) => Token::Caret,
             Some((c @ '0'..='9', _)) => match self.read_number(c) {
                 string if string.contains(".") => Token::Float(string),
                 string => Token::Int(string),
@@ -187,6 +188,7 @@ impl<'a> Scanner<'a> {
             Some((c @ '$', Some('a'..='z'))) => {
                 Token::SpecialMethodIdentifier(self.read_identifier(c))
             }
+            Some((c, _)) if c.is_whitespace() => Token::Whitespace(self.read_whitespace(c)),
             Some((c, _)) => Token::Unknown(c),
             None => Token::EndOfInput,
         };
@@ -194,7 +196,7 @@ impl<'a> Scanner<'a> {
         // In most cases, the length of a token can be calculated
         // automatically from the current column position and the
         // previous position. The exception is for tokens that can span
-        // multiple lines, such as string.
+        // multiple lines, such as strings.
         let length = match token_length {
             Some(length) => length,
             None => self.col_no - col_no,
@@ -269,15 +271,17 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    /// Consume and discard contiguous whitespace until a non-whitespace
-    /// character or EOF is reached.
-    fn skip_whitespace(&mut self) {
+    /// Read contiguous whitespace.
+    fn read_whitespace(&mut self, first_char: char) -> String {
+        let mut string = String::new();
+        string.push(first_char);
         loop {
             match self.next_if(|&c| c.is_whitespace()) {
-                Some(_) => (),
+                Some((c, _)) => string.push(c),
                 None => break,
             }
         }
+        string
     }
 
     /// Read contiguous digits and an optional decimal point into a new

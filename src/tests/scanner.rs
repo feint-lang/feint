@@ -40,9 +40,10 @@ fn scan_string_with_many_newlines() {
     let source = "  \" a\nb\n\nc\n\n\n  \"";
     let tokens = scan(source);
     let expected_string = " a\nb\n\nc\n\n\n  ".to_string();
-    assert_eq!(tokens.len(), 2);
+    assert_eq!(tokens.len(), 3);
     // Overall length includes quotes
-    check_token(tokens.get(0), Token::String(expected_string), 1, 3, 14);
+    check_token(tokens.get(0), Token::Whitespace("  ".to_string()), 1, 1, 2);
+    check_token(tokens.get(1), Token::String(expected_string), 1, 3, 14);
     check_token(tokens.last(), Token::EndOfInput, 7, 4, 0);
 }
 

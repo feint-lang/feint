@@ -1,5 +1,7 @@
 #[derive(Clone, Debug, PartialEq)]
 pub enum Token {
+    Whitespace(String), // Contiguous sequence of whitespace characters
+
     LeftParen,          // (
     RightParen,         // )
     LeftSquareBracket,  // [
@@ -15,23 +17,21 @@ pub enum Token {
     String(String), // "1"
 
     // Single-character operators
-    Equal, // =
-    Star,  // *
-    Slash, // /
-    Plus,  // +
-    Minus, // -
-    Not,   // !
-    Dot,   // .
+    Equal,   // =
+    Star,    // *
+    Slash,   // /
+    Plus,    // +
+    Minus,   // -
+    Not,     // !
+    Dot,     // .
+    Percent, // %
+    Caret,   // ^
 
     // Multi-character operators
     EqualEqual,         // ==
     And,                // &&
     Or,                 // ||
     DoubleStar,         // **
-    MulEqual,           // *=
-    DivEqual,           // /=
-    PlusEqual,          // +=
-    MinusEqual,         // -=
     NotEqual,           // !=
     GreaterThanOrEqual, // >=
     LessThanOrEqual,    // <=
@@ -39,10 +39,15 @@ pub enum Token {
     Range,              // ..
     AsBool,             // !! (the boolean evaluation of an object)
 
-    // This indicates the start of a block.
-    // For functions and methods it can also be followed by a return
-    // type.
-    ReturnType, // ->
+    // In-place operators
+    // TODO: If reassignment isn't allowed, these don't make sense
+    MulEqual,   // *=
+    DivEqual,   // /=
+    PlusEqual,  // +=
+    MinusEqual, // -=
+
+    // Can be used for named functions or anonymous blocks
+    BlockStart, // ->
 
     // Identifiers
     Identifier(String),              // name
