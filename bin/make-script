@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -euo pipefail
+shopt -s failglob
+
+bin_dir="$(dirname "$0")"
+name="$1"
+out_path="${bin_dir}/${name}"
+
+if test -f "$out_path"; then
+    printf "%s already exists\n" "$out_path" 1>&2
+    exit 1
+fi
+
+printf "Creating %s... " "${out_path}"
+
+printf "\
+#!/usr/bin/env bash
+set -euo pipefail
+shopt -s failglob
+echo \"Implement me!\"
+" >> "$out_path"
+
+chmod 755 "$out_path"
+
+printf "Done\n"
