@@ -53,7 +53,8 @@ use std::process::exit;
 
 use clap::{App, Arg};
 
-use feint::run::Runner;
+use feint::repl;
+use feint::run;
 
 fn main() {
     let app = App::new("Interpreter")
@@ -76,11 +77,16 @@ fn main() {
     let matches = app.get_matches();
     let file_name = matches.value_of("FILE_NAME");
     let debug = matches.is_present("debug");
-    let mut interpreter = Runner::new(debug);
 
     let result = match file_name {
-        Some(file_name) => interpreter.run(file_name),
-        None => interpreter.repl(),
+        Some(file_name) => run::Runner::new(debug).run_file(file_name),
+        None => {
+            let home = dirs::home_dir();
+            let base_path = home.unwrap_or_default();
+            let history_path_buf = base_path.join(".interpreter_history");
+            let history_path = history_path_buf.as_path();
+            repl::Runner::new(Some(history_path), debug).run()
+        }
     };
 
     match result {

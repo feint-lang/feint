@@ -11,7 +11,6 @@ pub struct Scanner<'a> {
     lookahead_stream: Peekable<Chars<'a>>,
     line_no: usize,
     col_no: usize,
-    remaining_source: String,
 }
 
 #[derive(Debug, PartialEq)]
@@ -19,6 +18,8 @@ pub struct TokenWithPosition {
     pub token: Token,
     pub line_no: usize,
     pub col_no: usize,
+    // The total length of a token, including quotes, newlines,
+    // backslashes, etc.
     pub length: usize,
 }
 
@@ -50,65 +51,74 @@ impl<'a> Scanner<'a> {
             lookahead_stream: "".chars().peekable(),
             line_no: 1,
             col_no: 1,
-            remaining_source: "".to_string(),
         }
     }
 
+    /// Scan text and return tokens. If an error is encountered, an
+    /// error result will be returned containing a special token that
+    /// indicates what the problem is along with all the tokens that
+    /// were successfully parsed prior to the error.
+    ///
+    /// The possible error conditions are:
+    ///
+    /// - Unknown token
+    /// - More input needed (e.g., unclosed string or group)
+    ///
+    /// In the first case, that's a syntax error.
+    ///
+    /// In the latter case, when more input is needed, you have to do
+    /// something like this in the calling code, which is pretty clunky:
+    ///
+    /// ```
+    /// // In this example, the string doesn't have its closing
+    /// // quote.
+    /// let scanner = Scanner::new();
+    /// let source = "s = \"abc";
+    /// let tokens = match scanner.scan(source) {
+    ///     Ok(tokens) => tokens,
+    ///     Err((error_token, tokens)) => match error_token.token {
+    ///         Token::NeedsMoreInput(remaining_input) => {
+    ///             let input = format!("{}\"", remaining_input);
+    ///             match scanner.scan(input.as_str()) {
+    ///                 Ok(tokens) => tokens,
+    ///                 Err((error_token, tokens)) => {
+    ///                     // Oops
+    ///                 },
+    ///             }
+    ///         }
+    ///     }
+    /// };
+    /// ```
+    ///
+    /// TODO: Find a better way to handle this^. E.g., figure out how to
+    ///       store the remaining, unparsed source internally or find
+    ///       some other way such that the caller doesn't need to deal
+    ///       with this in such a manual way.
     pub fn scan(
         &mut self,
-        source: String,
-        finalize: bool,
-    ) -> Result<Vec<TokenWithPosition>, String> {
+        source: &'a str,
+    ) -> Result<Vec<TokenWithPosition>, (TokenWithPosition, Vec<TokenWithPosition>)> {
         let mut tokens: Vec<TokenWithPosition> = vec![];
-
-        // if self.remaining_source.len() > 0 {
-        //     self.scan(self.remaining_source.clone(), false);
-        // }
 
         self.stream = source.chars().peekable();
         self.lookahead_stream = source.chars().peekable();
         self.lookahead_stream.next();
 
         loop {
+            self.skip_whitespace();
             let token_with_position = self.next_token();
-            let length = token_with_position.length;
             match token_with_position.token {
+                Token::Unknown(_) => {
+                    return Err((token_with_position, tokens));
+                }
+                Token::NeedsMoreInput(_) => {
+                    return Err((token_with_position, tokens));
+                }
                 Token::EndOfInput => {
                     tokens.push(token_with_position);
                     break;
                 }
-                Token::Unknown(c) => {
-                    return Err(format!("Encountered unknown token: {}", c));
-                }
-                // The length of a string should be 2 less than the
-                // length of its token.
-                Token::String(string) if length - string.len() == 1 => {
-                    self.col_no -= string.len() + 1;
-                    tokens.push(TokenWithPosition {
-                        token: Token::NeedsMoreInput(format!("\"{}", string)),
-                        line_no: token_with_position.line_no,
-                        col_no: token_with_position.col_no,
-                        length: token_with_position.length,
-                    });
-                    break;
-                }
-                _ => {
-                    tokens.push(token_with_position);
-                }
-            }
-            self.skip_whitespace();
-        }
-
-        if finalize {
-            match tokens.last() {
-                Some(TokenWithPosition {
-                    token: Token::NeedsMoreInput(_),
-                    line_no: _,
-                    col_no: _,
-                    length: _,
-                }) => return Err("More input needed".to_string()),
-                Some(_) => (),
-                None => (),
+                _ => tokens.push(token_with_position),
             }
         }
 
@@ -118,9 +128,24 @@ impl<'a> Scanner<'a> {
     fn next_token(&mut self) -> TokenWithPosition {
         let line_no = self.line_no;
         let col_no = self.col_no;
+        let mut token_length: Option<usize> = None;
 
         let token = match self.next() {
-            Some(('"', _)) => Token::String(self.read_string('"')),
+            Some(('"', _)) => match self.read_string('"') {
+                (string, length, true) => {
+                    token_length = Some(length);
+                    Token::String(string)
+                }
+                (string, length, false) => {
+                    if length > self.col_no {
+                        self.col_no = 1;
+                    } else {
+                        self.col_no -= length;
+                    }
+                    token_length = Some(length);
+                    Token::NeedsMoreInput(format!("\"{}", string))
+                }
+            },
             Some(('#', _)) => Token::Comment(self.read_comment()),
             Some((',', _)) => Token::Comma,
             Some(('(', _)) => Token::LeftParen,
@@ -166,7 +191,16 @@ impl<'a> Scanner<'a> {
             None => Token::EndOfInput,
         };
 
-        TokenWithPosition::new(token, line_no, col_no, self.col_no - col_no)
+        // In most cases, the length of a token can be calculated
+        // automatically from the current column position and the
+        // previous position. The exception is for tokens that can span
+        // multiple lines, such as string.
+        let length = match token_length {
+            Some(length) => length,
+            None => self.col_no - col_no,
+        };
+
+        TokenWithPosition::new(token, line_no, col_no, length)
     }
 
     /// Consume and return the next char in the stream.
@@ -282,20 +316,31 @@ impl<'a> Scanner<'a> {
     /// returned string does *not* include the opening and closing quote
     /// characters. Quotes can be embedded in a string by backslash-
     /// escaping them.
-    fn read_string(&mut self, quote: char) -> String {
+    fn read_string(&mut self, quote: char) -> (String, usize, bool) {
         let mut string = String::new();
+        let mut length = 1;
         loop {
             match self.next() {
-                Some(('\\', Some(d))) if d == quote => {
-                    string.push(d);
+                // Skip newlines preceded by backslash
+                Some(('\\', Some('\n'))) => {
                     self.next();
+                    length += 1;
                 }
-                Some((c, _)) if c == quote => break,
+                // Handle embedded/escaped quotes
+                Some(('\\', Some(d))) if d == quote => {
+                    self.next();
+                    string.push(d);
+                    length += 1;
+                }
+                // Found closing quote; return string
+                Some((c, _)) if c == quote => return (string, length + 1, true),
+                // Append current char and continue
                 Some((c, _)) => string.push(c),
-                None => break,
+                // End of input reached without finding closing quote :(
+                None => return (string, length, false),
             }
+            length += 1;
         }
-        string
     }
 
     /// Read starting from comment character to the end of the line.

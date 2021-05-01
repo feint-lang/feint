@@ -4,6 +4,19 @@ y = 1.0 + 2.0  # Add floats
 s = "a" + "b" + "c"
 string_with_embedded_quotes = "\"x y \" z"
 string_with_embedded_comment_char = "x # y # z"
+multiline_string = "\
+a
+b
+c
+"
+
+s =  " a
+b
+
+c
+
+
+  "
 
 x != y
 x == y
