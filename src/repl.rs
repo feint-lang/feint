@@ -1,4 +1,4 @@
-/// Run REPL until the user exits.
+/// Run REPL until user exits.
 use std::path::Path;
 
 use dirs;
@@ -36,7 +36,7 @@ impl<'a> Runner<'a> {
     pub fn run(&mut self) -> ExitResult {
         println!("Welcome to the FeInt REPL (read/eval/print loop)");
         println!("Type a line of code, then hit Enter to evaluate it");
-        println!("Type 'exit' or 'quit' to exit (without quotes)");
+        println!("Type .exit or .quit to exit");
 
         self.load_history();
 
@@ -86,7 +86,7 @@ impl<'a> Runner<'a> {
         let mut scanner = Scanner::new();
 
         let instructions = match source.trim() {
-            "exit" | "halt" | "quit" => {
+            ".exit" | ".halt" | ".quit" => {
                 vec![Instruction::Halt(0)]
             }
             ".stack" => {
@@ -111,19 +111,19 @@ impl<'a> Runner<'a> {
                         eprintln!("Syntax error: unknown token at column {}: {}", col_no, c);
                         return None;
                     }
-                    Token::NeedsMoreInput(remaining_input) => loop {
-                        match self.read_line("+ ", false) {
+                    Token::UnterminatedString(string) => loop {
+                        return match self.read_line("+ ", false) {
                             Ok(None) => {
                                 // Blank line (can't happen?)
-                                let input = format!("{}\n", remaining_input);
-                                return self.eval(input.as_str());
+                                let input = string + "\n";
+                                self.eval(input.as_str())
                             }
                             Ok(Some(new_input)) => {
-                                let input = format!("{}\n{}", remaining_input, new_input);
-                                return self.eval(input.as_str());
+                                let input = string + "\n" + new_input.as_str();
+                                self.eval(input.as_str())
                             }
-                            Err(err) => return Some(Err((1, format!("{}", err)))),
-                        }
+                            Err(err) => Some(Err((1, format!("{}", err)))),
+                        };
                     },
                     token => {
                         // This shouldn't happen.

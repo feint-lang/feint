@@ -12,9 +12,10 @@ pub enum Token {
     Comma, // ,
 
     // Fundamental types
-    Int(String),    // 1
-    Float(String),  // 1.0
-    String(String), // "1"
+    Int(String),                // 1
+    Float(String),              // 1.0
+    String(String),             // "1" (does NOT include quotes)
+    UnterminatedString(String), // "1 (DOES include opening quote)
 
     // Single-character operators
     Equal,   // =
@@ -57,6 +58,5 @@ pub enum Token {
 
     Comment(String), // # ... (to end of line)
     Unknown(char),
-    NeedsMoreInput(String),
     EndOfInput,
 }

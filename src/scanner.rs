@@ -77,8 +77,8 @@ impl<'a> Scanner<'a> {
     /// let tokens = match scanner.scan(source) {
     ///     Ok(tokens) => tokens,
     ///     Err((error_token, tokens)) => match error_token.token {
-    ///         Token::NeedsMoreInput(remaining_input) => {
-    ///             let input = format!("{}\"", remaining_input);
+    ///         Token::UnterminatedString(string) => {
+    ///             let input = string + "\"";
     ///             match scanner.scan(input.as_str()) {
     ///                 Ok(tokens) => tokens,
     ///                 Err((error_token, tokens)) => {
@@ -110,7 +110,7 @@ impl<'a> Scanner<'a> {
                 Token::Unknown(_) => {
                     return Err((token_with_position, tokens));
                 }
-                Token::NeedsMoreInput(_) => {
+                Token::UnterminatedString(_) => {
                     return Err((token_with_position, tokens));
                 }
                 Token::EndOfInput => {
@@ -142,7 +142,7 @@ impl<'a> Scanner<'a> {
                         self.col_no -= length;
                     }
                     token_length = Some(length);
-                    Token::NeedsMoreInput(format!("\"{}", string))
+                    Token::UnterminatedString(format!("\"{}", string))
                 }
             },
             Some(('#', _)) => Token::Comment(self.read_comment()),

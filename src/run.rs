@@ -61,9 +61,9 @@ impl<'a> Runner<'a> {
                         );
                         Err((1, message))
                     }
-                    Token::NeedsMoreInput(string) => {
+                    Token::UnterminatedString(string) => {
                         let message = format!(
-                            "{}\nIncomplete input starting on line {} at column {}",
+                            "{}\nUnterminated string starting on line {} at column {}",
                             string, error_token.line_no, error_token.col_no
                         );
                         Err((1, message))

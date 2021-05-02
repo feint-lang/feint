@@ -53,15 +53,14 @@ fn scan_string_unclosed() {
     let mut scanner = Scanner::new();
     match scanner.scan(source) {
         Err((error_token, tokens)) => match error_token.token {
-            Token::NeedsMoreInput(remaining_input) => {
+            Token::UnterminatedString(string) => {
                 assert_eq!(tokens.len(), 0);
-                assert_eq!(remaining_input, source.to_string());
+                assert_eq!(string, source.to_string());
                 assert_eq!(error_token.line_no, 1);
                 assert_eq!(error_token.col_no, 1);
                 assert_eq!(error_token.length, 4);
-                let input = format!("{}\"", remaining_input);
-                let new_source = input.as_str();
-                match scanner.scan(input.as_str()) {
+                let new_input = string + "\"";
+                match scanner.scan(new_input.as_str()) {
                     Ok(tokens) => {
                         // 1 string, 1 end-of-input
                         assert_eq!(tokens.len(), 2);
