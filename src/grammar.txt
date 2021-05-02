@@ -1,74 +1,107 @@
+# Every program is an expression containing 0 or more expressions.
 expr :
-    | bool
-    | int
-    | float
-    | string
-    | block
-    | binding
-    | function
-    | type
-    | binary_operator
+    | expr*
+    | assignment
+    | atom
     | binary_operation
+    | block
+    | function
+    | operation
+    | type
 
-atoms :
-    | identifier
-    | type_identifier
-    | type_method_identifier
+assignment :
+    | IDENTIFIER "=" expr
+
+atom :
     | bool
-    | int
     | float
-
-identifier :
-    | [a-z]
-    | [a-z][a-z0-9_]*[a-z0-9]
-
-type_identifier :
-    | [A-Z]
-    | [A-Z][A-Za-z0-9_]*[A-Za-z0-9]
-
-type_name :
-    | type_identifier
-
-type_method_identifier :
-    | "$"identifier
+    | int
+    | string
 
 bool :
     | "true"
     | "false"
 
-int :
-    | [0-9]+
-
 float :
-    | [0-9]+ "." [0-9]+
+    | FLOAT
 
+int :
+    | BIN
+    | DECIMAL
+    | HEX
+    | OCTAL
+
+string:
+    | "\"" CHAR* "\""
+
+# TODO: Figure out how to delineate blocks.
 block :
-    | expr+ "\n"
+    | expr* "\n"
 
 type :
-    | type_identifier "(" parameter_list? ")" "\n" block
+    | TYPE_IDENTIFIER "(" parameter_list? ")" "\n" block
 
 function :
-    | identifier "(" parameter_list? ")" [":" type_name ] "->" expr
-    | identifier "(" parameter_list? ")" [":" type_name ] "->" "\n" block
+    | IDENTIFIER "(" parameter_list? ")" type_annotation "->" expr
 
 parameter_list :
-    | parameter ["," parameter]+
+    | parameter "," parameter_list
+    | parameter
 
 parameter :
-    | identifier [":" type_name]
+    | IDENTIFIER type_annotation
 
-binary_operator :
-    | "*"
-    | "/"
-    | "+"
-    | "-"
+type_annotation :
+    | ""
+    | ":" TYPE_IDENTIFIER
 
-binary_operation :
-    | expr binary_operator expr
+operation :
+    | operation_1 "+" operation
+    | operation_1 "-" operation
+    | operation_1
+operation_1 :
+    | operand "*" operation_1
+    | operand "/" operation_1
+    | operand "%" operation_1
+    | operand
+operand :
+    | "(" operation ")"
+    | expr
+
+name:
+    | IDENTIFIER
+    | TYPE_IDENTIFIER
+    | TYPE_METHOD_IDENTIFIER
+
+import :
+    | import IMPORT_PATH
+    | import from IMPORT_PATH: IMPORTED_IDENTIFIER*
 
 comment :
-    | "#" comment_character*
+    | "#" COMMENT_CHARACTER*
 
-comment_character:
-    | any character except newline
+CHARACTER : ".*"
+COMMENT_CHARACTER : "[^\n]*"
+
+# Identifiers
+IDENTIFIER             : "[a-z]|[a-z][a-z0-9_]*[a-z0-9]"
+TYPE_IDENTIFIER        : "[A-Z]|[A-Z][A-Za-z0-9]*[A-Za-z0-9]"
+TYPE_METHOD_IDENTIFIER : "\$IDENTIFIER"
+
+# Imports
+IMPORT_PATH    :
+    | IMPORT_SEGMENT "." IMPORT_PATH
+    | IDENTIFIER
+IMPORTED_IDENTIFIER :
+    | name "," IMPORTED_IDENTIFIER*
+    | name
+
+# Integers
+BIN     : "(+|-)? 0b[01]+"
+HEX     : "(+|-)? 0x[A-Za-z0-9]+"
+DECIMAL : "(+|-)? 0|[1-9][0-9]*"
+OCTAL   : "(+|-)? 0o[0-7]+"
+
+# Floating point numbers
+# TODO: Add E notation
+FLOAT : "DECIMAL\.[0-9]+"
