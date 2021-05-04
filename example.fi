@@ -1,5 +1,8 @@
 x = 1 + 2
 y = 1.0 + 2.0  # Add floats
+1E9
+1E+9
+1.0e-9
 
 s = "a" + "b" + "c"
 string_with_embedded_quotes = "\"x y \" z"
@@ -28,7 +31,7 @@ list = [1, 2, 3]
 )
 
 # Anonymous block (new scope)
-->
+block ->
     x = 2
 
 Type ()
@@ -43,7 +46,7 @@ hello () ->
     print("hello")
     print("\"hello\"")
 
-func_with_return () -> String
+func_with_return_type (): String ->
     "abc"
 
 loop () ->

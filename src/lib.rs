@@ -5,6 +5,7 @@ mod frame;
 mod instructions;
 mod keywords;
 mod operators;
+mod parser;
 mod scanner;
 mod stack;
 mod tokens;

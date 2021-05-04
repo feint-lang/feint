@@ -75,6 +75,7 @@ name:
 
 import :
     | import IMPORT_PATH
+    | import IMPORT_PATH as IDENTIFIER
     | import from IMPORT_PATH: IMPORTED_IDENTIFIER*
 
 comment :
@@ -91,17 +92,21 @@ TYPE_METHOD_IDENTIFIER : "\$IDENTIFIER"
 # Imports
 IMPORT_PATH    :
     | IMPORT_SEGMENT "." IMPORT_PATH
+    | IDENTIFIER "as" IDENTIFIER
     | IDENTIFIER
 IMPORTED_IDENTIFIER :
     | name "," IMPORTED_IDENTIFIER*
+    | name "as" name
     | name
 
 # Integers
-BIN     : "(+|-)? 0b[01]+"
-HEX     : "(+|-)? 0x[A-Za-z0-9]+"
-DECIMAL : "(+|-)? 0|[1-9][0-9]*"
-OCTAL   : "(+|-)? 0o[0-7]+"
+BIN     : "(+|-)?0b[01]+"
+HEX     : "(+|-)?0x[A-Za-z0-9]+"
+DECIMAL : "(+|-)?0|[1-9][0-9]*"
+OCTAL   : "(+|-)?0o[0-7]+"
 
 # Floating point numbers
 # TODO: Add E notation
-FLOAT : "DECIMAL\.[0-9]+"
+FLOAT :
+    | "DECIMAL\.[0-9]+"
+    | "DECIMAL(\.[0-9]+)?(e|E)[+-]?DECIMAL"

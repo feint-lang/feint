@@ -1,6 +1,8 @@
 #[derive(Clone, Debug, PartialEq)]
 pub enum Token {
-    Whitespace(String), // Contiguous sequence of whitespace characters
+    Indent(u8), // Space characters following a newline
+    BlankLine,  // A line containing only whitespace
+    Whitespace, // Contiguous sequence of whitespace characters
 
     LeftParen,          // (
     RightParen,         // )
@@ -18,15 +20,17 @@ pub enum Token {
     UnterminatedString(String), // "1 (DOES include opening quote)
 
     // Single-character operators
-    Equal,   // =
-    Star,    // *
-    Slash,   // /
-    Plus,    // +
-    Minus,   // -
-    Not,     // !
-    Dot,     // .
-    Percent, // %
-    Caret,   // ^
+    Equal,     // =
+    Star,      // *
+    Slash,     // /
+    Plus,      // +
+    Minus,     // -
+    Not,       // !
+    Dot,       // .
+    Percent,   // %
+    Caret,     // ^
+    Ampersand, // &
+    Pipe,      // |
 
     // Multi-character operators
     EqualEqual,         // ==
@@ -38,6 +42,7 @@ pub enum Token {
     LessThanOrEqual,    // <=
     LoopFeed,           // <-
     Range,              // ..
+    RangeInclusive,     // ...
     AsBool,             // !! (the boolean evaluation of an object)
 
     // In-place operators
