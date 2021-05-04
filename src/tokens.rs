@@ -11,6 +11,7 @@ pub enum Token {
     LeftAngleBracket,   // <
     RightAngleBracket,  // >
 
+    Colon, // :
     Comma, // ,
 
     // Fundamental types
@@ -52,8 +53,8 @@ pub enum Token {
     PlusEqual,  // +=
     MinusEqual, // -=
 
-    // Can be used for named functions or anonymous blocks
-    BlockStart, // ->
+    // Indicates start of function or block
+    FuncStart, // ->
 
     // Identifiers
     Identifier(String),              // name

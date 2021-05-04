@@ -47,7 +47,7 @@ impl<'a> Runner<'a> {
             Ok(tokens) => {
                 if self.debug {
                     for t in tokens.iter() {
-                        eprintln!("{:?}", t);
+                        eprintln!("{}", t);
                     }
                 }
                 tokens

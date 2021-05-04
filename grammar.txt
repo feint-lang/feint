@@ -36,13 +36,13 @@ string:
 
 # TODO: Figure out how to delineate blocks.
 block :
-    | expr* "\n"
+    | (INDENT(N) expr)+ DEDENT(N - 1)
 
 type :
     | TYPE_IDENTIFIER "(" parameter_list? ")" "\n" block
 
 function :
-    | IDENTIFIER "(" parameter_list? ")" type_annotation "->" expr
+    | IDENTIFIER? "(" parameter_list? ")" type_annotation "->" (expr| "\n" block)
 
 parameter_list :
     | parameter "," parameter_list
@@ -110,3 +110,6 @@ OCTAL   : "(+|-)?0o[0-7]+"
 FLOAT :
     | "DECIMAL\.[0-9]+"
     | "DECIMAL(\.[0-9]+)?(e|E)[+-]?DECIMAL"
+
+INDENT(N) : " {N}"
+DEDENT(N) : " {N}"

@@ -24,29 +24,21 @@ pub struct TokenWithPosition {
     pub token: Token,
     pub line_no: usize,
     pub col_no: usize,
-    // The total length of a token, including quotes, newlines,
-    // backslashes, etc.
-    pub length: usize,
 }
 
 impl TokenWithPosition {
-    pub fn new(token: Token, line_no: usize, col_no: usize, length: usize) -> TokenWithPosition {
+    pub fn new(token: Token, line_no: usize, col_no: usize) -> TokenWithPosition {
         TokenWithPosition {
             token,
             line_no,
             col_no,
-            length,
         }
     }
 }
 
 impl fmt::Display for TokenWithPosition {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "Token {}:{}:{} {:?}",
-            self.line_no, self.col_no, self.length, self.token,
-        )
+        write!(f, "Token {}:{} {:?}", self.line_no, self.col_no, self.token)
     }
 }
 
@@ -135,27 +127,22 @@ impl<'a> Scanner<'a> {
     }
 
     fn next_token(&mut self) -> TokenWithPosition {
-        let line_no = self.line_no;
-        let col_no = self.col_no;
-        let mut token_length: Option<usize> = None;
+        let mut start_line_no = self.line_no;
+        let mut start_col_no = self.col_no;
 
         let token = match self.next() {
             Some(('"', _, _)) => match self.read_string('"') {
-                (string, length, true) => {
-                    token_length = Some(length);
-                    Token::String(string)
-                }
-                (string, length, false) => {
-                    if length > self.col_no {
-                        self.col_no = 1;
-                    } else {
-                        self.col_no -= length;
-                    }
-                    token_length = Some(length);
+                // Terminated
+                (string, true) => Token::String(string),
+                // Unterminated
+                (string, false) => {
+                    self.line_no = start_line_no;
+                    self.col_no = start_col_no;
                     Token::UnterminatedString(format!("\"{}", string))
                 }
             },
             Some(('#', _, _)) => Token::Comment(self.read_comment()),
+            Some((':', _, _)) => Token::Colon,
             Some((',', _, _)) => Token::Comma,
             Some(('(', _, _)) => Token::LeftParen,
             Some((')', _, _)) => Token::RightParen,
@@ -180,7 +167,7 @@ impl<'a> Scanner<'a> {
             Some(('+', Some('='), _)) => self.next_and_token(Token::PlusEqual),
             Some(('+', _, _)) => Token::Plus,
             Some(('-', Some('='), _)) => self.next_and_token(Token::MinusEqual),
-            Some(('-', Some('>'), _)) => self.next_and_token(Token::BlockStart),
+            Some(('-', Some('>'), _)) => self.next_and_token(Token::FuncStart),
             Some(('-', _, _)) => Token::Minus,
             Some(('!', Some('='), _)) => self.next_and_token(Token::NotEqual),
             Some(('!', Some('!'), _)) => self.next_and_token(Token::AsBool),
@@ -202,15 +189,26 @@ impl<'a> Scanner<'a> {
             Some((c @ '$', Some('a'..='z'), _)) => {
                 Token::SpecialMethodIdentifier(self.read_identifier(c))
             }
+            // XXX: Gnarly
             Some(('\n', _, _)) => {
-                let indent = self.read_indent();
+                start_line_no = self.line_no;
+                start_col_no = self.col_no;
+                let indent_level = self.read_indent();
                 match self.peek() {
                     Some(('\n', _, _)) => Token::BlankLine,
                     Some((c, _, _)) if c.is_whitespace() => {
                         self.read_whitespace();
-                        Token::Whitespace
+                        match self.peek_newline() {
+                            true => Token::BlankLine,
+                            false => Token::Whitespace,
+                        }
                     }
-                    Some(_) => Token::Indent(indent),
+                    Some(_) => {
+                        if indent_level == 0 {
+                            return self.next_token();
+                        }
+                        Token::Indent(indent_level)
+                    }
                     None => Token::EndOfInput,
                 }
             }
@@ -222,18 +220,7 @@ impl<'a> Scanner<'a> {
             None => Token::EndOfInput,
         };
 
-        // In most cases, the length of a token can be calculated
-        // automatically from the current column position and the
-        // previous position. The exception is for tokens that can span
-        // multiple lines, such as strings.
-        eprintln!("{} {} {} {:?}", self.line_no, col_no, self.col_no, token);
-
-        let length = match token_length {
-            Some(length) => length,
-            None => self.col_no - col_no,
-        };
-
-        TokenWithPosition::new(token, line_no, col_no, length)
+        TokenWithPosition::new(token, start_line_no, start_col_no)
     }
 
     /// Consume and return the next char in the stream.
@@ -333,6 +320,14 @@ impl<'a> Scanner<'a> {
         }
     }
 
+    /// Indicate whether the next character in the stream is a newline.
+    fn peek_newline(&mut self) -> bool {
+        match self.stream.peek() {
+            Some('\n') => true,
+            _ => false,
+        }
+    }
+
     /// Returns the number of contiguous space characters at the start
     /// of a line. An indent is defined as N space characters followed
     /// by a non-whitespace character.
@@ -417,30 +412,26 @@ impl<'a> Scanner<'a> {
     /// returned string does *not* include the opening and closing quote
     /// characters. Quotes can be embedded in a string by backslash-
     /// escaping them.
-    fn read_string(&mut self, quote: char) -> (String, usize, bool) {
+    fn read_string(&mut self, quote: char) -> (String, bool) {
         let mut string = String::new();
-        let mut length = 1;
         loop {
             match self.next() {
                 // Skip newlines preceded by backslash
                 Some(('\\', Some('\n'), _)) => {
                     self.next();
-                    length += 1;
                 }
                 // Handle embedded/escaped quotes
                 Some(('\\', Some(d), _)) if d == quote => {
                     self.next();
                     string.push(d);
-                    length += 1;
                 }
                 // Found closing quote; return string
-                Some((c, _, _)) if c == quote => return (string, length + 1, true),
+                Some((c, _, _)) if c == quote => return (string, true),
                 // Append current char and continue
                 Some((c, _, _)) => string.push(c),
                 // End of input reached without finding closing quote :(
-                None => return (string, length, false),
+                None => return (string, false),
             }
-            length += 1;
         }
     }
 
