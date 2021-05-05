@@ -60,38 +60,18 @@ impl<'a> Scanner<'a> {
     /// The possible error conditions are:
     ///
     /// - Unknown token
-    /// - More input needed (e.g., unclosed string or group)
+    /// - Unexpected whitespace after indent
+    /// - Unterminated string
     ///
-    /// In the first case, that's a syntax error.
+    /// The first two cases are syntax errors.
     ///
-    /// In the latter case, when more input is needed, you have to do
-    /// something like this in the calling code, which is pretty clunky:
-    ///
-    /// ```
-    /// // In this example, the string doesn't have a closing quote so
-    /// // more input is needed to complete the scan.
-    /// let scanner = Scanner::new();
-    /// let source = "s = \"abc";
-    /// let tokens = match scanner.scan(source) {
-    ///     Ok(tokens) => tokens,
-    ///     Err((error_token, tokens)) => match error_token.token {
-    ///         Token::UnterminatedString(string) => {
-    ///             let input = string + "\"";
-    ///             match scanner.scan(input.as_str()) {
-    ///                 Ok(tokens) => tokens,
-    ///                 Err((error_token, tokens)) => {
-    ///                     // Oops
-    ///                 },
-    ///             }
-    ///         }
-    ///     }
-    /// };
-    /// ```
+    /// In the case of an unterminated string, the original string plus
+    /// additional input can be re-scanned.
     ///
     /// TODO: Find a better way to handle this^. Figure out how to store
     ///       the remaining, unparsed source internally or find some
     ///       other way such that the caller doesn't need to deal with
-    ///       this in such a manual way.
+    ///       this in such a clunky way.
     pub fn scan(
         &mut self,
         source: &'a str,
