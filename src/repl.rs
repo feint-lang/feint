@@ -16,20 +16,18 @@ type ExitData = (i32, String);
 type ExitResult = Result<Option<String>, ExitData>;
 
 pub struct Runner<'a> {
-    pub reader: rustyline::Editor<()>,
-    pub history_path: Option<&'a Path>,
-    pub vm: VM<'a>,
-    pub debug: bool,
+    reader: rustyline::Editor<()>,
+    history_path: Option<&'a Path>,
+    vm: VM<'a>,
+    debug: bool,
 }
 
 impl<'a> Runner<'a> {
     pub fn new(history_path: Option<&'a Path>, debug: bool) -> Runner<'a> {
-        let reader = rustyline::Editor::<()>::new();
-        let vm = VM::new();
         Runner {
-            reader,
+            reader: rustyline::Editor::<()>::new(),
             history_path,
-            vm,
+            vm: VM::new(),
             debug,
         }
     }

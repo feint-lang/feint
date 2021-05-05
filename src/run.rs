@@ -10,8 +10,8 @@ type ExitData = (i32, String);
 type ExitResult = Result<Option<String>, ExitData>;
 
 pub struct Runner<'a> {
-    pub vm: VM<'a>,
-    pub debug: bool,
+    vm: VM<'a>,
+    debug: bool,
 }
 
 impl<'a> Runner<'a> {
