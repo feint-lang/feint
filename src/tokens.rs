@@ -1,8 +1,6 @@
 #[derive(Clone, Debug, PartialEq)]
 pub enum Token {
     Indent(u8), // Space characters following a newline
-    BlankLine,  // A line containing only whitespace
-    Whitespace, // Contiguous sequence of whitespace characters
 
     LeftParen,          // (
     RightParen,         // )
@@ -63,6 +61,8 @@ pub enum Token {
     SpecialMethodIdentifier(String), // $name (e.g., $bool on a type)
 
     Comment(String), // # ... (to end of line)
+
+    UnexpectedWhitespace,
     Unknown(char),
     EndOfInput,
 }

@@ -3,7 +3,6 @@ use std::iter::{Chain, Peekable};
 use std::str::Chars;
 
 use crate::tokens::Token;
-use rand::distributions::Open01;
 
 type NextOption = Option<(char, Option<char>, Option<char>)>;
 type PeekOption<'a> = Option<(&'a char, Option<&'a char>, Option<&'a char>)>;
@@ -98,6 +97,7 @@ impl<'a> Scanner<'a> {
         source: &'a str,
     ) -> Result<Vec<TokenWithPosition>, (TokenWithPosition, Vec<TokenWithPosition>)> {
         let mut tokens: Vec<TokenWithPosition> = vec![];
+        let mut previous_was_indent_0 = true;
 
         self.stream = source.chars().peekable();
         self.one_ahead_stream = source.chars().peekable();
@@ -109,17 +109,32 @@ impl<'a> Scanner<'a> {
         loop {
             let token_with_position = self.next_token();
             match token_with_position.token {
-                Token::Unknown(_) => {
+                Token::Unknown(_) | Token::UnterminatedString(_) | Token::UnexpectedWhitespace => {
                     return Err((token_with_position, tokens));
                 }
-                Token::UnterminatedString(_) => {
-                    return Err((token_with_position, tokens));
+                Token::Indent(0) => {
+                    // In effect, collapse contiguous blank lines
+                    if !previous_was_indent_0 {
+                        tokens.push(token_with_position);
+                    }
+                    previous_was_indent_0 = true;
                 }
                 Token::EndOfInput => {
-                    tokens.push(token_with_position);
+                    // End-of-input is handled like a newline.
+                    if !previous_was_indent_0 {
+                        tokens.push(TokenWithPosition::new(
+                            Token::Indent(0),
+                            token_with_position.line_no,
+                            token_with_position.col_no,
+                        ));
+                    }
                     break;
                 }
-                _ => tokens.push(token_with_position),
+                _ => {
+                    tokens.push(token_with_position);
+                    previous_was_indent_0 = false;
+                    self.consume_whitespace();
+                }
             }
         }
 
@@ -189,34 +204,28 @@ impl<'a> Scanner<'a> {
             Some((c @ '$', Some('a'..='z'), _)) => {
                 Token::SpecialMethodIdentifier(self.read_identifier(c))
             }
-            // XXX: Gnarly
+
             Some(('\n', _, _)) => {
                 start_line_no = self.line_no;
                 start_col_no = self.col_no;
+
                 let indent_level = self.read_indent();
-                match self.peek() {
-                    Some(('\n', _, _)) => Token::BlankLine,
-                    Some((c, _, _)) if c.is_whitespace() => {
-                        self.read_whitespace();
-                        match self.peek_newline() {
-                            true => Token::BlankLine,
-                            false => Token::Whitespace,
-                        }
-                    }
-                    Some(_) => {
-                        if indent_level == 0 {
-                            return self.next_token();
-                        }
-                        Token::Indent(indent_level)
-                    }
-                    None => Token::EndOfInput,
+                let whitespace_count = self.consume_whitespace();
+
+                match self.stream.peek() {
+                    // Blank or whitespace-only line
+                    Some('\n') | None => Token::Indent(0),
+                    Some(_) => match whitespace_count {
+                        // Indent followed by non-whitespace character
+                        0 => Token::Indent(indent_level),
+                        // Indent followed by unexpected whitespace
+                        _ => Token::UnexpectedWhitespace,
+                    },
                 }
             }
-            Some((c, _, _)) if c.is_whitespace() => {
-                self.read_whitespace();
-                Token::Whitespace
-            }
+
             Some((c, _, _)) => Token::Unknown(c),
+
             None => Token::EndOfInput,
         };
 
@@ -308,24 +317,17 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    /// Look at the next char from each stream but don't consume them.
-    fn peek(&mut self) -> PeekOption {
-        match self.stream.peek() {
-            Some(c) => Some((
-                c,
-                self.one_ahead_stream.peek(),
-                self.two_ahead_stream.peek(),
-            )),
-            None => None,
+    /// Consume contiguous whitespace up to the end of the line. Return
+    /// the number of whitespace characters consumed.
+    fn consume_whitespace(&mut self) -> usize {
+        let mut count = 0;
+        loop {
+            match self.next_if(|&c| c.is_whitespace() && c != '\n') {
+                Some(_) => count += 1,
+                None => break,
+            }
         }
-    }
-
-    /// Indicate whether the next character in the stream is a newline.
-    fn peek_newline(&mut self) -> bool {
-        match self.stream.peek() {
-            Some('\n') => true,
-            _ => false,
-        }
+        count
     }
 
     /// Returns the number of contiguous space characters at the start
@@ -340,16 +342,6 @@ impl<'a> Scanner<'a> {
             }
         }
         count
-    }
-
-    /// Read contiguous whitespace up to the end of the line.
-    fn read_whitespace(&mut self) {
-        loop {
-            match self.next_if(|&c| c.is_whitespace() && c != '\n') {
-                Some(_) => (),
-                None => break,
-            }
-        }
     }
 
     /// Read contiguous digits and an optional decimal point into a new

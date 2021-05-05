@@ -77,13 +77,6 @@ impl<'a> Runner<'a> {
         };
 
         let mut instructions: Vec<Instruction> = vec![];
-        for token in tokens {
-            if token.token == Token::EndOfInput {
-                instructions.push(Instruction::Halt(0));
-            }
-        }
-
-        instructions.clear();
         instructions.push(Instruction::Push(1));
         instructions.push(Instruction::Push(2));
         instructions.push(Instruction::Add);
