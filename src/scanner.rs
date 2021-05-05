@@ -2,7 +2,7 @@ use std::fmt;
 use std::iter::{Chain, Peekable};
 use std::str::Chars;
 
-use crate::tokens::Token;
+use crate::tokens::{Token, TokenWithPosition};
 
 type NextOption = Option<(char, Option<char>, Option<char>)>;
 type PeekOption<'a> = Option<(&'a char, Option<&'a char>, Option<&'a char>)>;
@@ -16,29 +16,6 @@ pub struct Scanner<'a> {
     two_ahead_stream: Peekable<Chars<'a>>,
     line_no: usize,
     col_no: usize,
-}
-
-#[derive(Debug, PartialEq)]
-pub struct TokenWithPosition {
-    pub token: Token,
-    pub line_no: usize,
-    pub col_no: usize,
-}
-
-impl TokenWithPosition {
-    pub fn new(token: Token, line_no: usize, col_no: usize) -> TokenWithPosition {
-        TokenWithPosition {
-            token,
-            line_no,
-            col_no,
-        }
-    }
-}
-
-impl fmt::Display for TokenWithPosition {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Token {}:{} {:?}", self.line_no, self.col_no, self.token)
-    }
 }
 
 impl<'a> Scanner<'a> {

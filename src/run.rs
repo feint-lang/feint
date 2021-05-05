@@ -2,8 +2,8 @@
 use std::fs;
 
 use crate::instructions::Instruction;
-use crate::scanner::{Scanner, TokenWithPosition};
-use crate::tokens::Token;
+use crate::scanner::Scanner;
+use crate::tokens::{Token, TokenWithPosition};
 use crate::vm::{VMState, VM};
 
 type ExitData = (i32, String);

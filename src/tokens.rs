@@ -1,3 +1,5 @@
+use std::fmt;
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum Token {
     Indent(u8), // Space characters following a newline
@@ -65,4 +67,27 @@ pub enum Token {
     UnexpectedWhitespace,
     Unknown(char),
     EndOfInput,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct TokenWithPosition {
+    pub token: Token,
+    pub line_no: usize,
+    pub col_no: usize,
+}
+
+impl TokenWithPosition {
+    pub fn new(token: Token, line_no: usize, col_no: usize) -> TokenWithPosition {
+        TokenWithPosition {
+            token,
+            line_no,
+            col_no,
+        }
+    }
+}
+
+impl fmt::Display for TokenWithPosition {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Token {}:{} {:?}", self.line_no, self.col_no, self.token)
+    }
 }

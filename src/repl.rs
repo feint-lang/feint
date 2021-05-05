@@ -2,14 +2,15 @@
 use std::path::Path;
 
 use dirs;
+use regex::internal::Inst;
 use rustyline::error::ReadlineError;
+use rustyline::validate::ValidationResult::Incomplete;
 
 use crate::instructions::Instruction;
-use crate::scanner::{Scanner, TokenWithPosition};
-use crate::tokens::Token;
+use crate::parser::Parser;
+use crate::scanner::Scanner;
+use crate::tokens::{Token, TokenWithPosition};
 use crate::vm::{VMState, VM};
-use regex::internal::Inst;
-use rustyline::validate::ValidationResult::Incomplete;
 
 type ExitData = (i32, String);
 type ExitResult = Result<Option<String>, ExitData>;
@@ -89,19 +90,22 @@ impl<'a> Runner<'a> {
             ".exit" | ".halt" | ".quit" => {
                 vec![Instruction::Halt(0)]
             }
-            ".stack" => {
-                vec![Instruction::Print(8)]
-            }
             _ => match scanner.scan(source) {
                 Ok(tokens) => {
-                    let mut instructions: Vec<Instruction> = vec![];
                     self.add_history_entry(source);
+
                     if self.debug {
                         for t in tokens.iter() {
                             eprintln!("{:?}", t);
                         }
                     }
-                    instructions.push(Instruction::Print(1));
+
+                    let fake_tokens: Vec<TokenWithPosition> = vec![];
+                    let mut parser = Parser::new(&fake_tokens);
+                    let result = parser.parse(&tokens);
+                    println!("{}", result);
+
+                    let mut instructions: Vec<Instruction> = vec![];
                     instructions
                 }
                 Err((error_token, _)) => match error_token.token {

@@ -1,5 +1,5 @@
-use crate::scanner::{Scanner, TokenWithPosition};
-use crate::tokens::Token;
+use crate::scanner::Scanner;
+use crate::tokens::{Token, TokenWithPosition};
 
 #[test]
 fn new() {
