@@ -49,6 +49,7 @@ Loops
         print(i)
 
 */
+use std::io;
 use std::process;
 
 use clap::{App, Arg};
@@ -79,26 +80,25 @@ fn main() {
     let debug = matches.is_present("debug");
 
     let result = match file_name {
-        Some(file_name) => {
-            let mut runner = run::Runner::new(debug);
-            runner.run_file(file_name)
-        }
-        None => {
-            let history_path = repl::Runner::default_history_path();
-            let mut runner = repl::Runner::new(Some(history_path.as_path()), debug);
-            runner.run()
-        }
+        Some(file_name) => run::run_file(file_name, debug),
+        None => repl::run(debug),
     };
 
     match result {
-        Ok(Some(message)) => {
-            println!("{}", message);
-            process::exit(0);
-        }
-        Ok(None) => process::exit(0),
-        Err((code, message)) => {
-            eprintln!("{}", message);
-            process::exit(code);
-        }
+        Ok(Some(message)) => exit(Some(message)),
+        Ok(None) => exit(None),
+        Err((code, message)) => error_exit(code, message),
     }
+}
+
+fn exit(message: Option<String>) {
+    if message.is_some() {
+        println!("{}", message.unwrap());
+    }
+    process::exit(0);
+}
+
+fn error_exit(code: i32, message: String) {
+    eprintln!("{}", message);
+    process::exit(code);
 }

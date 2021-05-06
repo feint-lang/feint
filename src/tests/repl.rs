@@ -2,19 +2,6 @@ use std::io::stdin;
 
 use crate::repl::Runner;
 
-fn new<'a>() -> Runner<'a> {
-    Runner::new(None, false)
-}
-
-fn eval(input: &str) {
-    let mut runner = new();
-    match runner.eval(input) {
-        Some(Ok(string)) => assert!(false),
-        Some(Err((code, string))) => assert!(false),
-        None => assert!(true), // eval returns None on valid input
-    }
-}
-
 #[test]
 fn eval_empty() {
     eval("");
@@ -31,6 +18,27 @@ fn eval_string() {
 }
 
 #[test]
-fn eval_unterminated_string() {
-    eval("x = \"abc");
+fn eval_multiline_string() {
+    eval("\"a \nb c\"");
+}
+
+// TODO: Figure out how to automatically send closing quote and newline
+// #[test]
+// fn eval_unterminated_string() {
+//     eval("x = \"abc");
+// }
+
+// Utilities -----------------------------------------------------------
+
+fn new<'a>() -> Runner<'a> {
+    Runner::new(None, false)
+}
+
+fn eval(input: &str) {
+    let mut runner = new();
+    match runner.eval(input) {
+        Some(Ok(string)) => assert!(false),
+        Some(Err((code, string))) => assert!(false),
+        None => assert!(true), // eval returns None on valid input
+    }
 }

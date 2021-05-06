@@ -2,12 +2,22 @@
 use std::fs;
 
 use crate::instructions::Instruction;
-use crate::scanner::Scanner;
+use crate::scanner::scan;
 use crate::tokens::{Token, TokenWithPosition};
 use crate::vm::{VMState, VM};
 
 type ExitData = (i32, String);
 type ExitResult = Result<Option<String>, ExitData>;
+
+pub fn run(source: &str, debug: bool) -> ExitResult {
+    let mut runner = Runner::new(debug);
+    runner.run(source)
+}
+
+pub fn run_file(file_name: &str, debug: bool) -> ExitResult {
+    let mut runner = Runner::new(debug);
+    runner.run_file(file_name)
+}
 
 pub struct Runner {
     debug: bool,
@@ -32,10 +42,9 @@ impl Runner {
     }
 
     pub fn run(&mut self, source: &str) -> ExitResult {
-        let mut scanner = Scanner::new();
         let mut vm = VM::new();
 
-        let tokens = match scanner.scan(source) {
+        let tokens = match scan(source, 1, 1) {
             Ok(tokens) => {
                 if self.debug {
                     for t in tokens.iter() {

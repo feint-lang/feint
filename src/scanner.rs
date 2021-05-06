@@ -7,7 +7,19 @@ use crate::tokens::{Token, TokenWithPosition};
 type NextOption = Option<(char, Option<char>, Option<char>)>;
 type PeekOption<'a> = Option<(&'a char, Option<&'a char>, Option<&'a char>)>;
 
+/// Create a scanner with the specified source, scan the source, and
+/// return the resulting tokens or error.
+pub fn scan(
+    source: &str,
+    line_no: usize,
+    col_no: usize,
+) -> Result<Vec<TokenWithPosition>, (TokenWithPosition, Vec<TokenWithPosition>)> {
+    let mut scanner = Scanner::new(source, line_no, col_no);
+    scanner.scan()
+}
+
 pub struct Scanner<'a> {
+    source: &'a str,
     /// Stream of input characters from input string
     stream: Peekable<Chars<'a>>,
     /// The same stream but one character ahead for easier lookaheads
@@ -19,13 +31,20 @@ pub struct Scanner<'a> {
 }
 
 impl<'a> Scanner<'a> {
-    pub fn new() -> Scanner<'a> {
+    pub fn new(source: &'a str, line_no: usize, col_no: usize) -> Scanner<'a> {
+        let stream = source.chars().peekable();
+        let mut one_ahead_stream = source.chars().peekable();
+        let mut two_ahead_stream = source.chars().peekable();
+        one_ahead_stream.next();
+        two_ahead_stream.next();
+        two_ahead_stream.next();
         Scanner {
-            stream: "".chars().peekable(),
-            one_ahead_stream: "".chars().peekable(),
-            two_ahead_stream: "".chars().peekable(),
-            line_no: 1,
-            col_no: 1,
+            source,
+            stream,
+            one_ahead_stream,
+            two_ahead_stream,
+            line_no,
+            col_no,
         }
     }
 
@@ -51,17 +70,9 @@ impl<'a> Scanner<'a> {
     ///       this in such a clunky way.
     pub fn scan(
         &mut self,
-        source: &'a str,
     ) -> Result<Vec<TokenWithPosition>, (TokenWithPosition, Vec<TokenWithPosition>)> {
         let mut tokens: Vec<TokenWithPosition> = vec![];
         let mut previous_was_indent_0 = true;
-
-        self.stream = source.chars().peekable();
-        self.one_ahead_stream = source.chars().peekable();
-        self.one_ahead_stream.next();
-        self.two_ahead_stream = source.chars().peekable();
-        self.two_ahead_stream.next();
-        self.two_ahead_stream.next();
 
         loop {
             let token_with_position = self.next_token();

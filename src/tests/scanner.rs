@@ -1,11 +1,10 @@
+use crate::scanner;
 use crate::scanner::Scanner;
 use crate::tokens::{Token, TokenWithPosition};
 
 #[test]
-fn new() {
-    let source = "";
-    let mut scanner = Scanner::new();
-    let tokens = scanner.scan(source).unwrap();
+fn scan_empty() {
+    let tokens = scan("");
     assert_eq!(tokens.len(), 0);
 }
 
@@ -50,16 +49,15 @@ fn scan_string_with_many_newlines() {
 #[test]
 fn scan_string_unclosed() {
     let source = "\"abc";
-    let mut scanner = Scanner::new();
-    match scanner.scan(source) {
+    match scanner::scan(source, 1, 1) {
         Err((error_token, tokens)) => match error_token.token {
             Token::UnterminatedString(string) => {
                 assert_eq!(tokens.len(), 0);
                 assert_eq!(string, source.to_string());
                 assert_eq!(error_token.line_no, 1);
                 assert_eq!(error_token.col_no, 1);
-                let new_input = string + "\"";
-                match scanner.scan(new_input.as_str()) {
+                let new_source = source.to_string() + "\"";
+                match scanner::scan(new_source.as_str(), 1, 1) {
                     Ok(tokens) => {
                         assert_eq!(tokens.len(), 2);
                         check_token(tokens.get(0), Token::String("abc".to_string()), 1, 1);
@@ -119,10 +117,11 @@ fn scan_unknown() {
     check_token(tokens.last(), Token::Indent(0), 1, 3);
 }
 
+// Utilities -----------------------------------------------------------
+
 /// Scan source and return tokens.
 fn scan(source: &str) -> Vec<TokenWithPosition> {
-    let mut scanner = Scanner::new();
-    match scanner.scan(source) {
+    match scanner::scan(source, 1, 1) {
         Ok(tokens) => tokens,
         Err((error_token, tokens)) => panic!("Scan failed unexpectedly: {}", error_token),
     }

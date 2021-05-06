@@ -7,13 +7,19 @@ use rustyline::error::ReadlineError;
 use rustyline::validate::ValidationResult::Incomplete;
 
 use crate::instructions::Instruction;
-use crate::parser::Parser;
-use crate::scanner::Scanner;
+use crate::parser::parse;
+use crate::scanner::scan;
 use crate::tokens::{Token, TokenWithPosition};
 use crate::vm::{VMState, VM};
 
 type ExitData = (i32, String);
 type ExitResult = Result<Option<String>, ExitData>;
+
+pub fn run(debug: bool) -> ExitResult {
+    let history_path = Runner::default_history_path();
+    let mut runner = Runner::new(Some(history_path.as_path()), debug);
+    runner.run()
+}
 
 pub struct Runner<'a> {
     reader: rustyline::Editor<()>,
@@ -51,7 +57,10 @@ impl<'a> Runner<'a> {
 
         loop {
             match self.read_line("→ ", true) {
-                Ok(None) => (),
+                Ok(None) => {
+                    // Blank or all-whitespace line.
+                    ()
+                }
                 Ok(Some(input)) => {
                     // Evaluate the input. If eval returns a result of
                     // any kind (ok or err), exit the loop and shut down
@@ -79,64 +88,73 @@ impl<'a> Runner<'a> {
         }
     }
 
-    /// Get a line of input from the user.
-    fn read_line(&mut self, prompt: &str, trim: bool) -> Result<Option<String>, ReadlineError> {
+    /// Get a line of input from the user. If the line comprises only
+    /// whitespace *and* ``trim_blank`` is set, the line will be trimmed
+    /// and ``None`` will be returned.
+    fn read_line(
+        &mut self,
+        prompt: &str,
+        trim_blank: bool,
+    ) -> Result<Option<String>, ReadlineError> {
         match self.reader.readline(prompt) {
-            Ok(input) if input.trim().len() == 0 => match trim {
-                true => Ok(None),
-                false => Ok(Some(input)),
-            },
+            Ok(input) if trim_blank && input.trim().len() == 0 => Ok(None),
             Ok(input) => Ok(Some(input)),
             Err(err) => Err(err),
         }
     }
 
     pub fn eval(&mut self, source: &str) -> Option<ExitResult> {
-        let mut scanner = Scanner::new();
+        let mut instructions: Vec<Instruction> = vec![];
 
-        let instructions = match source.trim() {
+        match source.trim() {
             ".exit" | ".halt" | ".quit" => {
-                vec![Instruction::Halt(0)]
+                instructions.push(Instruction::Halt(0));
             }
-            _ => match scanner.scan(source) {
-                Ok(tokens) => {
-                    self.add_history_entry(source);
-                    self.parse(tokens);
-                    let mut instructions: Vec<Instruction> = vec![];
-                    instructions
-                }
-                Err((error_token, tokens)) => match error_token.token {
-                    Token::Unknown(c) => {
-                        self.add_history_entry(source);
-                        let col_no = error_token.col_no;
-                        eprintln!("{: >width$}^", "", width = col_no + 1);
-                        eprintln!("Syntax error: unknown token at column {}: {}", col_no, c);
-                        return None;
-                    }
-                    Token::UnterminatedString(string) => {
+            _ => {
+                match scan(source, 1, 1) {
+                    Ok(tokens) => {
+                        // TODO: Set instructions
                         self.add_history_entry(source);
                         self.parse(tokens);
-                        loop {
+                    }
+                    Err((error_token, _)) => match error_token.token {
+                        Token::Unknown(c) => {
+                            self.add_history_entry(source);
+                            let col_no = error_token.col_no;
+                            eprintln!("{: >width$}^", "", width = col_no + 1);
+                            eprintln!("Syntax error: unknown token at column {}: '{}'", col_no, c);
+                            return None;
+                        }
+                        Token::UnterminatedString(_) => loop {
                             return match self.read_line("+ ", false) {
                                 Ok(None) => {
-                                    // Blank line (can't happen?)
-                                    let input = string + "\n";
+                                    let input = source.to_string() + "\n";
                                     self.eval(input.as_str())
                                 }
                                 Ok(Some(new_input)) => {
-                                    let input = string + "\n" + new_input.as_str();
+                                    let input = source.to_string() + "\n" + new_input.as_str();
                                     self.eval(input.as_str())
                                 }
                                 Err(err) => Some(Err((1, format!("{}", err)))),
                             };
+                        },
+                        Token::UnexpectedWhitespace => {
+                            self.add_history_entry(source);
+                            let col_no = error_token.col_no;
+                            eprintln!("{: >width$}^", "", width = col_no + 1);
+                            eprintln!("Syntax error: unexpected whitespace at column {}", col_no);
+                            return None;
                         }
-                    }
-                    token => {
-                        // This shouldn't happen.
-                        return Some(Err((1, format!("{:?}", token))));
-                    }
-                },
-            },
+                        token => {
+                            // This shouldn't happen.
+                            return Some(Err((
+                                1,
+                                format!("Unexpected error caused by token: {:?}", token),
+                            )));
+                        }
+                    },
+                }
+            }
         };
 
         match self.vm.execute(&instructions) {
@@ -153,9 +171,7 @@ impl<'a> Runner<'a> {
                 eprintln!("{:?}", t);
             }
         }
-        let init_tokens: Vec<TokenWithPosition> = vec![];
-        let mut parser = Parser::new(&init_tokens);
-        let result = parser.parse(&tokens);
+        let result = parse(&tokens);
         println!("{}", result);
     }
 

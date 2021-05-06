@@ -3,6 +3,12 @@ use std::slice::Iter;
 
 use crate::tokens::{Token, TokenWithPosition};
 
+/// Parse tokens and ...
+pub fn parse(tokens: &Vec<TokenWithPosition>) -> i32 {
+    let mut parser = Parser::new(tokens);
+    parser.parse()
+}
+
 pub struct Parser<'a> {
     stream: Peekable<Iter<'a, TokenWithPosition>>,
 }
@@ -14,8 +20,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn parse(&mut self, tokens: &'a Vec<TokenWithPosition>) -> i32 {
-        self.stream = tokens.iter().peekable();
+    pub fn parse(&mut self) -> i32 {
         if self.peek().is_none() {
             return 0;
         }
