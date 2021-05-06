@@ -20,10 +20,7 @@ impl<T> Stack<T> {
     }
 
     pub fn peek(&self) -> Option<&T> {
-        match self.size() {
-            0 => None,
-            _ => self.storage.last(),
-        }
+        self.storage.last()
     }
 
     /// Get the top N items from the stack. If the stack contains less

@@ -1,6 +1,7 @@
 use std::iter::Peekable;
 use std::str::Chars;
 
+use crate::stack::Stack;
 use crate::tokens::{Token, TokenWithPosition};
 
 type NextOption = Option<(char, Option<char>, Option<char>)>;
@@ -27,6 +28,7 @@ pub struct Scanner<'a> {
     two_ahead_stream: Peekable<Chars<'a>>,
     line_no: usize,
     col_no: usize,
+    bracket_stack: Stack<TokenWithPosition>,
 }
 
 impl<'a> Scanner<'a> {
@@ -44,6 +46,7 @@ impl<'a> Scanner<'a> {
             two_ahead_stream,
             line_no,
             col_no,
+            bracket_stack: Stack::new(),
         }
     }
 
@@ -94,7 +97,25 @@ impl<'a> Scanner<'a> {
                             token_with_position.col_no,
                         ));
                     }
-                    break Ok(tokens)
+                    break match self.bracket_stack.peek() {
+                        Some(t) => Err((t.clone(), tokens)),
+                        None => Ok(tokens),
+                    }
+                }
+                Token::LeftParen | Token::LeftSquareBracket => {
+                    self.bracket_stack.push(token_with_position.clone());
+                    tokens.push(token_with_position);
+                    previous_was_indent_0 = false;
+                    self.consume_whitespace();
+                }
+                Token::RightParen | Token::RightSquareBracket => {
+                    match self.bracket_stack.pop() {
+                        Some(_) => (),
+                        _ => break Err((token_with_position, tokens))
+                    }
+                    tokens.push(token_with_position);
+                    previous_was_indent_0 = false;
+                    self.consume_whitespace();
                 }
                 _ => {
                     tokens.push(token_with_position);
