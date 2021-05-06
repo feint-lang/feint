@@ -1,8 +1,8 @@
 /// Run REPL until user exits.
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use dirs;
-use regex::internal::Inst;
+
 use rustyline::error::ReadlineError;
 use rustyline::validate::ValidationResult::Incomplete;
 
@@ -30,6 +30,16 @@ impl<'a> Runner<'a> {
             vm: VM::new(),
             debug,
         }
+    }
+
+    /// Get the default history path, which is either ~/.feint_history
+    /// or, if the user's home directory can't be located,
+    /// ./.feint_history.
+    pub fn default_history_path() -> PathBuf {
+        let home = dirs::home_dir();
+        let base_path = home.unwrap_or_default();
+        let history_path_buf = base_path.join(".feint_history");
+        history_path_buf
     }
 
     pub fn run(&mut self) -> ExitResult {
@@ -81,7 +91,7 @@ impl<'a> Runner<'a> {
         }
     }
 
-    fn eval(&mut self, source: &str) -> Option<ExitResult> {
+    pub fn eval(&mut self, source: &str) -> Option<ExitResult> {
         let mut scanner = Scanner::new();
 
         let instructions = match source.trim() {
@@ -91,42 +101,36 @@ impl<'a> Runner<'a> {
             _ => match scanner.scan(source) {
                 Ok(tokens) => {
                     self.add_history_entry(source);
-
-                    if self.debug {
-                        for t in tokens.iter() {
-                            eprintln!("{:?}", t);
-                        }
-                    }
-
-                    let fake_tokens: Vec<TokenWithPosition> = vec![];
-                    let mut parser = Parser::new(&fake_tokens);
-                    let result = parser.parse(&tokens);
-                    println!("{}", result);
-
+                    self.parse(tokens);
                     let mut instructions: Vec<Instruction> = vec![];
                     instructions
                 }
-                Err((error_token, _)) => match error_token.token {
+                Err((error_token, tokens)) => match error_token.token {
                     Token::Unknown(c) => {
+                        self.add_history_entry(source);
                         let col_no = error_token.col_no;
                         eprintln!("{: >width$}^", "", width = col_no + 1);
                         eprintln!("Syntax error: unknown token at column {}: {}", col_no, c);
                         return None;
                     }
-                    Token::UnterminatedString(string) => loop {
-                        return match self.read_line("+ ", false) {
-                            Ok(None) => {
-                                // Blank line (can't happen?)
-                                let input = string + "\n";
-                                self.eval(input.as_str())
-                            }
-                            Ok(Some(new_input)) => {
-                                let input = string + "\n" + new_input.as_str();
-                                self.eval(input.as_str())
-                            }
-                            Err(err) => Some(Err((1, format!("{}", err)))),
-                        };
-                    },
+                    Token::UnterminatedString(string) => {
+                        self.add_history_entry(source);
+                        self.parse(tokens);
+                        loop {
+                            return match self.read_line("+ ", false) {
+                                Ok(None) => {
+                                    // Blank line (can't happen?)
+                                    let input = string + "\n";
+                                    self.eval(input.as_str())
+                                }
+                                Ok(Some(new_input)) => {
+                                    let input = string + "\n" + new_input.as_str();
+                                    self.eval(input.as_str())
+                                }
+                                Err(err) => Some(Err((1, format!("{}", err)))),
+                            };
+                        }
+                    }
                     token => {
                         // This shouldn't happen.
                         return Some(Err((1, format!("{:?}", token))));
@@ -141,6 +145,18 @@ impl<'a> Runner<'a> {
             VMState::Halted(code, None) => Some(Err((code, "Unknown Error".to_string()))),
             VMState::Idle => None,
         }
+    }
+
+    fn parse(&self, tokens: Vec<TokenWithPosition>) {
+        if self.debug {
+            for t in tokens.iter() {
+                eprintln!("{:?}", t);
+            }
+        }
+        let init_tokens: Vec<TokenWithPosition> = vec![];
+        let mut parser = Parser::new(&init_tokens);
+        let result = parser.parse(&tokens);
+        println!("{}", result);
     }
 
     fn load_history(&mut self) {

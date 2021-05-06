@@ -1,6 +1,8 @@
 # Every program is an expression containing 0 or more expressions.
-expr :
+program :
     | expr*
+
+expr :
     | assignment
     | atom
     | binary_operation

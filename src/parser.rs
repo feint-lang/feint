@@ -16,6 +16,9 @@ impl<'a> Parser<'a> {
 
     pub fn parse(&mut self, tokens: &'a Vec<TokenWithPosition>) -> i32 {
         self.stream = tokens.iter().peekable();
+        if self.peek().is_none() {
+            return 0;
+        }
         self.expr()
     }
 
@@ -82,6 +85,8 @@ impl<'a> Parser<'a> {
 
                 result
             }
+            Some(Token::String(_)) => 0,
+            Some(Token::Identifier(_)) => 0,
             Some(token) => panic!("Unexpected token: {:?}", token),
             None => panic!("Unexpected end of expression"),
         }

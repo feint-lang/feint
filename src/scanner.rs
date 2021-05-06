@@ -1,5 +1,5 @@
 use std::fmt;
-use std::iter::{Chain, Peekable};
+use std::iter::Peekable;
 use std::str::Chars;
 
 use crate::tokens::{Token, TokenWithPosition};

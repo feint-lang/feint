@@ -3,7 +3,6 @@ name = "feint"
 version = "0.1.0"
 authors = ["Wyatt Baldwin"]
 edition = "2018"
-license = "MIT"
 license-file = "LICENSE"
 
 [dependencies]

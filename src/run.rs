@@ -9,17 +9,13 @@ use crate::vm::{VMState, VM};
 type ExitData = (i32, String);
 type ExitResult = Result<Option<String>, ExitData>;
 
-pub struct Runner<'a> {
-    vm: VM<'a>,
+pub struct Runner {
     debug: bool,
 }
 
-impl<'a> Runner<'a> {
-    pub fn new(debug: bool) -> Runner<'a> {
-        Runner {
-            vm: VM::new(),
-            debug,
-        }
+impl Runner {
+    pub fn new(debug: bool) -> Runner {
+        Runner { debug }
     }
 
     pub fn run_file(&mut self, file_name: &str) -> ExitResult {
@@ -29,19 +25,15 @@ impl<'a> Runner<'a> {
                     println!("# Source from file: {}", file_name);
                     println!("{}", source.trim_end());
                 }
-                let result = self.run(source.as_str());
-                self.vm.halt();
-                result
+                self.run(source.as_str())
             }
-            Err(err) => {
-                self.vm.halt();
-                return Err((1, format!("Could not read source file: {}", err)));
-            }
+            Err(err) => Err((1, format!("Could not read source file: {}", err))),
         }
     }
 
     pub fn run(&mut self, source: &str) -> ExitResult {
         let mut scanner = Scanner::new();
+        let mut vm = VM::new();
 
         let tokens = match scanner.scan(source) {
             Ok(tokens) => {
@@ -82,7 +74,7 @@ impl<'a> Runner<'a> {
         instructions.push(Instruction::Add);
         instructions.push(Instruction::Halt(0));
 
-        match self.vm.execute(&instructions) {
+        match vm.execute(&instructions) {
             VMState::Halted(0, option_message) => Ok(option_message),
             VMState::Halted(code, Some(message)) => Err((code, message)),
             VMState::Halted(code, None) => Err((code, "Unknown error".to_string())),

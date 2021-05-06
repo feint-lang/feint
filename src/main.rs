@@ -49,7 +49,7 @@ Loops
         print(i)
 
 */
-use std::process::exit;
+use std::process;
 
 use clap::{App, Arg};
 
@@ -79,25 +79,26 @@ fn main() {
     let debug = matches.is_present("debug");
 
     let result = match file_name {
-        Some(file_name) => run::Runner::new(debug).run_file(file_name),
+        Some(file_name) => {
+            let mut runner = run::Runner::new(debug);
+            runner.run_file(file_name)
+        }
         None => {
-            let home = dirs::home_dir();
-            let base_path = home.unwrap_or_default();
-            let history_path_buf = base_path.join(".interpreter_history");
-            let history_path = history_path_buf.as_path();
-            repl::Runner::new(Some(history_path), debug).run()
+            let history_path = repl::Runner::default_history_path();
+            let mut runner = repl::Runner::new(Some(history_path.as_path()), debug);
+            runner.run()
         }
     };
 
     match result {
         Ok(Some(message)) => {
             println!("{}", message);
-            exit(0);
+            process::exit(0);
         }
-        Ok(None) => exit(0),
+        Ok(None) => process::exit(0),
         Err((code, message)) => {
             eprintln!("{}", message);
-            exit(code)
+            process::exit(code);
         }
     }
 }
