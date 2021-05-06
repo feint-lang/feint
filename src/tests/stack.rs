@@ -1,7 +1,7 @@
 use crate::stack::Stack;
 
 #[test]
-fn new() {
+fn new_stack_is_empty() {
     let stack: Stack<usize> = Stack::new();
     assert_eq!(stack.is_empty(), true);
 }

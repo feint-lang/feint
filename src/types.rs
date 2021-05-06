@@ -10,7 +10,7 @@ pub struct Type<'a> {
 }
 
 impl<'a> Type<'a> {
-    pub fn new(name: &'a str, methods: HashMap<&'a str, &'a Method>) -> Type<'a> {
+    pub fn new(name: &'a str, methods: HashMap<&'a str, &'a Method>) -> Self {
         let mut rng = rand::thread_rng();
         let id: usize = rng.gen();
         Type { id, name, methods }

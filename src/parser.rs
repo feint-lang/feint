@@ -14,7 +14,7 @@ pub struct Parser<'a> {
 }
 
 impl<'a> Parser<'a> {
-    pub fn new(tokens: &'a Vec<TokenWithPosition>) -> Parser<'a> {
+    pub fn new(tokens: &'a Vec<TokenWithPosition>) -> Self {
         Parser {
             stream: tokens.iter().peekable(),
         }
@@ -53,10 +53,9 @@ impl<'a> Parser<'a> {
                     self.next();
                     result -= self.term();
                 }
-                _ => break,
+                _ => break result,
             }
         }
-        result
     }
 
     fn term(&mut self) -> i32 {
@@ -71,10 +70,9 @@ impl<'a> Parser<'a> {
                     self.next();
                     result /= self.factor();
                 }
-                _ => break,
+                _ => break result,
             }
         }
-        result
     }
 
     fn factor(&mut self) -> i32 {

@@ -30,7 +30,7 @@ pub struct Scanner<'a> {
 }
 
 impl<'a> Scanner<'a> {
-    pub fn new(source: &'a str, line_no: usize, col_no: usize) -> Scanner<'a> {
+    pub fn new(source: &'a str, line_no: usize, col_no: usize) -> Self {
         let stream = source.chars().peekable();
         let mut one_ahead_stream = source.chars().peekable();
         let mut two_ahead_stream = source.chars().peekable();
@@ -72,12 +72,11 @@ impl<'a> Scanner<'a> {
     ) -> Result<Vec<TokenWithPosition>, (TokenWithPosition, Vec<TokenWithPosition>)> {
         let mut tokens: Vec<TokenWithPosition> = vec![];
         let mut previous_was_indent_0 = true;
-
         loop {
             let token_with_position = self.next_token();
             match token_with_position.token {
                 Token::Unknown(_) | Token::UnterminatedString(_) | Token::UnexpectedWhitespace => {
-                    return Err((token_with_position, tokens));
+                    break Err((token_with_position, tokens))
                 }
                 Token::Indent(0) => {
                     // In effect, collapse contiguous blank lines
@@ -95,7 +94,7 @@ impl<'a> Scanner<'a> {
                             token_with_position.col_no,
                         ));
                     }
-                    break;
+                    break Ok(tokens)
                 }
                 _ => {
                     tokens.push(token_with_position);
@@ -104,8 +103,6 @@ impl<'a> Scanner<'a> {
                 }
             }
         }
-
-        Ok(tokens)
     }
 
     fn next_token(&mut self) -> TokenWithPosition {
@@ -291,10 +288,9 @@ impl<'a> Scanner<'a> {
         loop {
             match self.next_if(|&c| c.is_whitespace() && c != '\n') {
                 Some(_) => count += 1,
-                None => break,
+                None => break count,
             }
         }
-        count
     }
 
     /// Returns the number of contiguous space characters at the start
@@ -305,18 +301,16 @@ impl<'a> Scanner<'a> {
         loop {
             match self.next_if(|&c| c == ' ') {
                 Some(_) => count += 1,
-                None => break,
+                None => break count,
             }
         }
-        count
     }
 
     /// Read contiguous digits and an optional decimal point into a new
     /// string. If a dot is encountered, it will be included only if the
     /// char following the dot is another digit.
     fn read_number(&mut self, first_digit: char) -> String {
-        let mut string = String::new();
-        string.push(first_digit);
+        let mut string = first_digit.to_string();
         string.push_str(self.collect_digits().as_str());
         match self.next_if_both(|&c| c == '.', |&d| d.is_digit(10)) {
             // If the number is followed by a dot and at least one
@@ -361,10 +355,9 @@ impl<'a> Scanner<'a> {
         loop {
             match self.next_if(|&c| c.is_digit(10)) {
                 Some((digit, _, _)) => digits.push(digit),
-                None => break,
+                None => break digits,
             }
         }
-        digits
     }
 
     /// Read characters inside quotes into a new string. Note that the
@@ -385,11 +378,11 @@ impl<'a> Scanner<'a> {
                     string.push(d);
                 }
                 // Found closing quote; return string
-                Some((c, _, _)) if c == quote => return (string, true),
+                Some((c, _, _)) if c == quote => break (string, true),
                 // Append current char and continue
                 Some((c, _, _)) => string.push(c),
                 // End of input reached without finding closing quote :(
-                None => return (string, false),
+                None => break (string, false),
             }
         }
     }
@@ -399,14 +392,13 @@ impl<'a> Scanner<'a> {
     /// returned comment string. Leading and trailing whitespace is also
     /// stripped.
     fn read_comment(&mut self) -> String {
-        let mut string = String::new();
+        let mut comment = String::new();
         loop {
             match self.next_if(|&c| c != '\n') {
-                Some((c, _, _)) => string.push(c),
-                None => break,
+                Some((c, _, _)) => comment.push(c),
+                None => break comment.trim().to_string(),
             }
         }
-        string.trim().to_string()
     }
 
     /// Read variable/function identifier.
@@ -420,15 +412,13 @@ impl<'a> Scanner<'a> {
     /// NOTE: Identifiers that don't end with a char as noted above will
     ///       cause an error later.
     fn read_identifier(&mut self, first_char: char) -> String {
-        let mut string = String::new();
-        string.push(first_char);
+        let mut string = first_char.to_string();
         loop {
             match self.next_if(|&c| c.is_ascii_lowercase() || c.is_digit(10) || c == '_') {
                 Some((c, _, _)) => string.push(c),
-                None => break,
+                None => break string,
             }
         }
-        string
     }
 
     /// Read type identifier.
@@ -438,14 +428,12 @@ impl<'a> Scanner<'a> {
     /// - start with an upper case ASCII letter (A-Z)
     /// - contain ASCII letters and numbers
     fn read_type_identifier(&mut self, first_char: char) -> String {
-        let mut string = String::new();
-        string.push(first_char);
+        let mut string = first_char.to_string();
         loop {
             match self.next_if(|&c| c.is_ascii_alphabetic() || c.is_digit(10)) {
                 Some((c, _, _)) => string.push(c),
-                None => break,
+                None => break string,
             }
         }
-        string
     }
 }

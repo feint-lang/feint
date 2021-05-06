@@ -5,6 +5,7 @@ use dirs;
 use rustyline::error::ReadlineError;
 
 use crate::instructions::Instruction;
+use crate::namespace::Namespace;
 use crate::parser::parse;
 use crate::scanner::scan;
 use crate::tokens::{Token, TokenWithPosition};
@@ -15,7 +16,9 @@ type ExitResult = Result<Option<String>, ExitData>;
 
 pub fn run(debug: bool) -> ExitResult {
     let history_path = Runner::default_history_path();
-    let mut runner = Runner::new(Some(history_path.as_path()), debug);
+    let namespace = Namespace::default();
+    let vm = VM::new(namespace);
+    let mut runner = Runner::new(Some(history_path.as_path()), vm, debug);
     runner.run()
 }
 
@@ -27,11 +30,11 @@ pub struct Runner<'a> {
 }
 
 impl<'a> Runner<'a> {
-    pub fn new(history_path: Option<&'a Path>, debug: bool) -> Runner<'a> {
+    pub fn new(history_path: Option<&'a Path>, vm: VM<'a>, debug: bool) -> Self {
         Runner {
             reader: rustyline::Editor::<()>::new(),
             history_path,
-            vm: VM::new(),
+            vm,
             debug,
         }
     }
@@ -66,7 +69,7 @@ impl<'a> Runner<'a> {
                     match self.eval(input.as_str()) {
                         Some(result) => {
                             self.vm.halt();
-                            return result;
+                            break result
                         }
                         None => (),
                     }
@@ -74,13 +77,13 @@ impl<'a> Runner<'a> {
                 // User hit Ctrl-C or Ctrl-D.
                 Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => {
                     self.vm.halt();
-                    return Ok(None);
+                    break Ok(None)
                 }
                 // Unexpected error encountered while attempting to read
                 // a line.
                 Err(err) => {
                     self.vm.halt();
-                    return Err((1, format!("Could not read line: {}", err)));
+                    break Err((1, format!("Could not read line: {}", err)))
                 }
             }
         }

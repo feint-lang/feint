@@ -1,13 +1,17 @@
 use crate::frame::Frame;
 use crate::instructions::Instruction;
+use crate::namespace::Namespace;
 use crate::stack::Stack;
 
+#[derive(Debug)]
 pub enum VMState {
     Idle,
     Halted(i32, Option<String>),
 }
 
 pub struct VM<'a> {
+    namespace: Namespace,
+
     // Items are pushed onto or popped from the stack as instructions
     // are executed in the instruction list.
     stack: Stack<usize>,
@@ -20,14 +24,16 @@ pub struct VM<'a> {
 /// then, implicitly, goes idle until it's passed some instructions to
 /// execute. After instructions are executed
 impl<'a> VM<'a> {
-    pub fn new() -> VM<'a> {
+    pub fn new(namespace: Namespace) -> Self {
         VM {
+            namespace,
             stack: Stack::new(),
             call_stack: Stack::new(),
         }
     }
 
     pub fn halt(&mut self) {
+        self.namespace.reset();
         self.stack.clear();
         self.call_stack.clear();
     }
@@ -40,21 +46,19 @@ impl<'a> VM<'a> {
     /// execute.
     pub fn execute(&mut self, instructions: &Vec<Instruction>) -> VMState {
         let mut instruction_pointer = 0;
-
         loop {
-            let instruction = instructions.get(instruction_pointer);
-            instruction_pointer += 1;
-            match instruction {
-                Some(instruction) => match self.execute_instruction(instruction) {
-                    VMState::Halted(code, message) => return VMState::Halted(code, message),
-                    _ => (),
+            match instructions.get(instruction_pointer) {
+                Some(instruction) => {
+                    instruction_pointer += 1;
+                    match self.execute_instruction(instruction) {
+                        state @ VMState::Halted(_, _) => break state,
+                        _ => (),
+                    }
                 },
                 // Go idle
-                None => break,
+                None => break VMState::Idle,
             }
         }
-
-        VMState::Idle
     }
 
     /// Run the specified instruction and return the VM's state.

@@ -77,7 +77,7 @@ pub struct TokenWithPosition {
 }
 
 impl TokenWithPosition {
-    pub fn new(token: Token, line_no: usize, col_no: usize) -> TokenWithPosition {
+    pub fn new(token: Token, line_no: usize, col_no: usize) -> Self {
         TokenWithPosition {
             token,
             line_no,

@@ -49,7 +49,6 @@ Loops
         print(i)
 
 */
-use std::io;
 use std::process;
 
 use clap::{App, Arg};

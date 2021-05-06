@@ -1,6 +1,8 @@
 use std::io::stdin;
 
+use crate::namespace::Namespace;
 use crate::repl::Runner;
+use crate::vm::VM;
 
 #[test]
 fn eval_empty() {
@@ -31,7 +33,9 @@ fn eval_multiline_string() {
 // Utilities -----------------------------------------------------------
 
 fn new<'a>() -> Runner<'a> {
-    Runner::new(None, false)
+    let namespace = Namespace::new(None);
+    let vm = VM::new(namespace);
+    Runner::new(None, vm, false)
 }
 
 fn eval(input: &str) {

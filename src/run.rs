@@ -2,30 +2,36 @@
 use std::fs;
 
 use crate::instructions::Instruction;
+use crate::namespace::Namespace;
 use crate::scanner::scan;
-use crate::tokens::{Token, TokenWithPosition};
+use crate::tokens::{Token};
 use crate::vm::{VMState, VM};
 
 type ExitData = (i32, String);
 type ExitResult = Result<Option<String>, ExitData>;
 
 pub fn run(source: &str, debug: bool) -> ExitResult {
-    let mut runner = Runner::new(debug);
+    let namespace = Namespace::default();
+    let vm = VM::new(namespace);
+    let mut runner = Runner::new(vm, debug);
     runner.run(source)
 }
 
 pub fn run_file(file_name: &str, debug: bool) -> ExitResult {
-    let mut runner = Runner::new(debug);
+    let namespace = Namespace::default();
+    let vm = VM::new(namespace);
+    let mut runner = Runner::new(vm, debug);
     runner.run_file(file_name)
 }
 
-pub struct Runner {
+pub struct Runner<'a> {
+    vm: VM<'a>,
     debug: bool,
 }
 
-impl Runner {
-    pub fn new(debug: bool) -> Runner {
-        Runner { debug }
+impl<'a> Runner<'a> {
+    pub fn new(vm: VM<'a>, debug: bool) -> Self {
+        Runner { vm, debug }
     }
 
     pub fn run_file(&mut self, file_name: &str) -> ExitResult {
@@ -42,8 +48,6 @@ impl Runner {
     }
 
     pub fn run(&mut self, source: &str) -> ExitResult {
-        let mut vm = VM::new();
-
         let tokens = match scan(source, 1, 1) {
             Ok(tokens) => {
                 if self.debug {
@@ -83,7 +87,7 @@ impl Runner {
         instructions.push(Instruction::Add);
         instructions.push(Instruction::Halt(0));
 
-        match vm.execute(&instructions) {
+        match self.vm.execute(&instructions) {
             VMState::Halted(0, option_message) => Ok(option_message),
             VMState::Halted(code, Some(message)) => Err((code, message)),
             VMState::Halted(code, None) => Err((code, "Unknown error".to_string())),
