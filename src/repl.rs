@@ -2,9 +2,7 @@
 use std::path::{Path, PathBuf};
 
 use dirs;
-
 use rustyline::error::ReadlineError;
-use rustyline::validate::ValidationResult::Incomplete;
 
 use crate::instructions::Instruction;
 use crate::parser::parse;

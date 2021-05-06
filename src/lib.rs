@@ -1,6 +1,7 @@
 pub mod repl;
 pub mod run;
 
+mod ast;
 mod frame;
 mod instructions;
 mod keywords;

@@ -14,7 +14,7 @@ fn scan_string_with_embedded_quote() {
     let source = "\"\\\"abc\"";
     let tokens = scan(source);
     assert_eq!(tokens.len(), 2);
-    check_token(tokens.get(0), Token::String("\"abc".to_string()), 1, 1);
+    check_string_token(tokens.get(0), "\"abc", 1, 1, 4);
     check_token(tokens.last(), Token::Indent(0), 1, 8);
 }
 
@@ -25,7 +25,7 @@ fn scan_string_with_newline() {
     let source = "\"abc\n\"";
     let tokens = scan(source);
     assert_eq!(tokens.len(), 2);
-    check_token(tokens.get(0), Token::String("abc\n".to_string()), 1, 1);
+    check_string_token(tokens.get(0), "abc\n", 1, 1, 4);
     check_token(tokens.get(1), Token::Indent(0), 2, 2);
 }
 
@@ -40,9 +40,8 @@ fn scan_string_with_many_newlines() {
     //   "
     let source = "\" a\nb\n\nc\n\n\n  \"";
     let tokens = scan(source);
-    let expected_string = " a\nb\n\nc\n\n\n  ".to_string();
     assert_eq!(tokens.len(), 2);
-    check_token(tokens.get(0), Token::String(expected_string), 1, 1);
+    check_string_token(tokens.get(0), " a\nb\n\nc\n\n\n  ", 1, 1, 12);
     check_token(tokens.get(1), Token::Indent(0), 7, 4);
 }
 
@@ -60,7 +59,7 @@ fn scan_string_unclosed() {
                 match scanner::scan(new_source.as_str(), 1, 1) {
                     Ok(tokens) => {
                         assert_eq!(tokens.len(), 2);
-                        check_token(tokens.get(0), Token::String("abc".to_string()), 1, 1);
+                        check_string_token(tokens.get(0), "abc", 1, 1, 3);
                         check_token(tokens.last(), Token::Indent(0), 1, 6);
                     }
                     _ => assert!(false),
@@ -137,18 +136,22 @@ fn check_token(actual: Option<&TokenWithPosition>, expected: Token, line_no: usi
 
 fn check_string_token(
     actual: Option<&TokenWithPosition>,
+    expected_string: &str,
     expected_line_no: usize,
     expected_col_no: usize,
-    expected_length: usize,
+    expected_len: usize,
 ) {
     assert!(actual.is_some());
     match actual {
         Some(TokenWithPosition {
-            token: Token::String(string),
-            line_no: expected_line_no,
-            col_no: expected_col_no,
+            token: Token::String(actual_string),
+            line_no: actual_line_no,
+            col_no: actual_col_no,
         }) => {
-            assert_eq!(string.len(), expected_length);
+            assert_eq!(actual_string, expected_string);
+            assert_eq!(actual_line_no, &expected_line_no);
+            assert_eq!(actual_col_no, &expected_col_no);
+            assert_eq!(actual_string.len(), expected_len);
         }
         _ => assert!(false),
     }

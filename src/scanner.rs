@@ -1,4 +1,3 @@
-use std::fmt;
 use std::iter::Peekable;
 use std::str::Chars;
 
