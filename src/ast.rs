@@ -2,7 +2,7 @@ use crate::tokens::Token;
 
 #[derive(Debug)]
 pub struct AST {
-    storage: Vec<ASTNode>,
+    pub storage: Vec<ASTNode>,
 }
 
 #[derive(Debug)]
@@ -38,6 +38,18 @@ impl AST {
         self.storage.get(index)
     }
 
+    pub fn get_node(&self, index: usize) -> Option<&Node> {
+        match self.storage.get(index) {
+            Some(ast_node) => Some(&ast_node.value),
+            None => None,
+        }
+    }
+
+    /// Pop node.
+    pub fn pop(&mut self) -> Option<ASTNode> {
+        self.storage.pop()
+    }
+
     /// Get total number of nodes in AST.
     pub fn size(&self) -> usize {
         self.storage.len()
@@ -67,5 +79,9 @@ impl ASTNode {
             parent,
             children: vec![],
         }
+    }
+
+    pub fn pop_child(&mut self) -> Option<usize> {
+        self.children.pop()
     }
 }

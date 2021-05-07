@@ -70,13 +70,16 @@ impl<'a> Parser<'a> {
 
     /// A program is a list of expressions.
     fn program(&mut self) {
+        let mut index = 0;
+        let mut prev_node: Node;
         loop {
             if self.peek().is_none() {
                 break;
             }
             match self.expression() {
                 Ok(node) => {
-                    self.ast.add(node, Some(0));
+                    eprintln!("{:?}", node);
+                    self.ast.add(node, Some(index));
                 }
                 Err(message) => {
                     eprintln!("{}", message);
@@ -100,15 +103,23 @@ impl<'a> Parser<'a> {
                 self.next();
                 match self.expression() {
                     Ok(Node::Object(obj)) => Node::Assignment(name, obj),
-                    Ok(node) => {
-                        return Err(format!(
-                            "Expression on right hand side of = is not an object: {:?}",
-                            node
-                        ))
-                    }
-                    // Ok(None) => {
-                    //     return Err("No expression found on right hand side of =".to_string())
-                    // }
+                    Ok(node) => return Err(format!("RHS is not an object: {:?}", node)),
+                    Err(message) => return Err(message),
+                }
+            }
+            // Binary operators
+            Some((Token::Plus, Some(_), _)) => {
+                eprintln!("++++");
+                let a = match self.ast.storage.pop() {
+                    Some(index) => match self.ast.get_node(index) {
+                        Some(Node::Object(s)) => s.to_string(),
+                        _ => return Err("XXX".to_string()),
+                    },
+                    _ => return Err("Not an object".to_string()),
+                };
+                match self.expression() {
+                    Ok(Node::Object(b)) => Node::BinaryOperation('+', a, b),
+                    Ok(node) => return Err(format!("RHS is not an object: {:?}", node)),
                     Err(message) => return Err(message),
                 }
             }
