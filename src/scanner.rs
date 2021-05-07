@@ -100,7 +100,7 @@ impl<'a> Scanner<'a> {
                     break match self.bracket_stack.peek() {
                         Some(t) => Err((t.clone(), tokens)),
                         None => Ok(tokens),
-                    }
+                    };
                 }
                 Token::LeftParen | Token::LeftSquareBracket => {
                     self.bracket_stack.push(token_with_position.clone());
@@ -111,7 +111,7 @@ impl<'a> Scanner<'a> {
                 Token::RightParen | Token::RightSquareBracket => {
                     match self.bracket_stack.pop() {
                         Some(_) => (),
-                        _ => break Err((token_with_position, tokens))
+                        _ => break Err((token_with_position, tokens)),
                     }
                     tokens.push(token_with_position);
                     previous_was_indent_0 = false;
@@ -181,7 +181,16 @@ impl<'a> Scanner<'a> {
                 string if string.contains(".") || string.contains("E") => Token::Float(string),
                 string => Token::Int(string),
             },
-            Some((c @ 'a'..='z', _, _)) => Token::Identifier(self.read_identifier(c)),
+            Some((c @ 'a'..='z', _, _)) => {
+                let identifier = self.read_identifier(c);
+                if identifier == "true" {
+                    Token::True
+                } else if identifier == "false" {
+                    Token::False
+                } else {
+                    Token::Identifier(identifier)
+                }
+            }
             Some((c @ 'A'..='Z', _, _)) => Token::TypeIdentifier(self.read_type_identifier(c)),
             Some((c @ '@', Some('a'..='z'), _)) => {
                 Token::TypeMethodIdentifier(self.read_identifier(c))

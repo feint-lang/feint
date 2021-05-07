@@ -15,8 +15,10 @@ pub enum Token {
     Comma, // ,
 
     // Fundamental types
-    Int(String),                // 1
+    True,
+    False,
     Float(String),              // 1.0
+    Int(String),                // 1
     String(String),             // "1" (does NOT include quotes)
     UnterminatedString(String), // "1 (DOES include opening quote)
 

@@ -1,4 +1,8 @@
 pub enum Keyword {
+    // Booleans
+    True,
+    False,
+
     // Imports
     Import,  // import <module>
     From,    // import from <module>: x, y, z

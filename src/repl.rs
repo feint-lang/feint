@@ -69,7 +69,7 @@ impl<'a> Runner<'a> {
                     match self.eval(input.as_str()) {
                         Some(result) => {
                             self.vm.halt();
-                            break result
+                            break result;
                         }
                         None => (),
                     }
@@ -77,13 +77,13 @@ impl<'a> Runner<'a> {
                 // User hit Ctrl-C or Ctrl-D.
                 Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => {
                     self.vm.halt();
-                    break Ok(None)
+                    break Ok(None);
                 }
                 // Unexpected error encountered while attempting to read
                 // a line.
                 Err(err) => {
                     self.vm.halt();
-                    break Err((1, format!("Could not read line: {}", err)))
+                    break Err((1, format!("Could not read line: {}", err)));
                 }
             }
         }
@@ -173,7 +173,7 @@ impl<'a> Runner<'a> {
             }
         }
         let result = parse(&tokens);
-        println!("{}", result);
+        println!("{:?}", result);
     }
 
     fn load_history(&mut self) {
