@@ -9,13 +9,43 @@ fn scan_empty() {
 }
 
 #[test]
+fn scan_int() {
+    let tokens = scan("123");
+    assert_eq!(tokens.len(), 2);
+    check_token(tokens.get(0), Token::Int("123".to_string()), 1, 1);
+}
+
+#[test]
+fn scan_float() {
+    let tokens = scan("123.1");
+    assert_eq!(tokens.len(), 2);
+    check_token(tokens.get(0), Token::Float("123.1".to_string()), 1, 1);
+}
+
+#[test]
+fn scan_float_with_e_and_no_sign() {
+    let tokens = scan("123.1e1");
+    eprintln!("{:?}", tokens);
+    assert_eq!(tokens.len(), 2);
+    check_token(tokens.get(0), Token::Float("123.1E+1".to_string()), 1, 1);
+}
+
+#[test]
+fn scan_float_with_e_and_sign() {
+    let tokens = scan("123.1e+1");
+    eprintln!("{:?}", tokens);
+    assert_eq!(tokens.len(), 2);
+    check_token(tokens.get(0), Token::Float("123.1E+1".to_string()), 1, 1);
+}
+
+#[test]
 fn scan_string_with_embedded_quote() {
     // "\"abc"
     let source = "\"\\\"abc\"";
     let tokens = scan(source);
     assert_eq!(tokens.len(), 2);
     check_string_token(tokens.get(0), "\"abc", 1, 1, 4);
-    check_token(tokens.last(), Token::Indent(0), 1, 8);
+    check_token(tokens.get(1), Token::Indent(0), 1, 8);
 }
 
 #[test]
@@ -60,7 +90,7 @@ fn scan_string_unclosed() {
                     Ok(tokens) => {
                         assert_eq!(tokens.len(), 2);
                         check_string_token(tokens.get(0), "abc", 1, 1, 3);
-                        check_token(tokens.last(), Token::Indent(0), 1, 6);
+                        check_token(tokens.get(1), Token::Indent(0), 1, 6);
                     }
                     _ => assert!(false),
                 }
@@ -113,7 +143,7 @@ fn scan_unknown() {
     assert_eq!(tokens.len(), 3);
     check_token(tokens.get(0), Token::Unknown('{'), 1, 1);
     check_token(tokens.get(1), Token::Unknown('}'), 1, 2);
-    check_token(tokens.last(), Token::Indent(0), 1, 3);
+    check_token(tokens.get(2), Token::Indent(0), 1, 3);
 }
 
 // Utilities -----------------------------------------------------------

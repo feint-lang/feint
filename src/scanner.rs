@@ -5,7 +5,8 @@ use crate::stack::Stack;
 use crate::tokens::{Token, TokenWithPosition};
 
 type NextOption = Option<(char, Option<char>, Option<char>)>;
-type PeekOption<'a> = Option<(&'a char, Option<&'a char>, Option<&'a char>)>;
+type NextTwoOption = Option<(char, char, Option<char>)>;
+type NextThreeOption = Option<(char, char, char)>;
 
 /// Create a scanner with the specified source, scan the source, and
 /// return the resulting tokens or error.
@@ -172,7 +173,7 @@ impl<'a> Scanner<'a> {
             Some(('!', Some('='), _)) => self.next_and_token(Token::NotEqual),
             Some(('!', Some('!'), _)) => self.next_and_token(Token::AsBool),
             Some(('!', _, _)) => Token::Not,
-            Some(('.', Some('.'), Some('.'))) => self.next_and_token(Token::RangeInclusive),
+            Some(('.', Some('.'), Some('.'))) => self.next_two_and_token(Token::RangeInclusive),
             Some(('.', Some('.'), _)) => self.next_and_token(Token::Range),
             Some(('.', _, _)) => Token::Dot,
             Some(('%', _, _)) => Token::Percent,
@@ -226,7 +227,7 @@ impl<'a> Scanner<'a> {
         TokenWithPosition::new(token, start_line_no, start_col_no)
     }
 
-    /// Consume and return the next char in the stream.
+    /// Consume and return the next character from each stream.
     fn next(&mut self) -> NextOption {
         match self.stream.next() {
             Some(c) => {
@@ -241,15 +242,23 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    /// Consume the next char in the stream and return the specified
-    /// token.
+    /// Consume the next character from each stream and return the
+    /// specified token.
     fn next_and_token(&mut self, token: Token) -> Token {
         self.next();
         token
     }
 
-    /// Consume and return the next char and next lookahead char if the
-    /// next char matches the specified condition.
+    /// Consume the next two characters from each stream and return the
+    /// specified token.
+    fn next_two_and_token(&mut self, token: Token) -> Token {
+        self.next();
+        self.next();
+        token
+    }
+
+    /// Consume and return the next character from each stream if the
+    /// next character matches the specified condition.
     fn next_if(&mut self, func: impl FnOnce(&char) -> bool) -> NextOption {
         match self.stream.next_if(func) {
             Some(c) => {
@@ -264,36 +273,52 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    /// Consume and return the next char and next lookahead char if
-    /// *both* the next char and next lookahead char match their
-    /// respective conditions.
+    /// Consume the next two characters from each stream if the
+    /// next two characters match their respective conditions. On match,
+    /// the next two characters are returned.
     fn next_if_both(
         &mut self,
         c_func: impl FnOnce(&char) -> bool,
         d_func: impl FnOnce(&char) -> bool,
-    ) -> NextOption {
+    ) -> NextTwoOption {
         match (self.stream.peek(), self.one_ahead_stream.peek()) {
             (Some(c), Some(d)) => match c_func(c) && d_func(d) {
-                true => self.next(),
+                true => {
+                    let c = self.stream.next().unwrap();
+                    let d = self.one_ahead_stream.next().unwrap();
+                    let e = self.two_ahead_stream.next();
+                    self.next();
+                    Some((c, d, e))
+                }
                 false => None,
             },
             _ => None,
         }
     }
 
+    /// Consume the next three characters from each stream if the
+    /// next three characters match their respective conditions. On
+    /// match, the next three characters are returned.
     fn next_if_all(
         &mut self,
         c_func: impl FnOnce(&char) -> bool,
         d_func: impl FnOnce(&char) -> bool,
         e_func: impl FnOnce(&char) -> bool,
-    ) -> NextOption {
+    ) -> NextThreeOption {
         match (
             self.stream.peek(),
             self.one_ahead_stream.peek(),
             self.two_ahead_stream.peek(),
         ) {
             (Some(c), Some(d), Some(e)) => match c_func(c) && d_func(d) && e_func(e) {
-                true => self.next(),
+                true => {
+                    let c = self.stream.next().unwrap();
+                    let d = self.one_ahead_stream.next().unwrap();
+                    let e = self.two_ahead_stream.next().unwrap();
+                    self.next();
+                    self.next();
+                    Some((c, d, e))
+                }
                 false => None,
             },
             _ => None,
@@ -346,33 +371,33 @@ impl<'a> Scanner<'a> {
             // If the number is followed by a dot and at least one
             // digit consume the dot, the digit, and any following
             // digits.
-            Some((dot, _, _)) => {
+            Some((dot, digit, _)) => {
                 string.push(dot);
+                string.push(digit);
                 string.push_str(self.collect_digits().as_str());
             }
             _ => (),
         }
-        // The next two match blocks handle E notation. The first
-        // matches WITHOUT a sign before the E and the second matches
-        // WITH a sign before the E. Lower or uppercase E is accepted
-        // and will be normalized to uppercase.
-        // TODO: Make this less verbose?
+        // Handle E notation *without* sign.
         match self.next_if_both(|&c| c == 'e' || c == 'E', |&e| e.is_digit(10)) {
-            Some((_e, _digit, _)) => {
+            Some((_, digit, _)) => {
                 string.push('E');
+                string.push('+');
+                string.push(digit);
                 string.push_str(self.collect_digits().as_str());
             }
             _ => (),
         }
+        // Handle E notation *with* sign.
         match self.next_if_all(
             |&c| c == 'e' || c == 'E',
             |&d| d == '+' || d == '-',
             |&e| e.is_digit(10),
         ) {
-            Some((_e, Some(sign), _digit)) => {
-                self.next(); // Skip over sign
+            Some((_, sign, digit)) => {
                 string.push('E');
                 string.push(sign);
+                string.push(digit);
                 string.push_str(self.collect_digits().as_str());
             }
             _ => (),
