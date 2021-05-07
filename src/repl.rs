@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use dirs;
 use rustyline::error::ReadlineError;
 
+use crate::ast::AST;
 use crate::instructions::Instruction;
 use crate::namespace::Namespace;
 use crate::parser::parse;
@@ -105,18 +106,16 @@ impl<'a> Runner<'a> {
     }
 
     pub fn eval(&mut self, source: &str) -> Option<ExitResult> {
-        let mut instructions: Vec<Instruction> = vec![];
-
-        match source.trim() {
+        let instructions: Vec<Instruction> = match source.trim() {
             ".exit" | ".halt" | ".quit" => {
-                instructions.push(Instruction::Halt(0));
+                vec![Instruction::Halt(0)]
             }
             _ => {
                 match scan(source, 1, 1) {
                     Ok(tokens) => {
                         // TODO: Set instructions
                         self.add_history_entry(source);
-                        self.parse(tokens);
+                        self.parse(tokens)
                     }
                     Err((error_token, _)) => match error_token.token {
                         Token::Unknown(c) => {
@@ -166,14 +165,17 @@ impl<'a> Runner<'a> {
         }
     }
 
-    fn parse(&self, tokens: Vec<TokenWithPosition>) {
+    fn parse(&self, tokens: Vec<TokenWithPosition>) -> Vec<Instruction> {
         if self.debug {
             for t in tokens.iter() {
                 eprintln!("{:?}", t);
             }
         }
-        let result = parse(&tokens);
-        println!("{:?}", result);
+        let ast = parse(&tokens);
+        let mut instructions = vec![];
+        eprintln!("{:?}", ast);
+
+        instructions
     }
 
     fn load_history(&mut self) {

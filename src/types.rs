@@ -41,3 +41,5 @@ pub struct Method {
     name: String,
     // ???
 }
+
+pub struct IntType {}

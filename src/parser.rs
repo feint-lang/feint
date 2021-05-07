@@ -1,8 +1,10 @@
 use std::iter::Peekable;
 use std::slice::Iter;
 
-use crate::ast::{Node, NodeValue, AST};
+use crate::ast::{ASTNode, Node, AST};
 use crate::tokens::{Token, TokenWithPosition};
+
+type NextOption<'a> = Option<(&'a Token, Option<&'a Token>, Option<&'a Token>)>;
 
 /// Parse tokens and ...
 pub fn parse(tokens: &Vec<TokenWithPosition>) -> AST {
@@ -13,24 +15,46 @@ pub fn parse(tokens: &Vec<TokenWithPosition>) -> AST {
 
 pub struct Parser<'a> {
     stream: Peekable<Iter<'a, TokenWithPosition>>,
+    one_ahead_stream: Peekable<Iter<'a, TokenWithPosition>>,
+    two_ahead_stream: Peekable<Iter<'a, TokenWithPosition>>,
     ast: AST,
 }
 
 impl<'a> Parser<'a> {
     pub fn new(tokens: &'a Vec<TokenWithPosition>) -> Self {
-        Self {
-            stream: tokens.iter().peekable(),
+        let stream = tokens.iter().peekable();
+        let mut one_ahead_stream = tokens.iter().peekable();
+        let mut two_ahead_stream = tokens.iter().peekable();
+        one_ahead_stream.next();
+        two_ahead_stream.next();
+        two_ahead_stream.next();
+        let instance = Self {
+            stream,
+            one_ahead_stream,
+            two_ahead_stream,
             ast: AST::new(),
-        }
+        };
+
+        instance
     }
 
     pub fn parse(&mut self) {
         self.program();
     }
 
-    fn next(&mut self) -> Option<&Token> {
+    fn next(&mut self) -> NextOption {
         match self.stream.next() {
-            Some(token) => Some(&token.token),
+            Some(token) => {
+                let one_ahead = match self.one_ahead_stream.next() {
+                    Some(t) => Some(&t.token),
+                    None => None,
+                };
+                let two_ahead = match self.two_ahead_stream.next() {
+                    Some(t) => Some(&t.token),
+                    None => None,
+                };
+                Some((&token.token, one_ahead, two_ahead))
+            }
             _ => None,
         }
     }
@@ -48,27 +72,32 @@ impl<'a> Parser<'a> {
     fn program(&mut self) {
         loop {
             match self.expression() {
-                Some(node_value) => {
-                    self.ast.add(node_value, Some(0));
+                Ok(Some(node)) => {
+                    self.ast.add(node, Some(0));
                 }
-                None => break,
+                Ok(None) => break,
+                _ => break,
             }
         }
     }
 
-    fn expression(&mut self) -> Option<NodeValue> {
-        match self.next() {
+    fn expression(&mut self) -> Result<Option<Node>, String> {
+        let node = match self.next() {
             // Atoms
-            Some(Token::True) => Some(NodeValue::Object("true".to_string())),
-            Some(Token::False) => Some(NodeValue::Object("false".to_string())),
-            Some(Token::Float(digits)) => Some(NodeValue::Object(digits.to_string())),
-            Some(Token::Int(digits)) => Some(NodeValue::Object(digits.to_string())),
-            Some(Token::String(string)) => Some(NodeValue::Object(string.to_string())),
-            // Binary operations
-            Some(Token::Plus) => Some(NodeValue::BinaryOperation('+')),
-            Some(Token::Minus) => Some(NodeValue::BinaryOperation('-')),
-            _ => None,
-        }
+            Some((Token::True, _, _)) => Node::Object("true".to_string()),
+            Some((Token::False, _, _)) => Node::Object("false".to_string()),
+            Some((Token::Float(digits), _, _)) => Node::Object(digits.to_string()),
+            Some((Token::Int(digits), _, _)) => Node::Object(digits.to_string()),
+            Some((Token::String(string), _, _)) => Node::Object(string.to_string()),
+            // Assignment
+            Some((Token::Identifier(name), Some(Token::Equal), Some(_))) => {
+                // self.next();
+                Node::Assignment(name.to_string())
+            }
+            _ => return Ok(None),
+        };
+
+        Ok(Some(node))
     }
 
     // fn term(&mut self) -> i32 {
