@@ -18,7 +18,7 @@ pub enum Node {
     Program,
     Object(String),
     BinaryOperation(char, String, String),
-    Assignment(String),
+    Assignment(String, String),
 }
 
 impl AST {

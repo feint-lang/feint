@@ -71,17 +71,22 @@ impl<'a> Parser<'a> {
     /// A program is a list of expressions.
     fn program(&mut self) {
         loop {
+            if self.peek().is_none() {
+                break;
+            }
             match self.expression() {
-                Ok(Some(node)) => {
+                Ok(node) => {
                     self.ast.add(node, Some(0));
                 }
-                Ok(None) => break,
-                _ => break,
+                Err(message) => {
+                    eprintln!("{}", message);
+                    break;
+                }
             }
         }
     }
 
-    fn expression(&mut self) -> Result<Option<Node>, String> {
+    fn expression(&mut self) -> Result<Node, String> {
         let node = match self.next() {
             // Atoms
             Some((Token::True, _, _)) => Node::Object("true".to_string()),
@@ -90,14 +95,28 @@ impl<'a> Parser<'a> {
             Some((Token::Int(digits), _, _)) => Node::Object(digits.to_string()),
             Some((Token::String(string), _, _)) => Node::Object(string.to_string()),
             // Assignment
-            Some((Token::Identifier(name), Some(Token::Equal), Some(_))) => {
-                // self.next();
-                Node::Assignment(name.to_string())
+            Some((Token::Identifier(identifier), Some(Token::Equal), Some(_))) => {
+                let name = identifier.to_string();
+                self.next();
+                match self.expression() {
+                    Ok(Node::Object(obj)) => Node::Assignment(name, obj),
+                    Ok(node) => {
+                        return Err(format!(
+                            "Expression on right hand side of = is not an object: {:?}",
+                            node
+                        ))
+                    }
+                    // Ok(None) => {
+                    //     return Err("No expression found on right hand side of =".to_string())
+                    // }
+                    Err(message) => return Err(message),
+                }
             }
-            _ => return Ok(None),
+            Some(token) => return Err(format!("Unhandled token: {:?}", token)),
+            None => return Err("Unexpectedly ran out of tokens".to_string()),
         };
 
-        Ok(Some(node))
+        Ok(node)
     }
 
     // fn term(&mut self) -> i32 {
