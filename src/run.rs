@@ -1,7 +1,7 @@
 /// Run provided source, typically from a file, to completion.
 use std::fs;
 
-use crate::scanner::{scan, Token};
+use crate::scanner::{scan, ScanError, ScanErrorType};
 use crate::vm::{Instruction, Namespace, VMState, VM};
 
 type ExitData = (i32, String);
@@ -45,7 +45,7 @@ impl<'a> Runner<'a> {
     }
 
     pub fn run(&mut self, source: &str) -> ExitResult {
-        let tokens = match scan(source) {
+        match scan(source) {
             Ok(tokens) => {
                 if self.debug {
                     for t in tokens.iter() {
@@ -54,26 +54,29 @@ impl<'a> Runner<'a> {
                 }
                 tokens
             }
-            Err((error_token, _)) => {
-                return match error_token.token {
-                    Token::Unknown(c) => {
+            Err(err) => {
+                return match err {
+                    ScanError {
+                        error: ScanErrorType::UnknownToken(c),
+                        location,
+                    } => {
                         let message = format!(
                             "Syntax error: unknown token at line {} column {}: {}",
-                            error_token.start.line, error_token.start.col, c
+                            location.line, location.col, c
                         );
                         Err((1, message))
                     }
-                    Token::UnterminatedString(string) => {
+                    ScanError {
+                        error: ScanErrorType::UnterminatedString(string),
+                        location,
+                    } => {
                         let message = format!(
                             "{}\nUnterminated string starting on line {} at column {}",
-                            string, error_token.start.line, error_token.start.col
+                            string, location.line, location.col
                         );
                         Err((1, message))
                     }
-                    _ => {
-                        // This shouldn't happen.
-                        Err((1, format!("{}", error_token)))
-                    }
+                    err => Err((1, format!("Unhandled scan error: {:?}", err))),
                 };
             }
         };

@@ -3,20 +3,29 @@ use std::str::Chars;
 
 use crate::util::Stack;
 
-use super::{Location, ScanResult, Token, TokenWithLocation};
+use super::{Location, ScanError, ScanErrorType, ScanResult, Token, TokenWithLocation};
 
 type NextOption = Option<(char, Option<char>, Option<char>)>;
 type NextTwoOption = Option<(char, char, Option<char>)>;
 type NextThreeOption = Option<(char, char, char)>;
 type PeekOption<'a> = Option<(&'a char, Option<&'a char>, Option<&'a char>)>;
 
-/// Create a scanner with the specified source, scan the source, and
+/// Create a scanner with the specified text source, scan the text, and
 /// return the resulting tokens or error.
-pub fn scan(
-    source: &str,
-) -> Result<Vec<TokenWithLocation>, (TokenWithLocation, Vec<TokenWithLocation>)> {
-    let mut scanner = Scanner::new(source, Location::new(1, 1));
-    scanner.scan()
+pub fn scan(text: &str) -> Result<Vec<TokenWithLocation>, ScanError> {
+    let mut scanner = Scanner::new(text, Location::new(1, 1));
+    let mut tokens: Vec<TokenWithLocation> = vec![];
+    for item in scanner {
+        match item {
+            Ok(token) => {
+                tokens.push(token);
+            }
+            Err(err) => {
+                return Err(err);
+            }
+        }
+    }
+    Ok(tokens)
 }
 
 pub struct Scanner<'a> {
@@ -29,7 +38,8 @@ pub struct Scanner<'a> {
     two_ahead_stream: Peekable<Chars<'a>>,
     location: Location,
     current_token: Option<Token>,
-    bracket_stack: Stack<(Token, Location)>,
+    indent_level: u8,
+    bracket_stack: Stack<(char, Location)>,
 }
 
 impl<'a> Scanner<'a> {
@@ -49,151 +59,79 @@ impl<'a> Scanner<'a> {
             two_ahead_stream,
             location,
             current_token: None,
+            indent_level: 0,
             bracket_stack: Stack::new(),
         }
     }
 
-    /// Scan text and return tokens. If an error is encountered, an
-    /// error result will be returned containing a special token that
-    /// indicates what the problem is along with all the tokens that
-    /// were successfully parsed prior to the error.
-    ///
-    /// The possible error conditions are:
-    ///
-    /// - Unknown token
-    /// - Unexpected whitespace after indent
-    /// - Unterminated string
-    ///
-    /// The first two cases are syntax errors.
-    ///
-    /// In the case of an unterminated string, the original string plus
-    /// additional input can be re-scanned.
-    ///
-    /// TODO: Find a better way to handle this^. Figure out how to store
-    ///       the remaining, unparsed source internally or find some
-    ///       other way such that the caller doesn't need to deal with
-    ///       this in such a clunky way.
-    pub fn scan(
-        &mut self,
-    ) -> Result<Vec<TokenWithLocation>, (TokenWithLocation, Vec<TokenWithLocation>)> {
-        if self.source.trim().len() == 0 {
-            return Ok(vec![TokenWithLocation::new(
-                Token::EndOfInput,
-                self.location,
-                self.location,
-            )]);
-        }
+    fn next_token(&mut self) -> ScanResult {
+        let start = self.location;
+        let mut end = Location::new(self.location.line, self.location.col - 1);
 
-        let mut tokens: Vec<TokenWithLocation> = vec![];
-        let mut indentation_level = 0;
-        let mut done = false;
-
-        loop {
-            let start = self.location;
-            let token = self.next_token();
-            let mut end = Location::new(self.location.line, self.location.col - 1);
-
-            let mut push = true;
-            let mut add_dedent = false;
-            let mut consume_whitespace = true;
-
-            match token {
-                Token::Newline => {
-                    // A newline will only be read by itself.
-                    end = Location::new(end.line - 1, start.col);
-                    // Indents follow newlines, so don't consume
-                    // whitespace after newlines.
-                    consume_whitespace = false;
-                    add_dedent = true;
-                    match self.peek_char() {
-                        Some(('\n', _, _)) => add_dedent = true,
-                        _ => (),
-                    }
-                }
-                Token::Indent(level) => {
-                    if level == indentation_level {
-                        push = false;
-                    } else if level < indentation_level {
-                        tokens.push(TokenWithLocation::new(
-                            Token::Dedent,
-                            Location::new(end.line, 0),
-                            Location::new(end.line, 0),
-                        ));
-                    }
-                    indentation_level = level;
-                }
-                Token::EndOfInput => {
-                    let bracket = self.bracket_stack.pop();
-                    match bracket {
-                        Some((token, location)) => {
-                            break Err((TokenWithLocation::new(token, location, location), tokens))
-                        }
-                        None => (),
-                    }
-                    done = true;
-                    consume_whitespace = false;
-                    // TODO: Not sure if necessary
-                    tokens.push(TokenWithLocation::new(
-                        Token::Dedent,
-                        Location::new(end.line, 0),
-                        Location::new(end.line, 0),
-                    ));
-                }
-                Token::LeftParen | Token::LeftSquareBracket => {
-                    self.bracket_stack.push((token.clone(), start));
-                }
-                Token::RightParen => match self.bracket_stack.pop() {
-                    Some((token, location)) if token != Token::LeftParen => {
-                        break Err((TokenWithLocation::new(token, location, location), tokens))
-                    }
-                    None => break Err((TokenWithLocation::new(token, start, start), tokens)),
-                    _ => (),
-                },
-                Token::RightSquareBracket => match self.bracket_stack.pop() {
-                    Some((token, location)) if token != Token::LeftSquareBracket => {
-                        break Err((TokenWithLocation::new(token, location, location), tokens))
-                    }
-                    None => break Err((TokenWithLocation::new(token, start, start), tokens)),
-                    _ => (),
-                },
-                Token::Unknown(_) | Token::UnterminatedString(_) | Token::UnexpectedWhitespace => {
-                    break Err((TokenWithLocation::new(token.clone(), start, end), tokens));
-                }
-                _ => {
-                    ();
-                }
-            }
-            self.current_token = Some(token.clone());
-            if push {
-                tokens.push(TokenWithLocation::new(token.clone(), start, end));
-            }
-            if consume_whitespace {
-                self.consume_whitespace();
-            }
-            if done {
-                break Ok(tokens);
-            }
-        }
-    }
-
-    fn next_token(&mut self) -> Token {
         let token = match self.next_char() {
             Some(('"', _, _)) => match self.read_string('"') {
                 (string, true) => Token::String(string),
-                (string, false) => Token::UnterminatedString(format!("\"{}", string)),
+                (string, false) => {
+                    return Err(ScanError::new(
+                        ScanErrorType::UnterminatedString(format!("\"{}", string)),
+                        start,
+                    ));
+                }
             },
             Some(('#', _, _)) => Token::Comment(self.read_comment()),
             Some((':', _, _)) => Token::Colon,
             Some((',', _, _)) => Token::Comma,
-            Some(('(', _, _)) => Token::LeftParen,
-            Some((')', _, _)) => Token::RightParen,
-            Some(('[', _, _)) => Token::LeftSquareBracket,
-            Some((']', _, _)) => Token::RightSquareBracket,
+            Some((c @ '(', _, _)) => {
+                self.bracket_stack.push((c, start));
+                Token::LeftParen
+            }
+            Some((c @ ')', _, _)) => {
+                match self.bracket_stack.pop() {
+                    Some(('(', _)) => (),
+                    None | Some(_) => {
+                        return Err(ScanError::new(
+                            ScanErrorType::UnmatchedClosingBracket(c),
+                            start,
+                        ));
+                    }
+                }
+                Token::RightParen
+            }
+            Some((c @ '[', _, _)) => {
+                self.bracket_stack.push((c, start));
+                Token::LeftSquareBracket
+            }
+            Some((c @ ']', _, _)) => {
+                match self.bracket_stack.pop() {
+                    Some(('[', _)) => (),
+                    None | Some(_) => {
+                        return Err(ScanError::new(
+                            ScanErrorType::UnmatchedClosingBracket(c),
+                            start,
+                        ));
+                    }
+                }
+                Token::RightSquareBracket
+            }
             Some(('<', Some('='), _)) => self.next_char_and_token(Token::LessThanOrEqual),
             Some(('<', Some('-'), _)) => self.next_char_and_token(Token::LoopFeed),
-            Some(('<', _, _)) => Token::LeftAngleBracket,
+            Some((c @ '<', _, _)) => {
+                self.bracket_stack.push((c, start));
+                Token::LeftAngleBracket
+            }
             Some(('>', Some('='), _)) => self.next_char_and_token(Token::GreaterThanOrEqual),
-            Some(('>', _, _)) => Token::RightAngleBracket,
+            Some((c @ '>', _, _)) => {
+                match self.bracket_stack.pop() {
+                    Some(('<', _)) => (),
+                    None | Some(_) => {
+                        return Err(ScanError::new(
+                            ScanErrorType::UnmatchedClosingBracket(c),
+                            start,
+                        ));
+                    }
+                }
+                Token::RightAngleBracket
+            }
             Some(('=', Some('='), _)) => self.next_char_and_token(Token::EqualEqual),
             Some(('=', _, _)) => Token::Equal,
             Some(('&', Some('&'), _)) => self.next_char_and_token(Token::And),
@@ -241,7 +179,10 @@ impl<'a> Scanner<'a> {
                 Token::SpecialMethodIdentifier(self.read_identifier(c))
             }
             // Newlines
-            Some(('\n', _, _)) => Token::Newline,
+            Some(('\n', _, _)) => {
+                end = Location::new(end.line - 1, start.col);
+                Token::Newline
+            }
             Some(('\r', Some('\n'), _)) => {
                 self.next_char();
                 Token::Newline
@@ -258,20 +199,43 @@ impl<'a> Scanner<'a> {
                             // Indent followed by non-whitespace character
                             0 => Token::Indent(num_spaces / 4),
                             // Indent followed by non-space whitespace character(s)
-                            _ => Token::UnexpectedIndent(num_spaces),
+                            _ => {
+                                return Err(ScanError::new(
+                                    ScanErrorType::UnexpectedIndent(num_spaces),
+                                    start,
+                                ));
+                            }
                         },
                         // Indent followed by unexpected whitespace
-                        _ => Token::UnexpectedWhitespace,
+                        _ => {
+                            return Err(ScanError::new(ScanErrorType::UnexpectedWhitespace, start));
+                        }
                     },
                 }
             }
             // Unknown
-            Some((c, _, _)) => Token::Unknown(c),
+            Some((c, _, _)) => {
+                return Err(ScanError::new(ScanErrorType::UnknownToken(c), start));
+            }
             // End of input
-            None => Token::EndOfInput,
+            None => {
+                let bracket = self.bracket_stack.pop();
+                match bracket {
+                    Some((c, location)) => {
+                        return Err(ScanError::new(
+                            ScanErrorType::UnmatchedOpeningBracket(c),
+                            location,
+                        ));
+                    }
+                    None => (),
+                }
+                Token::EndOfInput
+            }
         };
 
-        token
+        self.consume_whitespace();
+        self.current_token = Some(token.clone());
+        Ok(TokenWithLocation::new(token.clone(), start, end))
     }
 
     /// Consume and return the next character from each stream.
@@ -577,18 +541,19 @@ impl<'a> Scanner<'a> {
     }
 }
 
-// impl Iterator for Scanner<'_> {
-//     type Item = ScanResult;
-//
-//     fn next(&mut self) -> Option<Self::Item> {
-//         let token = self.inner_next();
-//         match token {
-//             Ok(TokenWithLocation {
-//                 token: Token::EndOfInput,
-//                 start: _,
-//                 end: _,
-//             }) => None,
-//             r => Some(r),
-//         }
-//     }
-// }
+impl Iterator for Scanner<'_> {
+    type Item = ScanResult;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let result = self.next_token();
+        match result {
+            Ok(TokenWithLocation {
+                token: Token::EndOfInput,
+                start: _,
+                end: _,
+            }) => None,
+            Ok(t) => Some(Ok(t)),
+            Err(t) => Some(Err(t)),
+        }
+    }
+}

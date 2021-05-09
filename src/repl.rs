@@ -5,7 +5,7 @@ use dirs;
 use rustyline::error::ReadlineError;
 
 use crate::parser::parse;
-use crate::scanner::{scan, Token, TokenWithLocation};
+use crate::scanner::{scan, ScanError, ScanErrorType, TokenWithLocation};
 use crate::vm::Instruction;
 use crate::vm::Namespace;
 use crate::vm::{VMState, VM};
@@ -108,50 +108,53 @@ impl<'a> Runner<'a> {
             ".exit" | ".halt" | ".quit" => {
                 vec![Instruction::Halt(0)]
             }
-            _ => {
-                match scan(source) {
-                    Ok(tokens) => {
-                        self.add_history_entry(source);
-                        self.parse(tokens)
-                    }
-                    Err((error_token, _)) => match error_token.token {
-                        Token::Unknown(c) => {
-                            self.add_history_entry(source);
-                            let col = error_token.start.col;
-                            eprintln!("{: >width$}^", "", width = col + 1);
-                            eprintln!("Syntax error: unknown token at column {}: '{}'", col, c);
-                            return None;
-                        }
-                        Token::UnterminatedString(_) => loop {
-                            return match self.read_line("+ ", false) {
-                                Ok(None) => {
-                                    let input = source.to_string() + "\n";
-                                    self.eval(input.as_str())
-                                }
-                                Ok(Some(new_input)) => {
-                                    let input = source.to_string() + "\n" + new_input.as_str();
-                                    self.eval(input.as_str())
-                                }
-                                Err(err) => Some(Err((1, format!("{}", err)))),
-                            };
-                        },
-                        Token::UnexpectedWhitespace => {
-                            self.add_history_entry(source);
-                            let col_no = error_token.start.col;
-                            eprintln!("{: >width$}^", "", width = col_no + 1);
-                            eprintln!("Syntax error: unexpected whitespace at column {}", col_no);
-                            return None;
-                        }
-                        token => {
-                            // This shouldn't happen.
-                            return Some(Err((
-                                1,
-                                format!("Unexpected error caused by token: {:?}", token),
-                            )));
-                        }
-                    },
+            _ => match scan(source) {
+                Ok(tokens) => {
+                    self.add_history_entry(source);
+                    self.parse(tokens)
                 }
-            }
+                Err(err) => match err {
+                    ScanError {
+                        error: ScanErrorType::UnknownToken(c),
+                        location,
+                    } => {
+                        self.add_history_entry(source);
+                        let col = location.col;
+                        eprintln!("{: >width$}^", "", width = col + 1);
+                        eprintln!("Syntax error: unknown token at column {}: '{}'", col, c);
+                        return None;
+                    }
+                    ScanError {
+                        error: ScanErrorType::UnterminatedString(_),
+                        location: _,
+                    } => loop {
+                        return match self.read_line("+ ", false) {
+                            Ok(None) => {
+                                let input = source.to_string() + "\n";
+                                self.eval(input.as_str())
+                            }
+                            Ok(Some(new_input)) => {
+                                let input = source.to_string() + "\n" + new_input.as_str();
+                                self.eval(input.as_str())
+                            }
+                            Err(err) => Some(Err((1, format!("{}", err)))),
+                        };
+                    },
+                    ScanError {
+                        error: ScanErrorType::UnexpectedWhitespace,
+                        location,
+                    } => {
+                        self.add_history_entry(source);
+                        let col_no = location.col;
+                        eprintln!("{: >width$}^", "", width = col_no + 1);
+                        eprintln!("Syntax error: unexpected whitespace at column {}", col_no);
+                        return None;
+                    }
+                    err => {
+                        return Some(Err((1, format!("Unhandled scan error: {:?}", err))));
+                    }
+                },
+            },
         };
 
         match self.vm.execute(&instructions) {

@@ -1,6 +1,5 @@
 use crate::ast::{ASTNode, ASTNodeValue};
-use crate::parser::{self, Parser};
-use crate::scanner::{Token, TokenWithLocation};
+use crate::parser;
 
 #[test]
 fn parse_empty() {

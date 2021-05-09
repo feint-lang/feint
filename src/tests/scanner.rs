@@ -1,5 +1,5 @@
 use crate::scanner;
-use crate::scanner::{Location, Token, TokenWithLocation};
+use crate::scanner::{Location, ScanError, ScanErrorType, Token, TokenWithLocation};
 
 #[test]
 fn scan_empty() {
@@ -84,11 +84,13 @@ fn scan_string_with_many_newlines() {
 fn scan_string_unclosed() {
     let source = "\"abc";
     match scanner::scan(source) {
-        Err((error_token, tokens)) => match error_token.token {
-            Token::UnterminatedString(string) => {
-                assert_eq!(tokens.len(), 0);
+        Err(err) => match err {
+            ScanError {
+                error: ScanErrorType::UnterminatedString(string),
+                location,
+            } => {
                 assert_eq!(string, source.to_string());
-                assert_eq!(error_token.start, Location::new(1, 1));
+                assert_eq!(location, Location::new(1, 1));
                 let new_source = source.to_string() + "\"";
                 match scanner::scan(new_source.as_str()) {
                     Ok(tokens) => {
@@ -156,12 +158,21 @@ g (y) ->
 #[test]
 #[should_panic]
 fn scan_unknown() {
-    let source = "{}";
-    let tokens = scan(source);
-    assert_eq!(tokens.len(), 3);
-    check_token(tokens.get(0), Token::Unknown('{'), 1, 1, 1, 1);
-    check_token(tokens.get(1), Token::Unknown('}'), 1, 2, 1, 1);
-    check_token(tokens.get(2), Token::Indent(0), 1, 3, 1, 1);
+    let source = "{";
+    match scanner::scan(source) {
+        Ok(tokens) => assert!(false),
+        Err(err) => match err {
+            ScanError {
+                error: ScanErrorType::UnknownToken(c),
+                location,
+            } => {
+                assert_eq!(c, '{');
+                assert_eq!(location.line, 1);
+                assert_eq!(location.col, 1);
+            }
+            _ => assert!(false),
+        },
+    }
 }
 
 // Utilities -----------------------------------------------------------
@@ -170,7 +181,7 @@ fn scan_unknown() {
 fn scan(source: &str) -> Vec<TokenWithLocation> {
     match scanner::scan(source) {
         Ok(tokens) => tokens,
-        Err((error_token, tokens)) => panic!("Scan failed unexpectedly: {}", error_token),
+        Err(err) => panic!("Scan failed unexpectedly: {:?}", err),
     }
 }
 

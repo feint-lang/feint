@@ -2,10 +2,9 @@ use std::fmt;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Token {
-    Newline,              // \n or \r\n
-    Indent(u8),           // Indentation level (multiple of 4)
-    Dedent,               // Indicates that indent level decreased
-    UnexpectedIndent(u8), // Unexpected indent (number of spaces)
+    Newline,
+    Indent(u8), // Indentation level (multiple of 4)
+    Dedent,     // Indicates that indent level decreased
 
     LeftParen,          // (
     RightParen,         // )
@@ -20,10 +19,9 @@ pub enum Token {
     // Fundamental types
     True,
     False,
-    Float(String),              // 1.0
-    Int(String, u32),           // 1, 0b1, 0o1, ox1
-    String(String),             // "1" (does NOT include quotes)
-    UnterminatedString(String), // "1 (DOES include opening quote)
+    Float(String),    // 1.0
+    Int(String, u32), // 1, 0b1, 0o1, ox1 (digits, radix)
+    String(String),   // "1" (does NOT include quotes)
 
     // Single-character operators
     Equal,     // =
@@ -69,8 +67,6 @@ pub enum Token {
 
     Comment(String), // # ... (to end of line)
 
-    UnexpectedWhitespace,
-    Unknown(char),
     EndOfInput,
 }
 

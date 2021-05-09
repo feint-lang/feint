@@ -1,4 +1,4 @@
-pub use result::ScanResult;
+pub use result::{ScanError, ScanErrorType, ScanResult};
 pub use scanner::{scan, Scanner};
 pub use token::{Location, Token, TokenWithLocation};
 
