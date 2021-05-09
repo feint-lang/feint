@@ -2,7 +2,10 @@ use std::fmt;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Token {
-    Indent(u8), // Space characters following a newline
+    Newline,              // \n or \r\n
+    Indent(u8),           // Indentation level (multiple of 4)
+    Dedent,               // Indicates that indent level decreased
+    UnexpectedIndent(u8), // Unexpected indent (number of spaces)
 
     LeftParen,          // (
     RightParen,         // )
@@ -18,7 +21,7 @@ pub enum Token {
     True,
     False,
     Float(String),              // 1.0
-    Int(String),                // 1
+    Int(String, u32),           // 1, 0b1, 0o1, ox1
     String(String),             // "1" (does NOT include quotes)
     UnterminatedString(String), // "1 (DOES include opening quote)
 
@@ -71,25 +74,55 @@ pub enum Token {
     EndOfInput,
 }
 
+// A token with its start and end locations in the source.
 #[derive(Clone, Debug, PartialEq)]
-pub struct TokenWithPosition {
+pub struct TokenWithLocation {
     pub token: Token,
-    pub line_no: usize,
-    pub col_no: usize,
+    pub start: Location,
+    pub end: Location,
 }
 
-impl TokenWithPosition {
-    pub fn new(token: Token, line_no: usize, col_no: usize) -> Self {
-        TokenWithPosition {
+impl TokenWithLocation {
+    pub fn new(token: Token, start: Location, end: Location) -> Self {
+        Self { token, start, end }
+    }
+
+    pub fn new_from_line_col(
+        token: Token,
+        start_line: usize,
+        start_col: usize,
+        end_line: usize,
+        end_col: usize,
+    ) -> Self {
+        Self::new(
             token,
-            line_no,
-            col_no,
-        }
+            Location::new(start_line, start_col),
+            Location::new(end_line, end_col),
+        )
     }
 }
 
-impl fmt::Display for TokenWithPosition {
+impl fmt::Display for TokenWithLocation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Token {}:{} {:?}", self.line_no, self.col_no, self.token)
+        write!(f, "Token {} -> {} {:?}", self.start, self.end, self.token)
+    }
+}
+
+// Represents a line and column in the source.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Location {
+    pub line: usize,
+    pub col: usize,
+}
+
+impl Location {
+    pub fn new(line: usize, col: usize) -> Self {
+        Self { line, col }
+    }
+}
+
+impl fmt::Display for Location {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}:{}", self.line, self.col)
     }
 }

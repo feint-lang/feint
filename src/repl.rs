@@ -4,12 +4,10 @@ use std::path::{Path, PathBuf};
 use dirs;
 use rustyline::error::ReadlineError;
 
-use crate::ast::AST;
-use crate::instructions::Instruction;
-use crate::namespace::Namespace;
 use crate::parser::parse;
-use crate::scanner::scan;
-use crate::tokens::{Token, TokenWithPosition};
+use crate::scanner::{scan, Token, TokenWithLocation};
+use crate::vm::Instruction;
+use crate::vm::Namespace;
 use crate::vm::{VMState, VM};
 
 type ExitData = (i32, String);
@@ -111,18 +109,17 @@ impl<'a> Runner<'a> {
                 vec![Instruction::Halt(0)]
             }
             _ => {
-                match scan(source, 1, 1) {
+                match scan(source) {
                     Ok(tokens) => {
-                        // TODO: Set instructions
                         self.add_history_entry(source);
                         self.parse(tokens)
                     }
                     Err((error_token, _)) => match error_token.token {
                         Token::Unknown(c) => {
                             self.add_history_entry(source);
-                            let col_no = error_token.col_no;
-                            eprintln!("{: >width$}^", "", width = col_no + 1);
-                            eprintln!("Syntax error: unknown token at column {}: '{}'", col_no, c);
+                            let col = error_token.start.col;
+                            eprintln!("{: >width$}^", "", width = col + 1);
+                            eprintln!("Syntax error: unknown token at column {}: '{}'", col, c);
                             return None;
                         }
                         Token::UnterminatedString(_) => loop {
@@ -140,7 +137,7 @@ impl<'a> Runner<'a> {
                         },
                         Token::UnexpectedWhitespace => {
                             self.add_history_entry(source);
-                            let col_no = error_token.col_no;
+                            let col_no = error_token.start.col;
                             eprintln!("{: >width$}^", "", width = col_no + 1);
                             eprintln!("Syntax error: unexpected whitespace at column {}", col_no);
                             return None;
@@ -165,16 +162,16 @@ impl<'a> Runner<'a> {
         }
     }
 
-    fn parse(&self, tokens: Vec<TokenWithPosition>) -> Vec<Instruction> {
+    fn parse(&self, tokens: Vec<TokenWithLocation>) -> Vec<Instruction> {
         if self.debug {
             for t in tokens.iter() {
-                eprintln!("{:?}", t);
+                eprintln!("{}", t);
             }
         }
-        let ast = parse(&tokens);
-        let mut instructions = vec![];
-        eprintln!("{:?}", ast);
+        // let ast = parse(&tokens);
+        // eprintln!("{:?}", ast);
 
+        let mut instructions = vec![];
         instructions
     }
 

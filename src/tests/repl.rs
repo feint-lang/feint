@@ -1,8 +1,5 @@
-use std::io::stdin;
-
-use crate::namespace::Namespace;
 use crate::repl::Runner;
-use crate::vm::VM;
+use crate::vm::{Namespace, VM};
 
 #[test]
 fn eval_empty() {

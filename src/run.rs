@@ -1,11 +1,8 @@
 /// Run provided source, typically from a file, to completion.
 use std::fs;
 
-use crate::instructions::Instruction;
-use crate::namespace::Namespace;
-use crate::scanner::scan;
-use crate::tokens::{Token};
-use crate::vm::{VMState, VM};
+use crate::scanner::{scan, Token};
+use crate::vm::{Instruction, Namespace, VMState, VM};
 
 type ExitData = (i32, String);
 type ExitResult = Result<Option<String>, ExitData>;
@@ -48,7 +45,7 @@ impl<'a> Runner<'a> {
     }
 
     pub fn run(&mut self, source: &str) -> ExitResult {
-        let tokens = match scan(source, 1, 1) {
+        let tokens = match scan(source) {
             Ok(tokens) => {
                 if self.debug {
                     for t in tokens.iter() {
@@ -62,20 +59,20 @@ impl<'a> Runner<'a> {
                     Token::Unknown(c) => {
                         let message = format!(
                             "Syntax error: unknown token at line {} column {}: {}",
-                            error_token.line_no, error_token.col_no, c
+                            error_token.start.line, error_token.start.col, c
                         );
                         Err((1, message))
                     }
                     Token::UnterminatedString(string) => {
                         let message = format!(
                             "{}\nUnterminated string starting on line {} at column {}",
-                            string, error_token.line_no, error_token.col_no
+                            string, error_token.start.line, error_token.start.col
                         );
                         Err((1, message))
                     }
                     _ => {
                         // This shouldn't happen.
-                        Err((1, format!("{:?}", error_token)))
+                        Err((1, format!("{}", error_token)))
                     }
                 };
             }

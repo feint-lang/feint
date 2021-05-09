@@ -2,16 +2,10 @@ pub mod repl;
 pub mod run;
 
 mod ast;
-mod namespace;
-mod frame;
-mod instructions;
-mod keywords;
-mod operators;
 mod parser;
 mod scanner;
-mod stack;
-mod tokens;
 mod types;
+mod util;
 mod vm;
 
 #[cfg(test)]

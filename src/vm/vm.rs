@@ -1,7 +1,8 @@
-use crate::frame::Frame;
-use crate::instructions::Instruction;
-use crate::namespace::Namespace;
-use crate::stack::Stack;
+use crate::util::Stack;
+
+use super::Frame;
+use super::Instruction;
+use super::Namespace;
 
 #[derive(Debug)]
 pub enum VMState {
@@ -54,7 +55,7 @@ impl<'a> VM<'a> {
                         state @ VMState::Halted(_, _) => break state,
                         _ => (),
                     }
-                },
+                }
                 // Go idle
                 None => break VMState::Idle,
             }

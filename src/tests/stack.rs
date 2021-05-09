@@ -1,4 +1,4 @@
-use crate::stack::Stack;
+use crate::util::Stack;
 
 #[test]
 fn new_stack_is_empty() {
