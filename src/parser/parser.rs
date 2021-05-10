@@ -141,7 +141,7 @@ impl<'a> Parser<'a> {
             // Binary operation
             Some((Token::Plus, _, _)) => ASTNodeValue::BinaryOperation('+'),
             // Other
-            Some((Token::Indent(n), _, _)) => ASTNodeValue::Indent(*n),
+            // Some((Token::Indent(n), _, _)) => ASTNodeValue::Indent(*n),
             Some((token, _, _)) => ASTNodeValue::UnknownToken(token.clone()),
             None => panic!("Unexpectedly ran out of tokens"),
         }

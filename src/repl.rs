@@ -141,13 +141,17 @@ impl<'a> Runner<'a> {
                         };
                     },
                     ScanError {
+                        error: ScanErrorType::WhitespaceAfterIndent,
+                        location,
+                    }
+                    | ScanError {
                         error: ScanErrorType::UnexpectedWhitespace,
                         location,
                     } => {
                         self.add_history_entry(source);
                         let col_no = location.col;
                         eprintln!("{: >width$}^", "", width = col_no + 1);
-                        eprintln!("Syntax error: unexpected whitespace at column {}", col_no);
+                        eprintln!("Syntax error: unexpected whitespace");
                         return None;
                     }
                     err => {

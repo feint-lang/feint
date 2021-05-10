@@ -16,8 +16,10 @@ impl ScanError {
 
 #[derive(Debug)]
 pub enum ScanErrorType {
-    UnexpectedIndent(u8), // number of spaces
-    UnexpectedWhitespace, // i.e, after an indent
+    InvalidIndent(u8),     // Indent is not a multiple of 4
+    IndentTooBig(u8),      // Indented too far
+    WhitespaceAfterIndent, // Non-space whitespace after indent
+    UnexpectedWhitespace,  // Other unexpected whitespace
     UnterminatedString(String),
     UnknownToken(char),
     UnmatchedOpeningBracket(char),

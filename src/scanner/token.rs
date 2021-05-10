@@ -2,9 +2,10 @@ use std::fmt;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Token {
-    Newline,
-    Indent(u8), // Indentation level (multiple of 4)
-    Dedent,     // Indicates that indent level decreased
+    EndOfInput,
+
+    BlockStart,
+    BlockEnd,
 
     LeftParen,          // (
     RightParen,         // )
@@ -66,8 +67,6 @@ pub enum Token {
     SpecialMethodIdentifier(String), // $name (e.g., $bool on a type)
 
     Comment(String), // # ... (to end of line)
-
-    EndOfInput,
 }
 
 // A token with its start and end locations in the source.

@@ -37,7 +37,6 @@ pub struct Scanner<'a> {
     /// The same stream but two characters ahead for easier lookaheads
     two_ahead_stream: Peekable<Chars<'a>>,
     location: Location,
-    current_token: Option<Token>,
     indent_level: u8,
     bracket_stack: Stack<(char, Location)>,
 }
@@ -58,27 +57,31 @@ impl<'a> Scanner<'a> {
             one_ahead_stream,
             two_ahead_stream,
             location,
-            current_token: None,
             indent_level: 0,
             bracket_stack: Stack::new(),
         }
     }
 
-    fn next_token(&mut self) -> ScanResult {
+    /// Try to get the next token and return a result containing either
+    /// a token with its start and end locations or an error. When None
+    /// is returned, the iterator will skip to the next token.
+    fn next_token(&mut self) -> Option<ScanResult> {
         let start = self.location;
-        let mut end = Location::new(self.location.line, self.location.col - 1);
 
         let token = match self.next_char() {
             Some(('"', _, _)) => match self.read_string('"') {
                 (string, true) => Token::String(string),
                 (string, false) => {
-                    return Err(ScanError::new(
+                    return Some(Err(ScanError::new(
                         ScanErrorType::UnterminatedString(format!("\"{}", string)),
                         start,
-                    ));
+                    )));
                 }
             },
-            Some(('#', _, _)) => Token::Comment(self.read_comment()),
+            Some(('#', _, _)) => {
+                self.consume_comment();
+                return None;
+            }
             Some((':', _, _)) => Token::Colon,
             Some((',', _, _)) => Token::Comma,
             Some((c @ '(', _, _)) => {
@@ -89,10 +92,10 @@ impl<'a> Scanner<'a> {
                 match self.bracket_stack.pop() {
                     Some(('(', _)) => (),
                     None | Some(_) => {
-                        return Err(ScanError::new(
+                        return Some(Err(ScanError::new(
                             ScanErrorType::UnmatchedClosingBracket(c),
                             start,
-                        ));
+                        )));
                     }
                 }
                 Token::RightParen
@@ -105,10 +108,10 @@ impl<'a> Scanner<'a> {
                 match self.bracket_stack.pop() {
                     Some(('[', _)) => (),
                     None | Some(_) => {
-                        return Err(ScanError::new(
+                        return Some(Err(ScanError::new(
                             ScanErrorType::UnmatchedClosingBracket(c),
                             start,
-                        ));
+                        )));
                     }
                 }
                 Token::RightSquareBracket
@@ -124,10 +127,10 @@ impl<'a> Scanner<'a> {
                 match self.bracket_stack.pop() {
                     Some(('<', _)) => (),
                     None | Some(_) => {
-                        return Err(ScanError::new(
+                        return Some(Err(ScanError::new(
                             ScanErrorType::UnmatchedClosingBracket(c),
                             start,
-                        ));
+                        )));
                     }
                 }
                 Token::RightAngleBracket
@@ -180,62 +183,104 @@ impl<'a> Scanner<'a> {
             }
             // Newlines
             Some(('\n', _, _)) => {
-                end = Location::new(end.line - 1, start.col);
-                Token::Newline
+                if self.bracket_stack.size() > 0 {
+                    self.consume_whitespace();
+                    return None;
+                }
+
+                let mut num_spaces = self.read_indent();
+                let mut whitespace_count = self.consume_whitespace();
+
+                match self.stream.peek() {
+                    None | Some('\n') => {
+                        // Blank line (including whitespace-only)
+                        return None;
+                    }
+                    Some('#') => {
+                        // Indented comment
+                        // self.next_char();
+                        self.consume_comment();
+                        return None;
+                    }
+                    _ => (),
+                }
+
+                if num_spaces % 4 != 0 {
+                    return Some(Err(ScanError::new(
+                        ScanErrorType::InvalidIndent(num_spaces),
+                        start,
+                    )));
+                }
+
+                if whitespace_count > 0 {
+                    // Indent followed by other whitespace character(s)
+                    return Some(Err(ScanError::new(
+                        ScanErrorType::WhitespaceAfterIndent,
+                        start,
+                    )));
+                }
+
+                // Now we have something that could be a valid indent.
+                // If the indent level has increased, that signals the
+                // start of a block. If it has decreased, that signals
+                // the end of a block. If it stayed the same, do
+                // nothing.
+                let indent_level = num_spaces / 4;
+                if indent_level == self.indent_level {
+                    return None;
+                } else if indent_level == self.indent_level + 1 {
+                    self.indent_level = indent_level;
+                    Token::BlockStart
+                } else if indent_level < self.indent_level {
+                    self.indent_level = indent_level;
+                    Token::BlockEnd
+                } else {
+                    return Some(Err(ScanError::new(
+                        ScanErrorType::IndentTooBig(indent_level),
+                        start,
+                    )));
+                }
             }
             Some(('\r', Some('\n'), _)) => {
-                self.next_char();
-                Token::Newline
+                // On the next iteration, the post-newline logic above
+                // will be invoked.
+                return None;
             }
-            // Indents
-            Some((' ', _, _)) if self.current_token == Some(Token::Newline) => {
-                let num_spaces = self.read_indent() + 1;
-                let whitespace_count = self.consume_whitespace();
-                match self.stream.peek() {
-                    // Blank or whitespace-only line
-                    Some('\n') | None => Token::Indent(0),
-                    Some(_) => match whitespace_count {
-                        0 => match num_spaces % 4 {
-                            // Indent followed by non-whitespace character
-                            0 => Token::Indent(num_spaces / 4),
-                            // Indent followed by non-space whitespace character(s)
-                            _ => {
-                                return Err(ScanError::new(
-                                    ScanErrorType::UnexpectedIndent(num_spaces),
-                                    start,
-                                ));
-                            }
-                        },
-                        // Indent followed by unexpected whitespace
-                        _ => {
-                            return Err(ScanError::new(ScanErrorType::UnexpectedWhitespace, start));
-                        }
-                    },
-                }
+            Some((c, _, _)) if c.is_whitespace() => {
+                return Some(Err(ScanError::new(
+                    ScanErrorType::UnexpectedWhitespace,
+                    start,
+                )));
             }
             // Unknown
             Some((c, _, _)) => {
-                return Err(ScanError::new(ScanErrorType::UnknownToken(c), start));
+                return Some(Err(ScanError::new(ScanErrorType::UnknownToken(c), start)));
             }
             // End of input
             None => {
-                let bracket = self.bracket_stack.pop();
-                match bracket {
-                    Some((c, location)) => {
-                        return Err(ScanError::new(
-                            ScanErrorType::UnmatchedOpeningBracket(c),
-                            location,
-                        ));
+                if 0 < self.indent_level {
+                    self.indent_level = 0;
+                    Token::BlockEnd
+                } else {
+                    let bracket = self.bracket_stack.pop();
+                    match bracket {
+                        Some((c, location)) => {
+                            return Some(Err(ScanError::new(
+                                ScanErrorType::UnmatchedOpeningBracket(c),
+                                location,
+                            )));
+                        }
+                        None => (),
                     }
-                    None => (),
+
+                    Token::EndOfInput
                 }
-                Token::EndOfInput
             }
         };
 
+        let end = Some(Location::new(self.location.line, self.location.col - 1));
         self.consume_whitespace();
-        self.current_token = Some(token.clone());
-        Ok(TokenWithLocation::new(token.clone(), start, end))
+        Some(Ok(TokenWithLocation::new(token, start, end.unwrap())))
     }
 
     /// Consume and return the next character from each stream.
@@ -372,8 +417,13 @@ impl<'a> Scanner<'a> {
         }
     }
 
+    /// Consume comment characters up to newline.
+    fn consume_comment(&mut self) {
+        while self.next_char_if(|&c| c != '\n').is_some() {}
+    }
+
     /// Returns the number of contiguous space characters at the start
-    /// of a line. An indent is defined as N space characters followed
+    /// of a line. An indent is defined as 4*N space characters followed
     /// by a non-whitespace character.
     fn read_indent(&mut self) -> u8 {
         let mut count = 0;
@@ -471,7 +521,6 @@ impl<'a> Scanner<'a> {
         let mut string = String::new();
         loop {
             match self.next_char() {
-                // Skip newlines preceded by backslash
                 Some(('\\', Some('\n'), _)) => {
                     self.next_char();
                 }
@@ -486,20 +535,6 @@ impl<'a> Scanner<'a> {
                 Some((c, _, _)) => string.push(c),
                 // End of input reached without finding closing quote :(
                 None => break (string, false),
-            }
-        }
-    }
-
-    /// Read starting from comment character to the end of the line.
-    /// Note that the opening comment character is *not* included in the
-    /// returned comment string. Leading and trailing whitespace is also
-    /// stripped.
-    fn read_comment(&mut self) -> String {
-        let mut comment = String::new();
-        loop {
-            match self.next_char_if(|&c| c != '\n') {
-                Some((c, _, _)) => comment.push(c),
-                None => break comment.trim().to_string(),
             }
         }
     }
@@ -545,15 +580,15 @@ impl Iterator for Scanner<'_> {
     type Item = ScanResult;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let result = self.next_token();
-        match result {
-            Ok(TokenWithLocation {
+        match self.next_token() {
+            Some(Ok(TokenWithLocation {
                 token: Token::EndOfInput,
                 start: _,
                 end: _,
-            }) => None,
-            Ok(t) => Some(Ok(t)),
-            Err(t) => Some(Err(t)),
+            })) => None,
+            Some(Ok(t)) => Some(Ok(t)),
+            Some(Err(t)) => Some(Err(t)),
+            None => self.next(),
         }
     }
 }

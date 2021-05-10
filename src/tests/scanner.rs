@@ -1,38 +1,36 @@
-use crate::scanner;
-use crate::scanner::{Location, ScanError, ScanErrorType, Token, TokenWithLocation};
+use crate::scanner::{self, Location, ScanError, ScanErrorType, Token, TokenWithLocation};
 
 #[test]
 fn scan_empty() {
     let tokens = scan("");
-    assert_eq!(tokens.len(), 1);
-    check_token(tokens.get(0), Token::EndOfInput, 1, 1, 1, 1);
+    assert_eq!(tokens.len(), 0);
 }
 
 #[test]
 fn scan_int() {
     let tokens = scan("123");
-    assert_eq!(tokens.len(), 3);
+    assert_eq!(tokens.len(), 1);
     check_token(tokens.get(0), Token::Int("123".to_string(), 10), 1, 1, 1, 3);
 }
 
 #[test]
 fn scan_binary_number() {
     let tokens = scan("0b11");
-    assert_eq!(tokens.len(), 3);
+    assert_eq!(tokens.len(), 1);
     check_token(tokens.get(0), Token::Int("11".to_string(), 2), 1, 1, 1, 4);
 }
 
 #[test]
 fn scan_float() {
     let tokens = scan("123.1");
-    assert_eq!(tokens.len(), 3);
+    assert_eq!(tokens.len(), 1);
     check_token(tokens.get(0), Token::Float("123.1".to_string()), 1, 1, 1, 5);
 }
 
 #[test]
 fn scan_float_with_e_and_no_sign() {
     let tokens = scan("123.1e1");
-    assert_eq!(tokens.len(), 3);
+    assert_eq!(tokens.len(), 1);
     let expected = Token::Float("123.1E+1".to_string());
     check_token(tokens.get(0), expected, 1, 1, 1, 7);
 }
@@ -40,8 +38,7 @@ fn scan_float_with_e_and_no_sign() {
 #[test]
 fn scan_float_with_e_and_sign() {
     let tokens = scan("123.1e+1");
-    eprintln!("{:?}", tokens);
-    assert_eq!(tokens.len(), 3);
+    assert_eq!(tokens.len(), 1);
     let expected = Token::Float("123.1E+1".to_string());
     check_token(tokens.get(0), expected, 1, 1, 1, 8);
 }
@@ -51,7 +48,7 @@ fn scan_string_with_embedded_quote() {
     // "\"abc"
     let source = "\"\\\"abc\"";
     let tokens = scan(source);
-    assert_eq!(tokens.len(), 3);
+    assert_eq!(tokens.len(), 1);
     check_string_token(tokens.get(0), "\"abc", 1, 1, 1, 7);
 }
 
@@ -61,8 +58,8 @@ fn scan_string_with_newline() {
     // "
     let source = "\"abc\n\"";
     let tokens = scan(source);
-    assert_eq!(tokens.len(), 2);
-    check_string_token(tokens.get(0), "abc\n", 1, 1, 1, 5);
+    assert_eq!(tokens.len(), 1);
+    check_string_token(tokens.get(0), "abc\n", 1, 1, 2, 1);
 }
 
 #[test]
@@ -76,7 +73,7 @@ fn scan_string_with_many_newlines() {
     //   "
     let source = "\" a\nb\n\nc\n\n\n  \"";
     let tokens = scan(source);
-    assert_eq!(tokens.len(), 3);
+    assert_eq!(tokens.len(), 1);
     check_string_token(tokens.get(0), " a\nb\n\nc\n\n\n  ", 1, 1, 7, 3);
 }
 
@@ -94,7 +91,7 @@ fn scan_string_unclosed() {
                 let new_source = source.to_string() + "\"";
                 match scanner::scan(new_source.as_str()) {
                     Ok(tokens) => {
-                        assert_eq!(tokens.len(), 3);
+                        assert_eq!(tokens.len(), 1);
                         check_string_token(tokens.get(0), "abc", 1, 1, 1, 5);
                     }
                     _ => assert!(false),
@@ -109,13 +106,13 @@ fn scan_string_unclosed() {
 #[test]
 fn scan_indents() {
     let source = "\
-f (x) ->
-    x
-    1
-
-
-g (y) ->
-    y
+f (x) ->  # 1
+    x     # 2
+    1     # 3
+          # 4
+          # 5
+g (y) ->  # 6
+    y     # 7\
 ";
     let tokens = scan(source);
 
@@ -130,33 +127,76 @@ g (y) ->
     check_token(tokens.get(2), token, 1, 4, 1, 4);
     check_token(tokens.get(3), Token::RightParen, 1, 5, 1, 5);
     check_token(tokens.get(4), Token::FuncStart, 1, 7, 1, 8);
-    check_token(tokens.get(5), Token::Newline, 1, 9, 1, 9);
-    check_token(tokens.get(6), Token::Indent(1), 2, 1, 2, 4);
+    check_token(tokens.get(5), Token::BlockStart, 1, 14, 2, 4);
     token = Token::Identifier("x".to_string());
-    check_token(tokens.get(7), token, 2, 5, 2, 5);
-    check_token(tokens.get(8), Token::Newline, 2, 6, 2, 6);
-    check_token(tokens.get(9), Token::Int("1".to_string(), 10), 3, 5, 3, 5);
-    check_token(tokens.get(10), Token::Newline, 3, 6, 3, 6);
-    check_token(tokens.get(11), Token::Dedent, 4, 0, 4, 0);
-    check_token(tokens.get(11), Token::Newline, 4, 1, 4, 1);
-    check_token(tokens.get(11), Token::Newline, 5, 1, 5, 1);
+    check_token(tokens.get(6), token, 2, 5, 2, 5);
+    check_token(tokens.get(7), Token::Int("1".to_string(), 10), 3, 5, 3, 5);
+    check_token(tokens.get(8), Token::BlockEnd, 5, 14, 6, 0);
 
     // g
-    // token = Token::Identifier("g".to_string());
-    // check_token(tokens.get(8), token, 5, 1, 1, 1);
-    // check_token(tokens.get(9), Token::LeftParen, 5, 3, 1, 1);
-    // token = Token::Identifier("y".to_string());
-    // check_token(tokens.get(10), token, 5, 4, 1, 1);
-    // check_token(tokens.get(11), Token::RightParen, 5, 5, 1, 1);
-    // check_token(tokens.get(12), Token::FuncStart, 5, 7, 1, 1);
-    // check_token(tokens.get(13), Token::Indent(4), 6, 1, 1, 1);
-    // token = Token::Identifier("y".to_string());
-    // check_token(tokens.get(14), token, 6, 5, 1, 1);
-    // check_token(tokens.get(15), Token::Indent(0), 7, 1, 1, 1);
+    token = Token::Identifier("g".to_string());
+    check_token(tokens.get(9), token, 6, 1, 6, 1);
+    check_token(tokens.get(10), Token::LeftParen, 6, 3, 6, 3);
+    token = Token::Identifier("y".to_string());
+    check_token(tokens.get(11), token, 6, 4, 6, 4);
+    check_token(tokens.get(12), Token::RightParen, 6, 5, 6, 5);
+    check_token(tokens.get(13), Token::FuncStart, 6, 7, 6, 8);
+    check_token(tokens.get(14), Token::BlockStart, 6, 14, 7, 4);
+    token = Token::Identifier("y".to_string());
+    check_token(tokens.get(15), token, 7, 5, 7, 5);
+    check_token(tokens.get(16), Token::BlockEnd, 7, 14, 7, 13);
+    assert!(tokens.get(17).is_none());
 }
 
 #[test]
-#[should_panic]
+fn scan_unexpected_indent_on_first_line() {
+    let source = "    abc = 1";
+    match scanner::scan(source) {
+        Ok(_) => assert!(false),
+        Err(err) => match err {
+            ScanError {
+                error: ScanErrorType::UnexpectedWhitespace,
+                location,
+            } => {
+                assert_eq!(location.line, 1);
+                assert_eq!(location.col, 1);
+            }
+            _ => assert!(false),
+        },
+    }
+}
+
+#[test]
+fn scan_brackets() {
+    let source = "
+
+    a = [
+   1,
+# comment
+  2,
+]
+
+        b = 1
+";
+    let tokens = scan(source);
+    let mut token;
+    for token in tokens {
+        eprintln!("{}", token);
+    }
+    // assert_eq!(tokens.len(), 8);
+    token = Token::Identifier("a".to_string());
+    // check_token(tokens.get(0), token, 3, 1, 3, 1);
+    // check_token(tokens.get(1), Token::Equal, 3, 3, 3, 3);
+    // check_token(tokens.get(2), Token::LeftSquareBracket, 3, 5, 3, 5);
+    // check_token(tokens.get(3), Token::Int("1".to_owned(), 10), 4, 4, 4, 4);
+    // check_token(tokens.get(4), Token::Comma, 4, 5, 4, 5);
+    // check_token(tokens.get(5), Token::Int("2".to_owned(), 10), 6, 3, 6, 3);
+    // check_token(tokens.get(6), Token::Comma, 6, 4, 6, 4);
+    // check_token(tokens.get(7), Token::RightSquareBracket, 7, 1, 7, 1);
+    // assert!(tokens.get(8).is_none());
+}
+
+#[test]
 fn scan_unknown() {
     let source = "{";
     match scanner::scan(source) {
