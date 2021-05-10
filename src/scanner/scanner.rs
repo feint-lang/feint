@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::iter::Peekable;
 use std::str::Chars;
 
@@ -37,6 +38,11 @@ pub struct Scanner<'a> {
     /// The same stream but two characters ahead for easier lookaheads
     two_ahead_stream: Peekable<Chars<'a>>,
     location: Location,
+    /// Temporary storage for tokens.
+    queue: VecDeque<TokenWithLocation>,
+    /// Keep track of whether we're at the start of a line so indents
+    /// can be handled specially.
+    at_line_start: bool,
     indent_level: u8,
     bracket_stack: Stack<(char, Location)>,
 }
@@ -57,30 +63,114 @@ impl<'a> Scanner<'a> {
             one_ahead_stream,
             two_ahead_stream,
             location,
+            queue: VecDeque::new(),
+            at_line_start: true,
             indent_level: 0,
             bracket_stack: Stack::new(),
         }
     }
 
-    /// Try to get the next token and return a result containing either
-    /// a token with its start and end locations or an error. When None
-    /// is returned, the iterator will skip to the next token.
-    fn next_token(&mut self) -> Option<ScanResult> {
+    fn next_from_queue(&mut self) -> ScanResult {
+        while self.queue.is_empty() {
+            self.add_tokens_to_queue()?;
+        }
+        Ok(self.queue.pop_front().unwrap())
+    }
+
+    fn add_token_to_queue(&mut self, token: Token, start: Location, end_option: Option<Location>) {
+        let end = match end_option {
+            Some(end) => end,
+            None => Location::new(self.location.line, self.location.col - 1),
+        };
+        let token_with_location = TokenWithLocation::new(token, start, end);
+        self.queue.push_back(token_with_location);
+    }
+
+    fn handle_indents(&mut self) -> Result<(), ScanError> {
         let start = self.location;
+        let mut num_spaces = self.read_indent();
+        let mut whitespace_count = self.consume_whitespace();
+
+        match self.stream.peek() {
+            None | Some('\n') => {
+                // Blank or whitespace-only line; skip it.
+                return Ok(());
+            }
+            Some('#') => {
+                // Line containing just a comment; skip it.
+                self.consume_comment();
+                return Ok(());
+            }
+            _ => (),
+        }
+
+        // Now we have 0 or more spaces followed by some other char.
+        // First, make sure it's a valid indent.
+        if num_spaces % 4 != 0 {
+            return Err(ScanError::new(
+                ScanErrorType::InvalidIndent(num_spaces),
+                start,
+            ));
+        }
+
+        // Next, make sure the indent isn't followed by additional non-
+        // space whitespace, because that would be confusing.
+        if whitespace_count > 0 {
+            return Err(ScanError::new(ScanErrorType::WhitespaceAfterIndent, start));
+        }
+
+        // Now we have something that could be a valid indent. If the
+        // indent level has increased, that signals the start of a
+        // block. If it has decreased, that signals the end of a block,
+        // and we may have to dedent multiple levels. If it stayed the
+        // same, do nothing.
+        let indent_level = num_spaces / 4;
+        if indent_level == self.indent_level {
+            return Ok(());
+        } else if indent_level == self.indent_level + 1 {
+            let location = Location::new(start.line, 0);
+            self.indent_level = indent_level;
+            self.add_token_to_queue(Token::BlockStart, location, Some(location));
+        } else if indent_level < self.indent_level {
+            let location = Location::new(start.line, 0);
+            while self.indent_level > indent_level {
+                self.indent_level -= 1;
+                self.add_token_to_queue(Token::BlockEnd, location, Some(location));
+            }
+        } else {
+            return Err(ScanError::new(
+                ScanErrorType::IndentTooBig(indent_level),
+                start,
+            ));
+        };
+
+        Ok(())
+    }
+
+    fn add_tokens_to_queue(&mut self) -> Result<(), ScanError> {
+        if self.at_line_start {
+            self.handle_indents()?;
+        }
+
+        let start = self.location;
+
+        // NOTE: handle_indents() may consume up to the end of a line,
+        // but it will always leave the newline in place.
+        self.at_line_start = false;
 
         let token = match self.next_char() {
             Some(('"', _, _)) => match self.read_string('"') {
                 (string, true) => Token::String(string),
                 (string, false) => {
-                    return Some(Err(ScanError::new(
+                    return Err(ScanError::new(
                         ScanErrorType::UnterminatedString(format!("\"{}", string)),
                         start,
-                    )));
+                    ));
                 }
             },
             Some(('#', _, _)) => {
                 self.consume_comment();
-                return None;
+                return Ok(());
             }
             Some((':', _, _)) => Token::Colon,
             Some((',', _, _)) => Token::Comma,
@@ -92,10 +182,10 @@ impl<'a> Scanner<'a> {
                 match self.bracket_stack.pop() {
                     Some(('(', _)) => (),
                     None | Some(_) => {
-                        return Some(Err(ScanError::new(
+                        return Err(ScanError::new(
                             ScanErrorType::UnmatchedClosingBracket(c),
                             start,
-                        )));
+                        ));
                     }
                 }
                 Token::RightParen
@@ -108,10 +198,10 @@ impl<'a> Scanner<'a> {
                 match self.bracket_stack.pop() {
                     Some(('[', _)) => (),
                     None | Some(_) => {
-                        return Some(Err(ScanError::new(
+                        return Err(ScanError::new(
                             ScanErrorType::UnmatchedClosingBracket(c),
                             start,
-                        )));
+                        ));
                     }
                 }
                 Token::RightSquareBracket
@@ -127,10 +217,10 @@ impl<'a> Scanner<'a> {
                 match self.bracket_stack.pop() {
                     Some(('<', _)) => (),
                     None | Some(_) => {
-                        return Some(Err(ScanError::new(
+                        return Err(ScanError::new(
                             ScanErrorType::UnmatchedClosingBracket(c),
                             start,
-                        )));
+                        ));
                     }
                 }
                 Token::RightAngleBracket
@@ -185,102 +275,53 @@ impl<'a> Scanner<'a> {
             Some(('\n', _, _)) => {
                 if self.bracket_stack.size() > 0 {
                     self.consume_whitespace();
-                    return None;
-                }
-
-                let mut num_spaces = self.read_indent();
-                let mut whitespace_count = self.consume_whitespace();
-
-                match self.stream.peek() {
-                    None | Some('\n') => {
-                        // Blank line (including whitespace-only)
-                        return None;
-                    }
-                    Some('#') => {
-                        // Indented comment
-                        // self.next_char();
-                        self.consume_comment();
-                        return None;
-                    }
-                    _ => (),
-                }
-
-                if num_spaces % 4 != 0 {
-                    return Some(Err(ScanError::new(
-                        ScanErrorType::InvalidIndent(num_spaces),
-                        start,
-                    )));
-                }
-
-                if whitespace_count > 0 {
-                    // Indent followed by other whitespace character(s)
-                    return Some(Err(ScanError::new(
-                        ScanErrorType::WhitespaceAfterIndent,
-                        start,
-                    )));
-                }
-
-                // Now we have something that could be a valid indent.
-                // If the indent level has increased, that signals the
-                // start of a block. If it has decreased, that signals
-                // the end of a block. If it stayed the same, do
-                // nothing.
-                let indent_level = num_spaces / 4;
-                if indent_level == self.indent_level {
-                    return None;
-                } else if indent_level == self.indent_level + 1 {
-                    self.indent_level = indent_level;
-                    Token::BlockStart
-                } else if indent_level < self.indent_level {
-                    self.indent_level = indent_level;
-                    Token::BlockEnd
                 } else {
-                    return Some(Err(ScanError::new(
-                        ScanErrorType::IndentTooBig(indent_level),
-                        start,
-                    )));
+                    self.at_line_start = true;
                 }
+                return Ok(());
             }
             Some(('\r', Some('\n'), _)) => {
                 // On the next iteration, the post-newline logic above
                 // will be invoked.
-                return None;
+                return Ok(());
             }
             Some((c, _, _)) if c.is_whitespace() => {
-                return Some(Err(ScanError::new(
-                    ScanErrorType::UnexpectedWhitespace,
-                    start,
-                )));
+                return Err(ScanError::new(ScanErrorType::UnexpectedWhitespace, start));
             }
             // Unknown
             Some((c, _, _)) => {
-                return Some(Err(ScanError::new(ScanErrorType::UnknownToken(c), start)));
+                return Err(ScanError::new(ScanErrorType::UnknownToken(c), start));
             }
             // End of input
             None => {
-                if 0 < self.indent_level {
-                    self.indent_level = 0;
-                    Token::BlockEnd
-                } else {
-                    let bracket = self.bracket_stack.pop();
-                    match bracket {
-                        Some((c, location)) => {
-                            return Some(Err(ScanError::new(
-                                ScanErrorType::UnmatchedOpeningBracket(c),
-                                location,
-                            )));
-                        }
-                        None => (),
+                if self.indent_level > 0 {
+                    // This will happen if the source doesn't end with
+                    // a newline.
+                    let location = Location::new(start.line + 1, 0);
+                    while self.indent_level > 0 {
+                        self.indent_level -= 1;
+                        self.add_token_to_queue(Token::BlockEnd, location, Some(location));
                     }
-
-                    Token::EndOfInput
                 }
+
+                let bracket = self.bracket_stack.pop();
+                match bracket {
+                    Some((c, location)) => {
+                        return Err(ScanError::new(
+                            ScanErrorType::UnmatchedOpeningBracket(c),
+                            location,
+                        ));
+                    }
+                    None => (),
+                }
+
+                Token::EndOfInput
             }
         };
 
-        let end = Some(Location::new(self.location.line, self.location.col - 1));
+        self.add_token_to_queue(token, start, None);
         self.consume_whitespace();
-        Some(Ok(TokenWithLocation::new(token, start, end.unwrap())))
+        Ok(())
     }
 
     /// Consume and return the next character from each stream.
@@ -580,15 +621,14 @@ impl Iterator for Scanner<'_> {
     type Item = ScanResult;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.next_token() {
-            Some(Ok(TokenWithLocation {
+        match self.next_from_queue() {
+            Ok(TokenWithLocation {
                 token: Token::EndOfInput,
                 start: _,
                 end: _,
-            })) => None,
-            Some(Ok(t)) => Some(Ok(t)),
-            Some(Err(t)) => Some(Err(t)),
-            None => self.next(),
+            }) => None,
+            Ok(t) => Some(Ok(t)),
+            Err(t) => Some(Err(t)),
         }
     }
 }

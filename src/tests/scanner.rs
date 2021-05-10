@@ -127,11 +127,11 @@ g (y) ->  # 6
     check_token(tokens.get(2), token, 1, 4, 1, 4);
     check_token(tokens.get(3), Token::RightParen, 1, 5, 1, 5);
     check_token(tokens.get(4), Token::FuncStart, 1, 7, 1, 8);
-    check_token(tokens.get(5), Token::BlockStart, 1, 14, 2, 4);
+    check_token(tokens.get(5), Token::BlockStart, 2, 0, 2, 0);
     token = Token::Identifier("x".to_string());
     check_token(tokens.get(6), token, 2, 5, 2, 5);
     check_token(tokens.get(7), Token::Int("1".to_string(), 10), 3, 5, 3, 5);
-    check_token(tokens.get(8), Token::BlockEnd, 5, 14, 6, 0);
+    check_token(tokens.get(8), Token::BlockEnd, 6, 0, 6, 0);
 
     // g
     token = Token::Identifier("g".to_string());
@@ -141,10 +141,10 @@ g (y) ->  # 6
     check_token(tokens.get(11), token, 6, 4, 6, 4);
     check_token(tokens.get(12), Token::RightParen, 6, 5, 6, 5);
     check_token(tokens.get(13), Token::FuncStart, 6, 7, 6, 8);
-    check_token(tokens.get(14), Token::BlockStart, 6, 14, 7, 4);
+    check_token(tokens.get(14), Token::BlockStart, 7, 0, 7, 0);
     token = Token::Identifier("y".to_string());
     check_token(tokens.get(15), token, 7, 5, 7, 5);
-    check_token(tokens.get(16), Token::BlockEnd, 7, 14, 7, 13);
+    check_token(tokens.get(16), Token::BlockEnd, 8, 0, 8, 0);
     assert!(tokens.get(17).is_none());
 }
 
