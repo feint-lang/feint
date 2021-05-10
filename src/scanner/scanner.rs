@@ -155,7 +155,9 @@ impl<'a> Scanner<'a> {
         let start = self.location;
 
         // NOTE: handle_indents() may consume up to the end of a line,
-        // but it will always leave the newline in place.
+        // but it will always leave the newline in place. We assume
+        // that we're not at the start of a newline, but if the next
+        // char is a newline, this will be updated.
         self.at_line_start = false;
 
         let token = match self.next_char() {
