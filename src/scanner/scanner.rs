@@ -43,7 +43,7 @@ pub struct Scanner<'a> {
     /// Keep track of whether we're at the start of a line so indents
     /// can be handled specially.
     at_line_start: bool,
-    indent_level: u8,
+    indent_level: i32,
     bracket_stack: Stack<(char, Location)>,
 }
 
@@ -65,7 +65,7 @@ impl<'a> Scanner<'a> {
             location,
             queue: VecDeque::new(),
             at_line_start: true,
-            indent_level: 0,
+            indent_level: -1,
             bracket_stack: Stack::new(),
         }
     }
@@ -132,6 +132,15 @@ impl<'a> Scanner<'a> {
         let indent_level = num_spaces / 4;
         if indent_level == self.indent_level {
             return Ok(());
+        } else if self.indent_level == -1 {
+            if indent_level == 0 {
+                self.indent_level = 0;
+                return Ok(());
+            }
+            return Err(ScanError::new(
+                ScanErrorType::UnexpectedIndent(indent_level),
+                start,
+            ));
         } else if indent_level == self.indent_level + 1 {
             let location = Location::new(start.line, 0);
             self.indent_level = indent_level;
@@ -144,7 +153,7 @@ impl<'a> Scanner<'a> {
             }
         } else {
             return Err(ScanError::new(
-                ScanErrorType::IndentTooBig(indent_level),
+                ScanErrorType::UnexpectedIndent(indent_level),
                 start,
             ));
         };
@@ -475,7 +484,7 @@ impl<'a> Scanner<'a> {
     /// Returns the number of contiguous space characters at the start
     /// of a line. An indent is defined as 4*N space characters followed
     /// by a non-whitespace character.
-    fn read_indent(&mut self) -> u8 {
+    fn read_indent(&mut self) -> i32 {
         let mut count = 0;
         loop {
             match self.next_char_if(|&c| c == ' ') {
@@ -635,9 +644,7 @@ impl Iterator for Scanner<'_> {
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.next_from_queue() {
-            Ok(TokenWithLocation { token: Token::EndOfInput, start: _, end: _ }) => {
-                None
-            }
+            Ok(TokenWithLocation { token: Token::EndOfInput, .. }) => None,
             Ok(t) => Some(Ok(t)),
             Err(t) => Some(Err(t)),
         }

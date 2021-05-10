@@ -156,7 +156,7 @@ fn scan_unexpected_indent_on_first_line() {
     match scanner::scan(source) {
         Ok(_) => assert!(false),
         Err(err) => match err {
-            ScanError { error: ScanErrorType::UnexpectedWhitespace, location } => {
+            ScanError { error: ScanErrorType::UnexpectedIndent(1), location } => {
                 assert_eq!(location.line, 1);
                 assert_eq!(location.col, 1);
             }
@@ -169,13 +169,14 @@ fn scan_unexpected_indent_on_first_line() {
 fn scan_brackets() {
     let source = "
 
-    a = [
+a = [
    1,
 # comment
   2,
 ]
 
-        b = 1
+# FIXME: This is an unexpected indent but the scanner doesn't detect that.
+    b = 1
 ";
     let tokens = scan(source);
     let mut token;

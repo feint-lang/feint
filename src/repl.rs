@@ -120,8 +120,7 @@ impl<'a> Runner<'a> {
                         return None;
                     }
                     ScanError {
-                        error: ScanErrorType::UnterminatedString(_),
-                        location: _,
+                        error: ScanErrorType::UnterminatedString(_), ..
                     } => loop {
                         return match self.read_line("+ ", false) {
                             Ok(None) => {
@@ -136,6 +135,26 @@ impl<'a> Runner<'a> {
                             Err(err) => Some(Err((1, format!("{}", err)))),
                         };
                     },
+                    ScanError {
+                        error: ScanErrorType::InvalidIndent(num_spaces),
+                        location,
+                    } => {
+                        self.add_history_entry(source);
+                        let col_no = location.col;
+                        eprintln!("{: >width$}^", "", width = col_no + 1);
+                        eprintln!("Syntax error: invalid indent with {} spaces (should be a multiple of 4)", num_spaces);
+                        return None;
+                    }
+                    ScanError {
+                        error: ScanErrorType::UnexpectedIndent(_),
+                        location,
+                    } => {
+                        self.add_history_entry(source);
+                        let col_no = location.col;
+                        eprintln!("{: >width$}^", "", width = col_no + 1);
+                        eprintln!("Syntax error: unexpected indent");
+                        return None;
+                    }
                     ScanError {
                         error: ScanErrorType::WhitespaceAfterIndent,
                         location,

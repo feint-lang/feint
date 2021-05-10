@@ -34,10 +34,7 @@ fn parse_simple_assignment() {
     assert_eq!(root.size(), 1);
     match ast.get(root.children[0]) {
         Some(ASTNode {
-            index: _,
-            value: ASTNodeValue::Assignment(name),
-            parent: _,
-            children: c,
+            value: ASTNodeValue::Assignment(name), children: c, ..
         }) => {
             assert_eq!(name, "n");
             assert_eq!(c.len(), 1);
@@ -64,10 +61,9 @@ fn parse_add() {
     assert_eq!(root.size(), 1);
     match ast.get(root.children[0]) {
         Some(ASTNode {
-            index: _,
             value: ASTNodeValue::BinaryOperation(operator),
-            parent: _,
             children: c,
+            ..
         }) => {
             assert_eq!(*operator, '+');
             assert_eq!(c.len(), 2);
