@@ -1,4 +1,6 @@
-use crate::scanner::{self, Location, ScanError, ScanErrorType, Token, TokenWithLocation};
+use crate::scanner::{
+    self, Location, ScanError, ScanErrorType, Token, TokenWithLocation,
+};
 
 #[test]
 fn scan_empty() {
@@ -154,10 +156,7 @@ fn scan_unexpected_indent_on_first_line() {
     match scanner::scan(source) {
         Ok(_) => assert!(false),
         Err(err) => match err {
-            ScanError {
-                error: ScanErrorType::UnexpectedWhitespace,
-                location,
-            } => {
+            ScanError { error: ScanErrorType::UnexpectedWhitespace, location } => {
                 assert_eq!(location.line, 1);
                 assert_eq!(location.col, 1);
             }
@@ -202,10 +201,7 @@ fn scan_unknown() {
     match scanner::scan(source) {
         Ok(tokens) => assert!(false),
         Err(err) => match err {
-            ScanError {
-                error: ScanErrorType::UnknownToken(c),
-                location,
-            } => {
+            ScanError { error: ScanErrorType::UnknownToken(c), location } => {
                 assert_eq!(c, '{');
                 assert_eq!(location.line, 1);
                 assert_eq!(location.col, 1);
@@ -251,16 +247,8 @@ fn check_string_token(
     match actual {
         Some(TokenWithLocation {
             token: Token::String(actual_string),
-            start:
-                Location {
-                    line: actual_start_line,
-                    col: actual_start_col,
-                },
-            end:
-                Location {
-                    line: actual_end_line,
-                    col: actual_end_col,
-                },
+            start: Location { line: actual_start_line, col: actual_start_col },
+            end: Location { line: actual_end_line, col: actual_end_col },
         }) => {
             assert_eq!(actual_string, expected_string);
             assert_eq!(actual_start_line, &expected_start_line);

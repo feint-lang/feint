@@ -6,9 +6,7 @@ pub struct Stack<T> {
 
 impl<T> Stack<T> {
     pub fn new() -> Self {
-        Stack {
-            storage: Vec::new(),
-        }
+        Stack { storage: Vec::new() }
     }
 
     pub fn push(&mut self, item: T) {

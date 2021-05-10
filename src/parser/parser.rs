@@ -129,15 +129,23 @@ impl<'a> Parser<'a> {
             // Atoms
             Some((Token::True, _, _)) => ASTNodeValue::Object("true".to_owned()),
             Some((Token::False, _, _)) => ASTNodeValue::Object("false".to_owned()),
-            Some((Token::Float(digits), _, _)) => ASTNodeValue::Object(digits.to_owned()),
-            Some((Token::Int(digits, radix), _, _)) => ASTNodeValue::Object(digits.to_owned()),
-            Some((Token::String(string), _, _)) => ASTNodeValue::Object(string.to_owned()),
+            Some((Token::Float(digits), _, _)) => {
+                ASTNodeValue::Object(digits.to_owned())
+            }
+            Some((Token::Int(digits, radix), _, _)) => {
+                ASTNodeValue::Object(digits.to_owned())
+            }
+            Some((Token::String(string), _, _)) => {
+                ASTNodeValue::Object(string.to_owned())
+            }
             // Assignment
             Some((Token::Identifier(name), Some(Token::Equal), _)) => {
                 ASTNodeValue::Assignment(name.clone())
             }
             // Reference
-            Some((Token::Identifier(name), _, _)) => ASTNodeValue::Reference(name.clone()),
+            Some((Token::Identifier(name), _, _)) => {
+                ASTNodeValue::Reference(name.clone())
+            }
             // Binary operation
             Some((Token::Plus, _, _)) => ASTNodeValue::BinaryOperation('+'),
             // Other

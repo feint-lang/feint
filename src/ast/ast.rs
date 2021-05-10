@@ -34,9 +34,7 @@ pub enum ASTNodeValue {
 
 impl AST {
     pub fn new() -> Self {
-        Self {
-            storage: vec![ASTNode::new(0, ASTNodeValue::ExpressionList, None)],
-        }
+        Self { storage: vec![ASTNode::new(0, ASTNodeValue::ExpressionList, None)] }
     }
 
     /// Return reference to root node.
@@ -121,12 +119,7 @@ impl fmt::Display for AST {
 
 impl ASTNode {
     pub fn new(index: usize, value: ASTNodeValue, parent: Option<usize>) -> Self {
-        Self {
-            index,
-            value,
-            parent,
-            children: vec![],
-        }
+        Self { index, value, parent, children: vec![] }
     }
 
     /// Return the index of the last child.

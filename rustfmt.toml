@@ -1,0 +1,20 @@
+max_width = 88
+use_small_heuristics = "Max"
+
+# Imports (use)
+imports_granularity = "Module"
+group_imports = "StdExternalCrate"
+
+# Don't collapse empty block onto a single line like {} because this
+# usually only happens when starting to implement something and is
+# extremely annoying. It's very rare to have an actually empty block.
+empty_item_single_line = false
+
+# Allows last arg in function call to wrap (JS style)
+overflow_delimited_expr = true
+
+reorder_impl_items = true
+
+# Comments
+wrap_comments = true
+comment_width = 72

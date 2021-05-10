@@ -59,12 +59,7 @@ use feint::run;
 fn main() {
     let app = App::new("Interpreter")
         .version("0.0")
-        .arg(
-            Arg::with_name("FILE_NAME")
-                .index(1)
-                .required(false)
-                .help("Script"),
-        )
+        .arg(Arg::with_name("FILE_NAME").index(1).required(false).help("Script"))
         .arg(
             Arg::with_name("debug")
                 .short("d")

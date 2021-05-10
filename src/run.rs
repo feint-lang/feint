@@ -56,10 +56,7 @@ impl<'a> Runner<'a> {
             }
             Err(err) => {
                 return match err {
-                    ScanError {
-                        error: ScanErrorType::UnknownToken(c),
-                        location,
-                    } => {
+                    ScanError { error: ScanErrorType::UnknownToken(c), location } => {
                         let message = format!(
                             "Syntax error: unknown token at line {} column {}: {}",
                             location.line, location.col, c

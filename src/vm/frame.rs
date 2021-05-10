@@ -11,10 +11,6 @@ pub struct Frame<'a> {
 
 impl<'a> Frame<'a> {
     pub fn new(return_address: usize) -> Self {
-        Frame {
-            parameters: HashMap::new(),
-            locals: HashMap::new(),
-            return_address,
-        }
+        Frame { parameters: HashMap::new(), locals: HashMap::new(), return_address }
     }
 }

@@ -8,11 +8,7 @@ pub struct Namespace {
 
 impl Namespace {
     pub fn new(parent: Option<Box<Namespace>>) -> Self {
-        Namespace {
-            parent,
-            storage: HashMap::new(),
-            assigned_names: vec![],
-        }
+        Namespace { parent, storage: HashMap::new(), assigned_names: vec![] }
     }
 
     pub fn get(&self, name: String) -> Option<usize> {
@@ -32,13 +28,17 @@ impl Namespace {
         self.storage.insert(key, value)
     }
 
-    pub fn assign(&mut self, name: String, value: usize) -> Result<Option<usize>, String> {
+    pub fn assign(
+        &mut self,
+        name: String,
+        value: usize,
+    ) -> Result<Option<usize>, String> {
         match self.storage.contains_key(name.as_str()) {
             true => Err(format!("Cannot re-assign {}", name)),
             false => {
                 self.assigned_names.push(name.clone());
                 Ok(self.storage.insert(name, value))
-            },
+            }
         }
     }
 

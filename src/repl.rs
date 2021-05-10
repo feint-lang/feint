@@ -30,12 +30,7 @@ pub struct Runner<'a> {
 
 impl<'a> Runner<'a> {
     pub fn new(history_path: Option<&'a Path>, vm: VM<'a>, debug: bool) -> Self {
-        Runner {
-            reader: rustyline::Editor::<()>::new(),
-            history_path,
-            vm,
-            debug,
-        }
+        Runner { reader: rustyline::Editor::<()>::new(), history_path, vm, debug }
     }
 
     /// Get the default history path, which is either ~/.feint_history
@@ -114,14 +109,14 @@ impl<'a> Runner<'a> {
                     self.parse(tokens)
                 }
                 Err(err) => match err {
-                    ScanError {
-                        error: ScanErrorType::UnknownToken(c),
-                        location,
-                    } => {
+                    ScanError { error: ScanErrorType::UnknownToken(c), location } => {
                         self.add_history_entry(source);
                         let col = location.col;
                         eprintln!("{: >width$}^", "", width = col + 1);
-                        eprintln!("Syntax error: unknown token at column {}: '{}'", col, c);
+                        eprintln!(
+                            "Syntax error: unknown token at column {}: '{}'",
+                            col, c
+                        );
                         return None;
                     }
                     ScanError {
@@ -134,7 +129,8 @@ impl<'a> Runner<'a> {
                                 self.eval(input.as_str())
                             }
                             Ok(Some(new_input)) => {
-                                let input = source.to_string() + "\n" + new_input.as_str();
+                                let input =
+                                    source.to_string() + "\n" + new_input.as_str();
                                 self.eval(input.as_str())
                             }
                             Err(err) => Some(Err((1, format!("{}", err)))),
@@ -155,7 +151,10 @@ impl<'a> Runner<'a> {
                         return None;
                     }
                     err => {
-                        return Some(Err((1, format!("Unhandled scan error: {:?}", err))));
+                        return Some(Err((
+                            1,
+                            format!("Unhandled scan error: {:?}", err),
+                        )));
                     }
                 },
             },
@@ -164,7 +163,9 @@ impl<'a> Runner<'a> {
         match self.vm.execute(&instructions) {
             VMState::Halted(0, option_message) => Some(Ok(option_message)),
             VMState::Halted(code, Some(message)) => Some(Err((code, message))),
-            VMState::Halted(code, None) => Some(Err((code, "Unknown Error".to_string()))),
+            VMState::Halted(code, None) => {
+                Some(Err((code, "Unknown Error".to_string())))
+            }
             VMState::Idle => None,
         }
     }

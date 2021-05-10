@@ -77,7 +77,12 @@ impl<'a> Scanner<'a> {
         Ok(self.queue.pop_front().unwrap())
     }
 
-    fn add_token_to_queue(&mut self, token: Token, start: Location, end_option: Option<Location>) {
+    fn add_token_to_queue(
+        &mut self,
+        token: Token,
+        start: Location,
+        end_option: Option<Location>,
+    ) {
         let end = match end_option {
             Some(end) => end,
             None => Location::new(self.location.line, self.location.col - 1),
@@ -208,13 +213,17 @@ impl<'a> Scanner<'a> {
                 }
                 Token::RightSquareBracket
             }
-            Some(('<', Some('='), _)) => self.next_char_and_token(Token::LessThanOrEqual),
+            Some(('<', Some('='), _)) => {
+                self.next_char_and_token(Token::LessThanOrEqual)
+            }
             Some(('<', Some('-'), _)) => self.next_char_and_token(Token::LoopFeed),
             Some((c @ '<', _, _)) => {
                 self.bracket_stack.push((c, start));
                 Token::LeftAngleBracket
             }
-            Some(('>', Some('='), _)) => self.next_char_and_token(Token::GreaterThanOrEqual),
+            Some(('>', Some('='), _)) => {
+                self.next_char_and_token(Token::GreaterThanOrEqual)
+            }
             Some((c @ '>', _, _)) => {
                 match self.bracket_stack.pop() {
                     Some(('<', _)) => (),
@@ -254,7 +263,9 @@ impl<'a> Scanner<'a> {
             Some(('%', _, _)) => Token::Percent,
             Some(('^', _, _)) => Token::Caret,
             Some((c @ '0'..='9', _, _)) => match self.read_number(c) {
-                (string, _) if string.contains(".") || string.contains("E") => Token::Float(string),
+                (string, _) if string.contains(".") || string.contains("E") => {
+                    Token::Float(string)
+                }
                 (string, radix) => Token::Int(string, radix),
             },
             // Identifiers
@@ -266,7 +277,9 @@ impl<'a> Scanner<'a> {
                     _ => Token::Identifier(identifier),
                 }
             }
-            Some((c @ 'A'..='Z', _, _)) => Token::TypeIdentifier(self.read_type_identifier(c)),
+            Some((c @ 'A'..='Z', _, _)) => {
+                Token::TypeIdentifier(self.read_type_identifier(c))
+            }
             Some((c @ '@', Some('a'..='z'), _)) => {
                 Token::TypeMethodIdentifier(self.read_identifier(c))
             }
@@ -302,7 +315,11 @@ impl<'a> Scanner<'a> {
                     let location = Location::new(start.line + 1, 0);
                     while self.indent_level > 0 {
                         self.indent_level -= 1;
-                        self.add_token_to_queue(Token::BlockEnd, location, Some(location));
+                        self.add_token_to_queue(
+                            Token::BlockEnd,
+                            location,
+                            Some(location),
+                        );
                     }
                 }
 
@@ -331,11 +348,7 @@ impl<'a> Scanner<'a> {
         match self.stream.next() {
             Some(c) => {
                 self.update_location(c);
-                Some((
-                    c,
-                    self.one_ahead_stream.next(),
-                    self.two_ahead_stream.next(),
-                ))
+                Some((c, self.one_ahead_stream.next(), self.two_ahead_stream.next()))
             }
             _ => None,
         }
@@ -343,11 +356,9 @@ impl<'a> Scanner<'a> {
 
     fn peek_char(&mut self) -> PeekOption {
         match self.stream.peek() {
-            Some(c) => Some((
-                c,
-                self.one_ahead_stream.peek(),
-                self.two_ahead_stream.peek(),
-            )),
+            Some(c) => {
+                Some((c, self.one_ahead_stream.peek(), self.two_ahead_stream.peek()))
+            }
             _ => None,
         }
     }
@@ -373,11 +384,7 @@ impl<'a> Scanner<'a> {
         match self.stream.next_if(func) {
             Some(c) => {
                 self.update_location(c);
-                Some((
-                    c,
-                    self.one_ahead_stream.next(),
-                    self.two_ahead_stream.next(),
-                ))
+                Some((c, self.one_ahead_stream.next(), self.two_ahead_stream.next()))
             }
             _ => None,
         }
@@ -512,7 +519,9 @@ impl<'a> Scanner<'a> {
                 _ => (),
             }
             // Handle E notation *without* sign.
-            match self.next_two_chars_if(|&c| c == 'e' || c == 'E', |&e| e.is_digit(radix)) {
+            match self
+                .next_two_chars_if(|&c| c == 'e' || c == 'E', |&e| e.is_digit(radix))
+            {
                 Some((_, digit, _)) => {
                     string.push('E');
                     string.push('+');
@@ -595,7 +604,9 @@ impl<'a> Scanner<'a> {
     fn read_identifier(&mut self, first_char: char) -> String {
         let mut string = first_char.to_string();
         loop {
-            match self.next_char_if(|&c| c.is_ascii_lowercase() || c.is_digit(10) || c == '_') {
+            match self
+                .next_char_if(|&c| c.is_ascii_lowercase() || c.is_digit(10) || c == '_')
+            {
                 Some((c, _, _)) => string.push(c),
                 None => break string,
             }
@@ -624,11 +635,9 @@ impl Iterator for Scanner<'_> {
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.next_from_queue() {
-            Ok(TokenWithLocation {
-                token: Token::EndOfInput,
-                start: _,
-                end: _,
-            }) => None,
+            Ok(TokenWithLocation { token: Token::EndOfInput, start: _, end: _ }) => {
+                None
+            }
             Ok(t) => Some(Ok(t)),
             Err(t) => Some(Err(t)),
         }

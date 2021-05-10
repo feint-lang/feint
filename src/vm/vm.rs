@@ -26,11 +26,7 @@ pub struct VM<'a> {
 /// execute. After instructions are executed
 impl<'a> VM<'a> {
     pub fn new(namespace: Namespace) -> Self {
-        VM {
-            namespace,
-            stack: Stack::new(),
-            call_stack: Stack::new(),
-        }
+        VM { namespace, stack: Stack::new(), call_stack: Stack::new() }
     }
 
     pub fn halt(&mut self) {

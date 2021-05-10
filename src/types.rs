@@ -16,15 +16,14 @@ impl<'a> Type<'a> {
         Type { id, name, methods }
     }
 
-    pub fn new_instance(&self, name: String, attributes: HashMap<&'a str, &'a Object>) -> Object {
+    pub fn new_instance(
+        &self,
+        name: String,
+        attributes: HashMap<&'a str, &'a Object>,
+    ) -> Object {
         let mut rng = rand::thread_rng();
         let id: usize = rng.gen();
-        Object {
-            id,
-            name,
-            type_: &self,
-            attributes,
-        }
+        Object { id, name, type_: &self, attributes }
     }
 }
 
