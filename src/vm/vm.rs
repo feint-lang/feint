@@ -1,8 +1,6 @@
 use crate::util::Stack;
 
-use super::Frame;
-use super::Instruction;
-use super::Namespace;
+use super::{Frame, Instruction, Instructions, Namespace};
 
 #[derive(Debug)]
 pub enum VMState {
@@ -41,7 +39,7 @@ impl<'a> VM<'a> {
     /// When a HALT instruction is encountered, the VM's state will be
     /// cleared; it can be "restarted" by passing more instructions to
     /// execute.
-    pub fn execute(&mut self, instructions: &Vec<Instruction>) -> VMState {
+    pub fn execute(&mut self, instructions: &Instructions) -> VMState {
         let mut instruction_pointer = 0;
         loop {
             match instructions.get(instruction_pointer) {

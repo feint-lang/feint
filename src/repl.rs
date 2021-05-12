@@ -8,9 +8,7 @@ use rustyline::error::ReadlineError;
 use super::parser::parse;
 use super::result::ExitResult;
 use super::scanner::{self, ScanError, ScanErrorKind, TokenWithLocation};
-use super::vm::Instruction;
-use super::vm::Namespace;
-use super::vm::{VMState, VM};
+use super::vm::{Instruction, Instructions, Namespace, VMState, VM};
 
 /// Run FeInt REPL until user exits.
 pub fn run(debug: bool) -> ExitResult {
@@ -99,7 +97,7 @@ impl<'a> Runner<'a> {
     }
 
     fn eval(&mut self, source: &str) -> Option<ExitResult> {
-        let instructions: Vec<Instruction> = match source.trim() {
+        let instructions: Instructions = match source.trim() {
             ".exit" | ".halt" | ".quit" => {
                 vec![Instruction::Halt(0)]
             }
@@ -143,8 +141,8 @@ impl<'a> Runner<'a> {
                         location,
                     } => {
                         self.add_history_entry(source);
-                        let col_no = location.col;
-                        eprintln!("{: >width$}^", "", width = col_no + 1);
+                        let col = location.col;
+                        eprintln!("{: >width$}^", "", width = col + 1);
                         eprintln!("Syntax error: invalid indent with {} spaces (should be a multiple of 4)", num_spaces);
                         return None;
                     }
@@ -153,8 +151,8 @@ impl<'a> Runner<'a> {
                         location,
                     } => {
                         self.add_history_entry(source);
-                        let col_no = location.col;
-                        eprintln!("{: >width$}^", "", width = col_no + 1);
+                        let col = location.col;
+                        eprintln!("{: >width$}^", "", width = col + 1);
                         eprintln!("Syntax error: unexpected indent");
                         return None;
                     }
@@ -167,8 +165,8 @@ impl<'a> Runner<'a> {
                         location,
                     } => {
                         self.add_history_entry(source);
-                        let col_no = location.col;
-                        eprintln!("{: >width$}^", "", width = col_no + 1);
+                        let col = location.col;
+                        eprintln!("{: >width$}^", "", width = col + 1);
                         eprintln!("Syntax error: unexpected whitespace");
                         return None;
                     }
@@ -192,7 +190,7 @@ impl<'a> Runner<'a> {
         }
     }
 
-    fn parse(&self, tokens: Vec<TokenWithLocation>) -> Vec<Instruction> {
+    fn parse(&self, tokens: Vec<TokenWithLocation>) -> Instructions {
         if self.debug {
             for t in tokens.iter() {
                 eprintln!("{}", t);

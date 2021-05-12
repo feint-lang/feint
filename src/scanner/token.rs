@@ -1,5 +1,7 @@
 use std::fmt;
 
+use num_bigint::BigInt;
+
 use crate::util::Location;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -15,9 +17,10 @@ pub enum Token {
     Comma, // ,
 
     // Fundamental types
-    Float(String),    // 1.0
-    Int(String, u32), // 1, 0b1, 0o1, ox1 (digits, radix)
-    String(String),   // "1" (does NOT include quotes)
+    Float(f64),           // 1.0, 1.0E+10
+    Int(BigInt),          // 1, 1_000, 0b1, 0o1, ox1 (digits, radix)
+    String(String),       // "words words words"
+    FormatString(String), // $"words {name_in_scope} words"
 
     // Single-character operators
     Equal,     // =

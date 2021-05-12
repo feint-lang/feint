@@ -1,4 +1,7 @@
 use std::io::Error;
+use std::num::ParseFloatError;
+
+use num_bigint::ParseBigIntError;
 
 use crate::util::Location;
 
@@ -28,5 +31,7 @@ pub enum ScanErrorKind {
     UnexpectedCharacter(char), // Char not recognized as token or start of token
     UnmatchedOpeningBracket(char), // Closing bracket with no matching opening bracket
     UnmatchedClosingBracket(char), // Opening bracket with no matching closing bracket
+    ParseIntError(ParseBigIntError),
+    ParseFloatError(ParseFloatError),
     CouldNotOpenSourceFile(Error),
 }

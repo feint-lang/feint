@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::types::Object;
+use crate::builtins::Object;
 
 /// VM call stack frame.
 pub struct Frame<'a> {

@@ -2,7 +2,7 @@
 
 use super::result::ExitResult;
 use super::scanner::{self, ScanError, ScanErrorKind};
-use super::vm::{Instruction, Namespace, VMState, VM};
+use super::vm::{Instruction, Instructions, Namespace, VMState, VM};
 use crate::scanner::TokenWithLocation;
 
 /// Run text source.
@@ -79,7 +79,7 @@ impl<'a> Runner<'a> {
             }
         };
 
-        let mut instructions: Vec<Instruction> = vec![];
+        let mut instructions: Instructions = vec![];
         instructions.push(Instruction::Push(1));
         instructions.push(Instruction::Push(2));
         instructions.push(Instruction::Add);

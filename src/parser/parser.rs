@@ -128,12 +128,10 @@ impl<'a> Parser<'a> {
             // Atoms
             Some((Token::True, _, _)) => ASTNodeValue::Object("true".to_owned()),
             Some((Token::False, _, _)) => ASTNodeValue::Object("false".to_owned()),
-            Some((Token::Float(digits), _, _)) => {
-                ASTNodeValue::Object(digits.to_owned())
+            Some((Token::Float(value), _, _)) => {
+                ASTNodeValue::Object(value.to_string())
             }
-            Some((Token::Int(digits, radix), _, _)) => {
-                ASTNodeValue::Object(digits.to_owned())
-            }
+            Some((Token::Int(value), _, _)) => ASTNodeValue::Object(value.to_string()),
             Some((Token::String(string), _, _)) => {
                 ASTNodeValue::Object(string.to_owned())
             }

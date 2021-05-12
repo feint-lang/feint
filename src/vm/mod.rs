@@ -1,5 +1,5 @@
 pub(crate) use frame::Frame;
-pub(crate) use instruction::Instruction;
+pub(crate) use instruction::{format_instructions, Instruction, Instructions};
 pub(crate) use namespace::Namespace;
 pub(crate) use vm::{VMState, VM};
 

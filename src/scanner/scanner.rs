@@ -2,6 +2,9 @@ use std::collections::VecDeque;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Cursor};
 
+use num_bigint::BigInt;
+use num_traits::Num;
+
 use crate::util::{Location, Source, Stack};
 
 use super::KEYWORDS;
@@ -310,9 +313,18 @@ where
             Some(('^', _, _)) => Token::Caret,
             Some((c @ '0'..='9', _, _)) => match self.read_number(c) {
                 (string, _) if string.contains(".") || string.contains("E") => {
-                    Token::Float(string)
+                    let value = string.parse::<f64>().map_err(|err| {
+                        ScanError::new(ScanErrorKind::ParseFloatError(err), start)
+                    })?;
+                    Token::Float(value)
                 }
-                (string, radix) => Token::Int(string, radix),
+                (string, radix) => {
+                    let value = BigInt::from_str_radix(string.as_str(), radix)
+                        .map_err(|err| {
+                            ScanError::new(ScanErrorKind::ParseIntError(err), start)
+                        })?;
+                    Token::Int(value)
+                }
             },
             // Identifiers
             Some((c @ 'a'..='z', _, _)) => {
@@ -717,28 +729,28 @@ mod tests {
     fn scan_int() {
         let tokens = scan_optimistic("123");
         assert_eq!(tokens.len(), 1);
-        check_token(tokens.get(0), Token::Int("123".to_string(), 10), 1, 1, 1, 3);
+        check_token(tokens.get(0), Token::Int(BigInt::from(123)), 1, 1, 1, 3);
     }
 
     #[test]
     fn scan_binary_number() {
-        let tokens = scan_optimistic("0b11");
+        let tokens = scan_optimistic("0b11"); // = 3
         assert_eq!(tokens.len(), 1);
-        check_token(tokens.get(0), Token::Int("11".to_string(), 2), 1, 1, 1, 4);
+        check_token(tokens.get(0), Token::Int(BigInt::from(3)), 1, 1, 1, 4);
     }
 
     #[test]
     fn scan_float() {
         let tokens = scan_optimistic("123.1");
         assert_eq!(tokens.len(), 1);
-        check_token(tokens.get(0), Token::Float("123.1".to_string()), 1, 1, 1, 5);
+        check_token(tokens.get(0), Token::Float(123.1 as f64), 1, 1, 1, 5);
     }
 
     #[test]
     fn scan_float_with_e_and_no_sign() {
         let tokens = scan_optimistic("123.1e1");
         assert_eq!(tokens.len(), 1);
-        let expected = Token::Float("123.1E+1".to_string());
+        let expected = Token::Float(123.1E+1);
         check_token(tokens.get(0), expected, 1, 1, 1, 7);
     }
 
@@ -746,7 +758,7 @@ mod tests {
     fn scan_float_with_e_and_sign() {
         let tokens = scan_optimistic("123.1e+1");
         assert_eq!(tokens.len(), 1);
-        let expected = Token::Float("123.1E+1".to_string());
+        let expected = Token::Float(123.1E+1);
         check_token(tokens.get(0), expected, 1, 1, 1, 8);
     }
 
@@ -854,7 +866,7 @@ g (y) ->  # 6
         check_token(tokens.get(5), Token::BlockStart, 2, 0, 2, 0);
         token = Token::Identifier("x".to_string());
         check_token(tokens.get(6), token, 2, 5, 2, 5);
-        check_token(tokens.get(7), Token::Int("1".to_string(), 10), 3, 5, 3, 5);
+        check_token(tokens.get(7), Token::Int(BigInt::from(1)), 3, 5, 3, 5);
         check_token(tokens.get(8), Token::BlockEnd, 6, 0, 6, 0);
 
         // g
