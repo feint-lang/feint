@@ -15,8 +15,6 @@ pub enum Token {
     Comma, // ,
 
     // Fundamental types
-    True,
-    False,
     Float(String),    // 1.0
     Int(String, u32), // 1, 0b1, 0o1, ox1 (digits, radix)
     String(String),   // "1" (does NOT include quotes)
@@ -36,6 +34,7 @@ pub enum Token {
 
     // Multi-character operators
     EqualEqual,         // ==
+    EqualEqualEqual,    // === (use instead of is???)
     And,                // &&
     Or,                 // ||
     DoubleStar,         // **
@@ -60,11 +59,30 @@ pub enum Token {
     BlockStart, // Start of indented block
     BlockEnd,   // End of indented block
 
+    // Keywords
+    True,     //true
+    False,    //false
+    Import,   // import <module>
+    From,     // import from <module>: x, y, z
+    Package,  // import from package.<module>: x, y, z
+    As,       // import <module> as <name>
+    Is,       // Identity (use === instead?)
+    Let,      // let (???)
+    Block,    // block
+    If,       // if
+    ElseIf,   // elif
+    Else,     // else
+    Loop,     // ??? (while true, like Rust)
+    For,      // ??? or use <-
+    While,    // ??? or use <-
+    Break,    // break
+    Continue, // continue
+
     // Identifiers
     Identifier(String),              // name
     TypeIdentifier(String),          // Name
     TypeMethodIdentifier(String),    // @name (called via type)
-    SpecialMethodIdentifier(String), // $name (e.g., $bool on a type)
+    SpecialMethodIdentifier(String), // $name (e.g., $bool, $str)
 
     EndOfInput,
 }

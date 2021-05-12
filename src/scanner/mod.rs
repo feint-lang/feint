@@ -1,8 +1,9 @@
-pub use result::{ScanError, ScanErrorKind};
+pub use keywords::KEYWORDS;
+pub use result::{ScanError, ScanErrorKind, ScanResult};
 pub use scanner::{scan, scan_file, scan_optimistic};
 pub use token::{Token, TokenWithLocation};
 
-mod keyword;
+mod keywords;
 mod operator;
 mod result;
 mod scanner;

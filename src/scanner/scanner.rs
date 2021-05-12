@@ -4,8 +4,9 @@ use std::io::{BufRead, BufReader, Cursor};
 
 use crate::util::{Location, Source, Stack};
 
-use super::result::{ScanError, ScanErrorKind, ScanResult};
-use super::token::{Token, TokenWithLocation};
+use super::KEYWORDS;
+use super::{ScanError, ScanErrorKind, ScanResult};
+use super::{Token, TokenWithLocation};
 
 type NextOption<'a> = Option<(char, Option<&'a char>, Option<&'a char>)>;
 type NextTwoOption<'a> = Option<(char, char, Option<&'a char>)>;
@@ -111,8 +112,8 @@ where
         );
 
         let start = self.source.location();
-        let mut num_spaces = self.read_indent();
-        let mut whitespace_count = self.consume_whitespace();
+        let num_spaces = self.read_indent();
+        let whitespace_count = self.consume_whitespace();
 
         match self.source.peek() {
             None | Some('\n') => {
@@ -316,9 +317,8 @@ where
             // Identifiers
             Some((c @ 'a'..='z', _, _)) => {
                 let identifier = self.read_identifier(c);
-                match identifier.as_str() {
-                    "true" => Token::True,
-                    "false" => Token::False,
+                match KEYWORDS.get(identifier.as_str()) {
+                    Some(token) => token.clone(),
                     _ => Token::Identifier(identifier),
                 }
             }
