@@ -1,8 +1,10 @@
 use std::collections::VecDeque;
 use std::fmt;
 use std::io::BufRead;
-use std::iter::Peekable;
-use std::str::Chars;
+
+/// Maximum line length in chars. This is used to set the capacity for
+/// the source's char queue up front to avoid allocations.
+const CAPACITY: usize = 255;
 
 /// A wrapper around some source, typically either some text or a file.
 /// The source is read line by line and the characters from each line
@@ -13,15 +15,10 @@ use std::str::Chars;
 ///   a line is reached; false otherwise)
 /// - The previous and current characters are tracked
 /// - Newlines are normalized (\r\n will be converted to \n)
-///
-/// IMPLEMENTATION NOTE: The chars for each line are collected into a
-/// temporary vector in order to get around borrowing/lifetime issues
-/// with trying to store the chars iter for the current line on self.
-/// This seems slightly inefficient.
 pub struct Source<T> {
     source: T,
     /// The queue of characters for the current line.
-    char_queue: VecDeque<char>,
+    queue: VecDeque<char>,
     pub line: usize,
     pub col: usize,
     pub at_start_of_line: bool,
@@ -36,7 +33,7 @@ where
     pub fn new(source: T) -> Self {
         let mut source = Source {
             source,
-            char_queue: VecDeque::new(),
+            queue: VecDeque::with_capacity(CAPACITY),
             line: 0,
             col: 0,
             at_start_of_line: true,
@@ -48,10 +45,10 @@ where
     }
 
     fn check_queue(&mut self) -> bool {
-        if self.char_queue.is_empty() {
+        if self.queue.is_empty() {
             // See if character queue can be refilled from the next line.
             let mut line = String::new();
-            let mut queue: VecDeque<char> = match self.source.read_line(&mut line) {
+            match self.source.read_line(&mut line) {
                 // No more lines; done.
                 Ok(0) => {
                     self.at_start_of_line = false;
@@ -61,7 +58,7 @@ where
                     self.line += 1;
                     self.col = 1;
                     self.at_start_of_line = true;
-                    line.chars().collect()
+                    self.queue.extend(line.chars());
                 }
                 Err(err) => {
                     // Panicking seems wonky, but if the source can't be
@@ -69,14 +66,13 @@ where
                     panic!("Could not read line from source: {}", err);
                 }
             };
-            if queue.len() > 1 {
+            if self.queue.len() > 1 {
                 // Normalize \r\n to \n
-                let i = queue.len() - 2;
-                if let (Some('\r'), Some('\n')) = (queue.get(i), queue.back()) {
-                    queue.remove(i);
+                let i = self.queue.len() - 2;
+                if self.queue[i] == '\r' && self.queue[i + 1] == '\n' {
+                    self.queue.remove(i);
                 }
             }
-            self.char_queue = queue;
         }
         // Queue wasn't empty or was refilled.
         true
@@ -84,7 +80,7 @@ where
 
     fn next_from_queue(&mut self) -> Option<char> {
         if self.check_queue() {
-            if let Some(c) = self.char_queue.pop_front() {
+            if let Some(c) = self.queue.pop_front() {
                 self.col += 1;
                 self.at_start_of_line = false;
                 self.previous_char = self.current_char;
@@ -98,7 +94,7 @@ where
     /// Peek at the next char.
     pub fn peek(&mut self) -> Option<&char> {
         if self.check_queue() {
-            return self.char_queue.front();
+            return self.queue.front();
         }
         None
     }
@@ -106,7 +102,7 @@ where
     /// Peek at the next two chars.
     pub fn peek_2(&mut self) -> (Option<&char>, Option<&char>) {
         if self.check_queue() {
-            let queue = &self.char_queue;
+            let queue = &self.queue;
             return (queue.get(0), queue.get(1));
         }
         (None, None)
@@ -115,7 +111,7 @@ where
     /// Peek at the next three chars.
     pub fn peek_3(&mut self) -> (Option<&char>, Option<&char>, Option<&char>) {
         if self.check_queue() {
-            let queue = &self.char_queue;
+            let queue = &self.queue;
             return (queue.get(0), queue.get(1), queue.get(2));
         }
         (None, None, None)
