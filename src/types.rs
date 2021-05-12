@@ -1,8 +1,6 @@
 use std::collections::HashMap;
 use std::fmt;
 
-use rand::Rng;
-
 #[derive(Debug)]
 pub struct Type<'a> {
     pub name: String,

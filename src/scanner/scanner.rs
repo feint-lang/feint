@@ -1,14 +1,11 @@
 use std::collections::VecDeque;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Cursor};
-use std::iter::Peekable;
-use std::str::Chars;
 
 use crate::util::{Location, Source, Stack};
 
 use super::result::{ScanError, ScanErrorKind, ScanResult};
 use super::token::{Token, TokenWithLocation};
-use std::cmp::max;
 
 type NextOption<'a> = Option<(char, Option<&'a char>, Option<&'a char>)>;
 type NextTwoOption<'a> = Option<(char, char, Option<&'a char>)>;
@@ -18,7 +15,7 @@ type NextThreeOption = Option<(char, char, char)>;
 /// return the resulting tokens or error.
 pub fn scan(text: &str) -> Result<Vec<TokenWithLocation>, ScanError> {
     let cursor = Cursor::new(text);
-    let mut scanner = Scanner::new(cursor);
+    let scanner = Scanner::new(cursor);
     scanner.collect()
 }
 
@@ -33,8 +30,8 @@ pub fn scan_file(file_name: &str) -> Result<Vec<TokenWithLocation>, ScanError> {
             ))
         }
     };
-    let mut reader = BufReader::new(file);
-    let mut scanner = Scanner::new(reader);
+    let reader = BufReader::new(file);
+    let scanner = Scanner::new(reader);
     scanner.collect()
 }
 
