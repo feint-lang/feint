@@ -1,4 +1,5 @@
-/// Run REPL until user exits.
+//! # FeInt REPL
+
 use std::path::{Path, PathBuf};
 
 use dirs;
@@ -11,6 +12,7 @@ use super::vm::Instruction;
 use super::vm::Namespace;
 use super::vm::{VMState, VM};
 
+/// Run FeInt REPL until user exits.
 pub fn run(debug: bool) -> ExitResult {
     let history_path = Runner::default_history_path();
     let namespace = Namespace::default();
@@ -19,7 +21,7 @@ pub fn run(debug: bool) -> ExitResult {
     runner.run()
 }
 
-pub struct Runner<'a> {
+struct Runner<'a> {
     reader: rustyline::Editor<()>,
     history_path: Option<&'a Path>,
     vm: VM<'a>,

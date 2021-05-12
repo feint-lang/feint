@@ -91,6 +91,6 @@ impl TokenWithLocation {
 
 impl fmt::Display for TokenWithLocation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}: {} -> {}", self.start, self.end, self.token)
+        write!(f, "{}: {} -> {}", self.token, self.start, self.end)
     }
 }

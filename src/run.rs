@@ -1,9 +1,11 @@
-/// Run provided source, typically from a file, to completion.
+//! # FeInt
+
 use super::result::ExitResult;
 use super::scanner::{self, ScanError, ScanErrorKind};
 use super::vm::{Instruction, Namespace, VMState, VM};
 use crate::scanner::TokenWithLocation;
 
+/// Run text source.
 pub fn run(source: &str, debug: bool) -> ExitResult {
     let namespace = Namespace::default();
     let vm = VM::new(namespace);
@@ -11,6 +13,7 @@ pub fn run(source: &str, debug: bool) -> ExitResult {
     runner.run(source)
 }
 
+/// Run source from file.
 pub fn run_file(file_name: &str, debug: bool) -> ExitResult {
     let namespace = Namespace::default();
     let vm = VM::new(namespace);

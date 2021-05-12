@@ -58,25 +58,43 @@ use feint::run;
 
 /// Interpret a file if one is specified. Otherwise, run the REPL.
 fn main() {
-    let app = App::new("Interpreter")
-        .version("0.0")
-        .arg(Arg::with_name("FILE_NAME").index(1).required(false).help("Script"))
+    let app = App::new("FeInt")
+        .version("0.0.0")
+        .arg(
+            Arg::with_name("FILE_NAME")
+                .index(1)
+                .required(false)
+                .conflicts_with("code")
+                .help("Script"))
+        .arg(
+            Arg::with_name("code")
+                .short("c")
+                .long("code")
+                .required(false)
+                .conflicts_with("FILE_NAME")
+                .takes_value(true)
+                .help("Code to run")
+        )
         .arg(
             Arg::with_name("debug")
                 .short("d")
                 .long("debug")
                 .required(false)
                 .takes_value(false)
-                .help("Enable debug mode?"),
+                .help("Enable debug mode?")
         );
 
     let matches = app.get_matches();
     let file_name = matches.value_of("FILE_NAME");
+    let code = matches.value_of("code");
     let debug = matches.is_present("debug");
 
-    let result = match file_name {
-        Some(file_name) => run::run_file(file_name, debug),
-        None => repl::run(debug),
+    let result = if let Some(code) = code {
+        run::run(code, debug)
+    } else if let Some(file_name) = file_name {
+        run::run_file(file_name, debug)
+    } else {
+        repl::run(debug)
     };
 
     match result {

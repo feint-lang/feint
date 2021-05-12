@@ -1,13 +1,13 @@
 [package]
 name = "feint"
-version = "0.1.0"
+version = "0.0.0"
 authors = ["Wyatt Baldwin"]
 edition = "2018"
 license-file = "LICENSE"
 
 [dependencies]
-clap = "^2.33.3"
-dirs = "*"
-rand = "^0.8.3"
-regex = "^1.4.6"
-rustyline = "*"
+clap = "~2.33.3"
+dirs = "~3.0.2"
+rand = "~0.8.3"
+regex = "~1.4.6"
+rustyline = "~8.0.0"
