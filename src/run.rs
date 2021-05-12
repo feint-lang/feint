@@ -1,11 +1,9 @@
 /// Run provided source, typically from a file, to completion.
 use std::fs;
 
-use crate::scanner::{scan, ScanError, ScanErrorType};
-use crate::vm::{Instruction, Namespace, VMState, VM};
-
-type ExitData = (i32, String);
-type ExitResult = Result<Option<String>, ExitData>;
+use super::result::ExitResult;
+use super::scanner::{scan, ScanError, ScanErrorType};
+use super::vm::{Instruction, Namespace, VMState, VM};
 
 pub fn run(source: &str, debug: bool) -> ExitResult {
     let namespace = Namespace::default();
@@ -21,17 +19,17 @@ pub fn run_file(file_name: &str, debug: bool) -> ExitResult {
     runner.run_file(file_name)
 }
 
-pub struct Runner<'a> {
+struct Runner<'a> {
     vm: VM<'a>,
     debug: bool,
 }
 
 impl<'a> Runner<'a> {
-    pub fn new(vm: VM<'a>, debug: bool) -> Self {
+    fn new(vm: VM<'a>, debug: bool) -> Self {
         Runner { vm, debug }
     }
 
-    pub fn run_file(&mut self, file_name: &str) -> ExitResult {
+    fn run_file(&mut self, file_name: &str) -> ExitResult {
         match fs::read_to_string(file_name) {
             Ok(source) => {
                 if self.debug {
@@ -44,7 +42,7 @@ impl<'a> Runner<'a> {
         }
     }
 
-    pub fn run(&mut self, source: &str) -> ExitResult {
+    fn run(&mut self, source: &str) -> ExitResult {
         match scan(source) {
             Ok(tokens) => {
                 if self.debug {
@@ -56,9 +54,12 @@ impl<'a> Runner<'a> {
             }
             Err(err) => {
                 return match err {
-                    ScanError { error: ScanErrorType::UnknownToken(c), location } => {
+                    ScanError {
+                        error: ScanErrorType::UnexpectedCharacter(c),
+                        location,
+                    } => {
                         let message = format!(
-                            "Syntax error: unknown token at line {} column {}: {}",
+                            "Syntax error: unexpected character at line {} column {}: {}",
                             location.line, location.col, c
                         );
                         Err((1, message))

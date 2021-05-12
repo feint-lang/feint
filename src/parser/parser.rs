@@ -2,8 +2,7 @@ use std::iter::Peekable;
 use std::slice::Iter;
 
 use crate::ast::{ASTNode, ASTNodeValue, AST};
-use crate::scanner::scan;
-use crate::scanner::{Token, TokenWithLocation};
+use crate::scanner::{self, Token, TokenWithLocation};
 
 type ParseResult = Result<AST, String>;
 type NextOption<'a> = Option<(&'a Token, Option<&'a Token>, Option<&'a Token>)>;
@@ -17,13 +16,13 @@ pub fn parse(tokens: &Vec<TokenWithLocation>) -> AST {
 
 /// Scan source, parse tokens, and return an AST.
 pub fn parse_from_source(source: &str) -> AST {
-    match scan(source) {
+    match scanner::scan(source) {
         Ok(tokens) => parse(&tokens),
         _ => AST::new(),
     }
 }
 
-pub struct Parser<'a> {
+struct Parser<'a> {
     stream: Peekable<Iter<'a, TokenWithLocation>>,
     one_ahead_stream: Peekable<Iter<'a, TokenWithLocation>>,
     two_ahead_stream: Peekable<Iter<'a, TokenWithLocation>>,
@@ -32,7 +31,7 @@ pub struct Parser<'a> {
 }
 
 impl<'a> Parser<'a> {
-    pub fn new(tokens: &'a Vec<TokenWithLocation>) -> Self {
+    fn new(tokens: &'a Vec<TokenWithLocation>) -> Self {
         let stream = tokens.iter().peekable();
         let mut one_ahead_stream = tokens.iter().peekable();
         let mut two_ahead_stream = tokens.iter().peekable();
@@ -50,7 +49,7 @@ impl<'a> Parser<'a> {
         instance
     }
 
-    pub fn parse(&mut self) {
+    fn parse(&mut self) {
         // A program is a list of expressions.
         self.expression_list(0);
     }
@@ -191,4 +190,135 @@ impl<'a> Parser<'a> {
     //         None => panic!("Unexpected end of expression"),
     //     }
     // }
+}
+
+#[cfg(test)]
+mod tests {
+    // All these tests except empty input hang, so they're ignored for
+    // the time being.
+
+    use super::*;
+
+    #[test]
+    fn parse_empty() {
+        let ast = parse_from_source("");
+        assert_eq!(ast.size(), 1); // has only a root node
+        let root = ast.root();
+        assert_eq!(root.size(), 0);
+    }
+
+    #[test]
+    #[ignore]
+    fn parse_int() {
+        let ast = parse_from_source("1");
+        assert_eq!(ast.size(), 2);
+        let root = ast.root();
+        assert_eq!(root.size(), 1);
+        match ast.get_value(1).unwrap() {
+            ASTNodeValue::Object(string) => assert_eq!(string, "1"),
+            _ => assert!(false, "Unexpected parse result for `1`"),
+        }
+    }
+
+    #[test]
+    #[ignore]
+    fn parse_simple_assignment() {
+        //      R
+        //      |
+        //      n=
+        //      |
+        //      1
+        let ast = parse_from_source("n = 1");
+        assert_eq!(ast.size(), 3, "{:?}", ast);
+        let root = ast.root();
+        assert_eq!(root.size(), 1);
+        match ast.get(root.children[0]) {
+            Some(ASTNode {
+                value: ASTNodeValue::Assignment(name),
+                children: c,
+                ..
+            }) => {
+                assert_eq!(name, "n");
+                assert_eq!(c.len(), 1);
+                assert_eq!(
+                    *ast.get_value(c[0]).unwrap(),
+                    ASTNodeValue::Object("1".to_owned()),
+                );
+            }
+            _ => assert!(false, "Unexpected parse result for `n = 1`"),
+        }
+    }
+
+    #[test]
+    #[ignore]
+    fn parse_add() {
+        //      R
+        //      |
+        //      +
+        //     / \
+        //    1   2
+        let ast = parse_from_source("1 + 2");
+        eprintln!("{:?}", ast);
+        assert_eq!(ast.size(), 4, "{:?}", ast);
+        let root = ast.root();
+        assert_eq!(root.size(), 1);
+        match ast.get(root.children[0]) {
+            Some(ASTNode {
+                value: ASTNodeValue::BinaryOperation(operator),
+                children: c,
+                ..
+            }) => {
+                assert_eq!(*operator, '+');
+                assert_eq!(c.len(), 2);
+                assert_eq!(
+                    *ast.get_value(c[0]).unwrap(),
+                    ASTNodeValue::Object("1".to_owned()),
+                );
+                assert_eq!(
+                    *ast.get_value(c[1]).unwrap(),
+                    ASTNodeValue::Object("2".to_owned())
+                );
+            }
+            _ => assert!(false, "Unexpected parse result for `1 + 2`"),
+        }
+    }
+
+    #[test]
+    #[ignore]
+    fn parse_assign_to_addition() {
+        let ast = parse_from_source("n = 1 + 2");
+        assert_eq!(ast.size(), 2);
+        let root = ast.root();
+        assert_eq!(root.size(), 1);
+        match ast.get_value(1) {
+            Some(ASTNodeValue::Assignment(name)) => {
+                assert_eq!(name, "n");
+                // assert_eq!(string, "1");
+            }
+            _ => assert!(false, "Unexpected parse result for `n = 1`"),
+        }
+    }
+
+    #[test]
+    #[ignore]
+    fn parse_simple_program() {
+        //      ROOT
+        //     /    \
+        //    a=    b=
+        //    |     |
+        //    1     +
+        //         / \
+        //        a   1
+        let ast = parse_from_source("a = 1\nb = a + 2\n");
+        assert_eq!(ast.size(), 7, "{:?}", ast);
+        let root = ast.root();
+        assert_eq!(root.size(), 2, "{:?}", ast);
+        match ast.get_value(1) {
+            Some(ASTNodeValue::Assignment(name)) => {
+                assert_eq!(name, "n");
+                // assert_eq!(string, "1");
+            }
+            _ => assert!(false, "Unexpected parse result for `n = 1`"),
+        }
+    }
 }

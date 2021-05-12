@@ -56,6 +56,7 @@ use clap::{App, Arg};
 use feint::repl;
 use feint::run;
 
+/// Interpret a file if one is specified. Otherwise, run the REPL.
 fn main() {
     let app = App::new("Interpreter")
         .version("0.0")
@@ -85,6 +86,7 @@ fn main() {
     }
 }
 
+/// Exit 0 with optional message.
 fn exit(message: Option<String>) {
     if message.is_some() {
         println!("{}", message.unwrap());
@@ -92,6 +94,7 @@ fn exit(message: Option<String>) {
     process::exit(0);
 }
 
+/// Exit with non-zero and error message.
 fn error_exit(code: i32, message: String) {
     eprintln!("{}", message);
     process::exit(code);

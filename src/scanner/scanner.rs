@@ -2,9 +2,11 @@ use std::collections::VecDeque;
 use std::iter::Peekable;
 use std::str::Chars;
 
+use crate::scanner::location::Location;
 use crate::util::Stack;
 
-use super::{Location, ScanError, ScanErrorType, ScanResult, Token, TokenWithLocation};
+use super::result::{ScanError, ScanErrorType, ScanResult};
+use super::token::{Token, TokenWithLocation};
 
 type NextOption = Option<(char, Option<char>, Option<char>)>;
 type NextTwoOption = Option<(char, char, Option<char>)>;
@@ -15,21 +17,18 @@ type PeekOption<'a> = Option<(&'a char, Option<&'a char>, Option<&'a char>)>;
 /// return the resulting tokens or error.
 pub fn scan(text: &str) -> Result<Vec<TokenWithLocation>, ScanError> {
     let mut scanner = Scanner::new(text, Location::new(1, 1));
-    let mut tokens: Vec<TokenWithLocation> = vec![];
-    for item in scanner {
-        match item {
-            Ok(token) => {
-                tokens.push(token);
-            }
-            Err(err) => {
-                return Err(err);
-            }
-        }
-    }
-    Ok(tokens)
+    scanner.collect()
 }
 
-pub struct Scanner<'a> {
+/// Scan and assume success.
+fn scan_optimistic(text: &str) -> Vec<TokenWithLocation> {
+    match scan(text) {
+        Ok(tokens) => tokens,
+        Err(err) => panic!("Scan failed unexpectedly: {:?}", err),
+    }
+}
+
+struct Scanner<'a> {
     source: &'a str,
     /// Stream of input characters from input string
     stream: Peekable<Chars<'a>>,
@@ -50,7 +49,7 @@ pub struct Scanner<'a> {
 impl<'a> Scanner<'a> {
     /// Create a new scanner from source text.
     /// XXX: Not sure if it's useful to be able to pass line & col no.
-    pub fn new(source: &'a str, location: Location) -> Self {
+    fn new(source: &'a str, location: Location) -> Self {
         let stream = source.chars().peekable();
         let mut one_ahead_stream = source.chars().peekable();
         let mut two_ahead_stream = source.chars().peekable();
@@ -171,7 +170,7 @@ impl<'a> Scanner<'a> {
         // NOTE: handle_indents() may consume up to the end of a line,
         // but it will always leave the newline in place. We assume
         // that we're not at the start of a newline, but if the next
-        // char is a newline, this will be updated.
+        // char is a newline, this will be updated below.
         self.at_line_start = false;
 
         let token = match self.next_char() {
@@ -263,7 +262,7 @@ impl<'a> Scanner<'a> {
             Some(('-', _, _)) => Token::Minus,
             Some(('!', Some('='), _)) => self.next_char_and_token(Token::NotEqual),
             Some(('!', Some('!'), _)) => self.next_char_and_token(Token::AsBool),
-            Some(('!', _, _)) => Token::Not,
+            Some(('!', _, _)) => Token::Bang,
             Some(('.', Some('.'), Some('.'))) => {
                 self.next_two_chars_and_token(Token::RangeInclusive)
             }
@@ -314,7 +313,10 @@ impl<'a> Scanner<'a> {
             }
             // Unknown
             Some((c, _, _)) => {
-                return Err(ScanError::new(ScanErrorType::UnknownToken(c), start));
+                return Err(ScanError::new(
+                    ScanErrorType::UnexpectedCharacter(c),
+                    start,
+                ));
             }
             // End of input
             None => {
@@ -494,22 +496,22 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    /// Read contiguous digits and an optional decimal point into a new
-    /// string. If a dot is encountered, it will be included only if the
-    /// char following the dot is another digit.
+    /// Read a number. Base 2, 8, 10, and 16 ints are supported as well
+    /// as base 10 floats.
     fn read_number(&mut self, first_digit: char) -> (String, u32) {
         let mut string = String::new();
 
         let radix: u32 = match (first_digit, self.peek_char()) {
-            ('0', Some(('b', _, _))) => 2,
-            ('0', Some(('o', _, _))) => 8,
-            ('0', Some(('x', _, _))) => 16,
+            ('0', Some(('b', _, _))) | ('0', Some(('B', _, _))) => 2,
+            ('0', Some(('o', _, _))) | ('0', Some(('O', _, _))) => 8,
+            ('0', Some(('x', _, _))) | ('0', Some(('X', _, _))) => 16,
             _ => 10,
         };
 
         if radix == 10 {
             string.push(first_digit);
         } else {
+            // Skip leading zero *and* type char.
             self.next_char();
         }
 
@@ -543,7 +545,7 @@ impl<'a> Scanner<'a> {
             match self.next_three_chars_if(
                 |&c| c == 'e' || c == 'E',
                 |&d| d == '+' || d == '-',
-                |&e| e.is_digit(10),
+                |&e| e.is_digit(radix),
             ) {
                 Some((_, sign, digit)) => {
                     string.push('E');
@@ -563,13 +565,13 @@ impl<'a> Scanner<'a> {
         loop {
             match self.next_char_if(|&c| c.is_digit(radix)) {
                 Some((digit, _, _)) => digits.push(digit),
-                None => break digits,
-            }
-            match self.peek_char() {
-                Some(('_', Some(c), _)) if c.is_digit(radix) => {
-                    self.next_char();
+                None => {
+                    match self.next_two_chars_if(|&c| c == '_', |&d| d.is_digit(radix))
+                    {
+                        Some((_, digit, _)) => digits.push(digit),
+                        None => break digits,
+                    }
                 }
-                _ => (),
             }
         }
     }
@@ -582,17 +584,57 @@ impl<'a> Scanner<'a> {
         let mut string = String::new();
         loop {
             match self.next_char() {
-                Some(('\\', Some('\n'), _)) => {
-                    self.next_char();
+                // Handle chars escaped by a preceding \.
+                Some(('\\', Some(c), _)) => {
+                    // TODO: Handle \o, \u, \x, etc
+                    self.next_char(); // Skip over the \.
+                    match c {
+                        // Skip newline when preceded by \ at end of
+                        // line. Note that this is the case where an
+                        // actual newline is embedded in a multiline
+                        // string and not the case where the string
+                        // "\n" was typed out. The "\n" case is handled
+                        // below.
+                        '\n' => (),
+
+                        'a' => string.push('\x07'),
+                        'b' => string.push('\x08'),
+                        'f' => string.push('\x0c'),
+
+                        // These next few lines might seem pointless,
+                        // but they're replacing the escape sequence in
+                        // the source text with the *actual* char in the
+                        // Rust string.
+                        '0' => string.push('\0'), // null
+                        'n' => string.push('\n'), // line feed
+                        'r' => string.push('\r'), // carriage return
+                        't' => string.push('\t'), // horizontal tab
+
+                        'v' => string.push('\x0b'), // vertical tab
+
+                        '\\' => string.push('\\'),
+
+                        // Unescape single quote. I'm not entirely sure
+                        // what the point of this is, since only double
+                        // quotes are used to quote strings, but it
+                        // seems to be a standard (Python and Rust both
+                        // do it).
+                        '\'' => string.push('\''),
+
+                        // This also seems to be a standard.
+                        '\"' => string.push('\"'),
+
+                        // Any other escaped char resolves to the
+                        // original *escaped* version of itself.
+                        c => {
+                            string.push('\\');
+                            string.push(c);
+                        }
+                    }
                 }
-                // Handle embedded/escaped quotes
-                Some(('\\', Some(d), _)) if d == quote => {
-                    self.next_char();
-                    string.push(d);
-                }
-                // Found closing quote; return string
+                // Found closing quote; return string.
                 Some((c, _, _)) if c == quote => break (string, true),
-                // Append current char and continue
+                // Append current char and continue.
                 Some((c, _, _)) => string.push(c),
                 // End of input reached without finding closing quote :(
                 None => break (string, false),
@@ -647,6 +689,282 @@ impl Iterator for Scanner<'_> {
             Ok(TokenWithLocation { token: Token::EndOfInput, .. }) => None,
             Ok(t) => Some(Ok(t)),
             Err(t) => Some(Err(t)),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn scan_empty() {
+        let tokens = scan_optimistic("");
+        assert_eq!(tokens.len(), 0);
+    }
+
+    #[test]
+    fn scan_int() {
+        let tokens = scan_optimistic("123");
+        assert_eq!(tokens.len(), 1);
+        check_token(tokens.get(0), Token::Int("123".to_string(), 10), 1, 1, 1, 3);
+    }
+
+    #[test]
+    fn scan_binary_number() {
+        let tokens = scan_optimistic("0b11");
+        assert_eq!(tokens.len(), 1);
+        check_token(tokens.get(0), Token::Int("11".to_string(), 2), 1, 1, 1, 4);
+    }
+
+    #[test]
+    fn scan_float() {
+        let tokens = scan_optimistic("123.1");
+        assert_eq!(tokens.len(), 1);
+        check_token(tokens.get(0), Token::Float("123.1".to_string()), 1, 1, 1, 5);
+    }
+
+    #[test]
+    fn scan_float_with_e_and_no_sign() {
+        let tokens = scan_optimistic("123.1e1");
+        assert_eq!(tokens.len(), 1);
+        let expected = Token::Float("123.1E+1".to_string());
+        check_token(tokens.get(0), expected, 1, 1, 1, 7);
+    }
+
+    #[test]
+    fn scan_float_with_e_and_sign() {
+        let tokens = scan_optimistic("123.1e+1");
+        assert_eq!(tokens.len(), 1);
+        let expected = Token::Float("123.1E+1".to_string());
+        check_token(tokens.get(0), expected, 1, 1, 1, 8);
+    }
+
+    #[test]
+    fn scan_string_with_embedded_quote() {
+        // "\"abc"
+        let source = "\"\\\"abc\"";
+        let tokens = scan_optimistic(source);
+        assert_eq!(tokens.len(), 1);
+        check_string_token(tokens.get(0), "\"abc", 1, 1, 1, 7);
+    }
+
+    #[test]
+    fn scan_string_with_newline() {
+        // "abc
+        // "
+        let source = "\"abc\n\"";
+        let tokens = scan_optimistic(source);
+        assert_eq!(tokens.len(), 1);
+        check_string_token(tokens.get(0), "abc\n", 1, 1, 2, 1);
+    }
+
+    #[test]
+    fn scan_string_with_many_newlines() {
+        // " a
+        // b
+        //
+        // c
+        //
+        //
+        //   "
+        let source = "\" a\nb\n\nc\n\n\n  \"";
+        let tokens = scan_optimistic(source);
+        assert_eq!(tokens.len(), 1);
+        check_string_token(tokens.get(0), " a\nb\n\nc\n\n\n  ", 1, 1, 7, 3);
+    }
+
+    #[test]
+    fn scan_string_with_escaped_chars() {
+        let tokens = scan_optimistic("\"\\0\\a\\b\\n\\'\\\"\"");
+        assert_eq!(tokens.len(), 1);
+        // NOTE: We could put a backslash before the single quote in
+        //       the expected string, but Rust seems to treat \' and '
+        //       as the same.
+        check_string_token(tokens.get(0), "\0\x07\x08\n'\"", 1, 1, 1, 14);
+    }
+
+    #[test]
+    fn scan_string_with_escaped_regular_char() {
+        let tokens = scan_optimistic("\"ab\\c\"");
+        assert_eq!(tokens.len(), 1);
+        check_string_token(tokens.get(0), "ab\\c", 1, 1, 1, 6);
+    }
+
+    #[test]
+    fn scan_string_unclosed() {
+        let source = "\"abc";
+        match scan(source) {
+            Err(err) => match err {
+                ScanError {
+                    error: ScanErrorType::UnterminatedString(string),
+                    location,
+                } => {
+                    assert_eq!(string, source.to_string());
+                    assert_eq!(location, Location::new(1, 1));
+                    let new_source = source.to_string() + "\"";
+                    match scan(new_source.as_str()) {
+                        Ok(tokens) => {
+                            assert_eq!(tokens.len(), 1);
+                            check_string_token(tokens.get(0), "abc", 1, 1, 1, 5);
+                        }
+                        _ => assert!(false),
+                    }
+                }
+                _ => assert!(false),
+            },
+            _ => assert!(false),
+        };
+    }
+
+    #[test]
+    fn scan_indents() {
+        let source = "\
+f (x) ->  # 1
+    x     # 2
+    1     # 3
+          # 4
+          # 5
+g (y) ->  # 6
+    y     # 7\
+";
+        let tokens = scan_optimistic(source);
+
+        // Used to keep rustfmt from wrapping
+        let mut token;
+
+        // f
+        token = Token::Identifier("f".to_string());
+        check_token(tokens.get(0), token, 1, 1, 1, 1);
+        check_token(tokens.get(1), Token::LeftParen, 1, 3, 1, 3);
+        token = Token::Identifier("x".to_string());
+        check_token(tokens.get(2), token, 1, 4, 1, 4);
+        check_token(tokens.get(3), Token::RightParen, 1, 5, 1, 5);
+        check_token(tokens.get(4), Token::FuncStart, 1, 7, 1, 8);
+        check_token(tokens.get(5), Token::BlockStart, 2, 0, 2, 0);
+        token = Token::Identifier("x".to_string());
+        check_token(tokens.get(6), token, 2, 5, 2, 5);
+        check_token(tokens.get(7), Token::Int("1".to_string(), 10), 3, 5, 3, 5);
+        check_token(tokens.get(8), Token::BlockEnd, 6, 0, 6, 0);
+
+        // g
+        token = Token::Identifier("g".to_string());
+        check_token(tokens.get(9), token, 6, 1, 6, 1);
+        check_token(tokens.get(10), Token::LeftParen, 6, 3, 6, 3);
+        token = Token::Identifier("y".to_string());
+        check_token(tokens.get(11), token, 6, 4, 6, 4);
+        check_token(tokens.get(12), Token::RightParen, 6, 5, 6, 5);
+        check_token(tokens.get(13), Token::FuncStart, 6, 7, 6, 8);
+        check_token(tokens.get(14), Token::BlockStart, 7, 0, 7, 0);
+        token = Token::Identifier("y".to_string());
+        check_token(tokens.get(15), token, 7, 5, 7, 5);
+        check_token(tokens.get(16), Token::BlockEnd, 8, 0, 8, 0);
+        assert!(tokens.get(17).is_none());
+    }
+
+    #[test]
+    fn scan_unexpected_indent_on_first_line() {
+        let source = "    abc = 1";
+        match scan(source) {
+            Ok(_) => assert!(false),
+            Err(err) => match err {
+                ScanError { error: ScanErrorType::UnexpectedIndent(1), location } => {
+                    assert_eq!(location.line, 1);
+                    assert_eq!(location.col, 1);
+                }
+                _ => assert!(false),
+            },
+        }
+    }
+
+    #[test]
+    fn scan_brackets() {
+        let source = "
+
+a = [
+   1,
+# comment
+  2,
+]
+
+# FIXME: This is an unexpected indent but the scanner doesn't detect that.
+    b = 1
+";
+        let tokens = scan_optimistic(source);
+        let mut token;
+        for token in tokens {
+            eprintln!("{}", token);
+        }
+        // assert_eq!(tokens.len(), 8);
+        token = Token::Identifier("a".to_string());
+        // check_token(tokens.get(0), token, 3, 1, 3, 1);
+        // check_token(tokens.get(1), Token::Equal, 3, 3, 3, 3);
+        // check_token(tokens.get(2), Token::LeftSquareBracket, 3, 5, 3, 5);
+        // check_token(tokens.get(3), Token::Int("1".to_owned(), 10), 4, 4, 4, 4);
+        // check_token(tokens.get(4), Token::Comma, 4, 5, 4, 5);
+        // check_token(tokens.get(5), Token::Int("2".to_owned(), 10), 6, 3, 6, 3);
+        // check_token(tokens.get(6), Token::Comma, 6, 4, 6, 4);
+        // check_token(tokens.get(7), Token::RightSquareBracket, 7, 1, 7, 1);
+        // assert!(tokens.get(8).is_none());
+    }
+
+    #[test]
+    fn scan_unknown() {
+        let source = "{";
+        match scan(source) {
+            Ok(tokens) => assert!(false),
+            Err(err) => match err {
+                ScanError {
+                    error: ScanErrorType::UnexpectedCharacter(c),
+                    location,
+                } => {
+                    assert_eq!(c, '{');
+                    assert_eq!(location.line, 1);
+                    assert_eq!(location.col, 1);
+                }
+                _ => assert!(false),
+            },
+        }
+    }
+
+    // Utilities -----------------------------------------------------------
+
+    /// Check token returned by scanner against expected token.
+    fn check_token(
+        actual: Option<&TokenWithLocation>,
+        expected: Token,
+        start_line: usize,
+        start_col: usize,
+        end_line: usize,
+        end_col: usize,
+    ) {
+        let start = Location::new(start_line, start_col);
+        let end = Location::new(end_line, end_col);
+        assert_eq!(actual, Some(&TokenWithLocation::new(expected, start, end)));
+    }
+
+    fn check_string_token(
+        actual: Option<&TokenWithLocation>,
+        expected_string: &str,
+        expected_start_line: usize,
+        expected_start_col: usize,
+        expected_end_line: usize,
+        expected_end_col: usize,
+    ) {
+        assert!(actual.is_some());
+        match actual {
+            Some(TokenWithLocation {
+                token: Token::String(actual_string),
+                start: Location { line: actual_start_line, col: actual_start_col },
+                end: Location { line: actual_end_line, col: actual_end_col },
+            }) => {
+                assert_eq!(actual_string, expected_string);
+                assert_eq!(actual_start_line, &expected_start_line);
+                assert_eq!(actual_start_col, &expected_start_col);
+                assert_eq!(actual_end_line, &expected_end_line);
+                assert_eq!(actual_end_col, &expected_end_col);
+            }
+            _ => assert!(false),
         }
     }
 }

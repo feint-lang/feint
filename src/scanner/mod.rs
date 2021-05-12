@@ -1,8 +1,10 @@
-pub use result::{ScanError, ScanErrorType, ScanResult};
-pub use scanner::{scan, Scanner};
-pub use token::{Location, Token, TokenWithLocation};
+pub use location::Location;
+pub use result::{ScanError, ScanErrorType};
+pub use scanner::scan;
+pub use token::{Token, TokenWithLocation};
 
 mod keyword;
+mod location;
 mod operator;
 mod result;
 mod scanner;

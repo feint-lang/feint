@@ -4,14 +4,12 @@ use std::path::{Path, PathBuf};
 use dirs;
 use rustyline::error::ReadlineError;
 
-use crate::parser::parse;
-use crate::scanner::{scan, ScanError, ScanErrorType, TokenWithLocation};
-use crate::vm::Instruction;
-use crate::vm::Namespace;
-use crate::vm::{VMState, VM};
-
-type ExitData = (i32, String);
-type ExitResult = Result<Option<String>, ExitData>;
+use super::parser::parse;
+use super::result::ExitResult;
+use super::scanner::{self, ScanError, ScanErrorType, TokenWithLocation};
+use super::vm::Instruction;
+use super::vm::Namespace;
+use super::vm::{VMState, VM};
 
 pub fn run(debug: bool) -> ExitResult {
     let history_path = Runner::default_history_path();
@@ -29,21 +27,21 @@ pub struct Runner<'a> {
 }
 
 impl<'a> Runner<'a> {
-    pub fn new(history_path: Option<&'a Path>, vm: VM<'a>, debug: bool) -> Self {
+    fn new(history_path: Option<&'a Path>, vm: VM<'a>, debug: bool) -> Self {
         Runner { reader: rustyline::Editor::<()>::new(), history_path, vm, debug }
     }
 
     /// Get the default history path, which is either ~/.feint_history
     /// or, if the user's home directory can't be located,
     /// ./.feint_history.
-    pub fn default_history_path() -> PathBuf {
+    fn default_history_path() -> PathBuf {
         let home = dirs::home_dir();
         let base_path = home.unwrap_or_default();
         let history_path_buf = base_path.join(".feint_history");
         history_path_buf
     }
 
-    pub fn run(&mut self) -> ExitResult {
+    fn run(&mut self) -> ExitResult {
         println!("Welcome to the FeInt REPL (read/eval/print loop)");
         println!("Type a line of code, then hit Enter to evaluate it");
         println!("Type .exit or .quit to exit");
@@ -98,23 +96,26 @@ impl<'a> Runner<'a> {
         }
     }
 
-    pub fn eval(&mut self, source: &str) -> Option<ExitResult> {
+    fn eval(&mut self, source: &str) -> Option<ExitResult> {
         let instructions: Vec<Instruction> = match source.trim() {
             ".exit" | ".halt" | ".quit" => {
                 vec![Instruction::Halt(0)]
             }
-            _ => match scan(source) {
+            _ => match scanner::scan(source) {
                 Ok(tokens) => {
                     self.add_history_entry(source);
                     self.parse(tokens)
                 }
                 Err(err) => match err {
-                    ScanError { error: ScanErrorType::UnknownToken(c), location } => {
+                    ScanError {
+                        error: ScanErrorType::UnexpectedCharacter(c),
+                        location,
+                    } => {
                         self.add_history_entry(source);
                         let col = location.col;
                         eprintln!("{: >width$}^", "", width = col + 1);
                         eprintln!(
-                            "Syntax error: unknown token at column {}: '{}'",
+                            "Syntax error: unexpected character at column {}: '{}'",
                             col, c
                         );
                         return None;
@@ -225,6 +226,55 @@ impl<'a> Runner<'a> {
                 }
             }
             None => (),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn eval_empty() {
+        eval("");
+    }
+
+    #[test]
+    fn eval_arithmetic() {
+        eval("2 * (3 + 4)");
+    }
+
+    #[test]
+    fn eval_string() {
+        eval("\"abc\"");
+    }
+
+    #[test]
+    fn eval_multiline_string() {
+        eval("\"a \nb c\"");
+    }
+
+    // TODO: Figure out how to automatically send closing quote and
+    //       newline to stdin.
+    // #[test]
+    // fn eval_unterminated_string() {
+    //     eval("x = \"abc");
+    // }
+
+    // Utilities -----------------------------------------------------------
+
+    fn new<'a>() -> Runner<'a> {
+        let namespace = Namespace::new(None);
+        let vm = VM::new(namespace);
+        Runner::new(None, vm, false)
+    }
+
+    fn eval(input: &str) {
+        let mut runner = new();
+        match runner.eval(input) {
+            Some(Ok(string)) => assert!(false),
+            Some(Err((code, string))) => assert!(false),
+            None => assert!(true), // eval returns None on valid input
         }
     }
 }

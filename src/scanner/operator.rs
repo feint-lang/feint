@@ -5,8 +5,3 @@ pub enum Operator {
     Equal,
     NotEqual,
 }
-
-// struct A;
-// impl A {
-//     const LogicalAnd: &'static str = "&&";
-// }

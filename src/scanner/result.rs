@@ -1,4 +1,6 @@
-use super::{Location, TokenWithLocation};
+use crate::scanner::location::Location;
+
+use super::TokenWithLocation;
 
 pub type ScanResult = Result<TokenWithLocation, ScanError>;
 
@@ -16,12 +18,12 @@ impl ScanError {
 
 #[derive(Debug)]
 pub enum ScanErrorType {
-    InvalidIndent(i32),    // Indent is not a multiple of 4
-    UnexpectedIndent(i32), // Indent in unexpected place
+    InvalidIndent(i32), // Indent is not a multiple of 4 (number of spaces)
+    UnexpectedIndent(i32), // Indent in unexpected place (indent level)
     WhitespaceAfterIndent, // Non-space whitespace after indent
-    UnexpectedWhitespace,  // Other unexpected whitespace
-    UnterminatedString(String),
-    UnknownToken(char),
-    UnmatchedOpeningBracket(char),
-    UnmatchedClosingBracket(char),
+    UnexpectedWhitespace, // Other unexpected whitespace
+    UnterminatedString(String), // String with no closing quote
+    UnexpectedCharacter(char), // Char not recognized as token or start of token
+    UnmatchedOpeningBracket(char), // Closing bracket with no matching opening bracket
+    UnmatchedClosingBracket(char), // Opening bracket with no matching closing bracket
 }

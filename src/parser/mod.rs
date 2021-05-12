@@ -1,3 +1,3 @@
-pub(crate) use parser::{parse, parse_from_source, Parser};
+pub(crate) use parser::{parse, parse_from_source};
 
 mod parser;
