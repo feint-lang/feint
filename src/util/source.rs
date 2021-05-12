@@ -4,7 +4,7 @@ use std::io::BufRead;
 
 /// Maximum line length in chars. This is used to set the capacity for
 /// the source's char queue up front to avoid allocations.
-const CAPACITY: usize = 255;
+const CAPACITY: usize = 255; // 2^8 - 1
 
 /// A wrapper around some source, typically either some text or a file.
 /// The source is read line by line and the characters from each line
