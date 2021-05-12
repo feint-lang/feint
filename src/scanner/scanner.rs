@@ -1,9 +1,11 @@
 use std::collections::VecDeque;
+use std::fs::File;
+use std::io::{BufRead, BufReader, Cursor};
 use std::iter::Peekable;
 use std::str::Chars;
 
 use crate::scanner::location::Location;
-use crate::util::Stack;
+use crate::util::{Source, Stack};
 
 use super::result::{ScanError, ScanErrorType, ScanResult};
 use super::token::{Token, TokenWithLocation};
@@ -16,7 +18,15 @@ type PeekOption<'a> = Option<(&'a char, Option<&'a char>, Option<&'a char>)>;
 /// Create a scanner with the specified text source, scan the text, and
 /// return the resulting tokens or error.
 pub fn scan(text: &str) -> Result<Vec<TokenWithLocation>, ScanError> {
-    let mut scanner = Scanner::new(text, Location::new(1, 1));
+    let cursor = Cursor::new(text);
+    let mut scanner = Scanner::new(cursor, Location::new(1, 1));
+    scanner.collect()
+}
+
+pub fn scan_file(file_name: &str) -> Result<Vec<TokenWithLocation>, ScanError> {
+    let file = File::open(file_name).unwrap();
+    let mut reader = BufReader::new(file);
+    let mut scanner = Scanner::new(reader, Location::new(1, 1));
     scanner.collect()
 }
 
@@ -28,14 +38,16 @@ fn scan_optimistic(text: &str) -> Vec<TokenWithLocation> {
     }
 }
 
-struct Scanner<'a> {
-    source: &'a str,
+struct Scanner<T>
+where
+    T: BufRead + Clone,
+{
     /// Stream of input characters from input string
-    stream: Peekable<Chars<'a>>,
+    stream: Source<T>,
     /// The same stream but one character ahead for easier lookaheads
-    one_ahead_stream: Peekable<Chars<'a>>,
+    one_ahead_stream: Source<T>,
     /// The same stream but two characters ahead for easier lookaheads
-    two_ahead_stream: Peekable<Chars<'a>>,
+    two_ahead_stream: Source<T>,
     location: Location,
     /// Temporary storage for tokens.
     queue: VecDeque<TokenWithLocation>,
@@ -46,18 +58,22 @@ struct Scanner<'a> {
     bracket_stack: Stack<(char, Location)>,
 }
 
-impl<'a> Scanner<'a> {
+impl<T> Scanner<T>
+where
+    T: BufRead + Clone,
+{
     /// Create a new scanner from source text.
     /// XXX: Not sure if it's useful to be able to pass line & col no.
-    fn new(source: &'a str, location: Location) -> Self {
-        let stream = source.chars().peekable();
-        let mut one_ahead_stream = source.chars().peekable();
-        let mut two_ahead_stream = source.chars().peekable();
+    fn new(reader: T, location: Location) -> Self {
+        let one_ahead_reader = reader.clone();
+        let two_ahead_reader = reader.clone();
+        let stream = Source::new(reader);
+        let mut one_ahead_stream = Source::new(one_ahead_reader);
+        let mut two_ahead_stream = Source::new(two_ahead_reader);
         one_ahead_stream.next();
         two_ahead_stream.next();
         two_ahead_stream.next();
         Scanner {
-            source,
             stream,
             one_ahead_stream,
             two_ahead_stream,
@@ -365,15 +381,6 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    fn peek_char(&mut self) -> PeekOption {
-        match self.stream.peek() {
-            Some(c) => {
-                Some((c, self.one_ahead_stream.peek(), self.two_ahead_stream.peek()))
-            }
-            _ => None,
-        }
-    }
-
     /// Consume the next character from each stream and return the
     /// specified token.
     fn next_char_and_token(&mut self, token: Token) -> Token {
@@ -501,11 +508,18 @@ impl<'a> Scanner<'a> {
     fn read_number(&mut self, first_digit: char) -> (String, u32) {
         let mut string = String::new();
 
-        let radix: u32 = match (first_digit, self.peek_char()) {
-            ('0', Some(('b', _, _))) | ('0', Some(('B', _, _))) => 2,
-            ('0', Some(('o', _, _))) | ('0', Some(('O', _, _))) => 8,
-            ('0', Some(('x', _, _))) | ('0', Some(('X', _, _))) => 16,
-            _ => 10,
+        let radix: u32 = if first_digit == '0' {
+            match self.stream.peek() {
+                Some('b') | Some('B') => 2,
+                Some('o') | Some('O') => 8,
+                Some('x') | Some('X') => 16,
+                Some(t) if t.is_ascii_alphabetic() => {
+                    panic!("Unsupported numeric type: {}", t);
+                }
+                _ => 10,
+            }
+        } else {
+            10
         };
 
         if radix == 10 {
@@ -681,7 +695,10 @@ impl<'a> Scanner<'a> {
     }
 }
 
-impl Iterator for Scanner<'_> {
+impl<T> Iterator for Scanner<T>
+where
+    T: BufRead + Clone,
+{
     type Item = ScanResult;
 
     fn next(&mut self) -> Option<Self::Item> {
