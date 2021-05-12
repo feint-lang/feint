@@ -1,9 +1,8 @@
 /// Run provided source, typically from a file, to completion.
-use std::fs;
-
 use super::result::ExitResult;
-use super::scanner::{scan, ScanError, ScanErrorType};
+use super::scanner::{self, ScanError, ScanErrorKind};
 use super::vm::{Instruction, Namespace, VMState, VM};
+use crate::scanner::TokenWithLocation;
 
 pub fn run(source: &str, debug: bool) -> ExitResult {
     let namespace = Namespace::default();
@@ -29,21 +28,19 @@ impl<'a> Runner<'a> {
         Runner { vm, debug }
     }
 
-    fn run_file(&mut self, file_name: &str) -> ExitResult {
-        match fs::read_to_string(file_name) {
-            Ok(source) => {
-                if self.debug {
-                    println!("# Source from file: {}", file_name);
-                    println!("{}", source.trim_end());
-                }
-                self.run(source.as_str())
-            }
-            Err(err) => Err((1, format!("Could not read source file: {}", err))),
-        }
+    fn run(&mut self, text: &str) -> ExitResult {
+        self.process_scan_result(scanner::scan(text))
     }
 
-    fn run(&mut self, source: &str) -> ExitResult {
-        match scan(source) {
+    fn run_file(&mut self, file_name: &str) -> ExitResult {
+        self.process_scan_result(scanner::scan_file(file_name))
+    }
+
+    fn process_scan_result(
+        &mut self,
+        tokens: Result<Vec<TokenWithLocation>, ScanError>,
+    ) -> ExitResult {
+        match tokens {
             Ok(tokens) => {
                 if self.debug {
                     for t in tokens.iter() {
@@ -55,7 +52,7 @@ impl<'a> Runner<'a> {
             Err(err) => {
                 return match err {
                     ScanError {
-                        error: ScanErrorType::UnexpectedCharacter(c),
+                        error: ScanErrorKind::UnexpectedCharacter(c),
                         location,
                     } => {
                         let message = format!(
@@ -65,7 +62,7 @@ impl<'a> Runner<'a> {
                         Err((1, message))
                     }
                     ScanError {
-                        error: ScanErrorType::UnterminatedString(string),
+                        error: ScanErrorKind::UnterminatedString(string),
                         location,
                     } => {
                         let message = format!(
@@ -90,6 +87,21 @@ impl<'a> Runner<'a> {
             VMState::Halted(code, Some(message)) => Err((code, message)),
             VMState::Halted(code, None) => Err((code, "Unknown error".to_string())),
             VMState::Idle => Err((i32::MAX, "Execution never halted".to_string())),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn run_text() {
+        let source = "x = 1\ny = 2\n1 + 2";
+        if let (Ok(_)) = run(source, true) {
+            assert!(true);
+        } else {
+            assert!(false);
         }
     }
 }

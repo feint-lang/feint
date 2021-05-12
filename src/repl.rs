@@ -6,7 +6,7 @@ use rustyline::error::ReadlineError;
 
 use super::parser::parse;
 use super::result::ExitResult;
-use super::scanner::{self, ScanError, ScanErrorType, TokenWithLocation};
+use super::scanner::{self, ScanError, ScanErrorKind, TokenWithLocation};
 use super::vm::Instruction;
 use super::vm::Namespace;
 use super::vm::{VMState, VM};
@@ -108,7 +108,7 @@ impl<'a> Runner<'a> {
                 }
                 Err(err) => match err {
                     ScanError {
-                        error: ScanErrorType::UnexpectedCharacter(c),
+                        error: ScanErrorKind::UnexpectedCharacter(c),
                         location,
                     } => {
                         self.add_history_entry(source);
@@ -121,7 +121,7 @@ impl<'a> Runner<'a> {
                         return None;
                     }
                     ScanError {
-                        error: ScanErrorType::UnterminatedString(_), ..
+                        error: ScanErrorKind::UnterminatedString(_), ..
                     } => loop {
                         return match self.read_line("+ ", false) {
                             Ok(None) => {
@@ -137,7 +137,7 @@ impl<'a> Runner<'a> {
                         };
                     },
                     ScanError {
-                        error: ScanErrorType::InvalidIndent(num_spaces),
+                        error: ScanErrorKind::InvalidIndent(num_spaces),
                         location,
                     } => {
                         self.add_history_entry(source);
@@ -147,7 +147,7 @@ impl<'a> Runner<'a> {
                         return None;
                     }
                     ScanError {
-                        error: ScanErrorType::UnexpectedIndent(_),
+                        error: ScanErrorKind::UnexpectedIndent(_),
                         location,
                     } => {
                         self.add_history_entry(source);
@@ -157,11 +157,11 @@ impl<'a> Runner<'a> {
                         return None;
                     }
                     ScanError {
-                        error: ScanErrorType::WhitespaceAfterIndent,
+                        error: ScanErrorKind::WhitespaceAfterIndent,
                         location,
                     }
                     | ScanError {
-                        error: ScanErrorType::UnexpectedWhitespace,
+                        error: ScanErrorKind::UnexpectedWhitespace,
                         location,
                     } => {
                         self.add_history_entry(source);

@@ -6,7 +6,7 @@ use std::str::Chars;
 
 use crate::util::{Location, Source, Stack};
 
-use super::result::{ScanError, ScanErrorType, ScanResult};
+use super::result::{ScanError, ScanErrorKind, ScanResult};
 use super::token::{Token, TokenWithLocation};
 use std::cmp::max;
 
@@ -24,7 +24,15 @@ pub fn scan(text: &str) -> Result<Vec<TokenWithLocation>, ScanError> {
 
 /// Create a scanner that reads from the specified file.
 pub fn scan_file(file_name: &str) -> Result<Vec<TokenWithLocation>, ScanError> {
-    let file = File::open(file_name).unwrap();
+    let file = match File::open(file_name) {
+        Ok(file) => file,
+        Err(err) => {
+            return Err(ScanError::new(
+                ScanErrorKind::CouldNotOpenSourceFile(err),
+                Location::new(0, 0),
+            ))
+        }
+    };
     let mut reader = BufReader::new(file);
     let mut scanner = Scanner::new(reader);
     scanner.collect()
@@ -75,7 +83,7 @@ where
         }
     }
 
-    fn next_from_queue(&mut self) -> ScanResult {
+    fn next_token_from_queue(&mut self) -> ScanResult {
         while self.queue.is_empty() {
             self.add_tokens_to_queue()?;
         }
@@ -126,7 +134,7 @@ where
         // First, make sure it's a valid indent.
         if num_spaces % 4 != 0 {
             return Err(ScanError::new(
-                ScanErrorType::InvalidIndent(num_spaces),
+                ScanErrorKind::InvalidIndent(num_spaces),
                 start,
             ));
         }
@@ -134,7 +142,7 @@ where
         // Next, make sure the indent isn't followed by additional non-
         // space whitespace, because that would be confusing.
         if whitespace_count > 0 {
-            return Err(ScanError::new(ScanErrorType::WhitespaceAfterIndent, start));
+            return Err(ScanError::new(ScanErrorKind::WhitespaceAfterIndent, start));
         }
 
         // Now we have something that could be a valid indent. If the
@@ -152,7 +160,7 @@ where
             }
             // Unexpected indent on the first line of code.
             return Err(ScanError::new(
-                ScanErrorType::UnexpectedIndent(indent_level),
+                ScanErrorKind::UnexpectedIndent(indent_level),
                 start,
             ));
         } else if indent_level == self.indent_level + 1 {
@@ -168,7 +176,7 @@ where
         } else {
             // Unexpected indent somewhere else.
             return Err(ScanError::new(
-                ScanErrorType::UnexpectedIndent(indent_level),
+                ScanErrorKind::UnexpectedIndent(indent_level),
                 start,
             ));
         };
@@ -188,7 +196,7 @@ where
                 (string, true) => Token::String(string),
                 (string, false) => {
                     return Err(ScanError::new(
-                        ScanErrorType::UnterminatedString(format!("\"{}", string)),
+                        ScanErrorKind::UnterminatedString(format!("\"{}", string)),
                         start,
                     ));
                 }
@@ -208,7 +216,7 @@ where
                     Some(('(', _)) => (),
                     None | Some(_) => {
                         return Err(ScanError::new(
-                            ScanErrorType::UnmatchedClosingBracket(c),
+                            ScanErrorKind::UnmatchedClosingBracket(c),
                             start,
                         ));
                     }
@@ -224,7 +232,7 @@ where
                     Some(('[', _)) => (),
                     None | Some(_) => {
                         return Err(ScanError::new(
-                            ScanErrorType::UnmatchedClosingBracket(c),
+                            ScanErrorKind::UnmatchedClosingBracket(c),
                             start,
                         ));
                     }
@@ -249,7 +257,7 @@ where
                     Some(('<', _)) => (),
                     None | Some(_) => {
                         return Err(ScanError::new(
-                            ScanErrorType::UnmatchedClosingBracket(c),
+                            ScanErrorKind::UnmatchedClosingBracket(c),
                             start,
                         ));
                     }
@@ -334,12 +342,12 @@ where
                 return Ok(());
             }
             Some((c, _, _)) if c.is_whitespace() => {
-                return Err(ScanError::new(ScanErrorType::UnexpectedWhitespace, start));
+                return Err(ScanError::new(ScanErrorKind::UnexpectedWhitespace, start));
             }
             // Unknown
             Some((c, _, _)) => {
                 return Err(ScanError::new(
-                    ScanErrorType::UnexpectedCharacter(c),
+                    ScanErrorKind::UnexpectedCharacter(c),
                     start,
                 ));
             }
@@ -363,7 +371,7 @@ where
                 match bracket {
                     Some((c, location)) => {
                         return Err(ScanError::new(
-                            ScanErrorType::UnmatchedOpeningBracket(c),
+                            ScanErrorKind::UnmatchedOpeningBracket(c),
                             location,
                         ));
                     }
@@ -690,7 +698,7 @@ where
     type Item = ScanResult;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.next_from_queue() {
+        match self.next_token_from_queue() {
             Ok(TokenWithLocation { token: Token::EndOfInput, .. }) => None,
             Ok(t) => Some(Ok(t)),
             Err(t) => Some(Err(t)),
@@ -802,7 +810,7 @@ mod tests {
         match scan(source) {
             Err(err) => match err {
                 ScanError {
-                    error: ScanErrorType::UnterminatedString(string),
+                    error: ScanErrorKind::UnterminatedString(string),
                     location,
                 } => {
                     assert_eq!(string, source.to_string());
@@ -873,7 +881,7 @@ g (y) ->  # 6
         match scan(source) {
             Ok(_) => assert!(false),
             Err(err) => match err {
-                ScanError { error: ScanErrorType::UnexpectedIndent(1), location } => {
+                ScanError { error: ScanErrorKind::UnexpectedIndent(1), location } => {
                     assert_eq!(location.line, 1);
                     assert_eq!(location.col, 1);
                 }
@@ -920,7 +928,7 @@ a = [
             Ok(tokens) => assert!(false),
             Err(err) => match err {
                 ScanError {
-                    error: ScanErrorType::UnexpectedCharacter(c),
+                    error: ScanErrorKind::UnexpectedCharacter(c),
                     location,
                 } => {
                     assert_eq!(c, '{');
