@@ -1,4 +1,4 @@
-use crate::scanner::location::Location;
+use crate::util::Location;
 
 use super::TokenWithLocation;
 

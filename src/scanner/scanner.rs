@@ -4,34 +4,35 @@ use std::io::{BufRead, BufReader, Cursor};
 use std::iter::Peekable;
 use std::str::Chars;
 
-use crate::scanner::location::Location;
-use crate::util::{Source, Stack};
+use crate::util::{Location, Source, Stack};
 
 use super::result::{ScanError, ScanErrorType, ScanResult};
 use super::token::{Token, TokenWithLocation};
+use std::cmp::max;
 
-type NextOption = Option<(char, Option<char>, Option<char>)>;
-type NextTwoOption = Option<(char, char, Option<char>)>;
+type NextOption<'a> = Option<(char, Option<&'a char>, Option<&'a char>)>;
+type NextTwoOption<'a> = Option<(char, char, Option<&'a char>)>;
 type NextThreeOption = Option<(char, char, char)>;
-type PeekOption<'a> = Option<(&'a char, Option<&'a char>, Option<&'a char>)>;
 
 /// Create a scanner with the specified text source, scan the text, and
 /// return the resulting tokens or error.
 pub fn scan(text: &str) -> Result<Vec<TokenWithLocation>, ScanError> {
     let cursor = Cursor::new(text);
-    let mut scanner = Scanner::new(cursor, Location::new(1, 1));
+    let mut scanner = Scanner::new(cursor);
     scanner.collect()
 }
 
+/// Create a scanner that reads from the specified file.
 pub fn scan_file(file_name: &str) -> Result<Vec<TokenWithLocation>, ScanError> {
     let file = File::open(file_name).unwrap();
     let mut reader = BufReader::new(file);
-    let mut scanner = Scanner::new(reader, Location::new(1, 1));
+    let mut scanner = Scanner::new(reader);
     scanner.collect()
 }
 
-/// Scan and assume success.
-fn scan_optimistic(text: &str) -> Vec<TokenWithLocation> {
+/// Scan and assume success, returning tokens in unwrapped form. Panic
+/// on error. Mainly useful for testing.
+pub fn scan_optimistic(text: &str) -> Vec<TokenWithLocation> {
     match scan(text) {
         Ok(tokens) => tokens,
         Err(err) => panic!("Scan failed unexpectedly: {:?}", err),
@@ -40,46 +41,35 @@ fn scan_optimistic(text: &str) -> Vec<TokenWithLocation> {
 
 struct Scanner<T>
 where
-    T: BufRead + Clone,
+    T: BufRead,
 {
-    /// Stream of input characters from input string
-    stream: Source<T>,
-    /// The same stream but one character ahead for easier lookaheads
-    one_ahead_stream: Source<T>,
-    /// The same stream but two characters ahead for easier lookaheads
-    two_ahead_stream: Source<T>,
-    location: Location,
-    /// Temporary storage for tokens.
+    /// This is the source code that's being scanned. T can be anything
+    /// that implements the BufRead trait (e.g., a Cursor wrapping some
+    /// text or a BufReader wrapping an open file).
+    source: Source<T>,
+    /// Temporary storage for tokens. This is mainly needed to handle
+    /// the complexity of indents, because there are cases where
+    /// multiple tokens will need to be emitted.
     queue: VecDeque<TokenWithLocation>,
     /// Keep track of whether we're at the start of a line so indents
     /// can be handled specially.
-    at_line_start: bool,
     indent_level: i32,
+    /// Opening brackets are pushed and later popped when the closing
+    /// bracket is encountered. This gives us a way to verify brackets
+    /// are matched and also lets us know when we're inside a group
+    /// where leading whitespace can be ignored.
     bracket_stack: Stack<(char, Location)>,
 }
 
 impl<T> Scanner<T>
 where
-    T: BufRead + Clone,
+    T: BufRead,
 {
-    /// Create a new scanner from source text.
-    /// XXX: Not sure if it's useful to be able to pass line & col no.
-    fn new(reader: T, location: Location) -> Self {
-        let one_ahead_reader = reader.clone();
-        let two_ahead_reader = reader.clone();
+    fn new(reader: T) -> Self {
         let stream = Source::new(reader);
-        let mut one_ahead_stream = Source::new(one_ahead_reader);
-        let mut two_ahead_stream = Source::new(two_ahead_reader);
-        one_ahead_stream.next();
-        two_ahead_stream.next();
-        two_ahead_stream.next();
         Scanner {
-            stream,
-            one_ahead_stream,
-            two_ahead_stream,
-            location,
+            source: stream,
             queue: VecDeque::new(),
-            at_line_start: true,
             indent_level: -1,
             bracket_stack: Stack::new(),
         }
@@ -100,18 +90,26 @@ where
     ) {
         let end = match end_option {
             Some(end) => end,
-            None => Location::new(self.location.line, self.location.col - 1),
+            None => Location::new(
+                self.source.line,
+                if self.source.col == 0 { 0 } else { self.source.col - 1 },
+            ),
         };
         let token_with_location = TokenWithLocation::new(token, start, end);
         self.queue.push_back(token_with_location);
     }
 
     fn handle_indents(&mut self) -> Result<(), ScanError> {
-        let start = self.location;
+        assert!(
+            self.source.at_start_of_line,
+            "This method should only be called when at the start of a line"
+        );
+
+        let start = self.source.location();
         let mut num_spaces = self.read_indent();
         let mut whitespace_count = self.consume_whitespace();
 
-        match self.stream.peek() {
+        match self.source.peek() {
             None | Some('\n') => {
                 // Blank or whitespace-only line; skip it.
                 return Ok(());
@@ -152,6 +150,7 @@ where
                 self.indent_level = 0;
                 return Ok(());
             }
+            // Unexpected indent on the first line of code.
             return Err(ScanError::new(
                 ScanErrorType::UnexpectedIndent(indent_level),
                 start,
@@ -167,6 +166,7 @@ where
                 self.add_token_to_queue(Token::BlockEnd, location, Some(location));
             }
         } else {
+            // Unexpected indent somewhere else.
             return Err(ScanError::new(
                 ScanErrorType::UnexpectedIndent(indent_level),
                 start,
@@ -177,17 +177,11 @@ where
     }
 
     fn add_tokens_to_queue(&mut self) -> Result<(), ScanError> {
-        if self.at_line_start {
+        if self.source.at_start_of_line {
             self.handle_indents()?;
         }
 
-        let start = self.location;
-
-        // NOTE: handle_indents() may consume up to the end of a line,
-        // but it will always leave the newline in place. We assume
-        // that we're not at the start of a newline, but if the next
-        // char is a newline, this will be updated below.
-        self.at_line_start = false;
+        let start = self.source.location();
 
         let token = match self.next_char() {
             Some(('"', _, _)) => match self.read_string('"') {
@@ -238,15 +232,17 @@ where
                 Token::RightSquareBracket
             }
             Some(('<', Some('='), _)) => {
-                self.next_char_and_token(Token::LessThanOrEqual)
+                self.consume_char_and_return_token(Token::LessThanOrEqual)
             }
-            Some(('<', Some('-'), _)) => self.next_char_and_token(Token::LoopFeed),
+            Some(('<', Some('-'), _)) => {
+                self.consume_char_and_return_token(Token::LoopFeed)
+            }
             Some((c @ '<', _, _)) => {
                 self.bracket_stack.push((c, start));
                 Token::LeftAngleBracket
             }
             Some(('>', Some('='), _)) => {
-                self.next_char_and_token(Token::GreaterThanOrEqual)
+                self.consume_char_and_return_token(Token::GreaterThanOrEqual)
             }
             Some((c @ '>', _, _)) => {
                 match self.bracket_stack.pop() {
@@ -260,29 +256,49 @@ where
                 }
                 Token::RightAngleBracket
             }
-            Some(('=', Some('='), _)) => self.next_char_and_token(Token::EqualEqual),
+            Some(('=', Some('='), _)) => {
+                self.consume_char_and_return_token(Token::EqualEqual)
+            }
             Some(('=', _, _)) => Token::Equal,
-            Some(('&', Some('&'), _)) => self.next_char_and_token(Token::And),
-            Some(('&', _, _)) => self.next_char_and_token(Token::Ampersand),
-            Some(('|', Some('|'), _)) => self.next_char_and_token(Token::Or),
-            Some(('|', _, _)) => self.next_char_and_token(Token::Pipe),
-            Some(('*', Some('*'), _)) => self.next_char_and_token(Token::DoubleStar),
-            Some(('*', Some('='), _)) => self.next_char_and_token(Token::MulEqual),
+            Some(('&', Some('&'), _)) => self.consume_char_and_return_token(Token::And),
+            Some(('&', _, _)) => self.consume_char_and_return_token(Token::Ampersand),
+            Some(('|', Some('|'), _)) => self.consume_char_and_return_token(Token::Or),
+            Some(('|', _, _)) => self.consume_char_and_return_token(Token::Pipe),
+            Some(('*', Some('*'), _)) => {
+                self.consume_char_and_return_token(Token::DoubleStar)
+            }
+            Some(('*', Some('='), _)) => {
+                self.consume_char_and_return_token(Token::MulEqual)
+            }
             Some(('*', _, _)) => Token::Star,
-            Some(('/', Some('='), _)) => self.next_char_and_token(Token::DivEqual),
+            Some(('/', Some('='), _)) => {
+                self.consume_char_and_return_token(Token::DivEqual)
+            }
             Some(('/', _, _)) => Token::Slash,
-            Some(('+', Some('='), _)) => self.next_char_and_token(Token::PlusEqual),
+            Some(('+', Some('='), _)) => {
+                self.consume_char_and_return_token(Token::PlusEqual)
+            }
             Some(('+', _, _)) => Token::Plus,
-            Some(('-', Some('='), _)) => self.next_char_and_token(Token::MinusEqual),
-            Some(('-', Some('>'), _)) => self.next_char_and_token(Token::FuncStart),
+            Some(('-', Some('='), _)) => {
+                self.consume_char_and_return_token(Token::MinusEqual)
+            }
+            Some(('-', Some('>'), _)) => {
+                self.consume_char_and_return_token(Token::FuncStart)
+            }
             Some(('-', _, _)) => Token::Minus,
-            Some(('!', Some('='), _)) => self.next_char_and_token(Token::NotEqual),
-            Some(('!', Some('!'), _)) => self.next_char_and_token(Token::AsBool),
+            Some(('!', Some('='), _)) => {
+                self.consume_char_and_return_token(Token::NotEqual)
+            }
+            Some(('!', Some('!'), _)) => {
+                self.consume_char_and_return_token(Token::AsBool)
+            }
             Some(('!', _, _)) => Token::Bang,
             Some(('.', Some('.'), Some('.'))) => {
-                self.next_two_chars_and_token(Token::RangeInclusive)
+                self.consume_two_chars_and_return_token(Token::RangeInclusive)
             }
-            Some(('.', Some('.'), _)) => self.next_char_and_token(Token::Range),
+            Some(('.', Some('.'), _)) => {
+                self.consume_char_and_return_token(Token::Range)
+            }
             Some(('.', _, _)) => Token::Dot,
             Some(('%', _, _)) => Token::Percent,
             Some(('^', _, _)) => Token::Caret,
@@ -314,14 +330,7 @@ where
             Some(('\n', _, _)) => {
                 if self.bracket_stack.size() > 0 {
                     self.consume_whitespace();
-                } else {
-                    self.at_line_start = true;
                 }
-                return Ok(());
-            }
-            Some(('\r', Some('\n'), _)) => {
-                // On the next iteration, the post-newline logic above
-                // will be invoked.
                 return Ok(());
             }
             Some((c, _, _)) if c.is_whitespace() => {
@@ -370,60 +379,57 @@ where
         Ok(())
     }
 
-    /// Consume and return the next character from each stream.
+    /// Consume and return the next character. The following two
+    /// characters are included as well for easy peeking.
     fn next_char(&mut self) -> NextOption {
-        match self.stream.next() {
+        match self.source.next() {
             Some(c) => {
-                self.update_location(c);
-                Some((c, self.one_ahead_stream.next(), self.two_ahead_stream.next()))
+                let (d, e) = self.source.peek_2();
+                Some((c, d, e))
             }
             _ => None,
         }
     }
 
-    /// Consume the next character from each stream and return the
-    /// specified token.
-    fn next_char_and_token(&mut self, token: Token) -> Token {
+    /// Consume the next character and return the specified token.
+    fn consume_char_and_return_token(&mut self, token: Token) -> Token {
         self.next_char();
         token
     }
 
-    /// Consume the next two characters from each stream and return the
-    /// specified token.
-    fn next_two_chars_and_token(&mut self, token: Token) -> Token {
+    /// Consume the next two characters and return the specified token.
+    fn consume_two_chars_and_return_token(&mut self, token: Token) -> Token {
         self.next_char();
         self.next_char();
         token
     }
 
-    /// Consume and return the next character from each stream if the
-    /// next character matches the specified condition.
+    /// Consume and return the next character if it matches the
+    /// specified condition.
     fn next_char_if(&mut self, func: impl FnOnce(&char) -> bool) -> NextOption {
-        match self.stream.next_if(func) {
-            Some(c) => {
-                self.update_location(c);
-                Some((c, self.one_ahead_stream.next(), self.two_ahead_stream.next()))
+        if let Some(c) = self.source.peek() {
+            if func(c) {
+                let c = self.source.next().unwrap();
+                let (d, e) = self.source.peek_2();
+                return Some((c, d, e));
             }
-            _ => None,
         }
+        None
     }
 
-    /// Consume the next two characters from each stream if the
-    /// next two characters match their respective conditions. On match,
-    /// the next two characters are returned.
+    /// Consume and return the next two characters if the next two
+    /// characters match their respective conditions.
     fn next_two_chars_if(
         &mut self,
         c_func: impl FnOnce(&char) -> bool,
         d_func: impl FnOnce(&char) -> bool,
     ) -> NextTwoOption {
-        match (self.stream.peek(), self.one_ahead_stream.peek()) {
+        match self.source.peek_2() {
             (Some(c), Some(d)) => match c_func(c) && d_func(d) {
                 true => {
-                    let c = self.stream.next().unwrap();
-                    let d = self.one_ahead_stream.next().unwrap();
-                    let e = self.two_ahead_stream.next();
-                    self.update_location(c);
-                    self.next_char();
+                    let c = self.source.next().unwrap();
+                    let d = self.source.next().unwrap();
+                    let e = self.source.peek();
                     Some((c, d, e))
                 }
                 false => None,
@@ -432,45 +438,27 @@ where
         }
     }
 
-    /// Consume the next three characters from each stream if the
-    /// next three characters match their respective conditions. On
-    /// match, the next three characters are returned.
+    /// Consume and return the next three characters if the next three
+    /// characters match their respective conditions.
     fn next_three_chars_if(
         &mut self,
         c_func: impl FnOnce(&char) -> bool,
         d_func: impl FnOnce(&char) -> bool,
         e_func: impl FnOnce(&char) -> bool,
     ) -> NextThreeOption {
-        match (
-            self.stream.peek(),
-            self.one_ahead_stream.peek(),
-            self.two_ahead_stream.peek(),
-        ) {
+        let (c, d, e) = self.source.peek_3();
+        match (c, d, e) {
             (Some(c), Some(d), Some(e)) => match c_func(c) && d_func(d) && e_func(e) {
                 true => {
-                    let c = self.stream.next().unwrap();
-                    let d = self.one_ahead_stream.next().unwrap();
-                    let e = self.two_ahead_stream.next().unwrap();
-                    self.update_location(c);
-                    self.next_char();
-                    self.next_char();
+                    let c = self.source.next().unwrap();
+                    let d = self.source.next().unwrap();
+                    let e = self.source.next().unwrap();
                     Some((c, d, e))
                 }
                 false => None,
             },
             _ => None,
         }
-    }
-
-    /// Update line and column numbers *every* time a character is
-    /// consumed from the stream.
-    fn update_location(&mut self, c: char) {
-        let (current_line, current_col) = (self.location.line, self.location.col);
-        let (line, col) = match c {
-            '\n' => (current_line + 1, 1),
-            _ => (current_line, current_col + 1),
-        };
-        self.location = Location::new(line, col);
     }
 
     /// Consume contiguous whitespace up to the end of the line. Return
@@ -509,7 +497,7 @@ where
         let mut string = String::new();
 
         let radix: u32 = if first_digit == '0' {
-            match self.stream.peek() {
+            match self.source.peek() {
                 Some('b') | Some('B') => 2,
                 Some('o') | Some('O') => 8,
                 Some('x') | Some('X') => 16,
@@ -597,61 +585,61 @@ where
     fn read_string(&mut self, quote: char) -> (String, bool) {
         let mut string = String::new();
         loop {
-            match self.next_char() {
+            if let Some((_, d, _)) = self.next_two_chars_if(|c| c == &'\\', |d| true) {
                 // Handle chars escaped by a preceding \.
-                Some(('\\', Some(c), _)) => {
-                    // TODO: Handle \o, \u, \x, etc
-                    self.next_char(); // Skip over the \.
-                    match c {
-                        // Skip newline when preceded by \ at end of
-                        // line. Note that this is the case where an
-                        // actual newline is embedded in a multiline
-                        // string and not the case where the string
-                        // "\n" was typed out. The "\n" case is handled
-                        // below.
-                        '\n' => (),
+                // TODO: Handle \o, \u, \x, etc
+                match d {
+                    // Skip newline when preceded by \ at end of
+                    // line. Note that this is the case where an
+                    // actual newline is embedded in a multiline
+                    // string and not the case where the string
+                    // "\n" was typed out. The "\n" case is handled
+                    // below.
+                    '\n' => (),
 
-                        'a' => string.push('\x07'),
-                        'b' => string.push('\x08'),
-                        'f' => string.push('\x0c'),
+                    'a' => string.push('\x07'),
+                    'b' => string.push('\x08'),
+                    'f' => string.push('\x0c'),
 
-                        // These next few lines might seem pointless,
-                        // but they're replacing the escape sequence in
-                        // the source text with the *actual* char in the
-                        // Rust string.
-                        '0' => string.push('\0'), // null
-                        'n' => string.push('\n'), // line feed
-                        'r' => string.push('\r'), // carriage return
-                        't' => string.push('\t'), // horizontal tab
+                    // These next few lines might seem pointless,
+                    // but they're replacing the escape sequence in
+                    // the source text with the *actual* char in the
+                    // Rust string.
+                    '0' => string.push('\0'), // null
+                    'n' => string.push('\n'), // line feed
+                    'r' => string.push('\r'), // carriage return
+                    't' => string.push('\t'), // horizontal tab
 
-                        'v' => string.push('\x0b'), // vertical tab
+                    'v' => string.push('\x0b'), // vertical tab
 
-                        '\\' => string.push('\\'),
+                    '\\' => string.push('\\'),
 
-                        // Unescape single quote. I'm not entirely sure
-                        // what the point of this is, since only double
-                        // quotes are used to quote strings, but it
-                        // seems to be a standard (Python and Rust both
-                        // do it).
-                        '\'' => string.push('\''),
+                    // Unescape single quote. I'm not entirely sure
+                    // what the point of this is, since only double
+                    // quotes are used to quote strings, but it
+                    // seems to be a standard (Python and Rust both
+                    // do it).
+                    '\'' => string.push('\''),
 
-                        // This also seems to be a standard.
-                        '\"' => string.push('\"'),
+                    // This also seems to be a standard.
+                    '\"' => string.push('\"'),
 
-                        // Any other escaped char resolves to the
-                        // original *escaped* version of itself.
-                        c => {
-                            string.push('\\');
-                            string.push(c);
-                        }
+                    // Any other escaped char resolves to the
+                    // original *escaped* version of itself.
+                    other => {
+                        string.push('\\');
+                        string.push(other);
                     }
                 }
-                // Found closing quote; return string.
-                Some((c, _, _)) if c == quote => break (string, true),
-                // Append current char and continue.
-                Some((c, _, _)) => string.push(c),
-                // End of input reached without finding closing quote :(
-                None => break (string, false),
+            } else {
+                match self.next_char() {
+                    // Found closing quote; return string.
+                    Some((c, _, _)) if c == quote => break (string, true),
+                    // Append current char and continue.
+                    Some((c, _, _)) => string.push(c),
+                    // End of input reached without finding closing quote :(
+                    None => break (string, false),
+                }
             }
         }
     }
@@ -697,7 +685,7 @@ where
 
 impl<T> Iterator for Scanner<T>
 where
-    T: BufRead + Clone,
+    T: BufRead,
 {
     type Item = ScanResult;
 

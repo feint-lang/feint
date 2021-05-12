@@ -1,4 +1,5 @@
 use std::collections::VecDeque;
+use std::fmt;
 use std::io::BufRead;
 use std::iter::Peekable;
 use std::str::Chars;
@@ -8,6 +9,8 @@ use std::str::Chars;
 /// are yielded (so to speak) in turn. Other features:
 ///
 /// - The current line and column in the source are tracked
+/// - Start-of-line state is tracked (true initially and when the end of
+///   a line is reached; false otherwise)
 /// - The previous and current characters are tracked
 /// - Newlines are normalized (\r\n will be converted to \n)
 ///
@@ -21,6 +24,7 @@ pub struct Source<T> {
     char_queue: VecDeque<char>,
     pub line: usize,
     pub col: usize,
+    pub at_start_of_line: bool,
     pub previous_char: Option<char>,
     pub current_char: Option<char>,
 }
@@ -30,14 +34,17 @@ where
     T: BufRead,
 {
     pub fn new(source: T) -> Self {
-        Self {
+        let mut source = Source {
             source,
             char_queue: VecDeque::new(),
             line: 0,
             col: 0,
+            at_start_of_line: true,
             previous_char: None,
             current_char: None,
-        }
+        };
+        source.check_queue();
+        source
     }
 
     fn check_queue(&mut self) -> bool {
@@ -46,13 +53,21 @@ where
             let mut line = String::new();
             let mut queue: VecDeque<char> = match self.source.read_line(&mut line) {
                 // No more lines; done.
-                Ok(0) => return false,
+                Ok(0) => {
+                    self.at_start_of_line = false;
+                    return false;
+                }
                 Ok(_) => {
                     self.line += 1;
                     self.col = 1;
+                    self.at_start_of_line = true;
                     line.chars().collect()
                 }
-                Err(err) => panic!("Could not read line from source: {}", err),
+                Err(err) => {
+                    // Panicking seems wonky, but if the source can't be
+                    // read, I'm pretty sure that's unrecoverable.
+                    panic!("Could not read line from source: {}", err);
+                }
             };
             if queue.len() > 1 {
                 // Normalize \r\n to \n
@@ -69,45 +84,55 @@ where
 
     fn next_from_queue(&mut self) -> Option<char> {
         if self.check_queue() {
-            let result = self.char_queue.pop_front();
-            match result {
-                Some(c) => {
-                    self.col += 1;
-                    self.previous_char = self.current_char;
-                    self.current_char = Some(c);
-                }
-                None => panic!("This shouldn't happen"),
+            if let Some(c) = self.char_queue.pop_front() {
+                self.col += 1;
+                self.at_start_of_line = false;
+                self.previous_char = self.current_char;
+                self.current_char = Some(c);
+                return self.current_char;
             }
-            result
-        } else {
-            None
         }
+        None
     }
 
+    /// Peek at the next char.
     pub fn peek(&mut self) -> Option<&char> {
         if self.check_queue() {
-            self.char_queue.front()
-        } else {
-            None
+            return self.char_queue.front();
         }
+        None
     }
 
-    pub fn peek_n(&mut self, n: usize) -> Option<Vec<&char>> {
+    /// Peek at the next two chars.
+    pub fn peek_2(&mut self) -> (Option<&char>, Option<&char>) {
         if self.check_queue() {
-            Some(vec![self.char_queue.front().unwrap()])
-        } else {
-            None
+            let queue = &self.char_queue;
+            return (queue.get(0), queue.get(1));
         }
+        (None, None)
     }
 
-    pub fn next_if(&mut self, func: impl FnOnce(&char) -> bool) -> Option<char> {
-        match self.peek() {
-            Some(c) => match func(c) {
-                true => self.next(),
-                false => None,
-            },
-            None => None,
+    /// Peek at the next three chars.
+    pub fn peek_3(&mut self) -> (Option<&char>, Option<&char>, Option<&char>) {
+        if self.check_queue() {
+            let queue = &self.char_queue;
+            return (queue.get(0), queue.get(1), queue.get(2));
         }
+        (None, None, None)
+    }
+
+    /// Get the next char if it matches the specified condition.
+    pub fn next_if(&mut self, func: impl FnOnce(&char) -> bool) -> Option<char> {
+        if let Some(c) = self.peek() {
+            if func(c) {
+                return self.next();
+            }
+        }
+        None
+    }
+
+    pub fn location(&self) -> Location {
+        Location::new(self.line, self.col)
     }
 }
 
@@ -119,5 +144,24 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         self.next_from_queue()
+    }
+}
+
+/// Represents a line and column in the source.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Location {
+    pub line: usize,
+    pub col: usize,
+}
+
+impl Location {
+    pub fn new(line: usize, col: usize) -> Self {
+        Self { line, col }
+    }
+}
+
+impl fmt::Display for Location {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}:{}", self.line, self.col)
     }
 }

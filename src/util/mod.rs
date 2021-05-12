@@ -1,4 +1,4 @@
-pub(crate) use source::Source;
+pub(crate) use source::{Location, Source};
 pub(crate) use stack::Stack;
 
 mod source;

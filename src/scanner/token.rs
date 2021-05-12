@@ -1,6 +1,6 @@
 use std::fmt;
 
-use super::Location;
+use crate::util::Location;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Token {
