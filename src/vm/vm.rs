@@ -1,8 +1,8 @@
 use crate::util::Stack;
 
 use super::{
-    BinaryOperator, ExecuteError, ExecuteErrorKind, ExecuteResult, Frame, Instruction,
-    Instructions, Namespace, VMState,
+    BinaryOperator, Constant, ConstantStore, ExecutionError, ExecutionErrorKind,
+    ExecutionResult, Frame, Instruction, Instructions, Namespace, VMState,
 };
 
 pub struct VM<'a> {
@@ -14,6 +14,8 @@ pub struct VM<'a> {
 
     // A new stack frame is pushed for each call
     call_stack: Stack<&'a Frame<'a>>,
+
+    constants: ConstantStore,
 }
 
 /// The FeInt virtual machine. When it's created, it's initialized and
@@ -21,7 +23,12 @@ pub struct VM<'a> {
 /// execute. After instructions are executed
 impl<'a> VM<'a> {
     pub fn new(namespace: Namespace) -> Self {
-        VM { namespace, stack: Stack::new(), call_stack: Stack::new() }
+        VM {
+            namespace,
+            stack: Stack::new(),
+            call_stack: Stack::new(),
+            constants: ConstantStore::new(),
+        }
     }
 
     pub fn halt(&mut self) {
@@ -36,7 +43,7 @@ impl<'a> VM<'a> {
     /// When a HALT instruction is encountered, the VM's state will be
     /// cleared; it can be "restarted" by passing more instructions to
     /// execute.
-    pub fn execute(&mut self, instructions: &Instructions) -> ExecuteResult {
+    pub fn execute(&mut self, instructions: &Instructions) -> ExecutionResult {
         let mut instruction_pointer = 0;
         loop {
             if let Some(instruction) = instructions.get(instruction_pointer) {
@@ -56,37 +63,40 @@ impl<'a> VM<'a> {
     pub fn execute_instruction(
         &mut self,
         instruction: &Instruction,
-    ) -> Option<ExecuteResult> {
+    ) -> Option<ExecutionResult> {
         match instruction {
-            Instruction::Push(v) => {
-                self.stack.push(*v);
+            Instruction::Pop => {
+                // TODO: Check if empty and return err if so
+                self.stack.pop().unwrap();
+            }
+            Instruction::StoreConst(value) => {
+                self.constants.add(Constant::new(*value));
+            }
+            Instruction::LoadConst(index) => {
+                let constant = self.constants.get(*index).unwrap();
+                self.stack.push(constant.value); // ???
             }
             Instruction::BinaryOperation(operator) => {
-                match self.pop_top_two() {
-                    Some((a, b)) => {
-                        let value = match operator {
-                            BinaryOperator::Multiply => a * b,
-                            BinaryOperator::Divide => a / b,
-                            BinaryOperator::Add => a + b,
-                            BinaryOperator::Subtract => a - b,
-                        };
-                        self.stack.push(value)
-                    }
-                    None => (), // TODO: Error!
+                if let Some((a, b)) = self.pop_top_two() {
+                    let value = match operator {
+                        BinaryOperator::Multiply => a * b,
+                        BinaryOperator::Divide => a / b,
+                        BinaryOperator::Add => a + b,
+                        BinaryOperator::Subtract => a - b,
+                    };
+                    self.stack.push(value);
+                } else {
+                    return Some(Err(ExecutionError::new(
+                        ExecutionErrorKind::GenericError(
+                            "Not enough values on stack".to_owned(),
+                        ),
+                    )));
                 };
             }
-            Instruction::Print(n) => match self.stack.peek_n(*n) {
-                items if items.len() == 0 => println!("Stack is empty"),
-                items if items.len() == 1 => println!("{}", items.get(0).unwrap()),
-                items => {
-                    let mut iter = items.iter().rev();
-                    let item = iter.next().unwrap();
-                    println!("{} TOP", item);
-                    while let Some(item) = iter.next() {
-                        println!("{}", item);
-                    }
-                }
-            },
+            Instruction::Return => {
+                // TODO: Implement actual return
+                println!("{}", self.stack.pop().unwrap());
+            }
             Instruction::Halt(code) => {
                 self.halt();
                 return Some(Ok(VMState::Halted(*code)));
@@ -138,13 +148,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn run_simple() {
+    fn execute_simple_program() {
         let mut vm = VM::new(Namespace::new(None));
         let instructions: Instructions = vec![
-            Instruction::Push(1),
-            Instruction::Push(2),
+            Instruction::StoreConst(1),
+            Instruction::StoreConst(2),
+            Instruction::LoadConst(0),
+            Instruction::LoadConst(1),
             Instruction::BinaryOperation(BinaryOperator::Add),
-            Instruction::Print(1),
+            Instruction::Return,
             Instruction::Halt(0),
         ];
         if let Ok(result) = vm.execute(&instructions) {

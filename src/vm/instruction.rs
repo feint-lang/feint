@@ -11,35 +11,44 @@ pub enum BinaryOperator {
     Subtract,
 }
 
+impl fmt::Display for BinaryOperator {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let operator = match self {
+            Self::Multiply => '*',
+            Self::Divide => '/',
+            Self::Add => '+',
+            Self::Subtract => '-',
+        };
+        write!(f, "{}", operator)
+    }
+}
+
 #[derive(Debug)]
 pub enum Instruction {
-    Print(u8), // Print up to 256 value(s) at top of stack
     Push(usize),
-    PushConst(usize),   // ???
+    Pop,
     Jump(usize),        // Jump unconditionally
     JumpIfTrue(usize),  // Jump if top of stack is true
     JumpIfFalse(usize), // Jump if top of stack is false
     BinaryOperation(BinaryOperator),
     Return,
-    Add, // Add top two items in stack; push result back
+    StoreConst(usize),
+    LoadConst(usize),
     Halt(i32),
 }
 
 impl fmt::Display for Instruction {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        use Instruction::*;
-        write!(
-            f,
-            "{}",
-            match self {
-                Add => format!("ADD"),
-                Print(v) => format_aligned("PRINT", v),
-                Push(v) => format_aligned("PUSH", v),
-                PushConst(v) => format_aligned("PUSH_CONST", v),
-                Return => format!("RETURN"),
-                i => format!("{:?}", i),
+        let string = match self {
+            Self::StoreConst(v) => format_aligned("STORE_CONST", v),
+            Self::LoadConst(v) => format_aligned("LOAD_CONST", v),
+            Self::BinaryOperation(operator) => {
+                format_aligned("BINARY_OPERATION", operator.to_string())
             }
-        )
+            Self::Return => format!("RETURN"),
+            i => format!("{:?}", i),
+        };
+        write!(f, "{}", string)
     }
 }
 
@@ -57,8 +66,10 @@ pub fn format_instructions(instructions: &Instructions) -> String {
     instructions
         .iter()
         .map(|instruction| {
+            let result =
+                format!("{:0>offset_width$} {}", offset, instruction, offset_width = 4);
             offset += 1;
-            format!("{:0>offset_width$} {}", offset, instruction, offset_width = 4)
+            result
         })
         .collect::<Vec<String>>()
         .join("\n")
@@ -70,19 +81,23 @@ mod tests {
     #[test]
     fn test_format_instructions() {
         let instructions: Instructions = vec![
-            Instruction::Push(1),
-            Instruction::Push(2),
-            Instruction::Add,
-            Instruction::Print(1),
+            Instruction::StoreConst(1), // value
+            Instruction::StoreConst(2), // value
+            Instruction::LoadConst(0),  // index
+            Instruction::LoadConst(1),  // index
+            Instruction::BinaryOperation(BinaryOperator::Add),
+            Instruction::Return,
         ];
         let string = format_instructions(&instructions);
         assert_eq!(
             string,
             "\
-0001 PUSH               1
-0002 PUSH               2
-0003 ADD
-0004 PRINT              1"
+0000 STORE_CONST        1
+0001 STORE_CONST        2
+0002 LOAD_CONST         0
+0003 LOAD_CONST         1
+0004 BINARY_OPERATION   +
+0006 RETURN"
         )
     }
 }

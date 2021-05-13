@@ -1,18 +1,18 @@
-pub type ExecuteResult = Result<VMState, String>;
+pub type ExecutionResult = Result<VMState, ExecutionError>;
 
 #[derive(Debug)]
-pub struct ExecuteError {
-    pub error: ExecuteErrorKind,
+pub struct ExecutionError {
+    pub error: ExecutionErrorKind,
 }
 
-impl ExecuteError {
-    pub fn new(error: ExecuteErrorKind) -> Self {
+impl ExecutionError {
+    pub fn new(error: ExecutionErrorKind) -> Self {
         Self { error }
     }
 }
 
 #[derive(Debug)]
-pub enum ExecuteErrorKind {
+pub enum ExecutionErrorKind {
     GenericError(String),
 }
 

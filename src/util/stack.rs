@@ -21,14 +21,6 @@ impl<T> Stack<T> {
         self.storage.last()
     }
 
-    /// Get the top N items from the stack. If the stack contains less
-    /// than N items, get all the items it does contain.
-    pub fn peek_n(&self, n: u8) -> &[T] {
-        let size = self.size();
-        let start = size - min(n as usize, size);
-        &self.storage[start..size]
-    }
-
     pub fn is_empty(&self) -> bool {
         self.storage.is_empty()
     }
