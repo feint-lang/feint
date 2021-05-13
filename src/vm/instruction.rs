@@ -3,13 +3,23 @@ use std::fmt::Formatter;
 
 pub type Instructions = Vec<Instruction>;
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
+pub enum BinaryOperator {
+    Multiply,
+    Divide,
+    Add,
+    Subtract,
+}
+
+#[derive(Debug)]
 pub enum Instruction {
     Print(u8), // Print up to 256 value(s) at top of stack
     Push(usize),
-    PushConst(usize), // ???
-    Jump(usize),      // Jump unconditionally
-    JumpIf(usize),    // Jump if top of stack is true
+    PushConst(usize),   // ???
+    Jump(usize),        // Jump unconditionally
+    JumpIfTrue(usize),  // Jump if top of stack is true
+    JumpIfFalse(usize), // Jump if top of stack is false
+    BinaryOperation(BinaryOperator),
     Return,
     Add, // Add top two items in stack; push result back
     Halt(i32),
@@ -64,7 +74,6 @@ mod tests {
             Instruction::Push(2),
             Instruction::Add,
             Instruction::Print(1),
-            Instruction::Return,
         ];
         let string = format_instructions(&instructions);
         assert_eq!(
@@ -73,8 +82,7 @@ mod tests {
 0001 PUSH               1
 0002 PUSH               2
 0003 ADD
-0004 PRINT              1
-0005 RETURN"
+0004 PRINT              1"
         )
     }
 }

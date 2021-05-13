@@ -1,12 +1,9 @@
 use crate::util::Stack;
 
-use super::{Frame, Instruction, Instructions, Namespace};
-
-#[derive(Debug)]
-pub enum VMState {
-    Idle,
-    Halted(i32, Option<String>),
-}
+use super::{
+    BinaryOperator, ExecuteError, ExecuteErrorKind, ExecuteResult, Frame, Instruction,
+    Instructions, Namespace, VMState,
+};
 
 pub struct VM<'a> {
     namespace: Namespace,
@@ -39,33 +36,43 @@ impl<'a> VM<'a> {
     /// When a HALT instruction is encountered, the VM's state will be
     /// cleared; it can be "restarted" by passing more instructions to
     /// execute.
-    pub fn execute(&mut self, instructions: &Instructions) -> VMState {
+    pub fn execute(&mut self, instructions: &Instructions) -> ExecuteResult {
         let mut instruction_pointer = 0;
         loop {
-            match instructions.get(instruction_pointer) {
-                Some(instruction) => {
-                    instruction_pointer += 1;
-                    match self.execute_instruction(instruction) {
-                        state @ VMState::Halted(_, _) => break state,
-                        _ => (),
-                    }
-                }
-                // Go idle
-                None => break VMState::Idle,
+            if let Some(instruction) = instructions.get(instruction_pointer) {
+                instruction_pointer += 1;
+                if let Some(result) = self.execute_instruction(instruction) {
+                    return result;
+                };
+            } else {
+                // No instructions left. Note that from the point of
+                // view of the VM, this is not an error.
+                break Ok(VMState::Idle);
             }
         }
     }
 
     /// Run the specified instruction and return the VM's state.
-    pub fn execute_instruction(&mut self, instruction: &Instruction) -> VMState {
+    pub fn execute_instruction(
+        &mut self,
+        instruction: &Instruction,
+    ) -> Option<ExecuteResult> {
         match instruction {
             Instruction::Push(v) => {
                 self.stack.push(*v);
             }
-            Instruction::Add => {
+            Instruction::BinaryOperation(operator) => {
                 match self.pop_top_two() {
-                    Some((a, b)) => self.stack.push(a + b),
-                    None => (),
+                    Some((a, b)) => {
+                        let value = match operator {
+                            BinaryOperator::Multiply => a * b,
+                            BinaryOperator::Divide => a / b,
+                            BinaryOperator::Add => a + b,
+                            BinaryOperator::Subtract => a - b,
+                        };
+                        self.stack.push(value)
+                    }
+                    None => (), // TODO: Error!
                 };
             }
             Instruction::Print(n) => match self.stack.peek_n(*n) {
@@ -82,14 +89,14 @@ impl<'a> VM<'a> {
             },
             Instruction::Halt(code) => {
                 self.halt();
-                return VMState::Halted(*code, None);
+                return Some(Ok(VMState::Halted(*code)));
             }
             instruction => {
                 #[cfg(debug_assertions)]
                 println!("{:?}", instruction);
             }
         }
-        VMState::Idle
+        None
     }
 
     fn push(&mut self, item: usize) {
@@ -124,5 +131,24 @@ impl<'a> VM<'a> {
 
     fn pop_frame(&mut self) -> Option<&Frame> {
         self.call_stack.pop()
+    }
+}
+
+mod tests {
+    use super::*;
+
+    #[test]
+    fn run_simple() {
+        let mut vm = VM::new(Namespace::new(None));
+        let instructions: Instructions = vec![
+            Instruction::Push(1),
+            Instruction::Push(2),
+            Instruction::BinaryOperation(BinaryOperator::Add),
+            Instruction::Print(1),
+            Instruction::Halt(0),
+        ];
+        if let Ok(result) = vm.execute(&instructions) {
+            assert_eq!(result, VMState::Halted(0));
+        }
     }
 }

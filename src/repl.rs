@@ -181,12 +181,12 @@ impl<'a> Runner<'a> {
         };
 
         match self.vm.execute(&instructions) {
-            VMState::Halted(0, option_message) => Some(Ok(option_message)),
-            VMState::Halted(code, Some(message)) => Some(Err((code, message))),
-            VMState::Halted(code, None) => {
-                Some(Err((code, "Unknown Error".to_string())))
+            Ok(VMState::Idle) => None,
+            Ok(VMState::Halted(0)) => Some(Ok(Some("Halted".to_owned()))),
+            Ok(VMState::Halted(code)) => {
+                Some(Err((code, format!("Halted abnormally: {}", code))))
             }
-            VMState::Idle => None,
+            Err(message) => Some(Err((1, message))),
         }
     }
 

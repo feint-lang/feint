@@ -2,7 +2,7 @@
 
 use super::result::ExitResult;
 use super::scanner::{self, ScanError, ScanErrorKind};
-use super::vm::{Instruction, Instructions, Namespace, VMState, VM};
+use super::vm::{ExecuteResult, Instruction, Instructions, Namespace, VMState, VM};
 use crate::scanner::TokenWithLocation;
 
 /// Run text source.
@@ -86,10 +86,12 @@ impl<'a> Runner<'a> {
         instructions.push(Instruction::Halt(0));
 
         match self.vm.execute(&instructions) {
-            VMState::Halted(0, option_message) => Ok(option_message),
-            VMState::Halted(code, Some(message)) => Err((code, message)),
-            VMState::Halted(code, None) => Err((code, "Unknown error".to_string())),
-            VMState::Idle => Err((i32::MAX, "Execution never halted".to_string())),
+            Ok(VMState::Idle) => Err((1, "Execution never halted".to_string())),
+            Ok(VMState::Halted(0)) => Ok(Some("Halted".to_owned())),
+            Ok(VMState::Halted(code)) => {
+                Err((code, format!("Halted abnormally: {}", code)))
+            }
+            Err(message) => Err((1, message)),
         }
     }
 }

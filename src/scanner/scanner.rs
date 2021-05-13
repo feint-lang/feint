@@ -907,27 +907,29 @@ a = [
    1,
 # comment
   2,
-]
+]  # another comment
 
-# FIXME: This is an unexpected indent but the scanner doesn't detect that.
-    b = 1
+b = 3
 ";
         let tokens = scan_optimistic(source);
+        let num_tokens = tokens.len();
+        println!("{:?}", tokens);
         let mut token;
-        for token in tokens {
-            eprintln!("{}", token);
-        }
-        // assert_eq!(tokens.len(), 8);
+        assert_eq!(num_tokens, 11);
         token = Token::Identifier("a".to_string());
-        // check_token(tokens.get(0), token, 3, 1, 3, 1);
-        // check_token(tokens.get(1), Token::Equal, 3, 3, 3, 3);
-        // check_token(tokens.get(2), Token::LeftSquareBracket, 3, 5, 3, 5);
-        // check_token(tokens.get(3), Token::Int("1".to_owned(), 10), 4, 4, 4, 4);
-        // check_token(tokens.get(4), Token::Comma, 4, 5, 4, 5);
-        // check_token(tokens.get(5), Token::Int("2".to_owned(), 10), 6, 3, 6, 3);
-        // check_token(tokens.get(6), Token::Comma, 6, 4, 6, 4);
-        // check_token(tokens.get(7), Token::RightSquareBracket, 7, 1, 7, 1);
-        // assert!(tokens.get(8).is_none());
+        check_token(tokens.get(0), token, 3, 1, 3, 1);
+        check_token(tokens.get(1), Token::Equal, 3, 3, 3, 3);
+        check_token(tokens.get(2), Token::LeftSquareBracket, 3, 5, 3, 5);
+        check_token(tokens.get(3), Token::Int(BigInt::from(1)), 4, 4, 4, 4);
+        check_token(tokens.get(4), Token::Comma, 4, 5, 4, 5);
+        check_token(tokens.get(5), Token::Int(BigInt::from(2)), 6, 3, 6, 3);
+        check_token(tokens.get(6), Token::Comma, 6, 4, 6, 4);
+        check_token(tokens.get(7), Token::RightSquareBracket, 7, 1, 7, 1);
+        token = Token::Identifier("b".to_string());
+        check_token(tokens.get(8), token, 9, 1, 9, 1);
+        check_token(tokens.get(9), Token::Equal, 9, 3, 9, 3);
+        check_token(tokens.get(10), Token::Int(BigInt::from(3)), 9, 5, 9, 5);
+        assert!(tokens.get(11).is_none());
     }
 
     #[test]
