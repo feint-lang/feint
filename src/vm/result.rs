@@ -1,3 +1,6 @@
+use std::fmt;
+use std::fmt::Formatter;
+
 pub type ExecutionResult = Result<VMState, ExecutionError>;
 
 #[derive(Debug)]
@@ -11,9 +14,21 @@ impl ExecutionError {
     }
 }
 
+impl fmt::Display for ExecutionError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self.error)
+    }
+}
+
 #[derive(Debug)]
 pub enum ExecutionErrorKind {
     GenericError(String),
+}
+
+impl fmt::Display for ExecutionErrorKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 #[derive(Debug, PartialEq)]

@@ -79,6 +79,7 @@ mod tests {
     use super::*;
 
     #[test]
+    /// This isn't a very useful test...
     fn test_format_instructions() {
         let instructions: Instructions = vec![
             Instruction::StoreConst(1), // value
@@ -97,7 +98,7 @@ mod tests {
 0002 LOAD_CONST         0
 0003 LOAD_CONST         1
 0004 BINARY_OPERATION   +
-0006 RETURN"
+0005 RETURN"
         )
     }
 }

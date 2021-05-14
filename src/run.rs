@@ -88,7 +88,7 @@ impl<'a> Runner<'a> {
             Ok(VMState::Halted(code)) => {
                 Err((code, format!("Halted abnormally: {}", code)))
             }
-            Err(message) => Err((1, message)),
+            Err(err) => Err((1, err.to_string())),
         }
     }
 }

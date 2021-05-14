@@ -1,24 +1,27 @@
+
 # Every program is an expression containing 0 or more expressions.
 program :
-    | expr*
+    | expression*
 
-expr :
+expression :
+    | "(" expression ")"
     | assignment
     | atom
-    | binary_operation
+    | sum
     | block
     | function
     | operation
     | type
 
 assignment :
-    | IDENTIFIER "=" expr
+    | IDENTIFIER "=" expression
 
 atom :
     | bool
     | float
     | int
     | string
+    | name
 
 bool :
     | "true"
@@ -28,23 +31,23 @@ float :
     | FLOAT
 
 int :
-    | BIN
-    | DECIMAL
-    | HEX
-    | OCTAL
+    | INT_02
+    | INT_08
+    | INT_10
+    | INT_16
 
 string:
     | "\"" CHAR* "\""
 
 # TODO: Figure out how to delineate blocks.
 block :
-    | (INDENT(N) expr)+ DEDENT(N - 1)
+    | BLOCK_START expression+ BLOCK_END
 
 type :
     | TYPE_IDENTIFIER "(" parameter_list? ")" "\n" block
 
 function :
-    | IDENTIFIER? "(" parameter_list? ")" type_annotation "->" (expr| "\n" block)
+    | IDENTIFIER? "(" parameter_list? ")" type_annotation "->" (expression| "\n" block)
 
 parameter_list :
     | parameter "," parameter_list
@@ -57,18 +60,15 @@ type_annotation :
     | ""
     | ":" TYPE_IDENTIFIER
 
-operation :
-    | operation_1 "+" operation
-    | operation_1 "-" operation
-    | operation_1
-operation_1 :
-    | operand "*" operation_1
-    | operand "/" operation_1
-    | operand "%" operation_1
-    | operand
-operand :
-    | "(" operation ")"
-    | expr
+sum :
+    | expression ("+" | "-") product
+    | product
+product :
+    | expression ("*" | "/" | "//" | "%") power
+    | power
+power :
+    | expression ("^" power)
+    | expression
 
 name:
     | IDENTIFIER
@@ -101,17 +101,20 @@ IMPORTED_IDENTIFIER :
     | name "as" name
     | name
 
-# Integers
-BIN     : "(+|-)?0b[01]+"
-HEX     : "(+|-)?0x[A-Za-z0-9]+"
-DECIMAL : "(+|-)?0|[1-9][0-9]*"
-OCTAL   : "(+|-)?0o[0-7]+"
+# Numeric character sets allowing for underscores between digits
+ZERO    : "0(_?0+)*"
+BINARY  : "[0-1](_?[0-1]+)*"
+OCTAL   : "[0-7](_?[0-7]+)*"
+DECIMAL : "[0-9](_?[0-9]+)*"
+NATURAL : "[1-9](_?[0-9]+)*"
+HEX     : "[A-Za-z0-9](_?[A-Za-z0-9]+)*"
 
-# Floating point numbers
-# TODO: Add E notation
 FLOAT :
-    | "DECIMAL\.[0-9]+"
-    | "DECIMAL(\.[0-9]+)?(e|E)[+-]?DECIMAL"
+    | "{ DECIMAL }\.{ DECIMAL }"
+    | "{ DECIMAL }(\.{ DECIMAL })?(e|E)[+-]?{ DECIMAL }"
 
-INDENT(N) : " {N}"
-DEDENT(N) : " {N}"
+# Integers
+INT_02  : "(+|-)?0b_?{ BINARY }"
+INT_08  : "(+|-)?0o_?{ OCTAL }"
+INT_10  : "(+|-)?({ ZERO }|{ NATURAL })"
+INT_16  : "(+|-)?0x_{ HEX }"
