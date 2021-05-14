@@ -10,13 +10,15 @@ const CAPACITY: usize = 255; // 2^8 - 1
 /// The source is read line by line and the characters from each line
 /// are yielded (so to speak) in turn. Other features:
 ///
+/// - Newlines are normalized (\r\n will be converted to \n)
 /// - The current line and column in the source are tracked
 /// - Start-of-line state is tracked (true initially and when the end of
 ///   a line is reached; false otherwise)
 /// - The previous and current characters are tracked
-/// - Newlines are normalized (\r\n will be converted to \n)
 pub struct Source<T> {
     source: T,
+    /// String buffer the source reader reads into.
+    buffer: String,
     /// The queue of characters for the current line.
     queue: VecDeque<char>,
     pub line: usize,
@@ -33,6 +35,7 @@ where
     pub fn new(source: T) -> Self {
         let mut source = Source {
             source,
+            buffer: String::with_capacity(CAPACITY),
             queue: VecDeque::with_capacity(CAPACITY),
             line: 0,
             col: 0,
@@ -47,32 +50,30 @@ where
     fn check_queue(&mut self) -> bool {
         if self.queue.is_empty() {
             // See if character queue can be refilled from the next line.
-            let mut line = String::new();
-            match self.source.read_line(&mut line) {
+            self.buffer.clear();
+            match self.source.read_line(&mut self.buffer) {
                 // No more lines; done.
                 Ok(0) => {
                     self.at_start_of_line = false;
                     return false;
                 }
                 Ok(_) => {
+                    self.queue.extend(self.buffer.chars());
                     self.line += 1;
                     self.col = 1;
                     self.at_start_of_line = true;
-                    self.queue.extend(line.chars());
+                    if self.queue.len() > 1 {
+                        // Normalize \r\n to \n
+                        let i = self.queue.len() - 2;
+                        if self.queue[i] == '\r' && self.queue[i + 1] == '\n' {
+                            self.queue.remove(i);
+                        }
+                    }
                 }
                 Err(err) => {
-                    // Panicking seems wonky, but if the source can't be
-                    // read, I'm pretty sure that's unrecoverable.
                     panic!("Could not read line from source: {}", err);
                 }
             };
-            if self.queue.len() > 1 {
-                // Normalize \r\n to \n
-                let i = self.queue.len() - 2;
-                if self.queue[i] == '\r' && self.queue[i + 1] == '\n' {
-                    self.queue.remove(i);
-                }
-            }
         }
         // Queue wasn't empty or was refilled.
         true

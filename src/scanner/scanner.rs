@@ -63,6 +63,7 @@ where
     /// Keep track of whether we're at the start of a line so indents
     /// can be handled specially.
     indent_level: i32,
+    block_stack: Stack<(Token, Location)>,
     /// Opening brackets are pushed and later popped when the closing
     /// bracket is encountered. This gives us a way to verify brackets
     /// are matched and also lets us know when we're inside a group
@@ -80,6 +81,7 @@ where
             source: stream,
             queue: VecDeque::new(),
             indent_level: -1,
+            block_stack: Stack::new(),
             bracket_stack: Stack::new(),
         }
     }
@@ -89,23 +91,6 @@ where
             self.add_tokens_to_queue()?;
         }
         Ok(self.queue.pop_front().unwrap())
-    }
-
-    fn add_token_to_queue(
-        &mut self,
-        token: Token,
-        start: Location,
-        end_option: Option<Location>,
-    ) {
-        let end = match end_option {
-            Some(end) => end,
-            None => Location::new(
-                self.source.line,
-                if self.source.col == 0 { 0 } else { self.source.col - 1 },
-            ),
-        };
-        let token_with_location = TokenWithLocation::new(token, start, end);
-        self.queue.push_back(token_with_location);
     }
 
     fn handle_indents(&mut self) -> Result<(), ScanError> {
@@ -151,7 +136,15 @@ where
         // block. If it has decreased, that signals the end of a block,
         // and we may have to dedent multiple levels. If it stayed the
         // same, do nothing.
-        let indent_level = num_spaces / 4;
+        self.set_indent_level(num_spaces / 4, start)
+    }
+
+    fn set_indent_level(
+        &mut self,
+        indent_level: i32,
+        start: Location,
+    ) -> Result<(), ScanError> {
+        let location = Location::new(start.line, 0);
         if indent_level == self.indent_level {
             return Ok(());
         } else if self.indent_level == -1 {
@@ -165,13 +158,16 @@ where
                 start,
             ));
         } else if indent_level == self.indent_level + 1 {
-            let location = Location::new(start.line, 0);
             self.indent_level = indent_level;
+            self.block_stack.push((Token::BlockStart, start));
             self.add_token_to_queue(Token::BlockStart, location, Some(location));
         } else if indent_level < self.indent_level {
-            let location = Location::new(start.line, 0);
             while self.indent_level > indent_level {
                 self.indent_level -= 1;
+                match self.block_stack.push((Token::BlockStart, start)) {
+                    Some((_token, _location)) => (),
+                    None => panic!(),
+                }
                 self.add_token_to_queue(Token::BlockEnd, location, Some(location));
             }
         } else {
@@ -208,63 +204,42 @@ where
             }
             Some((':', _, _)) => Token::Colon,
             Some((',', _, _)) => Token::Comma,
-            Some((c @ '(', _, _)) => {
-                self.bracket_stack.push((c, start));
+            Some(('(', _, _)) => {
+                self.bracket_stack.push(('(', start));
                 Token::LeftParen
             }
-            Some((c @ ')', _, _)) => {
-                match self.bracket_stack.pop() {
-                    Some(('(', _)) => (),
-                    None | Some(_) => {
-                        return Err(ScanError::new(
-                            ScanErrorKind::UnmatchedClosingBracket(c),
-                            start,
-                        ));
-                    }
-                }
-                Token::RightParen
+            Some((')', _, _)) => {
+                self.pop_bracket_and_return_token('(', ')', start, Token::RightParen)?
             }
-            Some((c @ '[', _, _)) => {
-                self.bracket_stack.push((c, start));
+            Some(('[', _, _)) => {
+                self.bracket_stack.push(('[', start));
                 Token::LeftSquareBracket
             }
-            Some((c @ ']', _, _)) => {
-                match self.bracket_stack.pop() {
-                    Some(('[', _)) => (),
-                    None | Some(_) => {
-                        return Err(ScanError::new(
-                            ScanErrorKind::UnmatchedClosingBracket(c),
-                            start,
-                        ));
-                    }
-                }
-                Token::RightSquareBracket
-            }
+            Some((']', _, _)) => self.pop_bracket_and_return_token(
+                '[',
+                ']',
+                start,
+                Token::RightSquareBracket,
+            )?,
             Some(('<', Some('='), _)) => {
                 self.consume_char_and_return_token(Token::LessThanOrEqual)
             }
             Some(('<', Some('-'), _)) => {
                 self.consume_char_and_return_token(Token::LoopFeed)
             }
-            Some((c @ '<', _, _)) => {
-                self.bracket_stack.push((c, start));
+            Some(('<', _, _)) => {
+                self.bracket_stack.push(('<', start));
                 Token::LeftAngleBracket
             }
             Some(('>', Some('='), _)) => {
                 self.consume_char_and_return_token(Token::GreaterThanOrEqual)
             }
-            Some((c @ '>', _, _)) => {
-                match self.bracket_stack.pop() {
-                    Some(('<', _)) => (),
-                    None | Some(_) => {
-                        return Err(ScanError::new(
-                            ScanErrorKind::UnmatchedClosingBracket(c),
-                            start,
-                        ));
-                    }
-                }
-                Token::RightAngleBracket
-            }
+            Some(('>', _, _)) => self.pop_bracket_and_return_token(
+                '<',
+                '>',
+                start,
+                Token::RightAngleBracket,
+            )?,
             Some(('=', Some('='), _)) => {
                 self.consume_char_and_return_token(Token::EqualEqual)
             }
@@ -362,32 +337,16 @@ where
             }
             // End of input
             None => {
-                if self.indent_level > 0 {
-                    // This will happen if the source doesn't end with
-                    // a newline.
-                    let location = Location::new(start.line + 1, 0);
-                    while self.indent_level > 0 {
-                        self.indent_level -= 1;
-                        self.add_token_to_queue(
-                            Token::BlockEnd,
-                            location,
-                            Some(location),
-                        );
-                    }
-                }
-
-                let bracket = self.bracket_stack.pop();
-                match bracket {
+                self.set_indent_level(0, Location::new(start.line + 1, 1));
+                match self.bracket_stack.pop() {
                     Some((c, location)) => {
                         return Err(ScanError::new(
                             ScanErrorKind::UnmatchedOpeningBracket(c),
                             location,
                         ));
                     }
-                    None => (),
+                    None => Token::EndOfInput,
                 }
-
-                Token::EndOfInput
             }
         };
 
@@ -396,16 +355,21 @@ where
         Ok(())
     }
 
-    /// Consume and return the next character. The following two
-    /// characters are included as well for easy peeking.
-    fn next_char(&mut self) -> NextOption {
-        match self.source.next() {
-            Some(c) => {
-                let (d, e) = self.source.peek_2();
-                Some((c, d, e))
-            }
-            _ => None,
-        }
+    fn add_token_to_queue(
+        &mut self,
+        token: Token,
+        start: Location,
+        end_option: Option<Location>,
+    ) {
+        let end = match end_option {
+            Some(end) => end,
+            None => Location::new(
+                self.source.line,
+                if self.source.col == 0 { 0 } else { self.source.col - 1 },
+            ),
+        };
+        let token_with_location = TokenWithLocation::new(token, start, end);
+        self.queue.push_back(token_with_location);
     }
 
     /// Consume the next character and return the specified token.
@@ -419,6 +383,37 @@ where
         self.next_char();
         self.next_char();
         token
+    }
+
+    fn pop_bracket_and_return_token(
+        &mut self,
+        opening_bracket: char,
+        closing_bracket: char,
+        location: Location,
+        token: Token,
+    ) -> Result<Token, ScanError> {
+        match self.bracket_stack.pop() {
+            Some((c, _)) if c == opening_bracket => (),
+            None | Some(_) => {
+                return Err(ScanError::new(
+                    ScanErrorKind::UnmatchedClosingBracket(closing_bracket),
+                    location,
+                ));
+            }
+        }
+        Ok(token)
+    }
+
+    /// Consume and return the next character. The following two
+    /// characters are included as well for easy peeking.
+    fn next_char(&mut self) -> NextOption {
+        match self.source.next() {
+            Some(c) => {
+                let (d, e) = self.source.peek_2();
+                Some((c, d, e))
+            }
+            _ => None,
+        }
     }
 
     /// Consume and return the next character if it matches the
