@@ -15,7 +15,10 @@ const CAPACITY: usize = 255; // 2^8 - 1
 /// - Start-of-line state is tracked (true initially and when the end of
 ///   a line is reached; false otherwise)
 /// - The previous and current characters are tracked
-pub struct Source<T> {
+pub struct Source<T>
+where
+    T: BufRead,
+{
     source: T,
     /// String buffer the source reader reads into.
     buffer: String,
@@ -23,7 +26,6 @@ pub struct Source<T> {
     queue: VecDeque<char>,
     pub line: usize,
     pub col: usize,
-    pub at_start_of_line: bool,
     pub previous_char: Option<char>,
     pub current_char: Option<char>,
 }
@@ -39,7 +41,6 @@ where
             queue: VecDeque::with_capacity(CAPACITY),
             line: 0,
             col: 0,
-            at_start_of_line: true,
             previous_char: None,
             current_char: None,
         };
@@ -54,14 +55,12 @@ where
             match self.source.read_line(&mut self.buffer) {
                 // No more lines; done.
                 Ok(0) => {
-                    self.at_start_of_line = false;
                     return false;
                 }
                 Ok(_) => {
                     self.queue.extend(self.buffer.chars());
                     self.line += 1;
                     self.col = 1;
-                    self.at_start_of_line = true;
                     if self.queue.len() > 1 {
                         // Normalize \r\n to \n
                         let i = self.queue.len() - 2;
@@ -83,7 +82,6 @@ where
         if self.check_queue() {
             if let Some(c) = self.queue.pop_front() {
                 self.col += 1;
-                self.at_start_of_line = false;
                 self.previous_char = self.current_char;
                 self.current_char = Some(c);
                 return self.current_char;
@@ -161,4 +159,9 @@ impl fmt::Display for Location {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}:{}", self.line, self.col)
     }
+}
+
+mod tests {
+    #[test]
+    fn source_from_text() {}
 }

@@ -76,9 +76,8 @@ where
     T: BufRead,
 {
     fn new(reader: T) -> Self {
-        let stream = Source::new(reader);
         Scanner {
-            source: stream,
+            source: Source::new(reader),
             queue: VecDeque::new(),
             indent_level: -1,
             block_stack: Stack::new(),
@@ -94,12 +93,14 @@ where
     }
 
     fn handle_indents(&mut self) -> Result<(), ScanError> {
-        assert!(
-            self.source.at_start_of_line,
+        assert_eq!(
+            self.source.current_char,
+            Some('\n'),
             "This method should only be called when at the start of a line"
         );
 
         let start = self.source.location();
+        let location = Location::new(start.line, 0);
         let num_spaces = self.read_indent();
         let whitespace_count = self.consume_whitespace();
 
@@ -136,15 +137,7 @@ where
         // block. If it has decreased, that signals the end of a block,
         // and we may have to dedent multiple levels. If it stayed the
         // same, do nothing.
-        self.set_indent_level(num_spaces / 4, start)
-    }
-
-    fn set_indent_level(
-        &mut self,
-        indent_level: i32,
-        start: Location,
-    ) -> Result<(), ScanError> {
-        let location = Location::new(start.line, 0);
+        let indent_level = num_spaces / 4;
         if indent_level == self.indent_level {
             return Ok(());
         } else if self.indent_level == -1 {
@@ -164,10 +157,7 @@ where
         } else if indent_level < self.indent_level {
             while self.indent_level > indent_level {
                 self.indent_level -= 1;
-                match self.block_stack.push((Token::BlockStart, start)) {
-                    Some((_token, _location)) => (),
-                    None => panic!(),
-                }
+                self.block_stack.push((Token::BlockStart, start));
                 self.add_token_to_queue(Token::BlockEnd, location, Some(location));
             }
         } else {
@@ -182,10 +172,6 @@ where
     }
 
     fn add_tokens_to_queue(&mut self) -> Result<(), ScanError> {
-        if self.source.at_start_of_line {
-            self.handle_indents()?;
-        }
-
         let start = self.source.location();
 
         let token = match self.next_char() {
@@ -336,18 +322,15 @@ where
                 ));
             }
             // End of input
-            None => {
-                self.set_indent_level(0, Location::new(start.line + 1, 1));
-                match self.bracket_stack.pop() {
-                    Some((c, location)) => {
-                        return Err(ScanError::new(
-                            ScanErrorKind::UnmatchedOpeningBracket(c),
-                            location,
-                        ));
-                    }
-                    None => Token::EndOfInput,
+            None => match self.bracket_stack.pop() {
+                Some((c, location)) => {
+                    return Err(ScanError::new(
+                        ScanErrorKind::UnmatchedOpeningBracket(c),
+                        location,
+                    ));
                 }
-            }
+                None => Token::EndOfInput,
+            },
         };
 
         self.add_token_to_queue(token, start, None);
