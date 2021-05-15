@@ -19,7 +19,7 @@ impl Program {
 impl fmt::Debug for Program {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for s in self.statements.iter() {
-            write!(f, "{:?}\n", s);
+            write!(f, "{:?}\n", s)?;
         }
         write!(f, "")
     }

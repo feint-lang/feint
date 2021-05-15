@@ -610,7 +610,7 @@ where
     fn read_string(&mut self, quote: char) -> (String, bool) {
         let mut string = String::new();
         loop {
-            if let Some((_, d, _)) = self.next_two_chars_if(|c| c == &'\\', |d| true) {
+            if let Some((_, d, _)) = self.next_two_chars_if(|c| c == &'\\', |_d| true) {
                 // Handle chars escaped by a preceding \.
                 // TODO: Handle \o, \u, \x, etc
                 match d {

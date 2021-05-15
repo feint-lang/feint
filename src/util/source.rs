@@ -1,30 +1,41 @@
 use std::collections::VecDeque;
 use std::fmt;
-use std::io::BufRead;
+use std::io::{BufRead, Take};
 
-/// Maximum line length in chars. This is used to set the capacity for
-/// the source's char queue up front to avoid allocations.
-const CAPACITY: usize = 255; // 2^8 - 1
+/// This is used to set the initial capacity for the source's char
+/// queue up front to avoid allocations. It assumes reasonable line
+/// lengths are in use plus some additional space for end-of-line
+/// comments, etc. 2^8 - 1 is used because using 2^8 will cause the
+/// queue's initial capacity to be doubled.
+const INITIAL_CAPACITY: usize = 255; // 2^8 - 1
+
+/// Maximum length of a line in bytes. This keeps malicious input from
+/// causing issues (e.g., extremely long lines or no EOF).
+///
+/// TODO: Determine an optimal max line length. It could probably be
+///       quite a bit larger before causing any issues. The only place
+///       this is likely to be relevant is when a user has a *really*
+///       long literal string with no newlines that they for some reason
+///       want to store in their source code.
+const MAX_LINE_LENGTH: u64 = 4096; // 2^12
+const MAX_LINE_LENGTH_USIZE: usize = MAX_LINE_LENGTH as usize;
 
 /// A wrapper around some source, typically either some text or a file.
 /// The source is read line by line and the characters from each line
 /// are yielded (so to speak) in turn. Other features:
 ///
 /// - Emits an initial newline to prime the queue and allow for
-///   consistent start-of-line handling/logic
-/// - The current line and column in the source are tracked
-/// - The previous and current characters are tracked
-///
-/// TODO: Should newlines be normalized? The scanner skips \r in anyway,
-///       except inside string literals. Does it makes sense to
-///       normalize newlines inside literal strings? If so, that could
-///       be handled in the scanner rather than futzing with *every
-///       single line* here.
+///   consistent start-of-line handling/logic.
+/// - Normalizes \r\n line endings to \n. NOTE: \r as a line ending
+///   is *not* handled. TODO: Detect use of \r as line ending?
+/// - Tracks current line and column.
+/// - Tracks previous and current characters.
+/// - Panics when lines are too long.
 pub struct Source<T>
 where
     T: BufRead,
 {
-    source: T,
+    stream: Take<T>,
     /// String buffer the source reader reads into.
     buffer: String,
     /// The queue of characters for the current line.
@@ -41,9 +52,9 @@ where
 {
     pub fn new(source: T) -> Self {
         let mut source = Source {
-            source,
-            buffer: String::with_capacity(CAPACITY),
-            queue: VecDeque::with_capacity(CAPACITY),
+            stream: source.take(MAX_LINE_LENGTH + 1),
+            buffer: String::with_capacity(INITIAL_CAPACITY),
+            queue: VecDeque::with_capacity(INITIAL_CAPACITY),
             line: 0,
             col: 0,
             previous_char: None,
@@ -54,20 +65,21 @@ where
     }
 
     fn check_queue(&mut self) -> bool {
-        let queue = &mut self.queue;
-        if queue.is_empty() {
+        if self.queue.is_empty() {
             // See if character queue can be refilled from the next line.
-            let buffer = &mut self.buffer;
-            buffer.clear();
-            match self.source.read_line(buffer) {
+            self.buffer.clear();
+            match self.stream.read_line(&mut self.buffer) {
                 Ok(0) => {
                     // All lines read; done.
                     return false;
                 }
-                Ok(_) => {
+                Ok(n) => {
+                    if n > MAX_LINE_LENGTH_USIZE {
+                        panic!("Line is too long (> {})", MAX_LINE_LENGTH);
+                    }
                     self.line += 1;
                     self.col = 1;
-                    queue.extend(buffer.chars());
+                    self.queue.extend(self.buffer.chars());
                 }
                 Err(err) => {
                     panic!("Could not read line from source: {}", err);
@@ -81,9 +93,16 @@ where
     fn next_from_queue(&mut self) -> Option<char> {
         if self.check_queue() {
             if let Some(c) = self.queue.pop_front() {
+                if c == '\r' {
+                    if let Some('\n') = self.queue.front() {
+                        self.queue.pop_front();
+                        self.current_char = Some('\n');
+                    }
+                } else {
+                    self.current_char = Some(c);
+                }
                 self.col += 1;
                 self.previous_char = self.current_char;
-                self.current_char = Some(c);
                 return self.current_char;
             }
         }
