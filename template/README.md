@@ -9,19 +9,24 @@ eventually) work.
     <package_name>
     ├──README.md
     ├──package.toml
+    ├──dependencies/
+    │  └──<dependency_package_name>
+    │     └── ... dependency package files ...
     ├──docs/
-    │  ├──index.md
+    │  └──index.md
     ├── src/
     │  ├──api.fi    => Exported/public API
     │  ├──main.fi   => main(), like Rust
-    │  ├──lib/      => The bulk of the package's code; nothing is
-    │  │  ├── x.fi     importable directly from here
-    │  │  ├── y.fi
-    │  │  ├── z.fi
-    ├──tests/
-    │  ├──test_x.fi
-    │  ├──test_y.fi
-    │  ├──test_z.fi
+    │  └──lib/      => The bulk of the package's code; nothing is
+    │     ├── x.fi     importable directly from here
+    │     ├── y.fi
+    │     ├── z.fi
+    │     └── <module_name>/
+    │         └── a.fi
+    └──tests/
+       ├──test_x.fi
+       ├──test_y.fi
+       └──test_z.fi
 
 # Exported API
 
