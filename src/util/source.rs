@@ -10,13 +10,10 @@ const CAPACITY: usize = 255; // 2^8 - 1
 /// The source is read line by line and the characters from each line
 /// are yielded (so to speak) in turn. Other features:
 ///
-/// - Emits a newline as the first character; this primes the queue and
-///   allows for start-of-line logic without having to track a separate
-///   variable to account for the start-of-input special case
+/// - Emits an initial newline to prime the queue and allow for
+///   consistent start-of-line handling/logic
 /// - Newlines are normalized (\r\n will be converted to \n)
 /// - The current line and column in the source are tracked
-/// - Start-of-line state is tracked (true initially and when the end of
-///   a line is reached; false otherwise)
 /// - The previous and current characters are tracked
 pub struct Source<T>
 where
@@ -52,23 +49,24 @@ where
     }
 
     fn check_queue(&mut self) -> bool {
-        if self.queue.is_empty() {
+        let queue = &mut self.queue;
+        if queue.is_empty() {
             // See if character queue can be refilled from the next line.
-            self.buffer.clear();
-            match self.source.read_line(&mut self.buffer) {
-                // No more lines; done.
+            let buffer = &mut self.buffer;
+            buffer.clear();
+            match self.source.read_line(buffer) {
                 Ok(0) => {
                     return false;
                 }
                 Ok(_) => {
-                    self.queue.extend(self.buffer.chars());
+                    queue.extend(buffer.chars());
                     self.line += 1;
                     self.col = 1;
-                    if self.queue.len() > 1 {
-                        // Normalize \r\n to \n
-                        let i = self.queue.len() - 2;
-                        if self.queue[i] == '\r' && self.queue[i + 1] == '\n' {
-                            self.queue.remove(i);
+                    let len = queue.len();
+                    if len > 1 {
+                        let (i, j) = (len - 2, len - 1);
+                        if queue[i] == '\r' && queue[j] == '\n' {
+                            queue.remove(i);
                         }
                     }
                 }
