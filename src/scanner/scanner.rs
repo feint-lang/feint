@@ -63,7 +63,6 @@ where
     /// Keep track of whether we're at the start of a line so indents
     /// can be handled specially.
     indent_level: i32,
-    block_stack: Stack<(Token, Location)>,
     /// Opening brackets are pushed and later popped when the closing
     /// bracket is encountered. This gives us a way to verify brackets
     /// are matched and also lets us know when we're inside a group
@@ -80,7 +79,6 @@ where
             source: Source::new(reader),
             queue: VecDeque::new(),
             indent_level: -1,
-            block_stack: Stack::new(),
             bracket_stack: Stack::new(),
         }
     }
@@ -100,7 +98,6 @@ where
         );
 
         let start = self.source.location();
-        let location = Location::new(start.line, 0);
         let num_spaces = self.read_indent();
         let whitespace_count = self.consume_whitespace();
 
@@ -132,41 +129,56 @@ where
             return Err(ScanError::new(ScanErrorKind::WhitespaceAfterIndent, start));
         }
 
-        // Now we have something that could be a valid indent. If the
-        // indent level has increased, that signals the start of a
-        // block. If it has decreased, that signals the end of a block,
-        // and we may have to dedent multiple levels. If it stayed the
-        // same, do nothing.
-        let indent_level = num_spaces / 4;
+        // Now we have something that *could* be a valid indent.
+        self.set_indent_level(num_spaces / 4, start)
+    }
+
+    /// Maybe update the current indent level. If the new indent level
+    /// is the same as the current indent level, do nothing. If it has
+    /// increased, that signals the start of a block. If it has
+    /// decreased, that signals the end of one or more blocks.
+    fn set_indent_level(
+        &mut self,
+        indent_level: i32,
+        start: Location,
+    ) -> Result<(), ScanError> {
         if indent_level == self.indent_level {
-            return Ok(());
+            // Stayed the same; nothing to do
         } else if self.indent_level == -1 {
+            // Special case for first line of code
             if indent_level == 0 {
                 self.indent_level = 0;
-                return Ok(());
+            } else {
+                return Err(ScanError::new(
+                    ScanErrorKind::UnexpectedIndent(indent_level),
+                    start,
+                ));
             }
-            // Unexpected indent on the first line of code.
-            return Err(ScanError::new(
-                ScanErrorKind::UnexpectedIndent(indent_level),
-                start,
-            ));
         } else if indent_level == self.indent_level + 1 {
+            // Increased by one level
+            let location = Location::new(start.line, 0);
             self.indent_level = indent_level;
-            self.block_stack.push((Token::BlockStart, start));
             self.add_token_to_queue(Token::BlockStart, location, Some(location));
         } else if indent_level < self.indent_level {
+            // Decreased by one or more levels
+            let location = Location::new(start.line, 0);
             while self.indent_level > indent_level {
                 self.indent_level -= 1;
-                self.block_stack.push((Token::BlockStart, start));
                 self.add_token_to_queue(Token::BlockEnd, location, Some(location));
             }
+            if self.indent_level < 0 {
+                return Err(ScanError::new(
+                    ScanErrorKind::UnexpectedDedent(indent_level),
+                    start,
+                ));
+            }
         } else {
-            // Unexpected indent somewhere else.
+            // Increased by *more* than one level
             return Err(ScanError::new(
                 ScanErrorKind::UnexpectedIndent(indent_level),
                 start,
             ));
-        };
+        }
 
         Ok(())
     }
@@ -194,19 +206,16 @@ where
                 self.bracket_stack.push(('(', start));
                 Token::LeftParen
             }
-            Some((')', _, _)) => {
-                self.pop_bracket_and_return_token('(', ')', start, Token::RightParen)?
+            Some((c @ ')', _, _)) => {
+                self.pop_bracket_and_return_token(c, start, Token::RightParen)?
             }
             Some(('[', _, _)) => {
                 self.bracket_stack.push(('[', start));
                 Token::LeftSquareBracket
             }
-            Some((']', _, _)) => self.pop_bracket_and_return_token(
-                '[',
-                ']',
-                start,
-                Token::RightSquareBracket,
-            )?,
+            Some((c @ ']', _, _)) => {
+                self.pop_bracket_and_return_token(c, start, Token::RightSquareBracket)?
+            }
             Some(('<', Some('='), _)) => {
                 self.consume_char_and_return_token(Token::LessThanOrEqual)
             }
@@ -220,12 +229,9 @@ where
             Some(('>', Some('='), _)) => {
                 self.consume_char_and_return_token(Token::GreaterThanOrEqual)
             }
-            Some(('>', _, _)) => self.pop_bracket_and_return_token(
-                '<',
-                '>',
-                start,
-                Token::RightAngleBracket,
-            )?,
+            Some((c @ '>', _, _)) => {
+                self.pop_bracket_and_return_token(c, start, Token::RightAngleBracket)?
+            }
             Some(('=', Some('='), _)) => {
                 self.consume_char_and_return_token(Token::EqualEqual)
             }
@@ -306,7 +312,9 @@ where
             }
             // Newlines
             Some(('\n', _, _)) => {
-                if self.bracket_stack.size() > 0 {
+                if self.bracket_stack.size() == 0 {
+                    self.handle_indents()?;
+                } else {
                     self.consume_whitespace();
                 }
                 return Ok(());
@@ -322,15 +330,18 @@ where
                 ));
             }
             // End of input
-            None => match self.bracket_stack.pop() {
-                Some((c, location)) => {
-                    return Err(ScanError::new(
-                        ScanErrorKind::UnmatchedOpeningBracket(c),
-                        location,
-                    ));
+            None => {
+                self.set_indent_level(0, Location::new(start.line + 1, 1))?;
+                match self.bracket_stack.pop() {
+                    Some((c, location)) => {
+                        return Err(ScanError::new(
+                            ScanErrorKind::UnmatchedOpeningBracket(c),
+                            location,
+                        ));
+                    }
+                    None => Token::EndOfInput,
                 }
-                None => Token::EndOfInput,
-            },
+            }
         };
 
         self.add_token_to_queue(token, start, None);
@@ -368,23 +379,27 @@ where
         token
     }
 
+    /// Check the specified closing bracket to ensure the last opening
+    /// bracket matches. If it does, the specified token is returned.
+    #[rustfmt::skip]
     fn pop_bracket_and_return_token(
         &mut self,
-        opening_bracket: char,
         closing_bracket: char,
         location: Location,
         token: Token,
     ) -> Result<Token, ScanError> {
-        match self.bracket_stack.pop() {
-            Some((c, _)) if c == opening_bracket => (),
-            None | Some(_) => {
-                return Err(ScanError::new(
-                    ScanErrorKind::UnmatchedClosingBracket(closing_bracket),
-                    location,
-                ));
+        match (self.bracket_stack.pop(), closing_bracket) {
+            | (Some(('(', _)), ')')
+            | (Some(('[', _)), ']')
+            | (Some(('<', _)), '>')
+            => {
+                Ok(token)
             }
+            _ => Err(ScanError::new(
+                ScanErrorKind::UnmatchedClosingBracket(closing_bracket),
+                location,
+            ))
         }
-        Ok(token)
     }
 
     /// Consume and return the next character. The following two
@@ -865,15 +880,14 @@ g (y) ->  # 6
     #[test]
     fn scan_unexpected_indent_on_first_line() {
         let source = "    abc = 1";
-        match scan(source) {
-            Ok(_) => assert!(false),
-            Err(err) => match err {
-                ScanError { error: ScanErrorKind::UnexpectedIndent(1), location } => {
-                    assert_eq!(location.line, 1);
-                    assert_eq!(location.col, 1);
-                }
-                _ => assert!(false),
-            },
+        let result = scan(source);
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            ScanError { error: ScanErrorKind::UnexpectedIndent(1), location } => {
+                assert_eq!(location.line, 1);
+                assert_eq!(location.col, 1);
+            }
+            err => assert!(false, "Unexpected error: {:?}", err),
         }
     }
 

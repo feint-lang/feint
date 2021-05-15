@@ -10,6 +10,9 @@ const CAPACITY: usize = 255; // 2^8 - 1
 /// The source is read line by line and the characters from each line
 /// are yielded (so to speak) in turn. Other features:
 ///
+/// - Emits a newline as the first character; this primes the queue and
+///   allows for start-of-line logic without having to track a separate
+///   variable to account for the start-of-input special case
 /// - Newlines are normalized (\r\n will be converted to \n)
 /// - The current line and column in the source are tracked
 /// - Start-of-line state is tracked (true initially and when the end of
@@ -44,7 +47,7 @@ where
             previous_char: None,
             current_char: None,
         };
-        source.check_queue();
+        source.queue.push_back('\n');
         source
     }
 

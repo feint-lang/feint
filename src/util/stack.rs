@@ -1,5 +1,3 @@
-use std::cmp::min;
-
 pub struct Stack<T> {
     storage: Vec<T>,
 }
