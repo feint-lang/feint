@@ -196,9 +196,6 @@ impl<'a> Runner<'a> {
                 eprintln!("{}", t);
             }
         }
-        // let ast = parse(&tokens);
-        // eprintln!("{:?}", ast);
-
         let mut instructions = vec![];
         instructions
     }

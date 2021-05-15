@@ -5,7 +5,6 @@
 pub mod repl;
 pub mod run;
 
-mod ast;
 mod builtins;
 mod parser;
 mod result;
