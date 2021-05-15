@@ -62,7 +62,7 @@ where
     queue: VecDeque<TokenWithLocation>,
     /// Keep track of whether we're at the start of a line so indents
     /// can be handled specially.
-    indent_level: i32,
+    indent_level: Option<u8>,
     /// Opening brackets are pushed and later popped when the closing
     /// bracket is encountered. This gives us a way to verify brackets
     /// are matched and also lets us know when we're inside a group
@@ -78,7 +78,7 @@ where
         Scanner {
             source: Source::new(reader),
             queue: VecDeque::new(),
-            indent_level: -1,
+            indent_level: None,
             bracket_stack: Stack::new(),
         }
     }
@@ -98,8 +98,8 @@ where
         );
 
         let start = self.source.location();
-        let num_spaces = self.read_indent();
-        let whitespace_count = self.consume_whitespace();
+        let num_spaces = self.read_indent()?;
+        let whitespace_count = self.consume_whitespace()?;
 
         match self.source.peek() {
             None | Some('\n') => {
@@ -139,39 +139,38 @@ where
     /// decreased, that signals the end of one or more blocks.
     fn set_indent_level(
         &mut self,
-        indent_level: i32,
+        indent_level: u8,
         start: Location,
     ) -> Result<(), ScanError> {
-        if indent_level == self.indent_level {
-            // Stayed the same; nothing to do
-        } else if self.indent_level == -1 {
+        if self.indent_level.is_none() {
             // Special case for first line of code
-            if indent_level == 0 {
-                self.indent_level = 0;
+            return if indent_level == 0 {
+                self.indent_level = Some(0);
+                Ok(())
             } else {
-                return Err(ScanError::new(
+                Err(ScanError::new(
                     ScanErrorKind::UnexpectedIndent(indent_level),
                     start,
-                ));
-            }
-        } else if indent_level == self.indent_level + 1 {
+                ))
+            };
+        }
+
+        let mut current_level = self.indent_level.unwrap();
+        let location = Location::new(start.line, 0);
+
+        if indent_level == current_level {
+            // Stayed the same; nothing to do
+        } else if indent_level == current_level + 1 {
             // Increased by one level
-            let location = Location::new(start.line, 0);
-            self.indent_level = indent_level;
+            self.indent_level = Some(indent_level);
             self.add_token_to_queue(Token::BlockStart, location, Some(location));
-        } else if indent_level < self.indent_level {
+        } else if indent_level < current_level {
             // Decreased by one or more levels
-            let location = Location::new(start.line, 0);
-            while self.indent_level > indent_level {
-                self.indent_level -= 1;
+            while current_level > indent_level {
                 self.add_token_to_queue(Token::BlockEnd, location, Some(location));
+                current_level -= 1;
             }
-            if self.indent_level < 0 {
-                return Err(ScanError::new(
-                    ScanErrorKind::UnexpectedDedent(indent_level),
-                    start,
-                ));
-            }
+            self.indent_level = Some(current_level);
         } else {
             // Increased by *more* than one level
             return Err(ScanError::new(
@@ -315,7 +314,7 @@ where
                 if self.bracket_stack.size() == 0 {
                     self.handle_indents()?;
                 } else {
-                    self.consume_whitespace();
+                    self.consume_whitespace()?;
                 }
                 return Ok(());
             }
@@ -345,7 +344,7 @@ where
         };
 
         self.add_token_to_queue(token, start, None);
-        self.consume_whitespace();
+        self.consume_whitespace()?;
         Ok(())
     }
 
@@ -473,12 +472,20 @@ where
 
     /// Consume contiguous whitespace up to the end of the line. Return
     /// the number of whitespace characters consumed.
-    fn consume_whitespace(&mut self) -> usize {
+    fn consume_whitespace(&mut self) -> Result<u8, ScanError> {
         let mut count = 0;
         loop {
             match self.next_char_if(|&c| c.is_whitespace() && c != '\n') {
-                Some(_) => count += 1,
-                None => break count,
+                Some(_) => {
+                    if count == u8::MAX {
+                        return Err(ScanError::new(
+                            ScanErrorKind::TooMuchWhitespace,
+                            self.source.location(),
+                        ));
+                    }
+                    count += 1
+                }
+                None => break Ok(count),
             }
         }
     }
@@ -491,12 +498,20 @@ where
     /// Returns the number of contiguous space characters at the start
     /// of a line. An indent is defined as 4*N space characters followed
     /// by a non-whitespace character.
-    fn read_indent(&mut self) -> i32 {
+    fn read_indent(&mut self) -> Result<u8, ScanError> {
         let mut count = 0;
         loop {
             match self.next_char_if(|&c| c == ' ') {
-                Some(_) => count += 1,
-                None => break count,
+                Some(_) => {
+                    if count == u8::MAX {
+                        return Err(ScanError::new(
+                            ScanErrorKind::TooMuchWhitespace,
+                            self.source.location(),
+                        ));
+                    }
+                    count += 1;
+                }
+                None => break Ok(count),
             }
         }
     }

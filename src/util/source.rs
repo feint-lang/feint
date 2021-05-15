@@ -12,9 +12,14 @@ const CAPACITY: usize = 255; // 2^8 - 1
 ///
 /// - Emits an initial newline to prime the queue and allow for
 ///   consistent start-of-line handling/logic
-/// - Newlines are normalized (\r\n will be converted to \n)
 /// - The current line and column in the source are tracked
 /// - The previous and current characters are tracked
+///
+/// TODO: Should newlines be normalized? The scanner skips \r in anyway,
+///       except inside string literals. Does it makes sense to
+///       normalize newlines inside literal strings? If so, that could
+///       be handled in the scanner rather than futzing with *every
+///       single line* here.
 pub struct Source<T>
 where
     T: BufRead,
@@ -56,19 +61,13 @@ where
             buffer.clear();
             match self.source.read_line(buffer) {
                 Ok(0) => {
+                    // All lines read; done.
                     return false;
                 }
                 Ok(_) => {
-                    queue.extend(buffer.chars());
                     self.line += 1;
                     self.col = 1;
-                    let len = queue.len();
-                    if len > 1 {
-                        let (i, j) = (len - 2, len - 1);
-                        if queue[i] == '\r' && queue[j] == '\n' {
-                            queue.remove(i);
-                        }
-                    }
+                    queue.extend(buffer.chars());
                 }
                 Err(err) => {
                     panic!("Could not read line from source: {}", err);

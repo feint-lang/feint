@@ -23,9 +23,8 @@ impl ScanError {
 
 #[derive(Debug)]
 pub enum ScanErrorKind {
-    InvalidIndent(i32), // Indent is not a multiple of 4 (number of spaces)
-    UnexpectedIndent(i32), // Indent in unexpected place (indent level)
-    UnexpectedDedent(i32), // Dedent in unexpected place (indent level)
+    InvalidIndent(u8), // Indent is not a multiple of 4 (number of spaces)
+    UnexpectedIndent(u8), // Indent in unexpected place (indent level)
     WhitespaceAfterIndent, // Non-space whitespace after indent
     UnexpectedWhitespace, // Other unexpected whitespace
     UnterminatedString(String), // String with no closing quote
@@ -35,4 +34,5 @@ pub enum ScanErrorKind {
     ParseIntError(ParseBigIntError),
     ParseFloatError(ParseFloatError),
     CouldNotOpenSourceFile(Error),
+    TooMuchWhitespace,
 }
