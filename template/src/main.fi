@@ -1,0 +1,20 @@
+# main.fi
+#
+# "package" is a special name referring to the current package. It's the
+# *only* way to access objects in the package.
+
+import package
+import from package: Type
+
+main (argv: List<String>) ->
+    i, arg <- argv
+        t = Type.new(arg)
+        print(i, t)
+
+# some ideas about how functions are defined
+f (x: Int): Int -> x * x
+
+g (h: Function()) ->
+    h()
+
+g((x) -> x)

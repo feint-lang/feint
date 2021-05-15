@@ -1,0 +1,21 @@
+# lib/type.fi
+Type ()
+    "A type definition"
+
+    @new (x) ->
+        this.x = x
+
+    meth (x) ->
+        this.x + x
+
+    # The $ prefix indicates a computed field (like @property in Python)
+    $computed () ->
+        result
+        # alternatively, do some complex stuff and cache the result
+        # this.computed = result
+
+    $computed.set (value) ->
+        this.computed = value
+
+    + (x) ->
+        this.x + x
