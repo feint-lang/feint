@@ -1,7 +1,14 @@
-
-# Every program is an expression containing 0 or more expressions.
+# Every program is an expression containing 0 or more statements.
 program :
-    | expression*
+    | statement*
+
+# Statements includes expressions that return values and other
+# statements that don't values. The intent is for most constructs to be
+# expressions. For things like loops it's no clear what the returned
+# values should be, so those probably won't be implemented as
+# expressions.
+statement :
+    | expression
 
 expression :
     | "(" expression ")"

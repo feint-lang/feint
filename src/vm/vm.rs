@@ -1,8 +1,8 @@
-use crate::util::Stack;
+use crate::util::{BinaryOperator, Stack};
 
 use super::{
-    BinaryOperator, Constant, ConstantStore, ExecutionError, ExecutionErrorKind,
-    ExecutionResult, Frame, Instruction, Instructions, Namespace, VMState,
+    Constant, ConstantStore, ExecutionError, ExecutionErrorKind, ExecutionResult,
+    Frame, Instruction, Instructions, Namespace, VMState,
 };
 
 pub struct VM<'a> {
@@ -81,6 +81,8 @@ impl<'a> VM<'a> {
                     let value = match operator {
                         BinaryOperator::Multiply => a * b,
                         BinaryOperator::Divide => a / b,
+                        BinaryOperator::FloorDiv => a / b,
+                        BinaryOperator::Modulo => a % b,
                         BinaryOperator::Add => a + b,
                         BinaryOperator::Subtract => a - b,
                     };

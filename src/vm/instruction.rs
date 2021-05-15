@@ -1,27 +1,8 @@
 use std::fmt;
-use std::fmt::Formatter;
+
+use crate::util::BinaryOperator;
 
 pub type Instructions = Vec<Instruction>;
-
-#[derive(Debug)]
-pub enum BinaryOperator {
-    Multiply,
-    Divide,
-    Add,
-    Subtract,
-}
-
-impl fmt::Display for BinaryOperator {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let operator = match self {
-            Self::Multiply => '*',
-            Self::Divide => '/',
-            Self::Add => '+',
-            Self::Subtract => '-',
-        };
-        write!(f, "{}", operator)
-    }
-}
 
 #[derive(Debug)]
 pub enum Instruction {
@@ -38,7 +19,7 @@ pub enum Instruction {
 }
 
 impl fmt::Display for Instruction {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let string = match self {
             Self::StoreConst(v) => format_aligned("STORE_CONST", v),
             Self::LoadConst(v) => format_aligned("LOAD_CONST", v),
