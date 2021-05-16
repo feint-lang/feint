@@ -32,11 +32,11 @@ impl<'a> Runner<'a> {
     }
 
     fn run(&mut self, text: &str) -> ExitResult {
-        self.process_scan_result(scanner::scan(text))
+        Ok(None)
     }
 
     fn run_file(&mut self, file_name: &str) -> ExitResult {
-        self.process_scan_result(scanner::scan_file(file_name))
+        Ok(None)
     }
 
     fn process_scan_result(
@@ -55,7 +55,7 @@ impl<'a> Runner<'a> {
             Err(err) => {
                 return match err {
                     ScanError {
-                        error: ScanErrorKind::UnexpectedCharacter(c),
+                        kind: ScanErrorKind::UnexpectedCharacter(c),
                         location,
                     } => {
                         let message = format!(
@@ -65,7 +65,7 @@ impl<'a> Runner<'a> {
                         Err((1, message))
                     }
                     ScanError {
-                        error: ScanErrorKind::UnterminatedString(string),
+                        kind: ScanErrorKind::UnterminatedString(string),
                         location,
                     } => {
                         let message = format!(

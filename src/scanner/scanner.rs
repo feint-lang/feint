@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 use std::fs::File;
-use std::io::{BufRead, BufReader, Cursor};
+use std::io::{self, BufRead, BufReader, Cursor};
 
 use num_bigint::BigInt;
 use num_traits::Num;
@@ -15,43 +15,39 @@ type NextOption<'a> = Option<(char, Option<&'a char>, Option<&'a char>)>;
 type NextTwoOption<'a> = Option<(char, char, Option<&'a char>)>;
 type NextThreeOption = Option<(char, char, char)>;
 
-/// Create a scanner with the specified text source, scan the text, and
-/// return the resulting tokens or error.
-pub fn scan(text: &str) -> Result<Vec<TokenWithLocation>, ScanError> {
-    let cursor = Cursor::new(text);
-    let scanner = Scanner::new(cursor);
+/// Create a scanner from the specified text, scan the text, and return
+/// the resulting tokens or error.
+pub fn scan_text(text: &str) -> Result<Vec<TokenWithLocation>, ScanError> {
+    let scanner = Scanner::<Cursor<&str>>::from_text(text);
     scanner.collect()
 }
 
-/// Create a scanner that reads from the specified file.
-pub fn scan_file(file_name: &str) -> Result<Vec<TokenWithLocation>, ScanError> {
-    let file = match File::open(file_name) {
-        Ok(file) => file,
+/// Create a scanner from the specified file, scan its text, and return
+/// the resulting tokens or error.
+pub fn scan_file(file_path: &str) -> Result<Vec<TokenWithLocation>, ScanError> {
+    let result = Scanner::<BufReader<File>>::from_file(file_path);
+    let scanner = match result {
+        Ok(scanner) => scanner,
         Err(err) => {
             return Err(ScanError::new(
                 ScanErrorKind::CouldNotOpenSourceFile(err),
                 Location::new(0, 0),
-            ))
+            ));
         }
     };
-    let reader = BufReader::new(file);
-    let scanner = Scanner::new(reader);
     scanner.collect()
 }
 
 /// Scan and assume success, returning tokens in unwrapped form. Panic
 /// on error. Mainly useful for testing.
 pub fn scan_optimistic(text: &str) -> Vec<TokenWithLocation> {
-    match scan(text) {
+    match scan_text(text) {
         Ok(tokens) => tokens,
         Err(err) => panic!("Scan failed unexpectedly: {:?}", err),
     }
 }
 
-struct Scanner<T>
-where
-    T: BufRead,
-{
+pub struct Scanner<T: BufRead> {
     /// This is the source code that's being scanned. T can be anything
     /// that implements the BufRead trait (e.g., a Cursor wrapping some
     /// text or a BufReader wrapping an open file).
@@ -70,17 +66,29 @@ where
     bracket_stack: Stack<(char, Location)>,
 }
 
-impl<T> Scanner<T>
-where
-    T: BufRead,
-{
-    fn new(reader: T) -> Self {
+impl<T: BufRead> Scanner<T> {
+    pub fn new(reader: T) -> Self {
         Scanner {
             source: Source::new(reader),
             queue: VecDeque::new(),
             indent_level: None,
             bracket_stack: Stack::new(),
         }
+    }
+
+    /// Create a scanner from the specified text.
+    pub fn from_text(text: &str) -> Scanner<Cursor<&str>> {
+        let cursor = Cursor::new(text);
+        let scanner = Scanner::new(cursor);
+        scanner
+    }
+
+    /// Create a scanner from the specified file.
+    pub fn from_file(file_path: &str) -> Result<Scanner<BufReader<File>>, io::Error> {
+        let file = File::open(file_path)?;
+        let reader = BufReader::new(file);
+        let scanner = Scanner::new(reader);
+        Ok(scanner)
     }
 
     fn next_token_from_queue(&mut self) -> ScanResult {
@@ -708,17 +716,14 @@ where
     }
 }
 
-impl<T> Iterator for Scanner<T>
-where
-    T: BufRead,
-{
+impl<T: BufRead> Iterator for Scanner<T> {
     type Item = ScanResult;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.next_token_from_queue() {
             Ok(TokenWithLocation { token: Token::EndOfInput, .. }) => None,
-            Ok(t) => Some(Ok(t)),
-            Err(t) => Some(Err(t)),
+            Ok(token) => Some(Ok(token)),
+            err => Some(err),
         }
     }
 }
@@ -824,16 +829,16 @@ mod tests {
     #[test]
     fn scan_string_unclosed() {
         let source = "\"abc";
-        match scan(source) {
+        match scan_text(source) {
             Err(err) => match err {
                 ScanError {
-                    error: ScanErrorKind::UnterminatedString(string),
+                    kind: ScanErrorKind::UnterminatedString(string),
                     location,
                 } => {
                     assert_eq!(string, source.to_string());
                     assert_eq!(location, Location::new(1, 1));
                     let new_source = source.to_string() + "\"";
-                    match scan(new_source.as_str()) {
+                    match scan_text(new_source.as_str()) {
                         Ok(tokens) => {
                             assert_eq!(tokens.len(), 1);
                             check_string_token(tokens.get(0), "abc", 1, 1, 1, 5);
@@ -895,10 +900,10 @@ g (y) ->  # 6
     #[test]
     fn scan_unexpected_indent_on_first_line() {
         let source = "    abc = 1";
-        let result = scan(source);
+        let result = scan_text(source);
         assert!(result.is_err());
         match result.unwrap_err() {
-            ScanError { error: ScanErrorKind::UnexpectedIndent(1), location } => {
+            ScanError { kind: ScanErrorKind::UnexpectedIndent(1), location } => {
                 assert_eq!(location.line, 1);
                 assert_eq!(location.col, 1);
             }
@@ -942,13 +947,10 @@ b = 3
     #[test]
     fn scan_unknown() {
         let source = "{";
-        match scan(source) {
+        match scan_text(source) {
             Ok(tokens) => assert!(false),
             Err(err) => match err {
-                ScanError {
-                    error: ScanErrorKind::UnexpectedCharacter(c),
-                    location,
-                } => {
+                ScanError { kind: ScanErrorKind::UnexpectedCharacter(c), location } => {
                     assert_eq!(c, '{');
                     assert_eq!(location.line, 1);
                     assert_eq!(location.col, 1);

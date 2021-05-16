@@ -1,4 +1,4 @@
-use std::io::Error;
+use std::io;
 use std::num::ParseFloatError;
 
 use num_bigint::ParseBigIntError;
@@ -11,13 +11,13 @@ pub type ScanResult = Result<TokenWithLocation, ScanError>;
 
 #[derive(Debug)]
 pub struct ScanError {
-    pub error: ScanErrorKind,
+    pub kind: ScanErrorKind,
     pub location: Location,
 }
 
 impl ScanError {
-    pub fn new(error: ScanErrorKind, location: Location) -> Self {
-        Self { error, location }
+    pub fn new(kind: ScanErrorKind, location: Location) -> Self {
+        Self { kind, location }
     }
 }
 
@@ -33,6 +33,6 @@ pub enum ScanErrorKind {
     UnmatchedClosingBracket(char), // Opening bracket with no matching closing bracket
     ParseIntError(ParseBigIntError),
     ParseFloatError(ParseFloatError),
-    CouldNotOpenSourceFile(Error),
+    CouldNotOpenSourceFile(io::Error),
     TooMuchWhitespace,
 }

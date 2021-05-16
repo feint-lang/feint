@@ -1,6 +1,7 @@
 use std::fmt;
 use std::str;
 
+#[derive(PartialEq)]
 pub enum BinaryOperator {
     Multiply,
     Divide,

@@ -5,10 +5,11 @@ use std::path::{Path, PathBuf};
 use dirs;
 use rustyline::error::ReadlineError;
 
-use super::parser::parse;
 use super::result::ExitResult;
 use super::scanner::{self, ScanError, ScanErrorKind, TokenWithLocation};
 use super::vm::{Instruction, Instructions, Namespace, VMState, VM};
+use crate::parser::{self, ParseError, ParseErrorKind};
+use crate::util::Location;
 
 /// Run FeInt REPL until user exits.
 pub fn run(debug: bool) -> ExitResult {
@@ -96,108 +97,52 @@ impl<'a> Runner<'a> {
         }
     }
 
-    fn eval(&mut self, source: &str) -> Option<ExitResult> {
-        let instructions: Instructions = match source.trim() {
+    fn eval(&mut self, text: &str) -> Option<ExitResult> {
+        self.add_history_entry(text);
+
+        match text.trim() {
             ".exit" | ".halt" | ".quit" => {
-                vec![Instruction::Halt(0)]
+                return Some(Ok(Some("Exit".to_owned())));
             }
-            _ => match scanner::scan(source) {
-                Ok(tokens) => {
-                    self.add_history_entry(source);
-                    self.parse(tokens)
+            _ => (),
+        }
+
+        match parser::parse_text(text) {
+            Ok(program) => {
+                eprintln!("{:?}", program);
+
+                // TODO:
+                let instructions = vec![];
+
+                match self.vm.execute(&instructions) {
+                    Ok(VMState::Idle) => None,
+                    Ok(VMState::Halted(0)) => Some(Ok(Some("Halted".to_owned()))),
+                    Ok(VMState::Halted(code)) => {
+                        Some(Err((code, format!("Halted abnormally: {}", code))))
+                    }
+                    Err(err) => Some(Err((1, err.to_string()))),
                 }
-                Err(err) => match err {
-                    ScanError {
-                        error: ScanErrorKind::UnexpectedCharacter(c),
-                        location,
-                    } => {
-                        self.add_history_entry(source);
-                        let col = location.col;
-                        eprintln!("{: >width$}^", "", width = col + 1);
-                        eprintln!(
-                            "Syntax error: unexpected character at column {}: '{}'",
-                            col, c
-                        );
-                        return None;
-                    }
-                    ScanError {
-                        error: ScanErrorKind::UnterminatedString(_), ..
-                    } => loop {
-                        return match self.read_line("+ ", false) {
-                            Ok(None) => {
-                                let input = source.to_string() + "\n";
-                                self.eval(input.as_str())
-                            }
-                            Ok(Some(new_input)) => {
-                                let input =
-                                    source.to_string() + "\n" + new_input.as_str();
-                                self.eval(input.as_str())
-                            }
-                            Err(err) => Some(Err((1, format!("{}", err)))),
-                        };
-                    },
-                    ScanError {
-                        error: ScanErrorKind::InvalidIndent(num_spaces),
-                        location,
-                    } => {
-                        self.add_history_entry(source);
-                        let col = location.col;
-                        eprintln!("{: >width$}^", "", width = col + 1);
-                        eprintln!("Syntax error: invalid indent with {} spaces (should be a multiple of 4)", num_spaces);
-                        return None;
-                    }
-                    ScanError {
-                        error: ScanErrorKind::UnexpectedIndent(_),
-                        location,
-                    } => {
-                        self.add_history_entry(source);
-                        let col = location.col;
-                        eprintln!("{: >width$}^", "", width = col + 1);
-                        eprintln!("Syntax error: unexpected indent");
-                        return None;
-                    }
-                    ScanError {
-                        error: ScanErrorKind::WhitespaceAfterIndent,
-                        location,
-                    }
-                    | ScanError {
-                        error: ScanErrorKind::UnexpectedWhitespace,
-                        location,
-                    } => {
-                        self.add_history_entry(source);
-                        let col = location.col;
-                        eprintln!("{: >width$}^", "", width = col + 1);
-                        eprintln!("Syntax error: unexpected whitespace");
-                        return None;
-                    }
-                    err => {
-                        return Some(Err((
-                            1,
-                            format!("Unhandled scan error: {:?}", err),
-                        )));
-                    }
-                },
-            },
-        };
-
-        match self.vm.execute(&instructions) {
-            Ok(VMState::Idle) => None,
-            Ok(VMState::Halted(0)) => Some(Ok(Some("Halted".to_owned()))),
-            Ok(VMState::Halted(code)) => {
-                Some(Err((code, format!("Halted abnormally: {}", code))))
             }
-            Err(err) => Some(Err((1, err.to_string()))),
-        }
-    }
-
-    fn parse(&self, tokens: Vec<TokenWithLocation>) -> Instructions {
-        if self.debug {
-            for t in tokens.iter() {
-                eprintln!("{}", t);
+            Err(err) => {
+                if self.handle_err(err) {
+                    // Continue until valid input.
+                    match self.read_line("+ ", false) {
+                        Ok(None) => {
+                            let input = text.to_string() + "\n";
+                            self.eval(input.as_str())
+                        }
+                        Ok(Some(new_input)) => {
+                            let input = text.to_string() + "\n" + new_input.as_str();
+                            self.eval(input.as_str())
+                        }
+                        Err(err) => Some(Err((1, format!("{}", err)))),
+                    }
+                } else {
+                    // Bail.
+                    None
+                }
             }
         }
-        let mut instructions = vec![];
-        instructions
     }
 
     fn load_history(&mut self) {
@@ -224,6 +169,68 @@ impl<'a> Runner<'a> {
             }
             None => (),
         }
+    }
+
+    /// Handle error. For now, true means the eval should continue
+    /// trying to add text to the original input while false means the
+    /// eval loop should give up on the input that caused the error.
+    fn handle_err(&mut self, err: ParseError) -> bool {
+        self.handle_parse_err(err.kind)
+    }
+
+    /// Handle parse error.
+    fn handle_parse_err(&mut self, kind: ParseErrorKind) -> bool {
+        match kind {
+            ParseErrorKind::ScanError(err) => {
+                return self.handle_scan_err(err.kind, err.location);
+            }
+            ParseErrorKind::UnhandledToken(token) => {
+                let location = token.start;
+                eprintln!("{: >width$}^", "", width = location.col + 1);
+                eprintln!("Unhandled token at {}: {:?}", location, token.token);
+            }
+            err => {
+                eprintln!("Unhandled parse error: {:?}", err);
+            }
+        }
+        false
+    }
+
+    /// Handle scan error.
+    fn handle_scan_err(&mut self, kind: ScanErrorKind, location: Location) -> bool {
+        match kind {
+            ScanErrorKind::UnexpectedCharacter(c) => {
+                let col = location.col;
+                eprintln!("{: >width$}^", "", width = col + 1);
+                eprintln!(
+                    "Syntax error: unexpected character at column {}: '{}'",
+                    col, c
+                );
+            }
+            ScanErrorKind::UnterminatedString(_) => {
+                return true;
+            }
+            ScanErrorKind::InvalidIndent(num_spaces) => {
+                let col = location.col;
+                eprintln!("{: >width$}^", "", width = col + 1);
+                eprintln!("Syntax error: invalid indent with {} spaces (should be a multiple of 4)", num_spaces);
+            }
+            ScanErrorKind::UnexpectedIndent(_) => {
+                let col = location.col;
+                eprintln!("{: >width$}^", "", width = col + 1);
+                eprintln!("Syntax error: unexpected indent");
+            }
+            ScanErrorKind::WhitespaceAfterIndent
+            | ScanErrorKind::UnexpectedWhitespace => {
+                let col = location.col;
+                eprintln!("{: >width$}^", "", width = col + 1);
+                eprintln!("Syntax error: unexpected whitespace");
+            }
+            err => {
+                eprintln!("Unhandled scan error at {}: {:?}", location, err);
+            }
+        }
+        false
     }
 }
 

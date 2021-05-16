@@ -6,6 +6,7 @@ use num_bigint::BigInt;
 use crate::util::BinaryOperator;
 
 /// Program - a list of statements.
+#[derive(PartialEq)]
 pub struct Program {
     pub statements: Vec<Statement>,
 }
@@ -26,6 +27,7 @@ impl fmt::Debug for Program {
 }
 
 /// Statement - a logical chunk of code.
+#[derive(PartialEq)]
 pub struct Statement {
     pub kind: StatementKind,
 }
@@ -46,6 +48,7 @@ impl fmt::Debug for Statement {
     }
 }
 
+#[derive(PartialEq)]
 pub enum StatementKind {
     Expression(Box<Expression>),
 }
@@ -61,6 +64,7 @@ impl fmt::Debug for StatementKind {
 }
 
 /// Expression - a statement that returns a value.
+#[derive(PartialEq)]
 pub struct Expression {
     pub kind: ExpressionKind,
 }
@@ -91,6 +95,7 @@ impl fmt::Debug for Expression {
     }
 }
 
+#[derive(PartialEq)]
 pub enum ExpressionKind {
     BinaryOperation(BinaryOperator, Box<Expression>, Box<Expression>),
     Block(Box<Block>),
@@ -113,6 +118,7 @@ impl fmt::Debug for ExpressionKind {
 }
 
 /// Block - list of statements in a new scope.
+#[derive(PartialEq)]
 pub struct Block {
     pub statements: Vec<Statement>,
 }
@@ -131,6 +137,7 @@ impl fmt::Debug for Block {
 
 /// Literal - a literal value written in the source code, such as 123,
 /// 1.23, or "123".
+#[derive(PartialEq)]
 pub struct Literal {
     pub kind: LiteralKind,
 }
@@ -151,6 +158,7 @@ impl fmt::Debug for Literal {
     }
 }
 
+#[derive(PartialEq)]
 pub enum LiteralKind {
     Float(f64),
     Int(BigInt),
