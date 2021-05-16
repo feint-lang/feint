@@ -93,10 +93,11 @@ pub enum Token {
 impl Token {
     pub fn as_str(&self) -> &str {
         match self {
-            Self::Star => "*",
-            Self::Slash => "/",
             Self::Plus => "+",
             Self::Minus => "-",
+            Self::Star => "*",
+            Self::Slash => "/",
+            Self::Caret => "^",
             _ => unimplemented!(),
         }
     }
@@ -104,12 +105,7 @@ impl Token {
 
 impl fmt::Display for Token {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let string = match self {
-            Self::Plus => "+",
-            Self::Minus => "-",
-            _ => return write!(f, "{:?}", self),
-        };
-        write!(f, "{}", string)
+        write!(f, "{:?}", self)
     }
 }
 

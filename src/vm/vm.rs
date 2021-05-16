@@ -79,12 +79,14 @@ impl<'a> VM<'a> {
             Instruction::BinaryOperation(operator) => {
                 if let Some((a, b)) = self.pop_top_two() {
                     let value = match operator {
+                        BinaryOperator::Add => a + b,
+                        BinaryOperator::Subtract => a - b,
                         BinaryOperator::Multiply => a * b,
                         BinaryOperator::Divide => a / b,
                         BinaryOperator::FloorDiv => a / b,
                         BinaryOperator::Modulo => a % b,
-                        BinaryOperator::Add => a + b,
-                        BinaryOperator::Subtract => a - b,
+                        // FIXME: Raise a to the b
+                        BinaryOperator::Raise => a * b,
                     };
                     self.stack.push(value);
                 } else {

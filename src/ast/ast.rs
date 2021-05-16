@@ -76,7 +76,7 @@ pub struct Expression {
 
 #[derive(PartialEq)]
 pub enum ExpressionKind {
-    BinaryOperation(BinaryOperator, Box<Expression>, Box<Expression>),
+    BinaryOperation(Box<Expression>, BinaryOperator, Box<Expression>),
     Block(Box<Block>),
     Function(String, Box<Block>),
     Literal(Box<Literal>),
@@ -87,13 +87,13 @@ impl Expression {
         Self { kind }
     }
 
-    pub fn new_binary_operation(operator: &str, a: Expression, b: Expression) -> Self {
+    pub fn new_binary_operation(a: Expression, operator: &str, b: Expression) -> Self {
         let operator = match BinaryOperator::from_str(operator) {
             Ok(op) => op,
             Err(err) => panic!("{}", err),
         };
         Self {
-            kind: ExpressionKind::BinaryOperation(operator, Box::new(a), Box::new(b)),
+            kind: ExpressionKind::BinaryOperation(Box::new(a), operator, Box::new(b)),
         }
     }
 
@@ -111,8 +111,8 @@ impl fmt::Debug for Expression {
 impl fmt::Debug for ExpressionKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::BinaryOperation(op, a, b) => {
-                write!(f, "{:?} {:?} {:?}", a, op, b)
+            Self::BinaryOperation(a, op, b) => {
+                write!(f, "({:?} {:?} {:?})", a, op, b)
             }
             Self::Literal(literal) => {
                 write!(f, "{:?}", literal)

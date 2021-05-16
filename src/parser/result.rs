@@ -20,5 +20,6 @@ pub enum ParseErrorKind {
     ScanError(scanner::ScanError),
     CouldNotOpenSourceFile(String),
     UnhandledToken(scanner::TokenWithLocation),
+    ExpectedBinaryOperator,
     ExpectedExpression,
 }

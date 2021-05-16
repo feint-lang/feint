@@ -107,7 +107,7 @@ impl<T: BufRead> Parser<T> {
     fn statements(&mut self) -> Result<Vec<ast::Statement>, ParseError> {
         let mut statements = vec![];
         loop {
-            match self.expression()? {
+            match self.expression(0)? {
                 Some(expr) => {
                     let statement = ast::Statement::new_expression(expr);
                     statements.push(statement);
@@ -119,7 +119,7 @@ impl<T: BufRead> Parser<T> {
         }
     }
 
-    fn expression(&mut self) -> Result<Option<ast::Expression>, ParseError> {
+    fn expression(&mut self, precedence: u8) -> Result<Option<ast::Expression>, ParseError> {
         let token = match self.next_token()? {
             Some(token) => token,
             None => return Ok(None),
@@ -127,7 +127,7 @@ impl<T: BufRead> Parser<T> {
 
         // *Always* start with a prefix expression, which includes
         // unary operations like -1 and !true as well as variable names.
-        let lhs = match token.token {
+        let mut lhs = match token.token {
             Token::Float(value) => {
                 ast::Expression::new_literal(ast::Literal::new_float(value))
             }
@@ -137,27 +137,41 @@ impl<T: BufRead> Parser<T> {
             _ => return Err(self.err(ParseErrorKind::UnhandledToken(token))),
         };
 
-        let maybe_infix_token = self.next_token_if(|token| match token {
-            Token::Star | Token::Slash | Token::Plus | Token::Minus => true,
-            _ => false,
-        })?;
-
         // See if the expression from above is followed by an infix
         // operator. If so, get the RHS expression and return a binary
         // operation. If not, just return the original expression.
-        let result = if let Some(infix_token) = maybe_infix_token {
-            match self.expression()? {
+        let mut next_precedence = self.get_next_precedence()?;
+
+        while precedence < next_precedence {
+            let infix_token = self.next_token()?.unwrap();
+            match self.expression(next_precedence)? {
                 Some(rhs) => {
                     let op = infix_token.token.as_str();
-                    ast::Expression::new_binary_operation(op, lhs, rhs)
+                    lhs = ast::Expression::new_binary_operation(lhs, op, rhs);
+                    next_precedence = self.get_next_precedence()?;
                 }
                 None => return Err(self.err(ParseErrorKind::ExpectedExpression)),
             }
-        } else {
-            lhs
-        };
+        }
 
-        Ok(Some(result))
+        Ok(Some(lhs))
+    }
+
+    /// Get the precedence of the next token *if* it's an infix
+    /// operator.
+    fn get_next_precedence(&mut self) -> Result<u8, ParseError> {
+        let precedence = match self.peek_token()? {
+            Some(token_with_location) => {
+                match token_with_location.token {
+                    Token::Plus | Token::Minus => 1,
+                    Token::Star | Token::Slash => 2,
+                    Token::Caret => 2,
+                    _ => 0,
+                }
+            }
+            None => 0
+        };
+        Ok(precedence)
     }
 }
 
@@ -232,7 +246,7 @@ mod tests {
         let statements = program.statements;
         assert_eq!(statements.len(), 1);
         let statement = statements.first().unwrap();
-        
+
         // FIXME: This test passes, but only because it's testing what
         //        we know is being returned instead of what *should* be
         //        returned.
