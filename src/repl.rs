@@ -187,7 +187,10 @@ impl<'a> Runner<'a> {
             ParseErrorKind::UnhandledToken(token) => {
                 let location = token.start;
                 eprintln!("{: >width$}^", "", width = location.col + 1);
-                eprintln!("Unhandled token at {}: {:?}", location, token.token);
+                eprintln!(
+                    "Parse error: unhandled token at {}: {:?}",
+                    location, token.token
+                );
             }
             err => {
                 eprintln!("Unhandled parse error: {:?}", err);

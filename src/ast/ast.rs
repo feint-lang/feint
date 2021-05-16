@@ -19,10 +19,9 @@ impl Program {
 
 impl fmt::Debug for Program {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for s in self.statements.iter() {
-            write!(f, "{:?}\n", s)?;
-        }
-        write!(f, "")
+        let items: Vec<String> =
+            self.statements.iter().map(|statement| statement.to_string()).collect();
+        write!(f, "{}", items.join("\n"))
     }
 }
 
@@ -30,6 +29,11 @@ impl fmt::Debug for Program {
 #[derive(PartialEq)]
 pub struct Statement {
     pub kind: StatementKind,
+}
+
+#[derive(PartialEq)]
+pub enum StatementKind {
+    Expression(Box<Expression>),
 }
 
 impl Statement {
@@ -42,15 +46,16 @@ impl Statement {
     }
 }
 
-impl fmt::Debug for Statement {
+impl fmt::Display for Statement {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self.kind)
     }
 }
 
-#[derive(PartialEq)]
-pub enum StatementKind {
-    Expression(Box<Expression>),
+impl fmt::Debug for Statement {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self.kind)
+    }
 }
 
 impl fmt::Debug for StatementKind {
@@ -67,6 +72,14 @@ impl fmt::Debug for StatementKind {
 #[derive(PartialEq)]
 pub struct Expression {
     pub kind: ExpressionKind,
+}
+
+#[derive(PartialEq)]
+pub enum ExpressionKind {
+    BinaryOperation(BinaryOperator, Box<Expression>, Box<Expression>),
+    Block(Box<Block>),
+    Function(String, Box<Block>),
+    Literal(Box<Literal>),
 }
 
 impl Expression {
@@ -93,14 +106,6 @@ impl fmt::Debug for Expression {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self.kind)
     }
-}
-
-#[derive(PartialEq)]
-pub enum ExpressionKind {
-    BinaryOperation(BinaryOperator, Box<Expression>, Box<Expression>),
-    Block(Box<Block>),
-    Function(String, Box<Block>),
-    Literal(Box<Literal>),
 }
 
 impl fmt::Debug for ExpressionKind {
@@ -142,9 +147,19 @@ pub struct Literal {
     pub kind: LiteralKind,
 }
 
+#[derive(PartialEq)]
+pub enum LiteralKind {
+    Float(f64),
+    Int(BigInt),
+}
+
 impl Literal {
     pub fn new(kind: LiteralKind) -> Self {
         Self { kind }
+    }
+
+    pub fn new_float(value: f64) -> Self {
+        Self { kind: LiteralKind::Float(value) }
     }
 
     pub fn new_int(value: BigInt) -> Self {
@@ -156,12 +171,6 @@ impl fmt::Debug for Literal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self.kind)
     }
-}
-
-#[derive(PartialEq)]
-pub enum LiteralKind {
-    Float(f64),
-    Int(BigInt),
 }
 
 impl fmt::Debug for LiteralKind {

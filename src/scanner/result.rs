@@ -1,4 +1,3 @@
-use std::io;
 use std::num::ParseFloatError;
 
 use num_bigint::ParseBigIntError;
@@ -9,7 +8,7 @@ use super::TokenWithLocation;
 
 pub type ScanResult = Result<TokenWithLocation, ScanError>;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ScanError {
     pub kind: ScanErrorKind,
     pub location: Location,
@@ -21,7 +20,7 @@ impl ScanError {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum ScanErrorKind {
     InvalidIndent(u8), // Indent is not a multiple of 4 (number of spaces)
     UnexpectedIndent(u8), // Indent in unexpected place (indent level)
@@ -33,6 +32,6 @@ pub enum ScanErrorKind {
     UnmatchedClosingBracket(char), // Opening bracket with no matching closing bracket
     ParseIntError(ParseBigIntError),
     ParseFloatError(ParseFloatError),
-    CouldNotOpenSourceFile(io::Error),
+    CouldNotOpenSourceFile(String),
     TooMuchWhitespace,
 }

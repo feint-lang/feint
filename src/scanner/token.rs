@@ -90,9 +90,26 @@ pub enum Token {
     EndOfInput,
 }
 
+impl Token {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Star => "*",
+            Self::Slash => "/",
+            Self::Plus => "+",
+            Self::Minus => "-",
+            _ => unimplemented!(),
+        }
+    }
+}
+
 impl fmt::Display for Token {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Token {:?}", self)
+        let string = match self {
+            Self::Plus => "+",
+            Self::Minus => "-",
+            _ => return write!(f, "{:?}", self),
+        };
+        write!(f, "{}", string)
     }
 }
 
