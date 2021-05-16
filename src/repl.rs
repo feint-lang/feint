@@ -112,7 +112,7 @@ impl<'a> Runner<'a> {
                 eprintln!("{:?}", program);
 
                 // TODO:
-                let instructions = vec![];
+                let instructions = vec![Instruction::Return];
 
                 match self.vm.execute(&instructions) {
                     Ok(VMState::Idle) => None,

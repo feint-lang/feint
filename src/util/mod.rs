@@ -1,7 +1,7 @@
-pub(crate) use binop::BinaryOperator;
+pub(crate) use operators::{BinaryOperator, UnaryOperator};
 pub(crate) use source::{Location, Source};
 pub(crate) use stack::Stack;
 
-mod binop;
+mod operators;
 mod source;
 mod stack;

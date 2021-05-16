@@ -98,6 +98,12 @@ impl Token {
             Self::Star => "*",
             Self::Slash => "/",
             Self::Caret => "^",
+            Self::Bang => "!",
+            Self::Identifier(s)
+            | Self::TypeIdentifier(s)
+            | Self::TypeMethodIdentifier(s)
+            | Self::SpecialMethodIdentifier(s) => s.as_str(),
+            Self::EndOfInput => "EOI",
             _ => unimplemented!(),
         }
     }

@@ -3,7 +3,7 @@ use std::str::FromStr;
 
 use num_bigint::BigInt;
 
-use crate::util::BinaryOperator;
+use crate::util::{BinaryOperator, UnaryOperator};
 
 /// Program - a list of statements.
 #[derive(PartialEq)]
@@ -76,6 +76,7 @@ pub struct Expression {
 
 #[derive(PartialEq)]
 pub enum ExpressionKind {
+    UnaryOperation(UnaryOperator, Box<Expression>),
     BinaryOperation(Box<Expression>, BinaryOperator, Box<Expression>),
     Block(Box<Block>),
     Function(String, Box<Block>),
@@ -85,6 +86,14 @@ pub enum ExpressionKind {
 impl Expression {
     pub fn new(kind: ExpressionKind) -> Self {
         Self { kind }
+    }
+
+    pub fn new_unary_operation(operator: &str, a: Expression) -> Self {
+        let operator = match UnaryOperator::from_str(operator) {
+            Ok(op) => op,
+            Err(err) => panic!("{}", err),
+        };
+        Self { kind: ExpressionKind::UnaryOperation(operator, Box::new(a)) }
     }
 
     pub fn new_binary_operation(a: Expression, operator: &str, b: Expression) -> Self {
@@ -111,6 +120,9 @@ impl fmt::Debug for Expression {
 impl fmt::Debug for ExpressionKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::UnaryOperation(op, b) => {
+                write!(f, "({:?}{:?})", op, b)
+            }
             Self::BinaryOperation(a, op, b) => {
                 write!(f, "({:?} {:?} {:?})", a, op, b)
             }

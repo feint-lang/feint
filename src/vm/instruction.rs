@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::util::BinaryOperator;
+use crate::util::{BinaryOperator, UnaryOperator};
 
 pub type Instructions = Vec<Instruction>;
 
@@ -11,6 +11,7 @@ pub enum Instruction {
     Jump(usize),        // Jump unconditionally
     JumpIfTrue(usize),  // Jump if top of stack is true
     JumpIfFalse(usize), // Jump if top of stack is false
+    UnaryOperation(UnaryOperator),
     BinaryOperation(BinaryOperator),
     Return,
     StoreConst(usize),
@@ -23,6 +24,9 @@ impl fmt::Display for Instruction {
         let string = match self {
             Self::StoreConst(v) => format_aligned("STORE_CONST", v),
             Self::LoadConst(v) => format_aligned("LOAD_CONST", v),
+            Self::UnaryOperation(operator) => {
+                format_aligned("UNARY_OPERATION", operator.to_string())
+            }
             Self::BinaryOperation(operator) => {
                 format_aligned("BINARY_OPERATION", operator.to_string())
             }

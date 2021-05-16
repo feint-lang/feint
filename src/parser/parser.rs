@@ -119,7 +119,10 @@ impl<T: BufRead> Parser<T> {
         }
     }
 
-    fn expression(&mut self, precedence: u8) -> Result<Option<ast::Expression>, ParseError> {
+    fn expression(
+        &mut self,
+        precedence: u8,
+    ) -> Result<Option<ast::Expression>, ParseError> {
         let token = match self.next_token()? {
             Some(token) => token,
             None => return Ok(None),
@@ -134,13 +137,23 @@ impl<T: BufRead> Parser<T> {
             Token::Int(value) => {
                 ast::Expression::new_literal(ast::Literal::new_int(value))
             }
+            t @ Token::Bang | t @ Token::Minus => {
+                let unary_precedence = self.get_unary_precedence(&t)?;
+                match self.expression(unary_precedence)? {
+                    Some(rhs) => {
+                        let op = t.as_str();
+                        ast::Expression::new_unary_operation(op, rhs)
+                    }
+                    None => return Err(self.err(ParseErrorKind::ExpectedExpression)),
+                }
+            }
             _ => return Err(self.err(ParseErrorKind::UnhandledToken(token))),
         };
 
         // See if the expression from above is followed by an infix
         // operator. If so, get the RHS expression and return a binary
         // operation. If not, just return the original expression.
-        let mut next_precedence = self.get_next_precedence()?;
+        let mut next_precedence = self.get_next_binary_precedence()?;
 
         while precedence < next_precedence {
             let infix_token = self.next_token()?.unwrap();
@@ -148,7 +161,7 @@ impl<T: BufRead> Parser<T> {
                 Some(rhs) => {
                     let op = infix_token.token.as_str();
                     lhs = ast::Expression::new_binary_operation(lhs, op, rhs);
-                    next_precedence = self.get_next_precedence()?;
+                    next_precedence = self.get_next_binary_precedence()?;
                 }
                 None => return Err(self.err(ParseErrorKind::ExpectedExpression)),
             }
@@ -157,19 +170,27 @@ impl<T: BufRead> Parser<T> {
         Ok(Some(lhs))
     }
 
-    /// Get the precedence of the next token *if* it's an infix
-    /// operator.
-    fn get_next_precedence(&mut self) -> Result<u8, ParseError> {
+    /// Get the precedence of the specified prefix/unary operator.
+    fn get_unary_precedence(&mut self, token: &Token) -> Result<u8, ParseError> {
+        let precedence = match token {
+            &Token::Plus | &Token::Minus | &Token::Bang => 6,
+            _ => panic!("Not a unary operator: {}", token),
+        };
+        Ok(precedence)
+    }
+
+    /// Get the precedence of the next token *if* it's an infix binary
+    /// operator. If the next token isn't an infix operator, its
+    /// precedence will be 0.
+    fn get_next_binary_precedence(&mut self) -> Result<u8, ParseError> {
         let precedence = match self.peek_token()? {
-            Some(token_with_location) => {
-                match token_with_location.token {
-                    Token::Plus | Token::Minus => 1,
-                    Token::Star | Token::Slash => 2,
-                    Token::Caret => 2,
-                    _ => 0,
-                }
-            }
-            None => 0
+            Some(token_with_location) => match token_with_location.token {
+                Token::Plus | Token::Minus => 1,
+                Token::Star | Token::Slash => 2,
+                Token::Caret => 3,
+                _ => 0,
+            },
+            None => 0,
         };
         Ok(precedence)
     }

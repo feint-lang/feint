@@ -1,4 +1,4 @@
-use crate::util::{BinaryOperator, Stack};
+use crate::util::{BinaryOperator, Stack, UnaryOperator};
 
 use super::{
     Constant, ConstantStore, ExecutionError, ExecutionErrorKind, ExecutionResult,
@@ -76,6 +76,21 @@ impl<'a> VM<'a> {
                 let constant = self.constants.get(*index).unwrap();
                 self.stack.push(constant.value); // ???
             }
+            Instruction::UnaryOperation(operator) => {
+                if let Some(a) = self.pop() {
+                    let value = match operator {
+                        UnaryOperator::Plus => a,
+                        // FIXME: Can't negate usize
+                        UnaryOperator::Negate => a,
+                        UnaryOperator::Not => !a,
+                    };
+                    self.stack.push(value);
+                } else {
+                    return Some(Err(ExecutionError::new(
+                        ExecutionErrorKind::NotEnoughValuesOnStack,
+                    )));
+                };
+            }
             Instruction::BinaryOperation(operator) => {
                 if let Some((a, b)) = self.pop_top_two() {
                     let value = match operator {
@@ -85,21 +100,21 @@ impl<'a> VM<'a> {
                         BinaryOperator::Divide => a / b,
                         BinaryOperator::FloorDiv => a / b,
                         BinaryOperator::Modulo => a % b,
-                        // FIXME: Raise a to the b
-                        BinaryOperator::Raise => a * b,
+                        BinaryOperator::Raise => a.pow(b as u32),
                     };
                     self.stack.push(value);
                 } else {
                     return Some(Err(ExecutionError::new(
-                        ExecutionErrorKind::GenericError(
-                            "Not enough values on stack".to_owned(),
-                        ),
+                        ExecutionErrorKind::NotEnoughValuesOnStack,
                     )));
                 };
             }
             Instruction::Return => {
                 // TODO: Implement actual return
-                println!("{}", self.stack.pop().unwrap());
+                match self.stack.pop() {
+                    Some(v) => println!("{}", v),
+                    None => eprintln!("Stack is empty!"),
+                }
             }
             Instruction::Halt(code) => {
                 self.halt();

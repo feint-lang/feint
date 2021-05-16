@@ -23,6 +23,7 @@ impl fmt::Display for ExecutionError {
 #[derive(Debug)]
 pub enum ExecutionErrorKind {
     GenericError(String),
+    NotEnoughValuesOnStack,
 }
 
 impl fmt::Display for ExecutionErrorKind {
