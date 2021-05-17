@@ -1,3 +1,8 @@
+use std::collections::HashMap;
+
+use num_bigint::BigInt;
+
+use crate::builtins::{self, Object, Type};
 use crate::util::{BinaryOperator, Stack, UnaryOperator};
 
 use super::{
@@ -7,6 +12,7 @@ use super::{
 
 pub struct VM<'a> {
     namespace: Namespace,
+    builtins: HashMap<&'a str, Type<'a>>,
 
     // Items are pushed onto or popped from the stack as instructions
     // are executed in the instruction list.
@@ -25,6 +31,7 @@ impl<'a> VM<'a> {
     pub fn new(namespace: Namespace) -> Self {
         VM {
             namespace,
+            builtins: builtins::init_builtin_types(),
             stack: Stack::new(),
             call_stack: Stack::new(),
             constants: ConstantStore::new(),
@@ -70,6 +77,9 @@ impl<'a> VM<'a> {
                 self.stack.pop().unwrap();
             }
             Instruction::StoreConst(value) => {
+                let int_type = self.builtins.get("Int").unwrap();
+                let int_obj = int_type.new_instance(HashMap::new());
+
                 self.constants.add(Constant::new(*value));
             }
             Instruction::LoadConst(index) => {
