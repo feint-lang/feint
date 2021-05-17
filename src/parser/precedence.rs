@@ -10,6 +10,14 @@ pub fn get_binary_precedence(token: &Token) -> u8 {
     get_operator_precedence(token).1
 }
 
+/// Return true if the token represents a right-associate operator.
+pub fn is_right_associative(token: &Token) -> bool {
+    match token {
+        Token::Caret => true, // a ^ b (exponentiation)
+        _ => false,
+    }
+}
+
 #[rustfmt::skip]
 /// Return the unary *and* binary precedence of the specified token,
 /// which may be 0 for either or both. 0 indicates that the token is
@@ -22,14 +30,21 @@ pub fn get_binary_precedence(token: &Token) -> u8 {
 ///       more complicated than this.
 pub fn get_operator_precedence(token: &Token) -> (u8, u8) {
     match token {
-        Token::Plus =>        (4, 1), // +a, a + b (no-op, addition)
-        Token::Minus =>       (4, 1), // -a, a - b (negation, subtraction)
-        Token::Star =>        (0, 2), // a * b     (multiplication)
-        Token::Slash =>       (0, 2), // a / b     (division)
-        Token::DoubleSlash => (0, 2), // a // b    (floor division)
-        Token::Percent =>     (0, 2), // a % b     (modulus)
-        Token::Caret =>       (0, 3), // a ^ b     (exponentiation)
-        Token::Bang =>        (4, 0), // !a        (logical not)
-        _ =>                  (0, 0), //           (not an operator)
+        | Token::Equal =>     (0, 1),  // a = b
+        
+        | Token::Plus                  // +a, a + b
+        | Token::Minus =>     (5, 2),  // -a, a - b
+        
+        | Token::Star                  // a * b
+        | Token::Slash                 // a / b   (floating point div)
+        | Token::DoubleSlash           // a // b  (floor div)
+        | Token::Percent =>   (0, 3),  // a % b
+       
+        | Token::Caret =>     (0, 4),  // a ^ b   (exponentiation)
+        
+        | Token::Bang =>      (5, 0),  // !a      (logical not)
+        
+        // Not an operator
+        _ =>                  (0, 0),
     }
 }

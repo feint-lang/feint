@@ -30,7 +30,10 @@ pub fn scan_file(file_path: &str) -> Result<Vec<TokenWithLocation>, ScanError> {
         Ok(scanner) => scanner,
         Err(err) => {
             return Err(ScanError::new(
-                ScanErrorKind::CouldNotOpenSourceFile(err.to_string()),
+                ScanErrorKind::CouldNotOpenSourceFile(
+                    file_path.to_string(),
+                    err.to_string(),
+                ),
                 Location::new(0, 0),
             ));
         }

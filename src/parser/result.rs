@@ -17,7 +17,7 @@ impl ParseError {
 #[derive(Clone, Debug)]
 pub enum ParseErrorKind {
     ScanError(ScanError),
-    CouldNotOpenSourceFile(String),
+    CouldNotOpenSourceFile(String, String),
     UnhandledToken(TokenWithLocation),
-    ExpectedExpression(TokenWithLocation),
+    ExpectedExpression(TokenWithLocation), // path, reason
 }

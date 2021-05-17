@@ -102,6 +102,7 @@ impl<'a> VM<'a> {
             Instruction::BinaryOperation(operator) => {
                 if let Some((a, b)) = self.pop_top_two() {
                     let value = match operator {
+                        BinaryOperator::Assign => 1,
                         BinaryOperator::Add => a + b,
                         BinaryOperator::Subtract => a - b,
                         BinaryOperator::Multiply => a * b,

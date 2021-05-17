@@ -94,6 +94,7 @@ pub enum Token {
 impl Token {
     pub fn as_str(&self) -> &str {
         match self {
+            Self::Equal => "=",
             Self::Plus => "+",
             Self::Minus => "-",
             Self::Star => "*",

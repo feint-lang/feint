@@ -1,7 +1,9 @@
 //! # FeInt
 
+use super::parser::{self, ParseError, ParseErrorKind};
 use super::result::ExitResult;
 use super::scanner::{ScanError, ScanErrorKind, TokenWithLocation};
+use super::util::Location;
 use super::vm::{ExecutionResult, Instruction, Instructions, Namespace, VMState, VM};
 
 /// Run text source.
@@ -13,11 +15,11 @@ pub fn run(source: &str, debug: bool) -> ExitResult {
 }
 
 /// Run source from file.
-pub fn run_file(file_name: &str, debug: bool) -> ExitResult {
+pub fn run_file(file_path: &str, debug: bool) -> ExitResult {
     let namespace = Namespace::default();
     let vm = VM::new(namespace);
     let mut runner = Runner::new(vm, debug);
-    runner.run_file(file_name)
+    runner.run_file(file_path)
 }
 
 struct Runner<'a> {
@@ -31,64 +33,109 @@ impl<'a> Runner<'a> {
     }
 
     fn run(&mut self, text: &str) -> ExitResult {
-        Ok(None)
-    }
-
-    fn run_file(&mut self, file_name: &str) -> ExitResult {
-        Ok(None)
-    }
-
-    fn process_scan_result(
-        &mut self,
-        tokens: Result<Vec<TokenWithLocation>, ScanError>,
-    ) -> ExitResult {
-        match tokens {
-            Ok(tokens) => {
-                if self.debug {
-                    for t in tokens.iter() {
-                        eprintln!("{}", t);
-                    }
-                }
-                tokens
+        match parser::parse_text(text) {
+            Ok(program) => {
+                eprintln!("{:?}", program);
+                Ok(None)
             }
             Err(err) => {
-                return match err {
-                    ScanError {
-                        kind: ScanErrorKind::UnexpectedCharacter(c),
-                        location,
-                    } => {
-                        let message = format!(
-                            "Syntax error: unexpected character at line {} column {}: {}",
-                            location.line, location.col, c
-                        );
-                        Err((1, message))
-                    }
-                    ScanError {
-                        kind: ScanErrorKind::UnterminatedString(string),
-                        location,
-                    } => {
-                        let message = format!(
-                            "{}\nUnterminated string starting on line {} at column {}",
-                            string, location.line, location.col
-                        );
-                        Err((1, message))
-                    }
-                    err => Err((1, format!("Unhandled scan error: {:?}", err))),
-                };
+                eprintln!("{}", text);
+                self.handle_err(err)
+            }
+        }
+    }
+
+    fn run_file(&mut self, file_path: &str) -> ExitResult {
+        match parser::parse_file(file_path) {
+            Ok(program) => {
+                eprintln!("{:?}", program);
+                Ok(None)
+            }
+            Err(err) => self.handle_err(err),
+        }
+    }
+
+    fn handle_err(&mut self, err: ParseError) -> ExitResult {
+        self.handle_parse_err(err.kind)
+    }
+
+    /// Handle parse error.
+    fn handle_parse_err(&mut self, kind: ParseErrorKind) -> ExitResult {
+        let message = match kind {
+            ParseErrorKind::ScanError(err) => {
+                return self.handle_scan_err(err.kind, err.location);
+            }
+            ParseErrorKind::CouldNotOpenSourceFile(path, message) => {
+                format!("Could not open source file: {}\n{}", path, message)
+            }
+            ParseErrorKind::UnhandledToken(token) => {
+                let location = token.start;
+                let col = location.col;
+                let marker = col - 1;
+                let token = token.token;
+                format!(
+                    "{:>width$}^\nParse error: unhandled token at {}: {:?}",
+                    "",
+                    location,
+                    token,
+                    width = marker
+                )
+            }
+            err => {
+                format!("Unhandled parse error: {:?}", err)
             }
         };
+        Err((2, message))
+    }
 
-        let mut instructions: Instructions = vec![];
-        instructions.push(Instruction::Halt(0));
-
-        match self.vm.execute(&instructions) {
-            Ok(VMState::Idle) => Err((1, "Execution never halted".to_string())),
-            Ok(VMState::Halted(0)) => Ok(Some("Halted".to_owned())),
-            Ok(VMState::Halted(code)) => {
-                Err((code, format!("Halted abnormally: {}", code)))
+    /// Handle scan error.
+    fn handle_scan_err(
+        &mut self,
+        kind: ScanErrorKind,
+        location: Location,
+    ) -> ExitResult {
+        let line = location.line;
+        let col = location.col;
+        let marker = col - 1;
+        let message = match kind {
+            ScanErrorKind::UnexpectedCharacter(c) => {
+                format!(
+                    "{:>width$}^\nSyntax error: unexpected character at column {}: '{}'",
+                    "", col, c, width = marker
+                )
             }
-            Err(err) => Err((1, err.to_string())),
-        }
+            ScanErrorKind::UnterminatedString(_) => {
+                format!(
+                    "{:>width$}^\nSyntax error: unterminated string literal at line {line}, col {col}",
+                    "", line = line, col = col, width = marker
+                )
+            }
+            ScanErrorKind::InvalidIndent(num_spaces) => {
+                format!(
+                    "{:>width$}^\nSyntax error: invalid indent with {} spaces (should be a multiple of 4)",
+                    "", num_spaces, width = marker
+                )
+            }
+            ScanErrorKind::UnexpectedIndent(_) => {
+                format!(
+                    "{:>width$}^\nSyntax error: unexpected indent",
+                    "",
+                    width = marker
+                )
+            }
+            ScanErrorKind::WhitespaceAfterIndent
+            | ScanErrorKind::UnexpectedWhitespace => {
+                format!(
+                    "{:>width$}^\nSyntax error: unexpected whitespace",
+                    "",
+                    width = marker
+                )
+            }
+            err => {
+                format!("Unhandled scan error at {}: {:?}", location, err)
+            }
+        };
+        Err((1, message))
     }
 }
 

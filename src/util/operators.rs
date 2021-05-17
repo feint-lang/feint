@@ -47,6 +47,7 @@ impl fmt::Debug for UnaryOperator {
 /// Binary operators
 #[derive(PartialEq)]
 pub enum BinaryOperator {
+    Assign,
     Add,
     Subtract,
     Multiply,
@@ -61,6 +62,7 @@ impl str::FromStr for BinaryOperator {
 
     fn from_str(op: &str) -> Result<Self, Self::Err> {
         let op = match op {
+            "=" => Self::Assign,
             "+" => Self::Add,
             "-" => Self::Subtract,
             "*" => Self::Multiply,
@@ -79,6 +81,7 @@ impl str::FromStr for BinaryOperator {
 impl fmt::Display for BinaryOperator {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let string = match self {
+            Self::Assign => "=",
             Self::Add => "+",
             Self::Subtract => "-",
             Self::Multiply => "*",

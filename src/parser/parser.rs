@@ -6,7 +6,9 @@ use std::iter::Peekable;
 use crate::ast;
 use crate::scanner::{ScanError, Scanner, Token, TokenWithLocation};
 
-use super::precedence::{get_binary_precedence, get_unary_precedence};
+use super::precedence::{
+    get_binary_precedence, get_unary_precedence, is_right_associative,
+};
 use super::{ParseError, ParseErrorKind, ParseResult};
 
 /// Create a parser from the specified text, scan the text into tokens,
@@ -25,6 +27,7 @@ pub fn parse_file(file_path: &str) -> ParseResult {
         Ok(scanner) => scanner,
         Err(err) => {
             return Err(ParseError::new(ParseErrorKind::CouldNotOpenSourceFile(
+                file_path.to_string(),
                 err.to_string(),
             )));
         }
@@ -124,54 +127,41 @@ impl<T: BufRead> Parser<T> {
         precedence: u8,
     ) -> Result<Option<ast::Expression>, ParseError> {
         let token = match self.next_token()? {
-            Some(t) => t,
+            Some(token) => token,
             None => return Ok(None),
         };
 
-        // *Always* start with a prefix expression, which includes
-        // unary operations like -1 and !true as well as variable names.
-        let mut lhs = match token.token {
+        let mut expr = match token.token {
+            // First, try for a literal or identifier, since they're
+            // leaf nodes.
             Token::Float(value) => {
                 ast::Expression::new_literal(ast::Literal::new_float(value))
             }
             Token::Int(value) => {
                 ast::Expression::new_literal(ast::Literal::new_int(value))
             }
-            _ => {
-                let unary_precedence = get_unary_precedence(&token.token);
-                if unary_precedence == 0 {
-                    return Err(self.err(ParseErrorKind::UnhandledToken(token)));
-                }
-                if let Some(rhs) = self.expression(unary_precedence)? {
-                    let op = token.token.as_str();
-                    ast::Expression::new_unary_operation(op, rhs)
-                } else {
-                    return Err(self.err(ParseErrorKind::ExpectedExpression(token)));
-                }
+            Token::Identifier(name) => {
+                ast::Expression::new_identifier(ast::Identifier::new_indentifier(name))
             }
+            // The token isn't a leaf node, so it *must* be some other
+            // kind of prefix token--a unary operation like -1 or !true.
+            _ => self.unary_expression(&token)?,
         };
 
         // See if the expression from above is followed by an infix
         // operator. If so, get the RHS expression and return a binary
-        // operation. If not, just return the original expression. Note
-        // that when the next precedence is 0, that indicates that the
-        // next token is *not* a binary operator.
-
+        // operation. If not, just return the original expression.
         loop {
-            let next = self.next_infix_token()?;
+            let next = self.next_infix_token(precedence)?;
             if let Some((infix_token, mut infix_precedence)) = next {
-                if precedence < infix_precedence {
-                    break;
-                }
-                // Lower precedence of right-associative operator
-                // TODO: Is this necessary?
-                if infix_token.token == Token::Caret {
+                // Lower precedence of right-associative operator when
+                // fetching its RHS expression.
+                if is_right_associative(&infix_token.token) {
                     infix_precedence -= 1;
                 }
-
                 if let Some(rhs) = self.expression(infix_precedence)? {
                     let op = infix_token.token.as_str();
-                    lhs = ast::Expression::new_binary_operation(lhs, op, rhs);
+                    expr = ast::Expression::new_binary_operation(expr, op, rhs);
                 } else {
                     return Err(
                         self.err(ParseErrorKind::ExpectedExpression(infix_token))
@@ -182,15 +172,39 @@ impl<T: BufRead> Parser<T> {
             }
         }
 
-        Ok(Some(lhs))
+        Ok(Some(expr))
     }
 
-    /// Return the next token along with its precedence *if* it's an
-    /// infix operator.
+    /// Get unary expression for the current unary operator token.
+    fn unary_expression(
+        &mut self,
+        token: &TokenWithLocation,
+    ) -> Result<ast::Expression, ParseError> {
+        let precedence = get_unary_precedence(&token.token);
+
+        if precedence == 0 {
+            return Err(self.err(ParseErrorKind::UnhandledToken(token.clone())));
+        }
+
+        if let Some(rhs) = self.expression(precedence)? {
+            let operator = token.token.as_str();
+            return Ok(ast::Expression::new_unary_operation(operator, rhs));
+        }
+
+        return Err(self.err(ParseErrorKind::ExpectedExpression(token.clone())));
+    }
+
+    /// Return the next token along with its precedence *if* it's both
+    /// an infix operator *and* its precedence is greater than the
+    /// current precedence level.
     fn next_infix_token(
         &mut self,
+        current_precedence: u8,
     ) -> Result<Option<(TokenWithLocation, u8)>, ParseError> {
-        if let Some(token) = self.next_token_if(|t| get_binary_precedence(t) > 0)? {
+        if let Some(token) = self.next_token_if(|t| {
+            let p = get_binary_precedence(t);
+            p > 0 && p > current_precedence
+        })? {
             let precedence = get_binary_precedence(&token.token);
             return Ok(Some((token, precedence)));
         }

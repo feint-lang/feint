@@ -32,6 +32,6 @@ pub enum ScanErrorKind {
     UnmatchedClosingBracket(char), // Opening bracket with no matching closing bracket
     ParseIntError(ParseBigIntError),
     ParseFloatError(ParseFloatError),
-    CouldNotOpenSourceFile(String),
+    CouldNotOpenSourceFile(String, String), // path, reason
     TooMuchWhitespace,
 }

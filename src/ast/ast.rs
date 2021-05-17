@@ -81,11 +81,20 @@ pub enum ExpressionKind {
     Block(Box<Block>),
     Function(String, Box<Block>),
     Literal(Box<Literal>),
+    Identifier(Box<Identifier>),
 }
 
 impl Expression {
     pub fn new(kind: ExpressionKind) -> Self {
         Self { kind }
+    }
+
+    pub fn new_literal(literal: Literal) -> Self {
+        Self { kind: ExpressionKind::Literal(Box::new(literal)) }
+    }
+
+    pub fn new_identifier(identifier: Identifier) -> Self {
+        Self { kind: ExpressionKind::Identifier(Box::new(identifier)) }
     }
 
     pub fn new_unary_operation(operator: &str, a: Expression) -> Self {
@@ -104,10 +113,6 @@ impl Expression {
         Self {
             kind: ExpressionKind::BinaryOperation(Box::new(a), operator, Box::new(b)),
         }
-    }
-
-    pub fn new_literal(literal: Literal) -> Self {
-        Self { kind: ExpressionKind::Literal(Box::new(literal)) }
     }
 }
 
@@ -194,3 +199,39 @@ impl fmt::Debug for LiteralKind {
         write!(f, "{}", string)
     }
 }
+
+/// Identifier
+#[derive(Debug, PartialEq)]
+pub struct Identifier {
+    pub kind: IdentifierKind,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum IdentifierKind {
+    Identifier(String),
+}
+
+impl Identifier {
+    pub fn new(kind: IdentifierKind) -> Self {
+        Self { kind }
+    }
+
+    pub fn new_indentifier(name: String) -> Self {
+        Self { kind: IdentifierKind::Identifier(name) }
+    }
+}
+
+// impl fmt::Debug for Identifier {
+//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+//         write!(f, "{:?}", self.kind)
+//     }
+// }
+//
+// impl fmt::Debug for IdentifierKind {
+//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+//         let name = match self {
+//             Self::Regular(name) => name,
+//         };
+//         write!(f, "{}", name)
+//     }
+// }
