@@ -41,6 +41,7 @@ pub enum Token {
     And,                // &&
     Or,                 // ||
     DoubleStar,         // **
+    DoubleSlash,        // //
     NotEqual,           // !=
     GreaterThanOrEqual, // >=
     LessThanOrEqual,    // <=

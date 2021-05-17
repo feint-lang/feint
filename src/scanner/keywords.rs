@@ -5,7 +5,7 @@ use lazy_static::lazy_static;
 use super::{Token, Token::*};
 
 lazy_static! {
-    /// Map of keywords to their respective Tokens
+    /// Map of keywords to their respective Tokens.
     pub static ref KEYWORDS: HashMap<&'static str, Token> = [
         ("true", True),
         ("false", False),

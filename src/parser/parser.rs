@@ -58,13 +58,12 @@ impl<T: BufRead> Parser<T> {
     }
 
     fn next_token(&mut self) -> Result<Option<TokenWithLocation>, ParseError> {
-        match self.token_stream.next() {
-            Some(result) => match result {
-                Ok(token_with_location) => Ok(Some(token_with_location)),
-                Err(err) => Err(self.scan_err(err)),
-            },
-            None => Ok(None),
+        if let Some(result) = self.token_stream.next() {
+            return result
+                .map(|token_with_location| Some(token_with_location))
+                .map_err(|err| self.scan_err(err));
         }
+        Ok(None)
     }
 
     fn next_token_if(
@@ -80,15 +79,17 @@ impl<T: BufRead> Parser<T> {
     }
 
     fn peek_token(&mut self) -> Result<Option<&TokenWithLocation>, ParseError> {
-        match self.token_stream.peek() {
-            Some(result) => match result {
-                Ok(token_with_location) => Ok(Some(token_with_location)),
-                Err(err) => {
-                    Err(ParseError::new(ParseErrorKind::ScanError(err.clone())))
-                }
-            },
-            None => Ok(None),
+        // peek() returns Option<ScanResult>
+        if let Some(result) = self.token_stream.peek() {
+            return result
+                .as_ref()
+                .map(|token_with_location| Some(token_with_location))
+                .map_err(|err| {
+                    // XXX: Can't use self.scan_err() here???
+                    ParseError::new(ParseErrorKind::ScanError(err.clone()))
+                });
         }
+        Ok(None)
     }
 
     /// Create a new ParseError of the specified kind.
@@ -123,36 +124,43 @@ impl<T: BufRead> Parser<T> {
         &mut self,
         precedence: u8,
     ) -> Result<Option<ast::Expression>, ParseError> {
-        let token = match self.next_token()? {
-            Some(token) => token,
+        let token_with_location = match self.next_token()? {
+            Some(t) => t,
             None => return Ok(None),
         };
 
         // *Always* start with a prefix expression, which includes
         // unary operations like -1 and !true as well as variable names.
-        let mut lhs = match token.token {
+        let mut lhs = match token_with_location.token {
             Token::Float(value) => {
                 ast::Expression::new_literal(ast::Literal::new_float(value))
             }
             Token::Int(value) => {
                 ast::Expression::new_literal(ast::Literal::new_int(value))
             }
-            t @ Token::Bang | t @ Token::Minus => {
-                let unary_precedence = self.get_unary_precedence(&t)?;
+            _ => {
+                let token = &token_with_location.token;
+                let unary_precedence = self.get_unary_precedence(token);
+                if unary_precedence == 0 {
+                    return Err(
+                        self.err(ParseErrorKind::UnhandledToken(token_with_location))
+                    );
+                }
                 match self.expression(unary_precedence)? {
                     Some(rhs) => {
-                        let op = t.as_str();
+                        let op = token.as_str();
                         ast::Expression::new_unary_operation(op, rhs)
                     }
                     None => return Err(self.err(ParseErrorKind::ExpectedExpression)),
                 }
             }
-            _ => return Err(self.err(ParseErrorKind::UnhandledToken(token))),
         };
 
         // See if the expression from above is followed by an infix
         // operator. If so, get the RHS expression and return a binary
-        // operation. If not, just return the original expression.
+        // operation. If not, just return the original expression. Note
+        // that when the next precedence is 0, that indicates that the
+        // next token is *not* a binary operator.
         let mut next_precedence = self.get_next_binary_precedence()?;
 
         while precedence < next_precedence {
@@ -170,29 +178,49 @@ impl<T: BufRead> Parser<T> {
         Ok(Some(lhs))
     }
 
-    /// Get the precedence of the specified prefix/unary operator.
-    fn get_unary_precedence(&mut self, token: &Token) -> Result<u8, ParseError> {
-        let precedence = match token {
-            &Token::Plus | &Token::Minus | &Token::Bang => 6,
-            _ => panic!("Not a unary operator: {}", token),
-        };
-        Ok(precedence)
+    /// Get unary precedence of token.
+    fn get_unary_precedence(&self, token: &Token) -> u8 {
+        self.get_operator_precedence(token).0
     }
 
-    /// Get the precedence of the next token *if* it's an infix binary
-    /// operator. If the next token isn't an infix operator, its
-    /// precedence will be 0.
+    /// Get binary precedence of token.
+    fn get_binary_precedence(&self, token: &Token) -> u8 {
+        self.get_operator_precedence(token).1
+    }
+
+    /// Get binary precedence of next token.
     fn get_next_binary_precedence(&mut self) -> Result<u8, ParseError> {
-        let precedence = match self.peek_token()? {
-            Some(token_with_location) => match token_with_location.token {
-                Token::Plus | Token::Minus => 1,
-                Token::Star | Token::Slash => 2,
-                Token::Caret => 3,
-                _ => 0,
-            },
-            None => 0,
-        };
-        Ok(precedence)
+        if let Some(TokenWithLocation { token, .. }) = self.peek_token()? {
+            /// FIXME: Usage of clone that feels wrong
+            let token = token.clone();
+            Ok(self.get_operator_precedence(&token).1)
+        } else {
+            Ok(0)
+        }
+    }
+
+    #[rustfmt::skip]
+    /// Return the unary *and* binary precedence of the specified token,
+    /// which may be 0 for either or both. 0 indicates that the token is
+    /// not an operator of the respective type.
+    ///
+    /// TODO: I'm not sure this is the best way to define this mapping.
+    ///       Would a static hash map be better? One issue with that is
+    ///       that Token can't be used as a hash map key, since it's not
+    ///       hashable. That could probably be "fixed", but it would be
+    ///       more complicated than this.
+    fn get_operator_precedence(&self, token: &Token) -> (u8, u8) {
+        match token {
+            Token::Plus =>        (4, 1), // +a, a + b (no-op, addition)
+            Token::Minus =>       (4, 1), // -a, a - b (negation, subtraction)
+            Token::Star =>        (0, 2), // a * b     (multiplication)
+            Token::Slash =>       (0, 2), // a / b     (division)
+            Token::DoubleSlash => (0, 2), // a // b    (floor division)
+            Token::Percent =>     (0, 2), // a % b     (modulus)
+            Token::Caret =>       (0, 3), // a ^ b     (exponentiation)
+            Token::Bang =>        (4, 0), // !a        (logical not)
+            _ =>                  (0, 0), //           (not an operator)
+        }
     }
 }
 
