@@ -1,7 +1,5 @@
 use std::collections::HashMap;
 
-use num_bigint::BigInt;
-
 use crate::builtins::{self, Object, Type};
 use crate::util::{BinaryOperator, Stack, UnaryOperator};
 
@@ -173,6 +171,7 @@ impl<'a> VM<'a> {
     }
 }
 
+#[cfg(test)]
 mod tests {
     use super::*;
 

@@ -1,6 +1,5 @@
 use crate::ast::Program;
-use crate::scanner;
-use crate::util::Location;
+use crate::scanner::{ScanError, TokenWithLocation};
 
 pub type ParseResult = Result<Program, ParseError>;
 
@@ -17,9 +16,8 @@ impl ParseError {
 
 #[derive(Clone, Debug)]
 pub enum ParseErrorKind {
-    ScanError(scanner::ScanError),
+    ScanError(ScanError),
     CouldNotOpenSourceFile(String),
-    UnhandledToken(scanner::TokenWithLocation),
-    ExpectedBinaryOperator,
-    ExpectedExpression,
+    UnhandledToken(TokenWithLocation),
+    ExpectedExpression(TokenWithLocation),
 }

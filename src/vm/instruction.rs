@@ -60,6 +60,7 @@ pub fn format_instructions(instructions: &Instructions) -> String {
         .join("\n")
 }
 
+#[cfg(test)]
 mod tests {
     use super::*;
 

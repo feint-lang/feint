@@ -3,11 +3,10 @@ use std::fs::File;
 use std::io::{BufRead, BufReader, Cursor};
 use std::iter::Peekable;
 
-use num_bigint::BigInt;
-
 use crate::ast;
-use crate::scanner::{self, ScanError, Scanner, Token, TokenWithLocation};
+use crate::scanner::{ScanError, Scanner, Token, TokenWithLocation};
 
+use super::precedence::{get_binary_precedence, get_unary_precedence};
 use super::{ParseError, ParseErrorKind, ParseResult};
 
 /// Create a parser from the specified text, scan the text into tokens,
@@ -124,14 +123,14 @@ impl<T: BufRead> Parser<T> {
         &mut self,
         precedence: u8,
     ) -> Result<Option<ast::Expression>, ParseError> {
-        let token_with_location = match self.next_token()? {
+        let token = match self.next_token()? {
             Some(t) => t,
             None => return Ok(None),
         };
 
         // *Always* start with a prefix expression, which includes
         // unary operations like -1 and !true as well as variable names.
-        let mut lhs = match token_with_location.token {
+        let mut lhs = match token.token {
             Token::Float(value) => {
                 ast::Expression::new_literal(ast::Literal::new_float(value))
             }
@@ -139,19 +138,15 @@ impl<T: BufRead> Parser<T> {
                 ast::Expression::new_literal(ast::Literal::new_int(value))
             }
             _ => {
-                let token = &token_with_location.token;
-                let unary_precedence = self.get_unary_precedence(token);
+                let unary_precedence = get_unary_precedence(&token.token);
                 if unary_precedence == 0 {
-                    return Err(
-                        self.err(ParseErrorKind::UnhandledToken(token_with_location))
-                    );
+                    return Err(self.err(ParseErrorKind::UnhandledToken(token)));
                 }
-                match self.expression(unary_precedence)? {
-                    Some(rhs) => {
-                        let op = token.as_str();
-                        ast::Expression::new_unary_operation(op, rhs)
-                    }
-                    None => return Err(self.err(ParseErrorKind::ExpectedExpression)),
+                if let Some(rhs) = self.expression(unary_precedence)? {
+                    let op = token.token.as_str();
+                    ast::Expression::new_unary_operation(op, rhs)
+                } else {
+                    return Err(self.err(ParseErrorKind::ExpectedExpression(token)));
                 }
             }
         };
@@ -161,75 +156,52 @@ impl<T: BufRead> Parser<T> {
         // operation. If not, just return the original expression. Note
         // that when the next precedence is 0, that indicates that the
         // next token is *not* a binary operator.
-        let mut next_precedence = self.get_next_binary_precedence()?;
 
-        while precedence < next_precedence {
-            let infix_token = self.next_token()?.unwrap();
-            match self.expression(next_precedence)? {
-                Some(rhs) => {
+        loop {
+            let next = self.next_infix_token()?;
+            if let Some((infix_token, mut infix_precedence)) = next {
+                if precedence < infix_precedence {
+                    break;
+                }
+                // Lower precedence of right-associative operator
+                // TODO: Is this necessary?
+                if infix_token.token == Token::Caret {
+                    infix_precedence -= 1;
+                }
+
+                if let Some(rhs) = self.expression(infix_precedence)? {
                     let op = infix_token.token.as_str();
                     lhs = ast::Expression::new_binary_operation(lhs, op, rhs);
-                    next_precedence = self.get_next_binary_precedence()?;
+                } else {
+                    return Err(
+                        self.err(ParseErrorKind::ExpectedExpression(infix_token))
+                    );
                 }
-                None => return Err(self.err(ParseErrorKind::ExpectedExpression)),
+            } else {
+                break;
             }
         }
 
         Ok(Some(lhs))
     }
 
-    /// Get unary precedence of token.
-    fn get_unary_precedence(&self, token: &Token) -> u8 {
-        self.get_operator_precedence(token).0
-    }
-
-    /// Get binary precedence of token.
-    fn get_binary_precedence(&self, token: &Token) -> u8 {
-        self.get_operator_precedence(token).1
-    }
-
-    /// Get binary precedence of next token.
-    fn get_next_binary_precedence(&mut self) -> Result<u8, ParseError> {
-        if let Some(TokenWithLocation { token, .. }) = self.peek_token()? {
-            /// FIXME: Usage of clone that feels wrong
-            let token = token.clone();
-            Ok(self.get_operator_precedence(&token).1)
-        } else {
-            Ok(0)
+    /// Return the next token along with its precedence *if* it's an
+    /// infix operator.
+    fn next_infix_token(
+        &mut self,
+    ) -> Result<Option<(TokenWithLocation, u8)>, ParseError> {
+        if let Some(token) = self.next_token_if(|t| get_binary_precedence(t) > 0)? {
+            let precedence = get_binary_precedence(&token.token);
+            return Ok(Some((token, precedence)));
         }
-    }
-
-    #[rustfmt::skip]
-    /// Return the unary *and* binary precedence of the specified token,
-    /// which may be 0 for either or both. 0 indicates that the token is
-    /// not an operator of the respective type.
-    ///
-    /// TODO: I'm not sure this is the best way to define this mapping.
-    ///       Would a static hash map be better? One issue with that is
-    ///       that Token can't be used as a hash map key, since it's not
-    ///       hashable. That could probably be "fixed", but it would be
-    ///       more complicated than this.
-    fn get_operator_precedence(&self, token: &Token) -> (u8, u8) {
-        match token {
-            Token::Plus =>        (4, 1), // +a, a + b (no-op, addition)
-            Token::Minus =>       (4, 1), // -a, a - b (negation, subtraction)
-            Token::Star =>        (0, 2), // a * b     (multiplication)
-            Token::Slash =>       (0, 2), // a / b     (division)
-            Token::DoubleSlash => (0, 2), // a // b    (floor division)
-            Token::Percent =>     (0, 2), // a % b     (modulus)
-            Token::Caret =>       (0, 3), // a ^ b     (exponentiation)
-            Token::Bang =>        (4, 0), // !a        (logical not)
-            _ =>                  (0, 0), //           (not an operator)
-        }
+        Ok(None)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    // All these tests except empty input hang, so they're ignored for
-    // the time being.
-
     use super::*;
+    use num_bigint::BigInt;
 
     #[test]
     fn parse_empty() {

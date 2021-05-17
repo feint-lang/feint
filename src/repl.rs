@@ -6,8 +6,8 @@ use dirs;
 use rustyline::error::ReadlineError;
 
 use super::result::ExitResult;
-use super::scanner::{self, ScanError, ScanErrorKind, TokenWithLocation};
-use super::vm::{Instruction, Instructions, Namespace, VMState, VM};
+use super::scanner::ScanErrorKind;
+use super::vm::{Instruction, Namespace, VMState, VM};
 use crate::parser::{self, ParseError, ParseErrorKind};
 use crate::util::Location;
 

@@ -1,9 +1,8 @@
 //! # FeInt
 
 use super::result::ExitResult;
-use super::scanner::{self, ScanError, ScanErrorKind};
+use super::scanner::{ScanError, ScanErrorKind, TokenWithLocation};
 use super::vm::{ExecutionResult, Instruction, Instructions, Namespace, VMState, VM};
-use crate::scanner::TokenWithLocation;
 
 /// Run text source.
 pub fn run(source: &str, debug: bool) -> ExitResult {
