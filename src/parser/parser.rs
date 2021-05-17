@@ -141,7 +141,7 @@ impl<T: BufRead> Parser<T> {
                 ast::Expression::new_literal(ast::Literal::new_int(value))
             }
             Token::Identifier(name) => {
-                ast::Expression::new_identifier(ast::Identifier::new_indentifier(name))
+                ast::Expression::new_identifier(ast::Identifier::new_identifier(name))
             }
             // The token isn't a leaf node, so it *must* be some other
             // kind of prefix token--a unary operation like -1 or !true.

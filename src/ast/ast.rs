@@ -19,8 +19,11 @@ impl Program {
 
 impl fmt::Debug for Program {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let items: Vec<String> =
-            self.statements.iter().map(|statement| statement.to_string()).collect();
+        let items: Vec<String> = self
+            .statements
+            .iter()
+            .map(|statement| format!("{:?}", statement))
+            .collect();
         write!(f, "{}", items.join("\n"))
     }
 }
@@ -43,12 +46,6 @@ impl Statement {
 
     pub fn new_expression(expression: Expression) -> Self {
         Self { kind: StatementKind::Expression(Box::new(expression)) }
-    }
-}
-
-impl fmt::Display for Statement {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self.kind)
     }
 }
 
@@ -125,16 +122,11 @@ impl fmt::Debug for Expression {
 impl fmt::Debug for ExpressionKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::UnaryOperation(op, b) => {
-                write!(f, "({:?}{:?})", op, b)
-            }
-            Self::BinaryOperation(a, op, b) => {
-                write!(f, "({:?} {:?} {:?})", a, op, b)
-            }
-            Self::Literal(literal) => {
-                write!(f, "{:?}", literal)
-            }
-            kind => write!(f, "{:?}", kind),
+            Self::UnaryOperation(op, b) => write!(f, "({:?}{:?})", op, b),
+            Self::BinaryOperation(a, op, b) => write!(f, "({:?} {:?} {:?})", a, op, b),
+            Self::Literal(literal) => write!(f, "{:?}", literal),
+            Self::Identifier(identifier) => write!(f, "{:?}", identifier),
+            _ => unimplemented!(),
         }
     }
 }
@@ -200,15 +192,16 @@ impl fmt::Debug for LiteralKind {
     }
 }
 
-/// Identifier
-#[derive(Debug, PartialEq)]
+/// Identifiers - names for variables, functions, types, and methods
+#[derive(PartialEq)]
 pub struct Identifier {
     pub kind: IdentifierKind,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(PartialEq)]
 pub enum IdentifierKind {
     Identifier(String),
+    TypeIdentifier(String),
 }
 
 impl Identifier {
@@ -216,22 +209,27 @@ impl Identifier {
         Self { kind }
     }
 
-    pub fn new_indentifier(name: String) -> Self {
+    pub fn new_identifier(name: String) -> Self {
         Self { kind: IdentifierKind::Identifier(name) }
+    }
+
+    pub fn new_type_identifier(name: String) -> Self {
+        Self { kind: IdentifierKind::TypeIdentifier(name) }
     }
 }
 
-// impl fmt::Debug for Identifier {
-//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-//         write!(f, "{:?}", self.kind)
-//     }
-// }
-//
-// impl fmt::Debug for IdentifierKind {
-//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-//         let name = match self {
-//             Self::Regular(name) => name,
-//         };
-//         write!(f, "{}", name)
-//     }
-// }
+impl fmt::Debug for Identifier {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self.kind)
+    }
+}
+
+impl fmt::Debug for IdentifierKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = match self {
+            Self::Identifier(name) => name,
+            Self::TypeIdentifier(name) => name,
+        };
+        write!(f, "{}", name)
+    }
+}
