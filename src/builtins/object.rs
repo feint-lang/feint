@@ -3,9 +3,12 @@ use std::fmt;
 
 use super::Type;
 
+pub trait TypeTrait {}
+
+pub trait ObjectTrait {}
+
 #[derive(Debug)]
 pub struct Object<'a> {
-    pub name: String,
     pub kind: &'a Type<'a>,
     pub attributes: HashMap<&'a str, &'a Object<'a>>,
 }
@@ -18,14 +21,7 @@ impl<'a> Object<'a> {
 
 impl<'a> fmt::Display for Object<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{} ({:?}) -> {} ({:?})",
-            self.kind.name,
-            self.kind.id(),
-            self.name,
-            self.id()
-        )
+        write!(f, "{} ({:?}) -> {:?}", self.kind.name, self.kind.id(), self.id())
     }
 }
 
@@ -41,14 +37,14 @@ mod tests {
 
     #[test]
     fn make_type() {
-        let t = Type::new("Type", HashMap::new());
+        let t = Type::new("builtins", "Object", vec![], HashMap::new());
         println!("{}", t);
     }
 
     #[test]
     fn make_object() {
-        let t = Type::new("Type", HashMap::new());
-        let o = t.new_instance("Object", HashMap::new());
+        let t = Type::new("builtins", "Object", vec![], HashMap::new());
+        let o = t.new_instance(HashMap::new());
         println!("{}", o);
     }
 }

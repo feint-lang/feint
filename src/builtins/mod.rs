@@ -11,3 +11,16 @@ mod int;
 mod kind;
 mod method;
 mod object;
+
+use std::collections::HashMap;
+
+pub(crate) fn init_builtin_types() -> HashMap<&'static str, Type<'static>> {
+    let mut types = HashMap::new();
+
+    let slots = vec!["value"];
+    let methods = HashMap::new();
+    let kind = Type::new("builtins", "Int", slots, methods);
+    types.insert(kind.name, kind);
+
+    types
+}
