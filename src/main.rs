@@ -65,7 +65,8 @@ fn main() {
                 .index(1)
                 .required(false)
                 .conflicts_with("code")
-                .help("Script"))
+                .help("Script"),
+        )
         .arg(
             Arg::with_name("code")
                 .short("c")
@@ -73,7 +74,7 @@ fn main() {
                 .required(false)
                 .conflicts_with("FILE_NAME")
                 .takes_value(true)
-                .help("Code to run")
+                .help("Code to run"),
         )
         .arg(
             Arg::with_name("debug")
@@ -81,7 +82,7 @@ fn main() {
                 .long("debug")
                 .required(false)
                 .takes_value(false)
-                .help("Enable debug mode?")
+                .help("Enable debug mode?"),
         );
 
     let matches = app.get_matches();

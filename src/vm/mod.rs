@@ -11,4 +11,5 @@ mod frame;
 mod instruction;
 mod namespace;
 mod result;
+mod types;
 mod vm;
