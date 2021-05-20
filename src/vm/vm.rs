@@ -3,7 +3,6 @@ use std::rc::Rc;
 
 use num_bigint::BigInt;
 
-use crate::types::{self, Object, ObjectTrait, Type, BUILTIN_TYPES};
 use crate::util::{BinaryOperator, Stack, UnaryOperator};
 
 use super::{
@@ -11,7 +10,7 @@ use super::{
     Instructions, Namespace, ObjectStore, VMState,
 };
 
-pub struct VM<'a> {
+pub struct VM {
     namespace: Namespace,
 
     // Items are pushed onto or popped from the stack as instructions
@@ -19,15 +18,15 @@ pub struct VM<'a> {
     stack: Stack<usize>,
 
     // A new stack frame is pushed for each call
-    call_stack: Stack<&'a Frame<'a>>,
+    call_stack: Stack<Frame>,
 
-    object_store: ObjectStore<'a>,
+    object_store: ObjectStore,
 }
 
 /// The FeInt virtual machine. When it's created, it's initialized and
 /// then, implicitly, goes idle until it's passed some instructions to
 /// execute. After instructions are executed
-impl<'a> VM<'a> {
+impl VM {
     pub fn new(namespace: Namespace) -> Self {
         VM {
             namespace,
@@ -161,11 +160,11 @@ impl<'a> VM<'a> {
         self.stack.peek()
     }
 
-    fn push_frame(&mut self, frame: &'a Frame) {
+    fn push_frame(&mut self, frame: Frame) {
         self.call_stack.push(frame);
     }
 
-    fn pop_frame(&mut self) -> Option<&Frame> {
+    fn pop_frame(&mut self) -> Option<Frame> {
         self.call_stack.pop()
     }
 }

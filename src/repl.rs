@@ -23,12 +23,12 @@ pub fn run(debug: bool) -> ExitResult {
 struct Runner<'a> {
     reader: rustyline::Editor<()>,
     history_path: Option<&'a Path>,
-    vm: VM<'a>,
+    vm: VM,
     debug: bool,
 }
 
 impl<'a> Runner<'a> {
-    fn new(history_path: Option<&'a Path>, vm: VM<'a>, debug: bool) -> Self {
+    fn new(history_path: Option<&'a Path>, vm: VM, debug: bool) -> Self {
         Runner { reader: rustyline::Editor::<()>::new(), history_path, vm, debug }
     }
 

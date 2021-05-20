@@ -22,13 +22,13 @@ pub fn run_file(file_path: &str, debug: bool) -> ExitResult {
     runner.run_file(file_path)
 }
 
-struct Runner<'a> {
-    vm: VM<'a>,
+struct Runner {
+    vm: VM,
     debug: bool,
 }
 
-impl<'a> Runner<'a> {
-    fn new(vm: VM<'a>, debug: bool) -> Self {
+impl Runner {
+    fn new(vm: VM, debug: bool) -> Self {
         Runner { vm, debug }
     }
 

@@ -1,15 +1,16 @@
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use crate::types::Object;
 
 /// VM call stack frame.
-pub struct Frame<'a> {
-    parameters: HashMap<&'a str, &'a Object<'a>>,
-    locals: HashMap<&'a str, &'a Object<'a>>,
+pub struct Frame {
+    parameters: HashMap<String, Rc<Object>>,
+    locals: HashMap<String, Rc<Object>>,
     return_address: usize,
 }
 
-impl<'a> Frame<'a> {
+impl Frame {
     pub fn new(return_address: usize) -> Self {
         Frame { parameters: HashMap::new(), locals: HashMap::new(), return_address }
     }
