@@ -1,7 +1,7 @@
-use crate::ast::Program;
+use crate::ast;
 use crate::scanner::{ScanError, TokenWithLocation};
 
-pub type ParseResult = Result<Program, ParseError>;
+pub type ParseResult = Result<ast::Program, ParseError>;
 
 #[derive(Clone, Debug)]
 pub struct ParseError {

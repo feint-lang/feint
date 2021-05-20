@@ -1,62 +1,79 @@
 //! # FeInt
 
-use super::parser::{self, ParseError, ParseErrorKind};
-use super::result::ExitResult;
-use super::scanner::{ScanError, ScanErrorKind, TokenWithLocation};
-use super::util::Location;
-use super::vm::{ExecutionResult, Instruction, Instructions, Namespace, VMState, VM};
+use crate::parser::{self, ParseError, ParseErrorKind};
+use crate::result::ExitResult;
+use crate::scanner::{ScanError, ScanErrorKind, TokenWithLocation};
+use crate::util::Location;
+use crate::vm::{
+    execute_file, execute_text, CompilationErrorKind, ExecutionErrorKind, VMState,
+};
 
 /// Run text source.
-pub fn run(source: &str, debug: bool) -> ExitResult {
-    let namespace = Namespace::default();
-    let vm = VM::new(namespace);
-    let mut runner = Runner::new(vm, debug);
-    runner.run(source)
+pub fn run(text: &str, debug: bool) -> ExitResult {
+    let mut runner = Runner::new(debug);
+    runner.run(text)
 }
 
 /// Run source from file.
 pub fn run_file(file_path: &str, debug: bool) -> ExitResult {
-    let namespace = Namespace::default();
-    let vm = VM::new(namespace);
-    let mut runner = Runner::new(vm, debug);
+    let mut runner = Runner::new(debug);
     runner.run_file(file_path)
 }
 
 struct Runner {
-    vm: VM,
     debug: bool,
 }
 
 impl Runner {
-    fn new(vm: VM, debug: bool) -> Self {
-        Runner { vm, debug }
+    fn new(debug: bool) -> Self {
+        Runner { debug }
     }
 
     fn run(&mut self, text: &str) -> ExitResult {
-        match parser::parse_text(text, self.debug) {
-            Ok(program) => {
-                eprintln!("{:?}", program);
-                Ok(None)
-            }
-            Err(err) => {
-                eprintln!("{}", text);
-                self.handle_err(err)
-            }
+        match execute_text(text, self.debug) {
+            Ok(vm_state) => self.vm_state_to_exit_result(vm_state),
+            Err(err) => self.handle_execution_err(err.kind),
         }
     }
 
     fn run_file(&mut self, file_path: &str) -> ExitResult {
-        match parser::parse_file(file_path, self.debug) {
-            Ok(program) => {
-                eprintln!("{:?}", program);
-                Ok(None)
-            }
-            Err(err) => self.handle_err(err),
+        match execute_file(file_path, self.debug) {
+            Ok(vm_state) => self.vm_state_to_exit_result(vm_state),
+            Err(err) => self.handle_execution_err(err.kind),
         }
     }
 
-    fn handle_err(&mut self, err: ParseError) -> ExitResult {
-        self.handle_parse_err(err.kind)
+    fn vm_state_to_exit_result(&self, vm_state: VMState) -> ExitResult {
+        if self.debug {
+            eprintln!("{:?}", vm_state);
+        }
+        match vm_state {
+            VMState::Halted(0) => Ok(None),
+            VMState::Halted(code) => {
+                Err((code, format!("Halted abnormally: {}", code)))
+            }
+            VMState::Idle => Err((-1, "Never halted".to_owned())),
+        }
+    }
+
+    fn handle_execution_err(&mut self, kind: ExecutionErrorKind) -> ExitResult {
+        let message = match kind {
+            ExecutionErrorKind::CompilationError(err) => {
+                return self.handle_compilation_err(err.kind);
+            }
+            ExecutionErrorKind::ParserError(err) => {
+                return self.handle_parse_err(err.kind);
+            }
+            err => format!("Unhandled execution error: {:?}", err),
+        };
+        Err((4, message))
+    }
+
+    fn handle_compilation_err(&mut self, kind: CompilationErrorKind) -> ExitResult {
+        let message = match kind {
+            err => format!("Unhandled compilation error: {:?}", err),
+        };
+        Err((3, message))
     }
 
     /// Handle parse error.

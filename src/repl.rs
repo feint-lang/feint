@@ -5,11 +5,13 @@ use std::path::{Path, PathBuf};
 use dirs;
 use rustyline::error::ReadlineError;
 
-use super::result::ExitResult;
-use super::scanner::ScanErrorKind;
-use super::vm::{Instruction, Namespace, VMState, VM};
 use crate::parser::{self, ParseError, ParseErrorKind};
+use crate::result::ExitResult;
+use crate::scanner::ScanErrorKind;
 use crate::util::Location;
+use crate::vm::{
+    compile, CompilationErrorKind, ExecutionErrorKind, Namespace, VMState, VM,
+};
 
 /// Run FeInt REPL until user exits.
 pub fn run(debug: bool) -> ExitResult {
@@ -40,6 +42,32 @@ impl<'a> Runner<'a> {
         let base_path = home.unwrap_or_default();
         let history_path_buf = base_path.join(".feint_history");
         history_path_buf
+    }
+
+    fn load_history(&mut self) {
+        match self.history_path {
+            Some(path) => {
+                println!("REPL history will be saved to {}", path.to_string_lossy());
+                match self.reader.load_history(path) {
+                    Ok(_) => (),
+                    Err(err) => eprintln!("Could not load REPL history: {}", err),
+                }
+            }
+            None => (),
+        }
+    }
+
+    fn add_history_entry(&mut self, input: &str) {
+        match self.history_path {
+            Some(path) => {
+                self.reader.add_history_entry(input);
+                match self.reader.save_history(path) {
+                    Ok(_) => (),
+                    Err(err) => eprintln!("Could not save REPL history: {}", err),
+                }
+            }
+            None => (),
+        }
     }
 
     fn run(&mut self) -> ExitResult {
@@ -97,34 +125,27 @@ impl<'a> Runner<'a> {
         }
     }
 
+    /// Evaluate text.
     fn eval(&mut self, text: &str) -> Option<ExitResult> {
         self.add_history_entry(text);
 
         match text.trim() {
             ".exit" | ".halt" | ".quit" => {
-                return Some(Ok(Some("Exit".to_owned())));
+                return Some(Ok(None));
             }
             _ => (),
         }
 
         match parser::parse_text(text, self.debug) {
-            Ok(program) => {
-                eprintln!("{:?}", program);
-
-                // TODO:
-                let instructions = vec![Instruction::Return];
-
-                match self.vm.execute(&instructions) {
-                    Ok(VMState::Idle) => None,
-                    Ok(VMState::Halted(0)) => Some(Ok(Some("Halted".to_owned()))),
-                    Ok(VMState::Halted(code)) => {
-                        Some(Err((code, format!("Halted abnormally: {}", code))))
-                    }
-                    Err(err) => Some(Err((1, err.to_string()))),
-                }
-            }
+            Ok(program) => match compile(program, self.debug) {
+                Ok(instructions) => match self.vm.execute(instructions) {
+                    Ok(state) => self.vm_state_to_exit_result(state),
+                    Err(err) => Some(self.handle_execution_err(err.kind)),
+                },
+                Err(err) => Some(self.handle_compilation_err(err.kind)),
+            },
             Err(err) => {
-                if self.handle_err(err) {
+                if self.handle_parse_err(err.kind) {
                     // Continue until valid input.
                     match self.read_line("+ ", false) {
                         Ok(None) => {
@@ -135,7 +156,7 @@ impl<'a> Runner<'a> {
                             let input = text.to_string() + "\n" + new_input.as_str();
                             self.eval(input.as_str())
                         }
-                        Err(err) => Some(Err((1, format!("{}", err)))),
+                        Err(err) => Some(Err((2, format!("{}", err)))),
                     }
                 } else {
                     // Bail.
@@ -145,40 +166,38 @@ impl<'a> Runner<'a> {
         }
     }
 
-    fn load_history(&mut self) {
-        match self.history_path {
-            Some(path) => {
-                println!("REPL history will be saved to {}", path.to_string_lossy());
-                match self.reader.load_history(path) {
-                    Ok(_) => (),
-                    Err(err) => eprintln!("Could not load REPL history: {}", err),
-                }
+    fn vm_state_to_exit_result(&self, vm_state: VMState) -> Option<ExitResult> {
+        if self.debug {
+            eprintln!("{:?}", vm_state);
+        }
+        match vm_state {
+            VMState::Idle => None,
+            VMState::Halted(0) => Some(Ok(Some("Halted".to_owned()))),
+            VMState::Halted(code) => {
+                Some(Err((code, format!("Halted abnormally: {}", code))))
             }
-            None => (),
         }
     }
 
-    fn add_history_entry(&mut self, input: &str) {
-        match self.history_path {
-            Some(path) => {
-                self.reader.add_history_entry(input);
-                match self.reader.save_history(path) {
-                    Ok(_) => (),
-                    Err(err) => eprintln!("Could not save REPL history: {}", err),
-                }
-            }
-            None => (),
-        }
+    /// Execution errors are all fatal for now.
+    fn handle_execution_err(&mut self, kind: ExecutionErrorKind) -> ExitResult {
+        let message = match kind {
+            err => format!("Unhandled execution error: {:?}", err),
+        };
+        Err((4, message))
     }
 
-    /// Handle error. For now, true means the eval should continue
+    /// Compilation errors are all fatal for now.
+    fn handle_compilation_err(&mut self, kind: CompilationErrorKind) -> ExitResult {
+        let message = match kind {
+            err => format!("Unhandled compilation error: {:?}", err),
+        };
+        Err((3, message))
+    }
+
+    /// Handle parse error. For now, true means the eval should continue
     /// trying to add text to the original input while false means the
     /// eval loop should give up on the input that caused the error.
-    fn handle_err(&mut self, err: ParseError) -> bool {
-        self.handle_parse_err(err.kind)
-    }
-
-    /// Handle parse error.
     fn handle_parse_err(&mut self, kind: ParseErrorKind) -> bool {
         match kind {
             ParseErrorKind::ScanError(err) => {

@@ -3,12 +3,42 @@ use std::rc::Rc;
 
 use num_bigint::BigInt;
 
+use crate::ast;
+use crate::parser::{parse_file, parse_text};
 use crate::util::{BinaryOperator, Stack, UnaryOperator};
 
 use super::{
-    ExecutionError, ExecutionErrorKind, ExecutionResult, Frame, Instruction,
+    compile, ExecutionError, ExecutionErrorKind, ExecutionResult, Frame, Instruction,
     Instructions, Namespace, ObjectStore, VMState,
 };
+
+/// Create a new VM and execute source text.
+pub fn execute_text(text: &str, debug: bool) -> ExecutionResult {
+    match parse_text(text, debug) {
+        Ok(program) => execute_program(program, debug),
+        Err(err) => Err(ExecutionError::new(ExecutionErrorKind::ParserError(err))),
+    }
+}
+
+/// Create a new VM and execute source from file.
+pub fn execute_file(file_path: &str, debug: bool) -> ExecutionResult {
+    match parse_file(file_path, debug) {
+        Ok(program) => execute_program(program, debug),
+        Err(err) => Err(ExecutionError::new(ExecutionErrorKind::ParserError(err))),
+    }
+}
+
+/// Create a new VM and execute AST program.
+pub fn execute_program(program: ast::Program, debug: bool) -> ExecutionResult {
+    match compile(program, debug) {
+        Ok(instructions) => {
+            let namespace = Namespace::new(None);
+            let mut vm = VM::new(namespace);
+            vm.execute(instructions)
+        }
+        Err(err) => Err(ExecutionError::new(ExecutionErrorKind::CompilationError(err))),
+    }
+}
 
 pub struct VM {
     namespace: Namespace,
@@ -48,7 +78,7 @@ impl VM {
     /// When a HALT instruction is encountered, the VM's state will be
     /// cleared; it can be "restarted" by passing more instructions to
     /// execute.
-    pub fn execute(&mut self, instructions: &Instructions) -> ExecutionResult {
+    pub fn execute(&mut self, instructions: Instructions) -> ExecutionResult {
         let mut instruction_pointer = 0;
         loop {
             if let Some(instruction) = instructions.get(instruction_pointer) {
@@ -185,7 +215,7 @@ mod tests {
             Instruction::Return,
             Instruction::Halt(0),
         ];
-        if let Ok(result) = vm.execute(&instructions) {
+        if let Ok(result) = vm.execute(instructions) {
             assert_eq!(result, VMState::Halted(0));
         }
     }
