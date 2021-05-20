@@ -67,6 +67,8 @@ pub struct Scanner<T: BufRead> {
     /// are matched and also lets us know when we're inside a group
     /// where leading whitespace can be ignored.
     bracket_stack: Stack<(char, Location)>,
+    /// The last token that was popped from the queue.
+    previous_token: Token,
 }
 
 impl<T: BufRead> Scanner<T> {
@@ -76,6 +78,7 @@ impl<T: BufRead> Scanner<T> {
             queue: VecDeque::new(),
             indent_level: None,
             bracket_stack: Stack::new(),
+            previous_token: Token::EndOfStatement,
         }
     }
 
@@ -98,7 +101,9 @@ impl<T: BufRead> Scanner<T> {
         while self.queue.is_empty() {
             self.add_tokens_to_queue()?;
         }
-        Ok(self.queue.pop_front().unwrap())
+        let token = self.queue.pop_front().unwrap();
+        self.previous_token = token.token.clone();
+        Ok(token)
     }
 
     fn handle_indents(&mut self) -> Result<(), ScanError> {
@@ -206,6 +211,18 @@ impl<T: BufRead> Scanner<T> {
                     ));
                 }
             },
+            Some(('$', Some('"'), _)) => {
+                self.next_char();
+                match self.read_string('"') {
+                    (string, true) => Token::FormatString(string),
+                    (string, false) => {
+                        return Err(ScanError::new(
+                            ScanErrorKind::UnterminatedString(format!("$\"{}", string)),
+                            start,
+                        ));
+                    }
+                }
+            }
             Some(('#', _, _)) => {
                 self.consume_comment();
                 return Ok(());
@@ -323,6 +340,7 @@ impl<T: BufRead> Scanner<T> {
             // Newlines
             Some(('\n', _, _)) => {
                 if self.bracket_stack.size() == 0 {
+                    self.maybe_add_end_of_statement_token(start);
                     self.handle_indents()?;
                 } else {
                     self.consume_whitespace()?;
@@ -341,22 +359,33 @@ impl<T: BufRead> Scanner<T> {
             }
             // End of input
             None => {
-                self.set_indent_level(0, Location::new(start.line + 1, 1))?;
-                match self.bracket_stack.pop() {
-                    Some((c, location)) => {
-                        return Err(ScanError::new(
-                            ScanErrorKind::UnmatchedOpeningBracket(c),
-                            location,
-                        ));
-                    }
-                    None => Token::EndOfInput,
+                if self.bracket_stack.size() == 0 {
+                    self.maybe_add_end_of_statement_token(start);
+                    self.set_indent_level(0, Location::new(start.line + 1, 1))?;
+                } else if let Some((c, location)) = self.bracket_stack.pop() {
+                    return Err(ScanError::new(
+                        ScanErrorKind::UnmatchedOpeningBracket(c),
+                        location,
+                    ));
                 }
+                Token::EndOfInput
             }
         };
 
         self.add_token_to_queue(token, start, None);
         self.consume_whitespace()?;
         Ok(())
+    }
+
+    fn maybe_add_end_of_statement_token(&mut self, location: Location) -> bool {
+        if self.previous_token == Token::EndOfStatement {
+            return false;
+        }
+        if self.bracket_stack.size() > 0 {
+            return false;
+        }
+        self.add_token_to_queue(Token::EndOfStatement, location, Some(location));
+        true
     }
 
     fn add_token_to_queue(
@@ -744,38 +773,43 @@ mod tests {
     #[test]
     fn scan_int() {
         let tokens = scan_optimistic("123");
-        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens.len(), 2);
         check_token(tokens.get(0), Token::Int(BigInt::from(123)), 1, 1, 1, 3);
+        check_token(tokens.get(1), Token::EndOfStatement, 1, 4, 1, 4);
     }
 
     #[test]
     fn scan_binary_number() {
         let tokens = scan_optimistic("0b11"); // = 3
-        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens.len(), 2);
         check_token(tokens.get(0), Token::Int(BigInt::from(3)), 1, 1, 1, 4);
+        check_token(tokens.get(1), Token::EndOfStatement, 1, 5, 1, 5);
     }
 
     #[test]
     fn scan_float() {
         let tokens = scan_optimistic("123.1");
-        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens.len(), 2);
         check_token(tokens.get(0), Token::Float(123.1 as f64), 1, 1, 1, 5);
+        check_token(tokens.get(1), Token::EndOfStatement, 1, 6, 1, 6);
     }
 
     #[test]
     fn scan_float_with_e_and_no_sign() {
         let tokens = scan_optimistic("123.1e1");
-        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens.len(), 2);
         let expected = Token::Float(123.1E+1);
         check_token(tokens.get(0), expected, 1, 1, 1, 7);
+        check_token(tokens.get(1), Token::EndOfStatement, 1, 8, 1, 8);
     }
 
     #[test]
     fn scan_float_with_e_and_sign() {
         let tokens = scan_optimistic("123.1e+1");
-        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens.len(), 2);
         let expected = Token::Float(123.1E+1);
         check_token(tokens.get(0), expected, 1, 1, 1, 8);
+        check_token(tokens.get(1), Token::EndOfStatement, 1, 9, 1, 9);
     }
 
     #[test]
@@ -783,8 +817,9 @@ mod tests {
         // "\"abc"
         let source = "\"\\\"abc\"";
         let tokens = scan_optimistic(source);
-        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens.len(), 2);
         check_string_token(tokens.get(0), "\"abc", 1, 1, 1, 7);
+        check_token(tokens.get(1), Token::EndOfStatement, 1, 8, 1, 8);
     }
 
     #[test]
@@ -793,8 +828,9 @@ mod tests {
         // "
         let source = "\"abc\n\"";
         let tokens = scan_optimistic(source);
-        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens.len(), 2);
         check_string_token(tokens.get(0), "abc\n", 1, 1, 2, 1);
+        check_token(tokens.get(1), Token::EndOfStatement, 2, 2, 2, 2);
     }
 
     #[test]
@@ -808,25 +844,28 @@ mod tests {
         //   "
         let source = "\" a\nb\n\nc\n\n\n  \"";
         let tokens = scan_optimistic(source);
-        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens.len(), 2);
         check_string_token(tokens.get(0), " a\nb\n\nc\n\n\n  ", 1, 1, 7, 3);
+        check_token(tokens.get(1), Token::EndOfStatement, 7, 4, 7, 4);
     }
 
     #[test]
     fn scan_string_with_escaped_chars() {
         let tokens = scan_optimistic("\"\\0\\a\\b\\n\\'\\\"\"");
-        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens.len(), 2);
         // NOTE: We could put a backslash before the single quote in
         //       the expected string, but Rust seems to treat \' and '
         //       as the same.
         check_string_token(tokens.get(0), "\0\x07\x08\n'\"", 1, 1, 1, 14);
+        check_token(tokens.get(1), Token::EndOfStatement, 1, 15, 1, 15);
     }
 
     #[test]
     fn scan_string_with_escaped_regular_char() {
         let tokens = scan_optimistic("\"ab\\c\"");
-        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens.len(), 2);
         check_string_token(tokens.get(0), "ab\\c", 1, 1, 1, 6);
+        check_token(tokens.get(1), Token::EndOfStatement, 1, 7, 1, 7);
     }
 
     #[test]
@@ -843,7 +882,7 @@ mod tests {
                     let new_source = source.to_string() + "\"";
                     match scan_text(new_source.as_str()) {
                         Ok(tokens) => {
-                            assert_eq!(tokens.len(), 1);
+                            assert_eq!(tokens.len(), 2);
                             check_string_token(tokens.get(0), "abc", 1, 1, 1, 5);
                         }
                         _ => assert!(false),
@@ -879,25 +918,31 @@ g (y) ->  # 6
         check_token(tokens.get(2), token, 1, 4, 1, 4);
         check_token(tokens.get(3), Token::RightParen, 1, 5, 1, 5);
         check_token(tokens.get(4), Token::FuncStart, 1, 7, 1, 8);
-        check_token(tokens.get(5), Token::BlockStart, 2, 0, 2, 0);
+        check_token(tokens.get(5), Token::EndOfStatement, 1, 14, 1, 14);
+        check_token(tokens.get(6), Token::BlockStart, 2, 0, 2, 0);
         token = Token::Identifier("x".to_string());
-        check_token(tokens.get(6), token, 2, 5, 2, 5);
-        check_token(tokens.get(7), Token::Int(BigInt::from(1)), 3, 5, 3, 5);
-        check_token(tokens.get(8), Token::BlockEnd, 6, 0, 6, 0);
+        check_token(tokens.get(7), token, 2, 5, 2, 5);
+        check_token(tokens.get(8), Token::EndOfStatement, 2, 14, 2, 14);
+        check_token(tokens.get(9), Token::Int(BigInt::from(1)), 3, 5, 3, 5);
+        check_token(tokens.get(10), Token::EndOfStatement, 3, 14, 3, 14);
+        check_token(tokens.get(11), Token::BlockEnd, 6, 0, 6, 0);
 
         // g
         token = Token::Identifier("g".to_string());
-        check_token(tokens.get(9), token, 6, 1, 6, 1);
-        check_token(tokens.get(10), Token::LeftParen, 6, 3, 6, 3);
+        check_token(tokens.get(12), token, 6, 1, 6, 1);
+        check_token(tokens.get(13), Token::LeftParen, 6, 3, 6, 3);
         token = Token::Identifier("y".to_string());
-        check_token(tokens.get(11), token, 6, 4, 6, 4);
-        check_token(tokens.get(12), Token::RightParen, 6, 5, 6, 5);
-        check_token(tokens.get(13), Token::FuncStart, 6, 7, 6, 8);
-        check_token(tokens.get(14), Token::BlockStart, 7, 0, 7, 0);
+        check_token(tokens.get(14), token, 6, 4, 6, 4);
+        check_token(tokens.get(15), Token::RightParen, 6, 5, 6, 5);
+        check_token(tokens.get(16), Token::FuncStart, 6, 7, 6, 8);
+        check_token(tokens.get(17), Token::EndOfStatement, 6, 14, 6, 14);
+        check_token(tokens.get(18), Token::BlockStart, 7, 0, 7, 0);
         token = Token::Identifier("y".to_string());
-        check_token(tokens.get(15), token, 7, 5, 7, 5);
-        check_token(tokens.get(16), Token::BlockEnd, 8, 0, 8, 0);
-        assert!(tokens.get(17).is_none());
+        check_token(tokens.get(19), token, 7, 5, 7, 5);
+        check_token(tokens.get(20), Token::EndOfStatement, 7, 14, 7, 14);
+        check_token(tokens.get(21), Token::BlockEnd, 8, 0, 8, 0);
+
+        assert!(tokens.get(22).is_none());
     }
 
     #[test]
@@ -930,7 +975,7 @@ b = 3
         let num_tokens = tokens.len();
         println!("{:?}", tokens);
         let mut token;
-        assert_eq!(num_tokens, 11);
+        assert_eq!(num_tokens, 13);
         token = Token::Identifier("a".to_string());
         check_token(tokens.get(0), token, 3, 1, 3, 1);
         check_token(tokens.get(1), Token::Equal, 3, 3, 3, 3);
@@ -940,11 +985,13 @@ b = 3
         check_token(tokens.get(5), Token::Int(BigInt::from(2)), 6, 3, 6, 3);
         check_token(tokens.get(6), Token::Comma, 6, 4, 6, 4);
         check_token(tokens.get(7), Token::RightSquareBracket, 7, 1, 7, 1);
+        check_token(tokens.get(8), Token::EndOfStatement, 7, 21, 7, 21);
         token = Token::Identifier("b".to_string());
-        check_token(tokens.get(8), token, 9, 1, 9, 1);
-        check_token(tokens.get(9), Token::Equal, 9, 3, 9, 3);
-        check_token(tokens.get(10), Token::Int(BigInt::from(3)), 9, 5, 9, 5);
-        assert!(tokens.get(11).is_none());
+        check_token(tokens.get(9), token, 9, 1, 9, 1);
+        check_token(tokens.get(10), Token::Equal, 9, 3, 9, 3);
+        check_token(tokens.get(11), Token::Int(BigInt::from(3)), 9, 5, 9, 5);
+        check_token(tokens.get(12), Token::EndOfStatement, 9, 6, 9, 6);
+        assert!(tokens.get(13).is_none());
     }
 
     #[test]

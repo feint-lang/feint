@@ -1,16 +1,18 @@
 use std::collections::HashMap;
+use std::rc::Rc;
 
-use crate::builtins::{self, Object, Type};
+use num_bigint::BigInt;
+
+use crate::types::{self, Object, ObjectTrait, Type, BUILTIN_TYPES};
 use crate::util::{BinaryOperator, Stack, UnaryOperator};
 
 use super::{
-    Constant, ConstantStore, ExecutionError, ExecutionErrorKind, ExecutionResult,
-    Frame, Instruction, Instructions, Namespace, VMState,
+    ExecutionError, ExecutionErrorKind, ExecutionResult, Frame, Instruction,
+    Instructions, Namespace, ObjectStore, VMState,
 };
 
 pub struct VM<'a> {
     namespace: Namespace,
-    builtins: HashMap<&'a str, Type<'a>>,
 
     // Items are pushed onto or popped from the stack as instructions
     // are executed in the instruction list.
@@ -19,7 +21,7 @@ pub struct VM<'a> {
     // A new stack frame is pushed for each call
     call_stack: Stack<&'a Frame<'a>>,
 
-    constants: ConstantStore,
+    object_store: ObjectStore<'a>,
 }
 
 /// The FeInt virtual machine. When it's created, it's initialized and
@@ -29,10 +31,9 @@ impl<'a> VM<'a> {
     pub fn new(namespace: Namespace) -> Self {
         VM {
             namespace,
-            builtins: builtins::init_builtin_types(),
             stack: Stack::new(),
             call_stack: Stack::new(),
-            constants: ConstantStore::new(),
+            object_store: ObjectStore::new(),
         }
     }
 
@@ -75,14 +76,11 @@ impl<'a> VM<'a> {
                 self.stack.pop().unwrap();
             }
             Instruction::StoreConst(value) => {
-                let int_type = self.builtins.get("Int").unwrap();
-                let int_obj = int_type.new_instance(HashMap::new());
-
-                self.constants.add(Constant::new(*value));
+                // let object = Type::make_int(BigInt::from(*value as i64));
+                // self.object_store.add(Rc::new(object));
             }
             Instruction::LoadConst(index) => {
-                let constant = self.constants.get(*index).unwrap();
-                self.stack.push(constant.value); // ???
+                // let object = self.object_store.get(*index).unwrap();
             }
             Instruction::UnaryOperation(operator) => {
                 if let Some(a) = self.pop() {

@@ -33,7 +33,7 @@ impl<'a> Runner<'a> {
     }
 
     fn run(&mut self, text: &str) -> ExitResult {
-        match parser::parse_text(text) {
+        match parser::parse_text(text, self.debug) {
             Ok(program) => {
                 eprintln!("{:?}", program);
                 Ok(None)
@@ -46,7 +46,7 @@ impl<'a> Runner<'a> {
     }
 
     fn run_file(&mut self, file_path: &str) -> ExitResult {
-        match parser::parse_file(file_path) {
+        match parser::parse_file(file_path, self.debug) {
             Ok(program) => {
                 eprintln!("{:?}", program);
                 Ok(None)
@@ -71,7 +71,7 @@ impl<'a> Runner<'a> {
             ParseErrorKind::UnhandledToken(token) => {
                 let location = token.start;
                 let col = location.col;
-                let marker = col - 1;
+                let marker = if col == 0 { col } else { col - 1 };
                 let token = token.token;
                 format!(
                     "{:>width$}^\nParse error: unhandled token at {}: {:?}",

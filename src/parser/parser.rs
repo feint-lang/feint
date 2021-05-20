@@ -13,15 +13,15 @@ use super::{ParseError, ParseErrorKind, ParseResult};
 
 /// Create a parser from the specified text, scan the text into tokens,
 /// parse the tokens, and return the resulting AST or error.
-pub fn parse_text(text: &str) -> ParseResult {
+pub fn parse_text(text: &str, debug: bool) -> ParseResult {
     let scanner = Scanner::<Cursor<&str>>::from_text(text);
-    let mut parser = Parser::new(scanner);
+    let mut parser = Parser::new(scanner, debug);
     parser.parse()
 }
 
 /// Create a parser from the specified file, scan its text into tokens,
 /// parse the tokens, and return the resulting AST or error.
-pub fn parse_file(file_path: &str) -> ParseResult {
+pub fn parse_file(file_path: &str, debug: bool) -> ParseResult {
     let result = Scanner::<BufReader<File>>::from_file(file_path);
     let scanner = match result {
         Ok(scanner) => scanner,
@@ -32,7 +32,7 @@ pub fn parse_file(file_path: &str) -> ParseResult {
             )));
         }
     };
-    let mut parser = Parser::new(scanner);
+    let mut parser = Parser::new(scanner, debug);
     parser.parse()
 }
 
@@ -42,11 +42,12 @@ pub struct Parser<T: BufRead> {
     /// Keep track of tokens until a valid statement is encountered.
     /// TODO: ???
     token_queue: VecDeque<TokenWithLocation>,
+    debug: bool,
 }
 
 impl<T: BufRead> Parser<T> {
-    fn new(scanner: Scanner<T>) -> Self {
-        Self { token_stream: scanner.peekable(), token_queue: VecDeque::new() }
+    fn new(scanner: Scanner<T>, debug: bool) -> Self {
+        Self { token_stream: scanner.peekable(), token_queue: VecDeque::new(), debug }
     }
 
     /// Scan source -> tokens
@@ -62,7 +63,12 @@ impl<T: BufRead> Parser<T> {
     fn next_token(&mut self) -> Result<Option<TokenWithLocation>, ParseError> {
         if let Some(result) = self.token_stream.next() {
             return result
-                .map(|token_with_location| Some(token_with_location))
+                .map(|token_with_location| {
+                    if self.debug {
+                        eprintln!("{}", token_with_location);
+                    }
+                    Some(token_with_location)
+                })
                 .map_err(|err| self.scan_err(err));
         }
         Ok(None)
@@ -110,16 +116,15 @@ impl<T: BufRead> Parser<T> {
     fn statements(&mut self) -> Result<Vec<ast::Statement>, ParseError> {
         let mut statements = vec![];
         loop {
-            match self.expression(0)? {
-                Some(expr) => {
-                    let statement = ast::Statement::new_expression(expr);
-                    statements.push(statement);
-                },
-                None => {
-                    break Ok(statements);
-                }
+            if self.peek_token()?.is_none() {
+                break;
+            }
+            if let Some(expr) = self.expression(0)? {
+                let statement = ast::Statement::new_expression(expr);
+                statements.push(statement);
             }
         }
+        Ok(statements)
     }
 
     fn expression(
@@ -132,6 +137,9 @@ impl<T: BufRead> Parser<T> {
         };
 
         let mut expr = match token.token {
+            Token::EndOfStatement => {
+                return Ok(None);
+            }
             // First, try for a literal or identifier, since they're
             // leaf nodes.
             Token::Float(value) => {
@@ -181,16 +189,13 @@ impl<T: BufRead> Parser<T> {
         token: &TokenWithLocation,
     ) -> Result<ast::Expression, ParseError> {
         let precedence = get_unary_precedence(&token.token);
-
         if precedence == 0 {
             return Err(self.err(ParseErrorKind::UnhandledToken(token.clone())));
         }
-
         if let Some(rhs) = self.expression(precedence)? {
             let operator = token.token.as_str();
             return Ok(ast::Expression::new_unary_operation(operator, rhs));
         }
-
         return Err(self.err(ParseErrorKind::ExpectedExpression(token.clone())));
     }
 
@@ -215,20 +220,23 @@ impl<T: BufRead> Parser<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::util::BinaryOperator;
     use num_bigint::BigInt;
 
     #[test]
     fn parse_empty() {
-        let result = parse_text("");
-        assert!(result.is_ok());
-        let program = result.unwrap();
-        assert_eq!(program.statements.len(), 0);
+        let result = parse_text("", true);
+        if let Ok(program) = result {
+            assert_eq!(program.statements.len(), 0);
+        } else {
+            assert!(false, "Program failed to parse: {:?}", result);
+        }
     }
 
     #[test]
     #[rustfmt::skip]
     fn parse_int() {
-        let result = parse_text("1");
+        let result = parse_text("1", true);
         assert!(result.is_ok());
         let program = result.unwrap();
         let statements = program.statements;
@@ -263,8 +271,13 @@ mod tests {
         //      n=
         //      |
         //      1
-        parse_text("n = 1");
-        assert!(false);
+        let result = parse_text("n = 1", true);
+        if let Ok(program) = result {
+            assert_eq!(program.statements.len(), 1);
+            // TODO: More checks
+        } else {
+            assert!(false, "Program failed to parse: {:?}", result);
+        }
     }
 
     #[test]
@@ -275,30 +288,47 @@ mod tests {
         //      +
         //     / \
         //    1   2
-        let result = parse_text("1 + 2");
+        let result = parse_text("1 + 2", true);
         assert!(result.is_ok());
         let program = result.unwrap();
         let statements = program.statements;
         assert_eq!(statements.len(), 1);
         let statement = statements.first().unwrap();
 
-        // FIXME: This test passes, but only because it's testing what
-        //        we know is being returned instead of what *should* be
-        //        returned.
         assert_eq!(
             *statement,
             ast::Statement {
                 kind: ast::StatementKind::Expression(
                     Box::new(
+                        // 1 + 2
                         ast::Expression {
-                            kind: ast::ExpressionKind::Literal(
+                            kind: ast::ExpressionKind::BinaryOperation(
                                 Box::new(
-                                    ast::Literal {
-                                        kind: ast::LiteralKind::Int(
-                                            BigInt::from(1)
+                                    // 1
+                                    ast::Expression {
+                                        kind: ast::ExpressionKind::Literal(
+                                            Box::new(
+                                                ast::Literal {
+                                                    kind: ast::LiteralKind::Int(BigInt::from(1))
+                                                }
+                                            )
                                         )
                                     }
-                                )
+                                ),
+                                // +
+                                BinaryOperator::Add,
+                                Box::new(
+                                    // 2
+                                    ast::Expression {
+                                        kind: ast::ExpressionKind::Literal(
+                                            Box::new(
+                                                ast::Literal {
+                                                    kind: ast::LiteralKind::Int(BigInt::from(2))
+                                                }
+                                            )
+                                        )
+                                    }
+                                ),
                             )
                         }
                     )
@@ -309,8 +339,14 @@ mod tests {
 
     #[test]
     fn parse_assign_to_addition() {
-        parse_text("n = 1 + 2");
-        assert!(false);
+        let result = parse_text("n = 1 + 2", true);
+        if let Ok(program) = result {
+            assert_eq!(program.statements.len(), 1);
+            eprintln!("{:?}", program);
+            // TODO: More checks
+        } else {
+            assert!(false, "Program failed to parse: {:?}", result);
+        }
     }
 
     #[test]
@@ -322,7 +358,12 @@ mod tests {
         //    1     +
         //         / \
         //        a   1
-        parse_text("a = 1\nb = a + 2\n");
-        assert!(false);
+        let result = parse_text("a = 1\nb = a + 2\n", true);
+        if let Ok(program) = result {
+            assert_eq!(program.statements.len(), 2);
+            // TODO: More checks
+        } else {
+            assert!(false, "Program failed to parse");
+        }
     }
 }

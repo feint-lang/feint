@@ -1,8 +1,24 @@
-//! The arena is where objects are stored. The VM stack references
-//! objects by pointer.
+use std::rc::Rc;
 
-use crate::builtins::Object;
+use crate::types::Object;
 
-pub struct Arena<'a> {
-    storage: Vec<Object<'a>>,
+/// Object store
+pub struct ObjectStore<'a> {
+    storage: Vec<Rc<Object<'a>>>,
+}
+
+impl<'a> ObjectStore<'a> {
+    pub fn new() -> Self {
+        Self { storage: Vec::new() }
+    }
+
+    pub fn add(&mut self, object: Rc<Object<'a>>) -> usize {
+        let index = self.storage.len();
+        self.storage.push(object);
+        return index;
+    }
+
+    pub fn get(&self, index: usize) -> Option<&Rc<Object>> {
+        self.storage.get(index)
+    }
 }

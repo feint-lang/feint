@@ -88,6 +88,7 @@ pub enum Token {
     TypeMethodIdentifier(String),    // @name (called via type)
     SpecialMethodIdentifier(String), // $name (e.g., $bool, $str)
 
+    EndOfStatement,
     EndOfInput,
 }
 

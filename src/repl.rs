@@ -107,7 +107,7 @@ impl<'a> Runner<'a> {
             _ => (),
         }
 
-        match parser::parse_text(text) {
+        match parser::parse_text(text, self.debug) {
             Ok(program) => {
                 eprintln!("{:?}", program);
 
