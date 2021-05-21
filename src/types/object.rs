@@ -4,58 +4,58 @@ use std::rc::Rc;
 
 use num_bigint::BigInt;
 
-use super::{builtins, ErrorKind, Type};
+use super::{builtins, ObjectError, ObjectErrorKind, Type};
+use std::fmt::Formatter;
 
-pub trait ObjectTrait {
+pub trait Object {
     fn class(&self) -> Rc<Type>;
+    fn get_attribute(&self, name: &str) -> Result<&Rc<Object>, ObjectError>;
+    fn set_attribute(&mut self, n: &str, n: Rc<Object>) -> Result<(), ObjectError>;
 
-    /// The unique ID of the object.
-    fn id(&self) -> *const Self {
-        self as *const Self
+    fn id(&self) -> usize {
+        let p = self as *const Self;
+        let p = p as *const () as usize;
+        p
     }
 
     fn name(&self) -> String {
         self.class().name().to_owned()
     }
+}
 
-    /// Is this object the other object?
-    fn is(&self, other: &Self) -> bool {
-        self.class().id() == other.class().id() && self.id() == other.id()
+impl PartialEq for Object {
+    fn eq(&self, other: &Self) -> bool {
+        if self.class().is(&other.class()) && self.id() == other.id() {
+            return true;
+        }
+        false
     }
+}
 
-    fn is_equal(&self, other: &Self) -> bool;
+impl fmt::Display for Object {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Object")
+    }
+}
+
+impl fmt::Debug for Object {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Object")
+    }
 }
 
 // Fundamentals --------------------------------------------------------
 
 #[derive(Debug)]
-pub enum Fundamental {
+pub enum FundamentalObject {
     None(Rc<Type>),
     Bool(Rc<Type>, bool),
     Float(Rc<Type>, f64),
     Int(Rc<Type>, BigInt),
 }
 
-impl PartialEq for Fundamental {
+impl PartialEq for FundamentalObject {
     fn eq(&self, other: &Self) -> bool {
-        self.is_equal(other)
-    }
-}
-
-impl ObjectTrait for Fundamental {
-    fn class(&self) -> Rc<Type> {
-        match self {
-            Self::None(class) => class.clone(),
-            Self::Bool(class, _) => class.clone(),
-            Self::Float(class, _) => class.clone(),
-            Self::Int(class, _) => class.clone(),
-        }
-    }
-
-    fn is_equal(&self, other: &Self) -> bool {
-        if self.is(other) {
-            return true;
-        }
         match (self, other) {
             (Self::Float(_, a), Self::Int(_, b)) => {
                 // FIXME: This probably isn't the right way to do this
@@ -75,7 +75,36 @@ impl ObjectTrait for Fundamental {
     }
 }
 
-impl fmt::Display for Fundamental {
+impl FundamentalObject {
+    fn is(&self, other: &Self) -> bool {
+        self.class().is(&other.class()) && self.id() == other.id()
+    }
+}
+
+impl Object for FundamentalObject {
+    fn class(&self) -> Rc<Type> {
+        match self {
+            Self::None(class) => class.clone(),
+            Self::Bool(class, _) => class.clone(),
+            Self::Float(class, _) => class.clone(),
+            Self::Int(class, _) => class.clone(),
+        }
+    }
+
+    fn get_attribute(&self, name: &str) -> Result<&Rc<Object>, ObjectError> {
+        Err(ObjectError::new(ObjectErrorKind::AttributeDoesNotExist(name.to_owned())))
+    }
+
+    fn set_attribute(
+        &mut self,
+        name: &str,
+        _value: Rc<Object>,
+    ) -> Result<(), ObjectError> {
+        Err(ObjectError::new(ObjectErrorKind::AttributeCannotBeSet(name.to_owned())))
+    }
+}
+
+impl fmt::Display for FundamentalObject {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let string = match self {
             Self::None(_) => "None".to_owned(),
@@ -89,96 +118,60 @@ impl fmt::Display for Fundamental {
 
 // Object --------------------------------------------------------------
 
-pub struct Object {
+pub struct ComplexObject {
     class: Rc<Type>,
-    attributes: HashMap<String, Rc<Attribute>>,
+    attributes: HashMap<String, Rc<Object>>,
 }
 
-impl Object {
+impl ComplexObject {
     pub fn new(class: Rc<Type>) -> Self {
         Self { class, attributes: HashMap::new() }
     }
 
-    pub fn set_attribute(&mut self, name: &str, value: Rc<Attribute>) {
-        self.attributes.insert(name.to_owned(), value);
-    }
-
-    pub fn get_attribute(&self, name: &str) -> Result<&Rc<Attribute>, ErrorKind> {
-        if let Some(value) = self.attributes.get(name) {
-            return Ok(value);
-        }
-        Err(ErrorKind::AttributeDoesNotExistError(name.to_owned()))
+    fn is(&self, other: &Self) -> bool {
+        self.class().is(&other.class()) && self.id() == other.id()
     }
 }
 
-impl PartialEq for Object {
+impl PartialEq for ComplexObject {
     fn eq(&self, other: &Self) -> bool {
-        self.is_equal(other)
+        if self.is(other) {
+            return true;
+        }
+        self.attributes == other.attributes
     }
 }
 
-impl ObjectTrait for Object {
+impl Object for ComplexObject {
     fn class(&self) -> Rc<Type> {
         self.class.clone()
     }
 
-    fn is_equal(&self, other: &Self) -> bool {
-        self.is(other) || (self.attributes == other.attributes)
+    fn get_attribute(&self, name: &str) -> Result<&Rc<Object>, ObjectError> {
+        if let Some(value) = self.attributes.get(name) {
+            return Ok(value);
+        }
+        Err(ObjectError::new(ObjectErrorKind::AttributeDoesNotExist(name.to_owned())))
+    }
+
+    fn set_attribute(
+        &mut self,
+        name: &str,
+        value: Rc<Object>,
+    ) -> Result<(), ObjectError> {
+        self.attributes.insert(name.to_owned(), value.clone());
+        Ok(())
     }
 }
 
-impl fmt::Display for Object {
+impl fmt::Display for ComplexObject {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}({:?})", self.class.name(), self.attributes)
+        write!(f, "{}", self.class.name())
     }
 }
 
-impl fmt::Debug for Object {
+impl fmt::Debug for ComplexObject {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "Object {} @ {:?} = {:?}",
-            self.class.name(),
-            self.id(),
-            self.attributes
-        )
-    }
-}
-
-// Attribute -----------------------------------------------------------
-
-#[derive(PartialEq)]
-pub enum Attribute {
-    Fundamental(Fundamental),
-    Object(Object),
-}
-
-impl fmt::Display for Attribute {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let string = match self {
-            Self::Fundamental(Fundamental::None(_)) => "None".to_string(),
-            Self::Fundamental(Fundamental::Bool(_, value)) => value.to_string(),
-            Self::Fundamental(Fundamental::Float(_, value)) => value.to_string(),
-            Self::Fundamental(Fundamental::Int(_, value)) => value.to_string(),
-            Self::Object(object) => object.to_string(),
-        };
-        write!(f, "{}", string)
-    }
-}
-
-impl fmt::Debug for Attribute {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let string = match self {
-            Self::Fundamental(Fundamental::None(_)) => "None".to_string(),
-            Self::Fundamental(Fundamental::Bool(_, value)) => {
-                format!("Bool({})", value)
-            }
-            Self::Fundamental(Fundamental::Float(_, value)) => {
-                format!("Float({})", value)
-            }
-            Self::Fundamental(Fundamental::Int(_, value)) => format!("Int({})", value),
-            Self::Object(object) => format!("{:?}", object),
-        };
-        write!(f, "{}", string)
+        write!(f, "Object {}", self.class.name())
     }
 }

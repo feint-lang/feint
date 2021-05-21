@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use crate::types::Object;
+use crate::types::ComplexObject;
 
 /// VM call stack frame.
 pub struct Frame {
-    parameters: HashMap<String, Rc<Object>>,
-    locals: HashMap<String, Rc<Object>>,
+    parameters: HashMap<String, Rc<ComplexObject>>,
+    locals: HashMap<String, Rc<ComplexObject>>,
     return_address: usize,
 }
 

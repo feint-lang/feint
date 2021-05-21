@@ -1,6 +1,6 @@
-pub(crate) use object::{Fundamental, Object, ObjectTrait};
-pub(crate) use result::ErrorKind;
-pub(crate) use types::Type;
+pub(crate) use object::*;
+pub(crate) use result::*;
+pub(crate) use types::*;
 
 mod builtins;
 mod object;
