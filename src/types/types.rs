@@ -15,16 +15,20 @@ pub struct Method {
 pub struct Type {
     module: String,
     name: String,
-    slots: Vec<String>,
+    slots: Option<Vec<String>>,
     methods: HashMap<String, Method>,
 }
 
 impl Type {
-    pub fn new(module: &str, name: &str, slots: Vec<&str>) -> Self {
-        let module = module.to_owned();
-        let name = name.to_owned();
-        let slots = slots.iter().map(|s| (*s).to_owned()).collect();
-        Self { module, name, slots, methods: HashMap::new() }
+    pub fn new<S: Into<String>>(module: S, name: S, slots: Option<Vec<&str>>) -> Self {
+        Self {
+            module: module.into(),
+            name: name.into(),
+            slots: slots.map_or(None, |slots| {
+                Some(slots.iter().map(|s| String::from(*s)).collect())
+            }),
+            methods: HashMap::new(),
+        }
     }
 
     pub fn id(&self) -> *const Self {
@@ -45,6 +49,12 @@ impl Type {
 
     pub fn is_equal(&self, other: &Self) -> bool {
         other.is(self)
+    }
+
+    pub fn has_slot(&self, name: &str) -> bool {
+        self.slots
+            .as_ref()
+            .map_or(true, |slots| slots.iter().position(|n| n == name).is_some())
     }
 }
 

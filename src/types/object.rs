@@ -26,23 +26,23 @@ pub trait ObjectTrait {
     fn is_equal(&self, other: &Self) -> bool;
 }
 
-// Built In ------------------------------------------------------------
+// Fundamentals --------------------------------------------------------
 
 #[derive(Debug)]
-pub enum Builtin {
+pub enum Fundamental {
     None(Rc<Type>),
     Bool(Rc<Type>, bool),
     Float(Rc<Type>, f64),
     Int(Rc<Type>, BigInt),
 }
 
-impl PartialEq for Builtin {
+impl PartialEq for Fundamental {
     fn eq(&self, other: &Self) -> bool {
         self.is_equal(other)
     }
 }
 
-impl ObjectTrait for Builtin {
+impl ObjectTrait for Fundamental {
     fn class(&self) -> Rc<Type> {
         match self {
             Self::None(class) => class.clone(),
@@ -75,7 +75,7 @@ impl ObjectTrait for Builtin {
     }
 }
 
-impl fmt::Display for Builtin {
+impl fmt::Display for Fundamental {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let string = match self {
             Self::None(_) => "None".to_owned(),
@@ -96,8 +96,7 @@ pub struct Object {
 
 impl Object {
     pub fn new(class: Rc<Type>) -> Self {
-        let attributes: HashMap<String, Rc<Attribute>> = HashMap::new();
-        Self { class, attributes }
+        Self { class, attributes: HashMap::new() }
     }
 
     pub fn set_attribute(&mut self, name: &str, value: Rc<Attribute>) {
@@ -150,17 +149,17 @@ impl fmt::Debug for Object {
 
 #[derive(PartialEq)]
 pub enum Attribute {
-    Builtin(Builtin),
+    Fundamental(Fundamental),
     Object(Object),
 }
 
 impl fmt::Display for Attribute {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let string = match self {
-            Self::Builtin(Builtin::None(_)) => "None".to_string(),
-            Self::Builtin(Builtin::Bool(_, value)) => value.to_string(),
-            Self::Builtin(Builtin::Float(_, value)) => value.to_string(),
-            Self::Builtin(Builtin::Int(_, value)) => value.to_string(),
+            Self::Fundamental(Fundamental::None(_)) => "None".to_string(),
+            Self::Fundamental(Fundamental::Bool(_, value)) => value.to_string(),
+            Self::Fundamental(Fundamental::Float(_, value)) => value.to_string(),
+            Self::Fundamental(Fundamental::Int(_, value)) => value.to_string(),
             Self::Object(object) => object.to_string(),
         };
         write!(f, "{}", string)
@@ -170,10 +169,14 @@ impl fmt::Display for Attribute {
 impl fmt::Debug for Attribute {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let string = match self {
-            Self::Builtin(Builtin::None(_)) => "None".to_string(),
-            Self::Builtin(Builtin::Bool(_, value)) => format!("Bool({})", value),
-            Self::Builtin(Builtin::Float(_, value)) => format!("Float({})", value),
-            Self::Builtin(Builtin::Int(_, value)) => format!("Int({})", value),
+            Self::Fundamental(Fundamental::None(_)) => "None".to_string(),
+            Self::Fundamental(Fundamental::Bool(_, value)) => {
+                format!("Bool({})", value)
+            }
+            Self::Fundamental(Fundamental::Float(_, value)) => {
+                format!("Float({})", value)
+            }
+            Self::Fundamental(Fundamental::Int(_, value)) => format!("Int({})", value),
             Self::Object(object) => format!("{:?}", object),
         };
         write!(f, "{}", string)

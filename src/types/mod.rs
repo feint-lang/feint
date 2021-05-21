@@ -1,4 +1,4 @@
-pub(crate) use object::{Object, ObjectTrait};
+pub(crate) use object::{Fundamental, Object, ObjectTrait};
 pub(crate) use result::ErrorKind;
 pub(crate) use types::Type;
 

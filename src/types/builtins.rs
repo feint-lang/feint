@@ -3,8 +3,10 @@ use std::rc::Rc;
 
 use num_bigint::BigInt;
 
-use super::Type;
-use crate::types::object::Builtin;
+use crate::ast::ExpressionKind::Function;
+
+use super::object::{Attribute, Fundamental, ObjectTrait};
+use super::types::Type;
 
 /// Built in boolean type
 pub struct Bool {
@@ -34,27 +36,31 @@ impl From<BigInt> for Int {
 }
 
 pub struct Builtins {
-    pub none: Rc<Type>,
-    pub bool: Rc<Type>,
+    pub none_singleton: Rc<Fundamental>,
+    pub true_singleton: Rc<Fundamental>,
+    pub false_singleton: Rc<Fundamental>,
     pub float: Rc<Type>,
     pub int: Rc<Type>,
 }
 
 impl Builtins {
     pub fn new() -> Self {
+        let none_type = Rc::new(Type::new("builtins", "None", None));
+        let bool_type = Rc::new(Type::new("builtins", "Bool", Some(vec!["value"])));
         Self {
-            none: Rc::new(Type::new("builtins", "None", vec![])),
-            bool: Rc::new(Type::new("builtins", "Bool", vec!["value"])),
-            float: Rc::new(Type::new("builtins", "Float", vec!["value"])),
-            int: Rc::new(Type::new("builtins", "Int", vec!["value"])),
+            none_singleton: Rc::new(Fundamental::None(none_type.clone())),
+            true_singleton: Rc::new(Fundamental::Bool(bool_type.clone(), true)),
+            false_singleton: Rc::new(Fundamental::Bool(bool_type.clone(), false)),
+            float: Rc::new(Type::new("builtins", "Float", Some(vec!["value"]))),
+            int: Rc::new(Type::new("builtins", "Int", Some(vec!["value"]))),
         }
     }
 
-    pub fn new_float(&self, value: f64) -> Builtin {
-        Builtin::Float(self.float.clone(), value)
+    pub fn new_float(&self, value: f64) -> Box<dyn ObjectTrait> {
+        Box::new(Fundamental::Float(self.float.clone(), value))
     }
 
-    pub fn new_int(&self, value: BigInt) -> Builtin {
-        Builtin::Int(self.int.clone(), value)
+    pub fn new_int(&self, value: BigInt) -> Box<dyn ObjectTrait> {
+        Box::new(Fundamental::Int(self.int.clone(), value))
     }
 }

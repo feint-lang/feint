@@ -172,7 +172,7 @@ impl<'a> Runner<'a> {
         }
         match vm_state {
             VMState::Idle => None,
-            VMState::Halted(0) => Some(Ok(Some("Halted".to_owned()))),
+            VMState::Halted(0) => None,
             VMState::Halted(code) => {
                 Some(Err((code, format!("Halted abnormally: {}", code))))
             }
