@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::fmt;
+use std::fmt::{self, Debug, Display, Formatter};
 use std::rc::Rc;
 
 use num_bigint::BigInt;
@@ -38,10 +38,6 @@ impl Type {
     pub fn is(&self, other: &Self) -> bool {
         self.id() == other.id()
     }
-
-    pub fn is_equal(&self, other: &Self) -> bool {
-        other.is(self)
-    }
 }
 
 impl PartialEq for Type {
@@ -50,14 +46,14 @@ impl PartialEq for Type {
     }
 }
 
-impl fmt::Display for Type {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl Display for Type {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "{}", self.name())
     }
 }
 
-impl fmt::Debug for Type {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl Debug for Type {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "Type {} @ {:?}", self.name(), self.id())
     }
 }

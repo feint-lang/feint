@@ -1,95 +1,17 @@
+use std::any::Any;
 use std::collections::HashMap;
-use std::fmt;
+use std::fmt::{self, Debug, Display, Formatter};
 use std::rc::Rc;
+use std::sync::Arc;
 
 use num_bigint::BigInt;
 
-use super::{builtins, ObjectError, ObjectErrorKind, Type};
-use std::fmt::Formatter;
+use super::builtins::{Bool, Float, Int};
+use super::result::{ObjectError, ObjectErrorKind};
+use super::types::Type;
 
 pub trait Object {
-    fn class(&self) -> Rc<Type>;
-    fn get_attribute(&self, name: &str) -> Result<&Rc<Object>, ObjectError>;
-    fn set_attribute(&mut self, n: &str, n: Rc<Object>) -> Result<(), ObjectError>;
-
-    fn id(&self) -> usize {
-        let p = self as *const Self;
-        let p = p as *const () as usize;
-        p
-    }
-
-    fn name(&self) -> String {
-        self.class().name().to_owned()
-    }
-}
-
-impl PartialEq for Object {
-    fn eq(&self, other: &Self) -> bool {
-        if self.class().is(&other.class()) && self.id() == other.id() {
-            return true;
-        }
-        false
-    }
-}
-
-impl fmt::Display for Object {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Object")
-    }
-}
-
-impl fmt::Debug for Object {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Object")
-    }
-}
-
-// Fundamentals --------------------------------------------------------
-
-#[derive(Debug)]
-pub enum FundamentalObject {
-    None(Rc<Type>),
-    Bool(Rc<Type>, bool),
-    Float(Rc<Type>, f64),
-    Int(Rc<Type>, BigInt),
-}
-
-impl PartialEq for FundamentalObject {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::Float(_, a), Self::Int(_, b)) => {
-                // FIXME: This probably isn't the right way to do this
-                a.fract() == 0.0 && BigInt::from(*a as i128) == *b
-            }
-            (Self::Int(_, a), Self::Float(_, b)) => {
-                b.fract() == 0.0 && BigInt::from(*b as i128) == *a
-            }
-            // TODO: I'm not sure these cases need to be checked since
-            //       the `self == other` check above should catch them.
-            (Self::None(_), Self::None(_)) => true,
-            (Self::Bool(_, a), Self::Bool(_, b)) => a == b,
-            (Self::Float(_, a), Self::Float(_, b)) => a == b,
-            (Self::Int(_, a), Self::Int(_, b)) => a == b,
-            _ => false,
-        }
-    }
-}
-
-impl FundamentalObject {
-    fn is(&self, other: &Self) -> bool {
-        self.class().is(&other.class()) && self.id() == other.id()
-    }
-}
-
-impl Object for FundamentalObject {
-    fn class(&self) -> Rc<Type> {
-        match self {
-            Self::None(class) => class.clone(),
-            Self::Bool(class, _) => class.clone(),
-            Self::Float(class, _) => class.clone(),
-            Self::Int(class, _) => class.clone(),
-        }
-    }
+    fn class(&self) -> Arc<Type>;
 
     fn get_attribute(&self, name: &str) -> Result<&Rc<Object>, ObjectError> {
         Err(ObjectError::new(ObjectErrorKind::AttributeDoesNotExist(name.to_owned())))
@@ -102,29 +24,91 @@ impl Object for FundamentalObject {
     ) -> Result<(), ObjectError> {
         Err(ObjectError::new(ObjectErrorKind::AttributeCannotBeSet(name.to_owned())))
     }
+
+    fn id(&self) -> usize {
+        let p = self as *const Self;
+        let p = p as *const () as usize;
+        p
+    }
+
+    fn name(&self) -> String {
+        self.class().name().to_owned()
+    }
+
+    fn as_any(&self) -> &dyn Any;
 }
 
-impl fmt::Display for FundamentalObject {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let string = match self {
-            Self::None(_) => "None".to_owned(),
-            Self::Bool(_, bool) => bool.to_string(),
-            Self::Float(_, value) => value.to_string(),
-            Self::Int(_, value) => value.to_string(),
-        };
-        write!(f, "{}", string)
+impl PartialEq for Object {
+    fn eq(&self, other: &Self) -> bool {
+        // This should catch None and Bool, since they're singletons
+        // (or will be).
+        if self.class().is(&other.class()) && self.id() == other.id() {
+            return true;
+        }
+
+        if let Some(a) = self.as_any().downcast_ref::<Bool>() {
+            if let Some(b) = other.as_any().downcast_ref::<Bool>() {
+                return false;
+            }
+        }
+
+        if let Some(a) = self.as_any().downcast_ref::<Float>() {
+            if let Some(b) = other.as_any().downcast_ref::<Float>() {
+                return a == b;
+            }
+        }
+
+        if let Some(a) = self.as_any().downcast_ref::<Int>() {
+            if let Some(b) = other.as_any().downcast_ref::<Int>() {
+                return a == b;
+            }
+        }
+
+        if let Some(a) = self.as_any().downcast_ref::<Float>() {
+            if let Some(b) = other.as_any().downcast_ref::<Int>() {
+                return a.eq_int(b);
+            }
+        }
+
+        if let Some(a) = self.as_any().downcast_ref::<Int>() {
+            if let Some(b) = other.as_any().downcast_ref::<Float>() {
+                return a.eq_float(b);
+            }
+        }
+
+        if let Some(a) = self.as_any().downcast_ref::<ComplexObject>() {
+            if let Some(b) = other.as_any().downcast_ref::<ComplexObject>() {
+                return a == b;
+            }
+        }
+
+        panic!("Could not compare {:?} and {:?}", self, other);
     }
 }
 
-// Object --------------------------------------------------------------
+impl Display for Object {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "Object")
+    }
+}
 
+impl Debug for Object {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "Object")
+    }
+}
+
+// ---------------------------------------------------------------------
+
+/// A complex object may have builtin objects and other custom objects
+/// as attributes.
 pub struct ComplexObject {
-    class: Rc<Type>,
+    class: Arc<Type>,
     attributes: HashMap<String, Rc<Object>>,
 }
 
 impl ComplexObject {
-    pub fn new(class: Rc<Type>) -> Self {
+    pub fn new(class: Arc<Type>) -> Self {
         Self { class, attributes: HashMap::new() }
     }
 
@@ -133,17 +117,8 @@ impl ComplexObject {
     }
 }
 
-impl PartialEq for ComplexObject {
-    fn eq(&self, other: &Self) -> bool {
-        if self.is(other) {
-            return true;
-        }
-        self.attributes == other.attributes
-    }
-}
-
 impl Object for ComplexObject {
-    fn class(&self) -> Rc<Type> {
+    fn class(&self) -> Arc<Type> {
         self.class.clone()
     }
 
@@ -162,16 +137,36 @@ impl Object for ComplexObject {
         self.attributes.insert(name.to_owned(), value.clone());
         Ok(())
     }
-}
 
-impl fmt::Display for ComplexObject {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.class.name())
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }
 
-impl fmt::Debug for ComplexObject {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Object {}", self.class.name())
+impl PartialEq for ComplexObject {
+    fn eq(&self, other: &Self) -> bool {
+        println!("COMPLEX EQ");
+        if self.is(other) {
+            return true;
+        }
+        println!("COMPLEX EQ NOT IS");
+        self.attributes == other.attributes
+    }
+}
+
+impl Debug for ComplexObject {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "Object {} @ {}", self, self.id())
+    }
+}
+
+impl Display for ComplexObject {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let names: Vec<String> = self
+            .attributes
+            .iter()
+            .map(|(n, v)| format!("{}={}", n, v.to_string()))
+            .collect();
+        write!(f, "{}({})", self.class.name(), names.join(", "))
     }
 }

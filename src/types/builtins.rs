@@ -1,21 +1,71 @@
+use std::any::Any;
 use std::collections::HashMap;
-use std::rc::Rc;
+use std::fmt::{self, Display, Formatter};
+use std::sync::Arc;
+
+use lazy_static::lazy_static;
 
 use num_bigint::BigInt;
 
-use crate::ast::ExpressionKind::Function;
-
-use super::object::{FundamentalObject, Object};
+use super::object::Object;
 use super::types::Type;
 
+lazy_static! {
+    pub static ref BUILTIN_TYPES: HashMap<&'static str, Arc<Type>> = {
+        let mut builtins = HashMap::new();
+        let mut insert = |n| builtins.insert(n, Arc::new(Type::new("builtins", n)));
+        insert("None");
+        insert("Bool");
+        insert("Float");
+        insert("Int");
+        builtins
+    };
+}
+
 /// Built in boolean type
+#[derive(Debug, PartialEq)]
 pub struct Bool {
     value: bool,
 }
 
+impl Display for Bool {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.value)
+    }
+}
+
+impl From<bool> for Bool {
+    fn from(value: bool) -> Self {
+        Bool { value }
+    }
+}
+
+impl Object for Bool {
+    fn class(&self) -> Arc<Type> {
+        BUILTIN_TYPES.get("Bool").unwrap().clone()
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
 /// Built in 64-bit float type
+#[derive(Debug, PartialEq)]
 pub struct Float {
     value: f64,
+}
+
+impl Float {
+    pub fn eq_int(&self, int: &Int) -> bool {
+        self.value.fract() == 0.0 && BigInt::from(self.value as i128) == int.value
+    }
+}
+
+impl Display for Float {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.value)
+    }
 }
 
 impl From<f64> for Float {
@@ -24,9 +74,32 @@ impl From<f64> for Float {
     }
 }
 
+impl Object for Float {
+    fn class(&self) -> Arc<Type> {
+        BUILTIN_TYPES.get("Float").unwrap().clone()
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
 /// Built in integer type
+#[derive(Debug, PartialEq)]
 pub struct Int {
     value: BigInt,
+}
+
+impl Int {
+    pub fn eq_float(&self, float: &Float) -> bool {
+        float.eq_int(self)
+    }
+}
+
+impl Display for Int {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.value)
+    }
 }
 
 impl From<BigInt> for Int {
@@ -35,33 +108,18 @@ impl From<BigInt> for Int {
     }
 }
 
-pub struct Builtins {
-    pub none_singleton: Rc<Object>,
-    pub true_singleton: Rc<Object>,
-    pub false_singleton: Rc<Object>,
-    pub float: Rc<Type>,
-    pub int: Rc<Type>,
+impl From<i32> for Int {
+    fn from(value: i32) -> Self {
+        Int { value: BigInt::from(value) }
+    }
 }
 
-impl Builtins {
-    pub fn new() -> Self {
-        let none_type = Rc::new(Type::new("builtins", "None"));
-        let bool_type = Rc::new(Type::new("builtins", "Bool"));
-        Self {
-            none_singleton: Rc::new(FundamentalObject::None(none_type.clone())),
-            true_singleton: Rc::new(FundamentalObject::Bool(bool_type.clone(), true)),
-            false_singleton: Rc::new(FundamentalObject::Bool(bool_type.clone(), false)),
-
-            float: Rc::new(Type::new("builtins", "Float")),
-            int: Rc::new(Type::new("builtins", "Int")),
-        }
+impl Object for Int {
+    fn class(&self) -> Arc<Type> {
+        BUILTIN_TYPES.get("Int").unwrap().clone()
     }
 
-    pub fn new_float(&self, value: f64) -> Rc<Object> {
-        Rc::new(FundamentalObject::Float(self.float.clone(), value))
-    }
-
-    pub fn new_int(&self, value: BigInt) -> Rc<Object> {
-        Rc::new(FundamentalObject::Int(self.int.clone(), value))
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }
