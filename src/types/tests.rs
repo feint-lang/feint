@@ -30,7 +30,7 @@ fn test_float() {
 #[test]
 fn test_compare_float_to_int() {
     let float = builtins::Float::from(1.0);
-    let int = builtins::Int::from(1);
+    let int = builtins::Int::from(1u8);
     assert!(Object::eq(&int, &float)); // compare via trait
     assert!(Object::eq(&float, &int)); // compare via trait
 }

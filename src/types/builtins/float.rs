@@ -1,45 +1,55 @@
-use std::any::Any;
-use std::collections::HashMap;
 use std::fmt;
-use std::sync::Arc;
 
-use num_bigint::BigInt;
+use builtin_object_derive::BuiltinObject;
 
-use super::super::class::Type;
-use super::super::object::Object;
+use super::cmp::eq_int_float;
 use super::int::Int;
-use super::BUILTIN_TYPES;
 
 /// Built in 64-bit float type
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, BuiltinObject)]
 pub struct Float {
     value: f64,
 }
 
 impl Float {
+    pub fn value(&self) -> &f64 {
+        &self.value
+    }
+
+    /// Is this Float equal to the specified Int?
     pub fn eq_int(&self, int: &Int) -> bool {
-        self.value.fract() == 0.0 && BigInt::from(self.value as i128) == *int.value()
+        eq_int_float(int, self)
     }
 }
+
+macro_rules! float_from {
+    ($($T:ty),+) => { $(
+        impl From<$T> for Float {
+            fn from(value: $T) -> Self {
+                let value = value as f64;
+                Float { value }
+            }
+        }
+    )+ };
+}
+
+float_from!(f32, f64, i8, u8, i16, u16, i32, u32, i64, u64, i128, u128);
+
+macro_rules! float_from_string {
+    ($($T:ty),+) => { $(
+        impl From<$T> for Float {
+            fn from(value: $T) -> Self {
+                let value = value.parse::<f64>().unwrap();
+                Float { value }
+            }
+        }
+    )+ };
+}
+
+float_from_string!(&str, String, &String);
 
 impl fmt::Display for Float {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.value)
-    }
-}
-
-impl From<f64> for Float {
-    fn from(value: f64) -> Self {
-        Float { value }
-    }
-}
-
-impl Object for Float {
-    fn class(&self) -> Arc<Type> {
-        BUILTIN_TYPES.get("Float").unwrap().clone()
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
     }
 }

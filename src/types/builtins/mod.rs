@@ -5,6 +5,7 @@ pub(crate) use nil::{Nil, NIL};
 pub(crate) use types::BUILTIN_TYPES;
 
 mod bool;
+mod cmp;
 mod float;
 mod int;
 mod nil;

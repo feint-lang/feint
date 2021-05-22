@@ -1,17 +1,15 @@
-use std::any::Any;
-use std::collections::HashMap;
 use std::fmt;
-use std::sync::Arc;
 
 use num_bigint::BigInt;
+use num_traits::{FromPrimitive, Num};
 
-use super::super::class::Type;
-use super::super::object::Object;
+use builtin_object_derive::BuiltinObject;
+
+use super::cmp::eq_int_float;
 use super::float::Float;
-use super::BUILTIN_TYPES;
 
 /// Built in integer type
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, BuiltinObject)]
 pub struct Int {
     value: BigInt,
 }
@@ -21,14 +19,9 @@ impl Int {
         &self.value
     }
 
+    /// Is this Int equal to the specified Float?
     pub fn eq_float(&self, float: &Float) -> bool {
-        float.eq_int(self)
-    }
-}
-
-impl fmt::Display for Int {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.value)
+        eq_int_float(self, float)
     }
 }
 
@@ -38,18 +31,47 @@ impl From<BigInt> for Int {
     }
 }
 
-impl From<i32> for Int {
-    fn from(value: i32) -> Self {
-        Int { value: BigInt::from(value) }
+macro_rules! int_from {
+    ($($T:ty),+) => { $(
+        impl From<$T> for Int {
+            fn from(value: $T) -> Self {
+                Int { value: BigInt::from(value) }
+            }
+        }
+    )+ };
+}
+
+int_from!(i8, u8, i16, u16, i32, u32, i64, u64, i128, u128);
+
+impl From<f32> for Int {
+    fn from(value: f32) -> Self {
+        let value = BigInt::from_f32(value).unwrap();
+        Int { value }
     }
 }
 
-impl Object for Int {
-    fn class(&self) -> Arc<Type> {
-        BUILTIN_TYPES.get("Int").unwrap().clone()
+impl From<f64> for Int {
+    fn from(value: f64) -> Self {
+        let value = BigInt::from_f64(value).unwrap();
+        Int { value }
     }
+}
 
-    fn as_any(&self) -> &dyn Any {
-        self
+macro_rules! int_from_string {
+    ($($T:ty),+) => { $(
+        impl From<$T> for Int {
+            fn from(value: $T) -> Self {
+                let value = BigInt::from_str_radix(value.as_ref(), 10).unwrap();
+                Int { value }
+            }
+        }
+    )+ };
+}
+
+int_from_string!(&str, String, &String);
+
+impl fmt::Display for Int {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.value)
     }
 }

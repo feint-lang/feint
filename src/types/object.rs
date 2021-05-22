@@ -46,23 +46,25 @@ pub trait ObjectExt: Object {
 
 impl<T: Object + ?Sized> ObjectExt for T {}
 
-/// Used to compare two instance of the *same* type.
+/// Used to compare two instances of the *same* type.
 macro_rules! compare_instances {
-    ($a:ident, $b:ident, $name:ident) => {
-        if let Some(a) = $a.as_any().downcast_ref::<$name>() {
-            if let Some(b) = $b.as_any().downcast_ref::<$name>() {
+    ($a:ident, $b:ident, $A:ty) => {
+        if let Some(a) = $a.as_any().downcast_ref::<$A>() {
+            if let Some(b) = $b.as_any().downcast_ref::<$A>() {
                 return a == b;
             }
         }
     };
 }
 
-/// Used to compare two instance of *different* types.
+/// Used to compare two instances of *different* types. The last arg is
+/// the name of method to be called on the first instance with the
+/// second instance as its arg like `a.meth(b)`.
 macro_rules! compare_instances_of_different_types {
-    ($a:ident, $b:ident, $a_type:ident, $b_type:ident, $a_meth:ident) => {
-        if let Some(a) = $a.as_any().downcast_ref::<$a_type>() {
-            if let Some(b) = $b.as_any().downcast_ref::<$b_type>() {
-                return a.$a_meth(b);
+    ($a:ident, $b:ident, $A:ty, $B:ty, $meth:ident) => {
+        if let Some(a) = $a.as_any().downcast_ref::<$A>() {
+            if let Some(b) = $b.as_any().downcast_ref::<$B>() {
+                return a.$meth(b);
             }
         }
     };

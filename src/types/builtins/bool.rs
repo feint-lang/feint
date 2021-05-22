@@ -1,13 +1,8 @@
-use std::any::Any;
-use std::collections::HashMap;
 use std::fmt;
-use std::sync::Arc;
 
 use lazy_static::lazy_static;
 
-use super::super::class::Type;
-use super::super::object::Object;
-use super::BUILTIN_TYPES;
+use builtin_object_derive::BuiltinObject;
 
 lazy_static! {
     pub static ref TRUE: Bool = Bool { value: true };
@@ -15,7 +10,7 @@ lazy_static! {
 }
 
 /// Built in boolean type
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, BuiltinObject)]
 pub struct Bool {
     value: bool,
 }
@@ -23,15 +18,5 @@ pub struct Bool {
 impl fmt::Display for Bool {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.value)
-    }
-}
-
-impl Object for Bool {
-    fn class(&self) -> Arc<Type> {
-        BUILTIN_TYPES.get("Bool").unwrap().clone()
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
     }
 }
