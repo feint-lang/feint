@@ -3,9 +3,16 @@ use std::collections::HashMap;
 use std::fmt;
 use std::sync::Arc;
 
+use lazy_static::lazy_static;
+
 use super::super::class::Type;
 use super::super::object::Object;
 use super::BUILTIN_TYPES;
+
+lazy_static! {
+    pub static ref TRUE: Bool = Bool { value: true };
+    pub static ref FALSE: Bool = Bool { value: false };
+}
 
 /// Built in boolean type
 #[derive(Debug, PartialEq)]
@@ -16,12 +23,6 @@ pub struct Bool {
 impl fmt::Display for Bool {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.value)
-    }
-}
-
-impl From<bool> for Bool {
-    fn from(value: bool) -> Self {
-        Bool { value }
     }
 }
 

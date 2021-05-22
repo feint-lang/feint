@@ -3,25 +3,23 @@ use std::collections::HashMap;
 use std::fmt;
 use std::sync::Arc;
 
+use lazy_static::lazy_static;
+
 use super::super::class::Type;
 use super::super::object::Object;
 use super::BUILTIN_TYPES;
 
+lazy_static! {
+    pub static ref NIL: Nil = Nil {};
+}
+
 /// Built in nil type
 #[derive(Debug, PartialEq)]
-pub struct Nil {
-    value: bool,
-}
+pub struct Nil {}
 
 impl fmt::Display for Nil {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.value)
-    }
-}
-
-impl From<bool> for Nil {
-    fn from(value: bool) -> Self {
-        Nil { value }
+        write!(f, "nil")
     }
 }
 

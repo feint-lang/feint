@@ -46,50 +46,41 @@ pub trait ObjectExt: Object {
 
 impl<T: Object + ?Sized> ObjectExt for T {}
 
+/// Used to compare two instance of the *same* type.
+macro_rules! compare_instances {
+    ($a:ident, $b:ident, $name:ident) => {
+        if let Some(a) = $a.as_any().downcast_ref::<$name>() {
+            if let Some(b) = $b.as_any().downcast_ref::<$name>() {
+                return a == b;
+            }
+        }
+    };
+}
+
+/// Used to compare two instance of *different* types.
+macro_rules! compare_instances_of_different_types {
+    ($a:ident, $b:ident, $a_type:ident, $b_type:ident, $a_meth:ident) => {
+        if let Some(a) = $a.as_any().downcast_ref::<$a_type>() {
+            if let Some(b) = $b.as_any().downcast_ref::<$b_type>() {
+                return a.$a_meth(b);
+            }
+        }
+    };
+}
+
 impl PartialEq for dyn Object {
     fn eq(&self, other: &Self) -> bool {
-        // This should catch None and Bool, since they're singletons
-        // (or will be).
-        if self.class().is(&other.class()) && self.id() == other.id() {
+        // This should catch Bool (when both true or both false) and Nil
+        // (always), since they're singletons.
+        if self.is(other) {
             return true;
         }
-
-        if let Some(a) = self.as_any().downcast_ref::<Bool>() {
-            if let Some(b) = other.as_any().downcast_ref::<Bool>() {
-                return false;
-            }
-        }
-
-        if let Some(a) = self.as_any().downcast_ref::<Float>() {
-            if let Some(b) = other.as_any().downcast_ref::<Float>() {
-                return a == b;
-            }
-        }
-
-        if let Some(a) = self.as_any().downcast_ref::<Int>() {
-            if let Some(b) = other.as_any().downcast_ref::<Int>() {
-                return a == b;
-            }
-        }
-
-        if let Some(a) = self.as_any().downcast_ref::<Float>() {
-            if let Some(b) = other.as_any().downcast_ref::<Int>() {
-                return a.eq_int(b);
-            }
-        }
-
-        if let Some(a) = self.as_any().downcast_ref::<Int>() {
-            if let Some(b) = other.as_any().downcast_ref::<Float>() {
-                return a.eq_float(b);
-            }
-        }
-
-        if let Some(a) = self.as_any().downcast_ref::<ComplexObject>() {
-            if let Some(b) = other.as_any().downcast_ref::<ComplexObject>() {
-                return a == b;
-            }
-        }
-
+        compare_instances!(self, other, Bool);
+        compare_instances!(self, other, Float);
+        compare_instances!(self, other, Int);
+        compare_instances_of_different_types!(self, other, Float, Int, eq_int);
+        compare_instances_of_different_types!(self, other, Int, Float, eq_float);
+        compare_instances!(self, other, ComplexObject);
         panic!("Could not compare {:?} and {:?}", self, other);
     }
 }
@@ -105,5 +96,3 @@ impl fmt::Debug for dyn Object {
         write!(f, "Object")
     }
 }
-
-// ---------------------------------------------------------------------
