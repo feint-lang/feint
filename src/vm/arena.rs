@@ -4,7 +4,7 @@ use crate::types::Object;
 
 /// Object store
 pub struct ObjectStore {
-    storage: Vec<Rc<Object>>,
+    storage: Vec<Rc<dyn Object>>,
 }
 
 impl ObjectStore {
@@ -12,13 +12,13 @@ impl ObjectStore {
         Self { storage: Vec::new() }
     }
 
-    pub fn add(&mut self, object: Rc<Object>) -> usize {
+    pub fn add(&mut self, object: Rc<dyn Object>) -> usize {
         let index = self.storage.len();
         self.storage.push(object.clone());
         return index;
     }
 
-    pub fn get(&self, index: usize) -> Option<&Rc<Object>> {
+    pub fn get(&self, index: usize) -> Option<&Rc<dyn Object>> {
         self.storage.get(index)
     }
 }

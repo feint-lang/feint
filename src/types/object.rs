@@ -13,14 +13,14 @@ use super::types::Type;
 pub trait Object {
     fn class(&self) -> Arc<Type>;
 
-    fn get_attribute(&self, name: &str) -> Result<&Rc<Object>, ObjectError> {
+    fn get_attribute(&self, name: &str) -> Result<&Rc<dyn Object>, ObjectError> {
         Err(ObjectError::new(ObjectErrorKind::AttributeDoesNotExist(name.to_owned())))
     }
 
     fn set_attribute(
         &mut self,
         name: &str,
-        _value: Rc<Object>,
+        _value: Rc<dyn Object>,
     ) -> Result<(), ObjectError> {
         Err(ObjectError::new(ObjectErrorKind::AttributeCannotBeSet(name.to_owned())))
     }
@@ -38,7 +38,7 @@ pub trait Object {
     fn as_any(&self) -> &dyn Any;
 }
 
-impl PartialEq for Object {
+impl PartialEq for dyn Object {
     fn eq(&self, other: &Self) -> bool {
         // This should catch None and Bool, since they're singletons
         // (or will be).
@@ -86,13 +86,13 @@ impl PartialEq for Object {
     }
 }
 
-impl Display for Object {
+impl Display for dyn Object {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "Object")
     }
 }
 
-impl Debug for Object {
+impl Debug for dyn Object {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "Object")
     }
@@ -104,7 +104,7 @@ impl Debug for Object {
 /// as attributes.
 pub struct ComplexObject {
     class: Arc<Type>,
-    attributes: HashMap<String, Rc<Object>>,
+    attributes: HashMap<String, Rc<dyn Object>>,
 }
 
 impl ComplexObject {
@@ -122,7 +122,7 @@ impl Object for ComplexObject {
         self.class.clone()
     }
 
-    fn get_attribute(&self, name: &str) -> Result<&Rc<Object>, ObjectError> {
+    fn get_attribute(&self, name: &str) -> Result<&Rc<dyn Object>, ObjectError> {
         if let Some(value) = self.attributes.get(name) {
             return Ok(value);
         }
@@ -132,7 +132,7 @@ impl Object for ComplexObject {
     fn set_attribute(
         &mut self,
         name: &str,
-        value: Rc<Object>,
+        value: Rc<dyn Object>,
     ) -> Result<(), ObjectError> {
         self.attributes.insert(name.to_owned(), value.clone());
         Ok(())
@@ -162,11 +162,8 @@ impl Debug for ComplexObject {
 
 impl Display for ComplexObject {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let names: Vec<String> = self
-            .attributes
-            .iter()
-            .map(|(n, v)| format!("{}={}", n, v.to_string()))
-            .collect();
+        let names: Vec<String> =
+            self.attributes.iter().map(|(n, v)| format!("{}={}", n, v)).collect();
         write!(f, "{}({})", self.class.name(), names.join(", "))
     }
 }
