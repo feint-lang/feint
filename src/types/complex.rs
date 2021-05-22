@@ -24,8 +24,8 @@ impl ComplexObject {
 }
 
 impl Object for ComplexObject {
-    fn class(&self) -> Type {
-        self.class.borrow()
+    fn class(&self) -> &Arc<Type> {
+        &self.class
     }
 
     fn get_attribute(&self, name: &str) -> Result<&Rc<dyn Object>, ObjectError> {

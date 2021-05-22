@@ -12,6 +12,12 @@ pub struct Float {
 }
 
 impl Float {
+    pub fn new(value: f64) -> Self {
+        let instance = Self { value };
+        instance.class().clone();
+        instance
+    }
+
     pub fn value(&self) -> &f64 {
         &self.value
     }
@@ -27,7 +33,7 @@ macro_rules! float_from {
         impl From<$T> for Float {
             fn from(value: $T) -> Self {
                 let value = value as f64;
-                Float { value }
+                Float::new(value)
             }
         }
     )+ };
@@ -40,7 +46,7 @@ macro_rules! float_from_string {
         impl From<$T> for Float {
             fn from(value: $T) -> Self {
                 let value = value.parse::<f64>().unwrap();
-                Float { value }
+                Float::new(value)
             }
         }
     )+ };

@@ -5,8 +5,8 @@ use lazy_static::lazy_static;
 use builtin_object_derive::BuiltinObject;
 
 lazy_static! {
-    pub static ref TRUE: Bool = Bool { value: true };
-    pub static ref FALSE: Bool = Bool { value: false };
+    pub static ref TRUE: Bool = Bool::new(true);
+    pub static ref FALSE: Bool = Bool::new(false);
 }
 
 /// Built in boolean type
@@ -15,9 +15,17 @@ pub struct Bool {
     value: bool,
 }
 
+impl Bool {
+    pub fn new(value: bool) -> Self {
+        let instance = Self { value };
+        instance.class().clone();
+        instance
+    }
+}
+
 impl From<bool> for Bool {
     fn from(value: bool) -> Self {
-        Bool { value }
+        Self::new(value)
     }
 }
 

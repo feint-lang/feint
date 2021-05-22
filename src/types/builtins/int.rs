@@ -15,6 +15,12 @@ pub struct Int {
 }
 
 impl Int {
+    pub fn new(value: BigInt) -> Self {
+        let instance = Self { value };
+        instance.class().clone();
+        instance
+    }
+
     pub fn value(&self) -> &BigInt {
         &self.value
     }
@@ -27,7 +33,7 @@ impl Int {
 
 impl From<BigInt> for Int {
     fn from(value: BigInt) -> Self {
-        Int { value }
+        Int::new(value)
     }
 }
 
@@ -35,7 +41,8 @@ macro_rules! int_from {
     ($($T:ty),+) => { $(
         impl From<$T> for Int {
             fn from(value: $T) -> Self {
-                Int { value: BigInt::from(value) }
+                let value = BigInt::from(value);
+                Int::new(value)
             }
         }
     )+ };
@@ -46,14 +53,14 @@ int_from!(i8, u8, i16, u16, i32, u32, i64, u64, i128, u128);
 impl From<f32> for Int {
     fn from(value: f32) -> Self {
         let value = BigInt::from_f32(value).unwrap();
-        Int { value }
+        Int::new(value)
     }
 }
 
 impl From<f64> for Int {
     fn from(value: f64) -> Self {
         let value = BigInt::from_f64(value).unwrap();
-        Int { value }
+        Int::new(value)
     }
 }
 
@@ -62,7 +69,7 @@ macro_rules! int_from_string {
         impl From<$T> for Int {
             fn from(value: $T) -> Self {
                 let value = BigInt::from_str_radix(value.as_ref(), 10).unwrap();
-                Int { value }
+                Int::new(value)
             }
         }
     )+ };

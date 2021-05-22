@@ -10,7 +10,7 @@ use super::result::{ObjectError, ObjectErrorKind};
 
 /// Represents an instance of some type (AKA "class").
 pub trait Object {
-    fn class(&self) -> Type;
+    fn class(&self) -> &Arc<Type>;
 
     fn get_attribute(&self, name: &str) -> Result<&Rc<dyn Object>, ObjectError> {
         Err(ObjectError::new(ObjectErrorKind::AttributeDoesNotExist(name.to_owned())))
