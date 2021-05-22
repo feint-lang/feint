@@ -1,15 +1,14 @@
 use std::any::Any;
-use std::collections::HashMap;
-use std::fmt::{self, Debug, Display, Formatter};
+use std::fmt;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use num_bigint::BigInt;
-
 use super::builtins::{Bool, Float, Int};
+use super::class::Type;
+use super::complex::ComplexObject;
 use super::result::{ObjectError, ObjectErrorKind};
-use super::types::Type;
 
+/// Represents an instance of some type (AKA "class").
 pub trait Object {
     fn class(&self) -> Arc<Type>;
 
@@ -37,6 +36,15 @@ pub trait Object {
 
     fn as_any(&self) -> &dyn Any;
 }
+
+/// Methods that aren't "object safe"
+pub trait ObjectExt: Object {
+    fn is(&self, other: &Self) -> bool {
+        self.class().is(&other.class()) && self.id() == other.id()
+    }
+}
+
+impl<T: Object + ?Sized> ObjectExt for T {}
 
 impl PartialEq for dyn Object {
     fn eq(&self, other: &Self) -> bool {
@@ -86,84 +94,16 @@ impl PartialEq for dyn Object {
     }
 }
 
-impl Display for dyn Object {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+impl fmt::Display for dyn Object {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Object")
     }
 }
 
-impl Debug for dyn Object {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+impl fmt::Debug for dyn Object {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Object")
     }
 }
 
 // ---------------------------------------------------------------------
-
-/// A complex object may have builtin objects and other custom objects
-/// as attributes.
-pub struct ComplexObject {
-    class: Arc<Type>,
-    attributes: HashMap<String, Rc<dyn Object>>,
-}
-
-impl ComplexObject {
-    pub fn new(class: Arc<Type>) -> Self {
-        Self { class, attributes: HashMap::new() }
-    }
-
-    fn is(&self, other: &Self) -> bool {
-        self.class().is(&other.class()) && self.id() == other.id()
-    }
-}
-
-impl Object for ComplexObject {
-    fn class(&self) -> Arc<Type> {
-        self.class.clone()
-    }
-
-    fn get_attribute(&self, name: &str) -> Result<&Rc<dyn Object>, ObjectError> {
-        if let Some(value) = self.attributes.get(name) {
-            return Ok(value);
-        }
-        Err(ObjectError::new(ObjectErrorKind::AttributeDoesNotExist(name.to_owned())))
-    }
-
-    fn set_attribute(
-        &mut self,
-        name: &str,
-        value: Rc<dyn Object>,
-    ) -> Result<(), ObjectError> {
-        self.attributes.insert(name.to_owned(), value.clone());
-        Ok(())
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-}
-
-impl PartialEq for ComplexObject {
-    fn eq(&self, other: &Self) -> bool {
-        println!("COMPLEX EQ");
-        if self.is(other) {
-            return true;
-        }
-        println!("COMPLEX EQ NOT IS");
-        self.attributes == other.attributes
-    }
-}
-
-impl Debug for ComplexObject {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "Object {} @ {}", self, self.id())
-    }
-}
-
-impl Display for ComplexObject {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let names: Vec<String> =
-            self.attributes.iter().map(|(n, v)| format!("{}={}", n, v)).collect();
-        write!(f, "{}({})", self.class.name(), names.join(", "))
-    }
-}

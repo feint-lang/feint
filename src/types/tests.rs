@@ -1,10 +1,10 @@
-use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use num_bigint::BigInt;
-
-use super::*;
+use super::builtins;
+use super::class::Type;
+use super::complex::ComplexObject;
+use super::object::Object;
 
 #[test]
 fn test_float() {

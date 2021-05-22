@@ -1,21 +1,24 @@
+//! "Class" and "type" are used interchangeably and mean exactly the
+//! same thing. Lower case "class" is used instead of "type" because the
+//! latter is a Rust keyword.
+
 use std::collections::HashMap;
-use std::fmt::{self, Debug, Display, Formatter};
+use std::fmt;
 use std::rc::Rc;
 
-use num_bigint::BigInt;
+use super::object::Object;
 
-use super::builtins;
-use super::ComplexObject;
-
-pub struct Method {
+pub struct Function {
+    module: String,
     name: String,
     parameters: Vec<String>,
 }
 
+/// Represents a type, whether builtin or user-defined.
 pub struct Type {
     module: String,
     name: String,
-    methods: HashMap<String, Method>,
+    methods: HashMap<String, Function>,
 }
 
 impl Type {
@@ -46,14 +49,14 @@ impl PartialEq for Type {
     }
 }
 
-impl Display for Type {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+impl fmt::Display for Type {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.name())
     }
 }
 
-impl Debug for Type {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+impl fmt::Debug for Type {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Type {} @ {:?}", self.name(), self.id())
     }
 }
