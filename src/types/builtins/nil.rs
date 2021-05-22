@@ -1,3 +1,5 @@
+//! Built in nil type
+
 use std::fmt;
 
 use lazy_static::lazy_static;

@@ -29,11 +29,11 @@ fn impl_builtin_object_derive(ast: &syn::DeriveInput) -> TokenStream {
         use super::super::object::Object;
         use super::super::class::Type;
 
-        use super::BUILTIN_TYPES;
+        use super::BUILTINS;
 
         impl Object for #name {
-            fn class(&self) -> Arc<Type> {
-                BUILTIN_TYPES.get(stringify!(#name)).unwrap().clone()
+            fn class(&self) -> Type {
+                BUILTINS.get(stringify!(#name))
             }
 
             fn as_any(&self) -> &dyn Any {

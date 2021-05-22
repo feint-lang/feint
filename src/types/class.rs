@@ -4,9 +4,6 @@
 
 use std::collections::HashMap;
 use std::fmt;
-use std::rc::Rc;
-
-use super::object::Object;
 
 pub struct Function {
     module: String,

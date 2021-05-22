@@ -1,4 +1,8 @@
+//! A complex object may have builtin objects and other custom objects
+//! as attributes. This is opposed to fundamental types, like `Bool` and
+//! `Float` that wrap Rust primitives.
 use std::any::Any;
+use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::fmt;
 use std::rc::Rc;
@@ -8,8 +12,6 @@ use super::class::Type;
 use super::object::{Object, ObjectExt};
 use super::result::{ObjectError, ObjectErrorKind};
 
-/// A complex object may have builtin objects and other custom objects
-/// as attributes.
 pub struct ComplexObject {
     class: Arc<Type>,
     attributes: HashMap<String, Rc<dyn Object>>,
@@ -17,13 +19,13 @@ pub struct ComplexObject {
 
 impl ComplexObject {
     pub fn new(class: Arc<Type>) -> Self {
-        Self { class, attributes: HashMap::new() }
+        Self { class: class.clone(), attributes: HashMap::new() }
     }
 }
 
 impl Object for ComplexObject {
-    fn class(&self) -> Arc<Type> {
-        self.class.clone()
+    fn class(&self) -> Type {
+        self.class.borrow()
     }
 
     fn get_attribute(&self, name: &str) -> Result<&Rc<dyn Object>, ObjectError> {
