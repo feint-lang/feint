@@ -163,7 +163,7 @@ mod tests {
 
     #[test]
     fn test_run_text() {
-        let source = "x = 1\ny = 2\n1 + 2";
+        let source = "1 + 2";
         if let (Ok(_)) = run_text(source, true) {
             assert!(true);
         } else {
