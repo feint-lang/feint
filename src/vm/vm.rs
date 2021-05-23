@@ -4,7 +4,7 @@ use std::rc::Rc;
 use num_bigint::BigInt;
 
 use crate::ast;
-use crate::parser::{parse_file, parse_text};
+use crate::parser;
 use crate::util::{BinaryOperator, Stack, UnaryOperator};
 
 use super::{
@@ -14,7 +14,7 @@ use super::{
 
 /// Create a new VM and execute source text.
 pub fn execute_text(text: &str, debug: bool) -> ExecutionResult {
-    match parse_text(text, debug) {
+    match parser::parse_text(text, debug) {
         Ok(program) => execute_program(program, debug),
         Err(err) => Err(ExecutionError::new(ExecutionErrorKind::ParserError(err))),
     }
@@ -22,7 +22,15 @@ pub fn execute_text(text: &str, debug: bool) -> ExecutionResult {
 
 /// Create a new VM and execute source from file.
 pub fn execute_file(file_path: &str, debug: bool) -> ExecutionResult {
-    match parse_file(file_path, debug) {
+    match parser::parse_file(file_path, debug) {
+        Ok(program) => execute_program(program, debug),
+        Err(err) => Err(ExecutionError::new(ExecutionErrorKind::ParserError(err))),
+    }
+}
+
+/// Create a new VM and execute source from stdin.
+pub fn execute_stdin(debug: bool) -> ExecutionResult {
+    match parser::parse_stdin(debug) {
         Ok(program) => execute_program(program, debug),
         Err(err) => Err(ExecutionError::new(ExecutionErrorKind::ParserError(err))),
     }

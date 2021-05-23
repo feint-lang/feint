@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 use std::fs::File;
-use std::io::{BufRead, BufReader, Cursor};
+use std::io::{self, BufRead, BufReader, Cursor};
 use std::iter::Peekable;
 
 use crate::ast;
@@ -36,7 +36,15 @@ pub fn parse_file(file_path: &str, debug: bool) -> ParseResult {
     parser.parse()
 }
 
-pub struct Parser<T: BufRead> {
+/// Create a parser from stdin, scan the text into tokens, parse the
+/// tokens, and return the resulting AST or error.
+pub fn parse_stdin(debug: bool) -> ParseResult {
+    let scanner = Scanner::<BufReader<io::Stdin>>::from_stdin();
+    let mut parser = Parser::new(scanner, debug);
+    parser.parse()
+}
+
+struct Parser<T: BufRead> {
     token_stream: Peekable<Scanner<T>>,
 
     /// Keep track of tokens until a valid statement is encountered.

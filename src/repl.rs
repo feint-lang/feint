@@ -15,59 +15,23 @@ use crate::vm::{
 
 /// Run FeInt REPL until user exits.
 pub fn run(debug: bool) -> ExitResult {
-    let history_path = Runner::default_history_path();
+    let history_path = Repl::default_history_path();
     let namespace = Namespace::default();
     let vm = VM::new(namespace);
-    let mut runner = Runner::new(Some(history_path.as_path()), vm, debug);
-    runner.run()
+    let mut repl = Repl::new(Some(history_path.as_path()), vm, debug);
+    repl.run()
 }
 
-struct Runner<'a> {
+struct Repl<'a> {
     reader: rustyline::Editor<()>,
     history_path: Option<&'a Path>,
     vm: VM,
     debug: bool,
 }
 
-impl<'a> Runner<'a> {
+impl<'a> Repl<'a> {
     fn new(history_path: Option<&'a Path>, vm: VM, debug: bool) -> Self {
-        Runner { reader: rustyline::Editor::<()>::new(), history_path, vm, debug }
-    }
-
-    /// Get the default history path, which is either ~/.feint_history
-    /// or, if the user's home directory can't be located,
-    /// ./.feint_history.
-    fn default_history_path() -> PathBuf {
-        let home = dirs::home_dir();
-        let base_path = home.unwrap_or_default();
-        let history_path_buf = base_path.join(".feint_history");
-        history_path_buf
-    }
-
-    fn load_history(&mut self) {
-        match self.history_path {
-            Some(path) => {
-                println!("REPL history will be saved to {}", path.to_string_lossy());
-                match self.reader.load_history(path) {
-                    Ok(_) => (),
-                    Err(err) => eprintln!("Could not load REPL history: {}", err),
-                }
-            }
-            None => (),
-        }
-    }
-
-    fn add_history_entry(&mut self, input: &str) {
-        match self.history_path {
-            Some(path) => {
-                self.reader.add_history_entry(input);
-                match self.reader.save_history(path) {
-                    Ok(_) => (),
-                    Err(err) => eprintln!("Could not save REPL history: {}", err),
-                }
-            }
-            None => (),
-        }
+        Repl { reader: rustyline::Editor::<()>::new(), history_path, vm, debug }
     }
 
     fn run(&mut self) -> ExitResult {
@@ -254,6 +218,42 @@ impl<'a> Runner<'a> {
         }
         false
     }
+
+    /// Get the default history path, which is either ~/.feint_history
+    /// or, if the user's home directory can't be located,
+    /// ./.feint_history.
+    fn default_history_path() -> PathBuf {
+        let home = dirs::home_dir();
+        let base_path = home.unwrap_or_default();
+        let history_path_buf = base_path.join(".feint_history");
+        history_path_buf
+    }
+
+    fn load_history(&mut self) {
+        match self.history_path {
+            Some(path) => {
+                println!("REPL history will be saved to {}", path.to_string_lossy());
+                match self.reader.load_history(path) {
+                    Ok(_) => (),
+                    Err(err) => eprintln!("Could not load REPL history: {}", err),
+                }
+            }
+            None => (),
+        }
+    }
+
+    fn add_history_entry(&mut self, input: &str) {
+        match self.history_path {
+            Some(path) => {
+                self.reader.add_history_entry(input);
+                match self.reader.save_history(path) {
+                    Ok(_) => (),
+                    Err(err) => eprintln!("Could not save REPL history: {}", err),
+                }
+            }
+            None => (),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -289,10 +289,10 @@ mod tests {
 
     // Utilities -----------------------------------------------------------
 
-    fn new<'a>() -> Runner<'a> {
+    fn new<'a>() -> Repl<'a> {
         let namespace = Namespace::new(None);
         let vm = VM::new(namespace);
-        Runner::new(None, vm, false)
+        Repl::new(None, vm, false)
     }
 
     fn eval(input: &str) {

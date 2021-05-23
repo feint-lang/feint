@@ -97,6 +97,14 @@ impl<T: BufRead> Scanner<T> {
         Ok(scanner)
     }
 
+    /// Create a scanner from stdin
+    pub fn from_stdin() -> Scanner<BufReader<io::Stdin>> {
+        let stdin = io::stdin();
+        let reader = BufReader::new(stdin);
+        let scanner = Scanner::new(reader);
+        scanner
+    }
+
     fn next_token_from_queue(&mut self) -> ScanResult {
         while self.queue.is_empty() {
             self.add_tokens_to_queue()?;
@@ -1010,7 +1018,7 @@ b = 3
         }
     }
 
-    // Utilities -----------------------------------------------------------
+    // Utilities -------------------------------------------------------
 
     /// Check token returned by scanner against expected token.
     fn check_token(

@@ -4,20 +4,33 @@ use crate::parser::{self, ParseError, ParseErrorKind};
 use crate::result::ExitResult;
 use crate::scanner::{ScanError, ScanErrorKind, TokenWithLocation};
 use crate::util::Location;
-use crate::vm::{
-    execute_file, execute_text, CompilationErrorKind, ExecutionErrorKind, VMState,
-};
+use crate::vm::{self, CompilationErrorKind, ExecutionErrorKind, VMState};
 
 /// Run text source.
-pub fn run(text: &str, debug: bool) -> ExitResult {
+pub fn run_text(text: &str, debug: bool) -> ExitResult {
     let mut runner = Runner::new(debug);
-    runner.run(text)
+    match vm::execute_text(text, debug) {
+        Ok(vm_state) => runner.vm_state_to_exit_result(vm_state),
+        Err(err) => runner.handle_execution_err(err.kind),
+    }
 }
 
 /// Run source from file.
 pub fn run_file(file_path: &str, debug: bool) -> ExitResult {
     let mut runner = Runner::new(debug);
-    runner.run_file(file_path)
+    match vm::execute_file(file_path, debug) {
+        Ok(vm_state) => runner.vm_state_to_exit_result(vm_state),
+        Err(err) => runner.handle_execution_err(err.kind),
+    }
+}
+
+/// Run source from file.
+pub fn run_stdin(debug: bool) -> ExitResult {
+    let mut runner = Runner::new(debug);
+    match vm::execute_stdin(debug) {
+        Ok(vm_state) => runner.vm_state_to_exit_result(vm_state),
+        Err(err) => runner.handle_execution_err(err.kind),
+    }
 }
 
 struct Runner {
@@ -27,20 +40,6 @@ struct Runner {
 impl Runner {
     fn new(debug: bool) -> Self {
         Runner { debug }
-    }
-
-    fn run(&mut self, text: &str) -> ExitResult {
-        match execute_text(text, self.debug) {
-            Ok(vm_state) => self.vm_state_to_exit_result(vm_state),
-            Err(err) => self.handle_execution_err(err.kind),
-        }
-    }
-
-    fn run_file(&mut self, file_path: &str) -> ExitResult {
-        match execute_file(file_path, self.debug) {
-            Ok(vm_state) => self.vm_state_to_exit_result(vm_state),
-            Err(err) => self.handle_execution_err(err.kind),
-        }
     }
 
     fn vm_state_to_exit_result(&self, vm_state: VMState) -> ExitResult {
@@ -161,9 +160,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn run_text() {
+    fn test_run_text() {
         let source = "x = 1\ny = 2\n1 + 2";
-        if let (Ok(_)) = run(source, true) {
+        if let (Ok(_)) = run_text(source, true) {
             assert!(true);
         } else {
             assert!(false);

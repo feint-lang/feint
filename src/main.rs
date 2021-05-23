@@ -1,54 +1,3 @@
-/*!
-Interpreter
-
-- Everything is an object of some type.
-- Avoid keywords.
-- Everything is immutable by default.
-- Disallow arbitrary attachment of attributes.
-- Lexical scoping.
-- No this/self on methods but this/self is required to access
-  attributes.
-
-Builtin Types
-
-- Bool
-- Int
-- Float
-- String
-- Char?
-- None
-- Some
-- Option
-
-Types
-
-- Upper camel case only
-
-    <Name> ([args])
-
-        @new (value)
-            this.value = value
-
-    > Name.new(value)
-
-Functions
-
-- Lower snake case only
-
-    <name> ([args]) [-> T]
-        <body>
-
-    <name> = ([args]) [-> T] <body>
-
-    <name> = ([args]) [-> T]
-        <body>
-
-Loops
-
-    i <- 0..10
-        print(i)
-
-*/
 use std::process;
 
 use clap::{App, Arg};
@@ -65,7 +14,7 @@ fn main() {
                 .index(1)
                 .required(false)
                 .conflicts_with("code")
-                .help("Script"),
+                .help("Script file to run (use - to read from stdin)"),
         )
         .arg(
             Arg::with_name("code")
@@ -91,9 +40,13 @@ fn main() {
     let debug = matches.is_present("debug");
 
     let result = if let Some(code) = code {
-        run::run(code, debug)
+        run::run_text(code, debug)
     } else if let Some(file_name) = file_name {
-        run::run_file(file_name, debug)
+        if file_name == "-" {
+            run::run_stdin(debug)
+        } else {
+            run::run_file(file_name, debug)
+        }
     } else {
         repl::run(debug)
     };
