@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::process;
 
 use clap::{App, Arg};
@@ -26,6 +27,20 @@ fn main() {
                 .help("Code to run"),
         )
         .arg(
+            Arg::with_name("history_path")
+                .long("history-path")
+                .required(false)
+                .takes_value(true)
+                .help("Disable REPL history?"),
+        )
+        .arg(
+            Arg::with_name("no_history")
+                .long("no-history")
+                .required(false)
+                .takes_value(false)
+                .help("Disable REPL history?"),
+        )
+        .arg(
             Arg::with_name("debug")
                 .short("d")
                 .long("debug")
@@ -37,6 +52,8 @@ fn main() {
     let matches = app.get_matches();
     let file_name = matches.value_of("FILE_NAME");
     let code = matches.value_of("code");
+    let history_path = matches.value_of("history_path");
+    let save_repl_history = !matches.is_present("no_history");
     let debug = matches.is_present("debug");
 
     let result = if let Some(code) = code {
@@ -48,7 +65,16 @@ fn main() {
             run::run_file(file_name, debug)
         }
     } else {
-        repl::run(debug)
+        match save_repl_history {
+            true => {
+                let history_path = match history_path {
+                    Some(path) => PathBuf::from(path),
+                    None => default_history_path(),
+                };
+                repl::run(Some(history_path.as_path()), debug)
+            }
+            false => repl::run(None, debug),
+        }
     };
 
     match result {
@@ -56,6 +82,15 @@ fn main() {
         Ok(None) => exit(None),
         Err((code, message)) => error_exit(code, message),
     }
+}
+
+/// Get the default history path, which is either ~/.feint_history or,
+/// if the user's home directory can't be located, ./.feint_history.
+fn default_history_path() -> PathBuf {
+    let home = dirs::home_dir();
+    let base_path = home.unwrap_or_default();
+    let history_path_buf = base_path.join(".feint_history");
+    history_path_buf
 }
 
 /// Exit 0 with optional message.

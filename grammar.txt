@@ -1,17 +1,17 @@
-# Every program is an expression containing 0 or more statements.
+# Every program contains 0 or more statements.
 program :
     | statement*
 
 # Statements includes expressions that return values and other
 # statements that don't values. The intent is for most constructs to be
-# expressions. For things like loops it's no clear what the returned
-# values should be, so those probably won't be implemented as
+# expressions. For things like loops it's not clear what the returned
+# value should be, so those probably won't be implemented as
 # expressions.
 statement :
-    | expression
+    | expr
 
-expression :
-    | "(" expression ")"
+expr :
+    | "(" expr ")"
     | assignment
     | atom
     | sum
@@ -21,7 +21,7 @@ expression :
     | type
 
 assignment :
-    | IDENTIFIER "=" expression
+    | IDENTIFIER "=" expr
 
 atom :
     | bool
@@ -48,13 +48,13 @@ string:
 
 # TODO: Figure out how to delineate blocks.
 block :
-    | BLOCK_START expression+ BLOCK_END
+    | BLOCK_START expr+ BLOCK_END
 
 type :
     | TYPE_IDENTIFIER "(" parameter_list? ")" "\n" block
 
 function :
-    | IDENTIFIER? "(" parameter_list? ")" type_annotation "->" (expression| "\n" block)
+    | IDENTIFIER? "(" parameter_list? ")" type_annotation "->" (expr| "\n" block)
 
 parameter_list :
     | parameter "," parameter_list
@@ -68,14 +68,14 @@ type_annotation :
     | ":" TYPE_IDENTIFIER
 
 sum :
-    | expression ("+" | "-") product
+    | expr ("+" | "-") product
     | product
 product :
-    | expression ("*" | "/" | "//" | "%") power
+    | expr ("*" | "/" | "//" | "%") power
     | power
 power :
-    | expression ("^" power)
-    | expression
+    | expr ("^" power)
+    | expr
 
 name:
     | IDENTIFIER

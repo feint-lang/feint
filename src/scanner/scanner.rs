@@ -41,8 +41,15 @@ pub fn scan_file(file_path: &str) -> Result<Vec<TokenWithLocation>, ScanError> {
     scanner.collect()
 }
 
-/// Scan and assume success, returning tokens in unwrapped form. Panic
-/// on error. Mainly useful for testing.
+/// Create a scanner from stdin, scan the text into tokens, and return
+/// the resulting tokens or error.
+pub fn scan_stdin() -> Result<Vec<TokenWithLocation>, ScanError> {
+    let scanner = Scanner::<BufReader<io::Stdin>>::from_stdin();
+    scanner.collect()
+}
+
+/// Scan text and assume success, returning tokens in unwrapped form.
+/// Panic on error. Mainly useful for testing.
 pub fn scan_optimistic(text: &str) -> Vec<TokenWithLocation> {
     match scan_text(text) {
         Ok(tokens) => tokens,
@@ -72,7 +79,7 @@ pub struct Scanner<T: BufRead> {
 }
 
 impl<T: BufRead> Scanner<T> {
-    pub fn new(reader: T) -> Self {
+    fn new(reader: T) -> Self {
         Scanner {
             source: Source::new(reader),
             queue: VecDeque::new(),

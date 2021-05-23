@@ -36,7 +36,7 @@ pub struct Statement {
 
 #[derive(PartialEq)]
 pub enum StatementKind {
-    Expression(Box<Expression>),
+    Expr(Box<Expr>),
 }
 
 impl Statement {
@@ -44,22 +44,22 @@ impl Statement {
         Self { kind }
     }
 
-    pub fn new_expression(expression: Expression) -> Self {
-        Self { kind: StatementKind::Expression(Box::new(expression)) }
+    pub fn new_expr(expr: Expr) -> Self {
+        Self { kind: StatementKind::Expr(Box::new(expr)) }
     }
 }
 
 impl fmt::Debug for Statement {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self.kind)
+        write!(f, "Statement({:?})", self.kind)
     }
 }
 
 impl fmt::Debug for StatementKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Expression(expression) => {
-                write!(f, "({:?})", expression)
+            Self::Expr(expr) => {
+                write!(f, "Expr({:?})", expr)
             }
         }
     }
@@ -67,59 +67,57 @@ impl fmt::Debug for StatementKind {
 
 /// Expression - a statement that returns a value.
 #[derive(PartialEq)]
-pub struct Expression {
-    pub kind: ExpressionKind,
+pub struct Expr {
+    pub kind: ExprKind,
 }
 
 #[derive(PartialEq)]
-pub enum ExpressionKind {
-    UnaryOperation(UnaryOperator, Box<Expression>),
-    BinaryOperation(Box<Expression>, BinaryOperator, Box<Expression>),
+pub enum ExprKind {
+    UnaryOperation(UnaryOperator, Box<Expr>),
+    BinaryOperation(Box<Expr>, BinaryOperator, Box<Expr>),
     Block(Box<Block>),
     Function(String, Box<Block>),
     Literal(Box<Literal>),
     Identifier(Box<Identifier>),
 }
 
-impl Expression {
-    pub fn new(kind: ExpressionKind) -> Self {
+impl Expr {
+    pub fn new(kind: ExprKind) -> Self {
         Self { kind }
     }
 
     pub fn new_literal(literal: Literal) -> Self {
-        Self { kind: ExpressionKind::Literal(Box::new(literal)) }
+        Self { kind: ExprKind::Literal(Box::new(literal)) }
     }
 
     pub fn new_identifier(identifier: Identifier) -> Self {
-        Self { kind: ExpressionKind::Identifier(Box::new(identifier)) }
+        Self { kind: ExprKind::Identifier(Box::new(identifier)) }
     }
 
-    pub fn new_unary_operation(operator: &str, a: Expression) -> Self {
+    pub fn new_unary_operation(operator: &str, a: Expr) -> Self {
         let operator = match UnaryOperator::from_str(operator) {
             Ok(op) => op,
             Err(err) => panic!("{}", err),
         };
-        Self { kind: ExpressionKind::UnaryOperation(operator, Box::new(a)) }
+        Self { kind: ExprKind::UnaryOperation(operator, Box::new(a)) }
     }
 
-    pub fn new_binary_operation(a: Expression, operator: &str, b: Expression) -> Self {
+    pub fn new_binary_operation(a: Expr, operator: &str, b: Expr) -> Self {
         let operator = match BinaryOperator::from_str(operator) {
             Ok(op) => op,
             Err(err) => panic!("{}", err),
         };
-        Self {
-            kind: ExpressionKind::BinaryOperation(Box::new(a), operator, Box::new(b)),
-        }
+        Self { kind: ExprKind::BinaryOperation(Box::new(a), operator, Box::new(b)) }
     }
 }
 
-impl fmt::Debug for Expression {
+impl fmt::Debug for Expr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self.kind)
     }
 }
 
-impl fmt::Debug for ExpressionKind {
+impl fmt::Debug for ExprKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::UnaryOperation(op, b) => write!(f, "({:?}{:?})", op, b),
@@ -145,7 +143,7 @@ impl Block {
 
 impl fmt::Debug for Block {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self.statements)
+        write!(f, "Block({:?})", self.statements)
     }
 }
 

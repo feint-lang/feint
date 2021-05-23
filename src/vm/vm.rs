@@ -4,7 +4,7 @@ use std::rc::Rc;
 use num_bigint::BigInt;
 
 use crate::ast;
-use crate::parser;
+use crate::parser::{self, ParseResult};
 use crate::util::{BinaryOperator, Stack, UnaryOperator};
 
 use super::{
@@ -12,36 +12,34 @@ use super::{
     Instructions, Namespace, ObjectStore, VMState,
 };
 
-/// Create a new VM and execute source text.
+/// Execute source text.
 pub fn execute_text(text: &str, debug: bool) -> ExecutionResult {
-    match parser::parse_text(text, debug) {
-        Ok(program) => execute_program(program, debug),
-        Err(err) => Err(ExecutionError::new(ExecutionErrorKind::ParserError(err))),
-    }
+    execute_parse_result(parser::parse_text(text), debug)
 }
 
-/// Create a new VM and execute source from file.
+/// Execute source from file.
 pub fn execute_file(file_path: &str, debug: bool) -> ExecutionResult {
-    match parser::parse_file(file_path, debug) {
-        Ok(program) => execute_program(program, debug),
-        Err(err) => Err(ExecutionError::new(ExecutionErrorKind::ParserError(err))),
-    }
+    execute_parse_result(parser::parse_file(file_path), debug)
 }
 
-/// Create a new VM and execute source from stdin.
+/// Execute source from stdin.
 pub fn execute_stdin(debug: bool) -> ExecutionResult {
-    match parser::parse_stdin(debug) {
+    execute_parse_result(parser::parse_stdin(), debug)
+}
+
+/// Execute parse result.
+fn execute_parse_result(result: ParseResult, debug: bool) -> ExecutionResult {
+    match result {
         Ok(program) => execute_program(program, debug),
         Err(err) => Err(ExecutionError::new(ExecutionErrorKind::ParserError(err))),
     }
 }
 
 /// Create a new VM and execute AST program.
-pub fn execute_program(program: ast::Program, debug: bool) -> ExecutionResult {
+fn execute_program(program: ast::Program, debug: bool) -> ExecutionResult {
     match compile(program, debug) {
         Ok(instructions) => {
-            let namespace = Namespace::new(None);
-            let mut vm = VM::new(namespace);
+            let mut vm = VM::default();
             vm.execute(instructions)
         }
         Err(err) => Err(ExecutionError::new(ExecutionErrorKind::CompilationError(err))),
@@ -59,6 +57,13 @@ pub struct VM {
     call_stack: Stack<Frame>,
 
     object_store: ObjectStore,
+}
+
+impl Default for VM {
+    fn default() -> Self {
+        let namespace = Namespace::new(None);
+        VM::new(namespace)
+    }
 }
 
 /// The FeInt virtual machine. When it's created, it's initialized and
@@ -213,7 +218,7 @@ mod tests {
 
     #[test]
     fn execute_simple_program() {
-        let mut vm = VM::new(Namespace::new(None));
+        let mut vm = VM::default();
         let instructions: Instructions = vec![
             Instruction::StoreConst(1),
             Instruction::StoreConst(2),

@@ -9,16 +9,11 @@ use crate::parser::{self, ParseError, ParseErrorKind};
 use crate::result::ExitResult;
 use crate::scanner::ScanErrorKind;
 use crate::util::Location;
-use crate::vm::{
-    compile, CompilationErrorKind, ExecutionErrorKind, Namespace, VMState, VM,
-};
+use crate::vm::{compile, CompilationErrorKind, ExecutionErrorKind, VMState, VM};
 
 /// Run FeInt REPL until user exits.
-pub fn run(debug: bool) -> ExitResult {
-    let history_path = Repl::default_history_path();
-    let namespace = Namespace::default();
-    let vm = VM::new(namespace);
-    let mut repl = Repl::new(Some(history_path.as_path()), vm, debug);
+pub fn run(history_path: Option<&Path>, debug: bool) -> ExitResult {
+    let mut repl = Repl::new(history_path, VM::default(), debug);
     repl.run()
 }
 
@@ -37,9 +32,8 @@ impl<'a> Repl<'a> {
     fn run(&mut self) -> ExitResult {
         println!("Welcome to the FeInt REPL (read/eval/print loop)");
         println!("Type a line of code, then hit Enter to evaluate it");
-        println!("Type .exit or .quit to exit");
-
         self.load_history();
+        println!("Type .exit or .quit to exit");
 
         loop {
             match self.read_line("→ ", true) {
@@ -100,7 +94,7 @@ impl<'a> Repl<'a> {
             _ => (),
         }
 
-        match parser::parse_text(text, self.debug) {
+        match parser::parse_text(text) {
             Ok(program) => match compile(program, self.debug) {
                 Ok(instructions) => match self.vm.execute(instructions) {
                     Ok(state) => self.vm_state_to_exit_result(state),
@@ -132,7 +126,7 @@ impl<'a> Repl<'a> {
 
     fn vm_state_to_exit_result(&self, vm_state: VMState) -> Option<ExitResult> {
         if self.debug {
-            eprintln!("{:?}", vm_state);
+            eprintln!("VM STATE:\n{:?}", vm_state);
         }
         match vm_state {
             VMState::Idle => None,
@@ -219,16 +213,6 @@ impl<'a> Repl<'a> {
         false
     }
 
-    /// Get the default history path, which is either ~/.feint_history
-    /// or, if the user's home directory can't be located,
-    /// ./.feint_history.
-    fn default_history_path() -> PathBuf {
-        let home = dirs::home_dir();
-        let base_path = home.unwrap_or_default();
-        let history_path_buf = base_path.join(".feint_history");
-        history_path_buf
-    }
-
     fn load_history(&mut self) {
         match self.history_path {
             Some(path) => {
@@ -290,8 +274,7 @@ mod tests {
     // Utilities -----------------------------------------------------------
 
     fn new<'a>() -> Repl<'a> {
-        let namespace = Namespace::new(None);
-        let vm = VM::new(namespace);
+        let vm = VM::default();
         Repl::new(None, vm, false)
     }
 

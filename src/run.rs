@@ -4,33 +4,24 @@ use crate::parser::{self, ParseError, ParseErrorKind};
 use crate::result::ExitResult;
 use crate::scanner::{ScanError, ScanErrorKind, TokenWithLocation};
 use crate::util::Location;
-use crate::vm::{self, CompilationErrorKind, ExecutionErrorKind, VMState};
+use crate::vm;
 
 /// Run text source.
 pub fn run_text(text: &str, debug: bool) -> ExitResult {
     let mut runner = Runner::new(debug);
-    match vm::execute_text(text, debug) {
-        Ok(vm_state) => runner.vm_state_to_exit_result(vm_state),
-        Err(err) => runner.handle_execution_err(err.kind),
-    }
+    runner.exit(vm::execute_text(text, debug))
 }
 
 /// Run source from file.
 pub fn run_file(file_path: &str, debug: bool) -> ExitResult {
     let mut runner = Runner::new(debug);
-    match vm::execute_file(file_path, debug) {
-        Ok(vm_state) => runner.vm_state_to_exit_result(vm_state),
-        Err(err) => runner.handle_execution_err(err.kind),
-    }
+    runner.exit(vm::execute_file(file_path, debug))
 }
 
-/// Run source from file.
+/// Read and run source from stdin.
 pub fn run_stdin(debug: bool) -> ExitResult {
     let mut runner = Runner::new(debug);
-    match vm::execute_stdin(debug) {
-        Ok(vm_state) => runner.vm_state_to_exit_result(vm_state),
-        Err(err) => runner.handle_execution_err(err.kind),
-    }
+    runner.exit(vm::execute_stdin(debug))
 }
 
 struct Runner {
@@ -42,25 +33,35 @@ impl Runner {
         Runner { debug }
     }
 
-    fn vm_state_to_exit_result(&self, vm_state: VMState) -> ExitResult {
-        if self.debug {
-            eprintln!("{:?}", vm_state);
-        }
-        match vm_state {
-            VMState::Halted(0) => Ok(None),
-            VMState::Halted(code) => {
-                Err((code, format!("Halted abnormally: {}", code)))
-            }
-            VMState::Idle => Err((-1, "Never halted".to_owned())),
+    /// Take result from VM execution and return an appropriate exit
+    /// result.
+    fn exit(&mut self, result: vm::ExecutionResult) -> ExitResult {
+        match result {
+            Ok(vm_state) => self.vm_state_to_exit_result(vm_state),
+            Err(err) => self.handle_execution_err(err.kind),
         }
     }
 
-    fn handle_execution_err(&mut self, kind: ExecutionErrorKind) -> ExitResult {
+    /// Convert VM state to exit result.
+    fn vm_state_to_exit_result(&self, vm_state: vm::VMState) -> ExitResult {
+        if self.debug {
+            eprintln!("VM STATE:\n{:?}", vm_state);
+        }
+        match vm_state {
+            vm::VMState::Halted(0) => Ok(None),
+            vm::VMState::Halted(code) => {
+                Err((code, format!("Halted abnormally: {}", code)))
+            }
+            vm::VMState::Idle => Err((-1, "Never halted".to_owned())),
+        }
+    }
+
+    fn handle_execution_err(&mut self, kind: vm::ExecutionErrorKind) -> ExitResult {
         let message = match kind {
-            ExecutionErrorKind::CompilationError(err) => {
+            vm::ExecutionErrorKind::CompilationError(err) => {
                 return self.handle_compilation_err(err.kind);
             }
-            ExecutionErrorKind::ParserError(err) => {
+            vm::ExecutionErrorKind::ParserError(err) => {
                 return self.handle_parse_err(err.kind);
             }
             err => format!("Unhandled execution error: {:?}", err),
@@ -68,7 +69,7 @@ impl Runner {
         Err((4, message))
     }
 
-    fn handle_compilation_err(&mut self, kind: CompilationErrorKind) -> ExitResult {
+    fn handle_compilation_err(&mut self, kind: vm::CompilationErrorKind) -> ExitResult {
         let message = match kind {
             err => format!("Unhandled compilation error: {:?}", err),
         };
