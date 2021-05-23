@@ -14,7 +14,7 @@ impl ObjectStore {
 
     pub fn add(&mut self, object: Rc<dyn Object>) -> usize {
         let index = self.storage.len();
-        self.storage.push(object.clone());
+        self.storage.push(object);
         return index;
     }
 

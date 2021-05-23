@@ -1,8 +1,7 @@
 //! # FeInt REPL
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-use dirs;
 use rustyline::error::ReadlineError;
 
 use crate::compiler::{compile, CompilationErrorKind};

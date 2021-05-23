@@ -115,18 +115,25 @@ impl VM {
         instruction: &Instruction,
     ) -> Option<ExecutionResult> {
         match instruction {
+            Instruction::Print => {
+                eprintln!("{:?}", self.stack.peek().unwrap_or(&0usize));
+            }
+            Instruction::Push(value) => {
+                // TODO: Check if empty and return err if so
+                self.stack.push(*value);
+            }
             Instruction::Pop => {
                 // TODO: Check if empty and return err if so
                 self.stack.pop().unwrap();
             }
-            Instruction::StoreConst(value) => {
-                // let object = Type::make_int(BigInt::from(*value as i64));
-                // self.object_store.add(Rc::new(object));
+            Instruction::StoreConst(obj) => {
+                let index = self.object_store.add(obj.clone());
+                self.stack.push(index);
             }
             Instruction::LoadConst(index) => {
-                // let object = self.object_store.get(*index).unwrap();
+                let obj = self.object_store.get(*index).unwrap();
             }
-            Instruction::UnaryOperation(operator) => {
+            Instruction::UnaryOp(operator) => {
                 if let Some(a) = self.pop() {
                     let value = match operator {
                         UnaryOperator::Plus => a,
@@ -141,8 +148,8 @@ impl VM {
                     )));
                 };
             }
-            Instruction::BinaryOperation(operator) => {
-                if let Some((a, b)) = self.pop_top_two() {
+            Instruction::BinaryOp(operator) => {
+                if let Some((b, a)) = self.pop_top_two() {
                     let value = match operator {
                         BinaryOperator::Assign => 1,
                         BinaryOperator::Add => a + b,
@@ -171,9 +178,8 @@ impl VM {
                 self.halt();
                 return Some(Ok(VMState::Halted(*code)));
             }
-            instruction => {
-                #[cfg(debug_assertions)]
-                println!("{:?}", instruction);
+            _ => {
+                todo!();
             }
         }
         None
@@ -217,17 +223,18 @@ impl VM {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::builtins::Int;
 
     #[test]
     fn execute_simple_program() {
         let mut vm = VM::default();
         let instructions: Instructions = vec![
-            Instruction::StoreConst(1),
-            Instruction::StoreConst(2),
-            Instruction::LoadConst(0),
+            Instruction::StoreConst(Rc::new(Int::from(1))),
+            Instruction::StoreConst(Rc::new(Int::from(2))),
             Instruction::LoadConst(1),
-            Instruction::BinaryOperation(BinaryOperator::Add),
-            Instruction::Return,
+            Instruction::LoadConst(0),
+            Instruction::BinaryOp(BinaryOperator::Add),
+            Instruction::Print,
             Instruction::Halt(0),
         ];
         if let Ok(result) = vm.execute(instructions) {

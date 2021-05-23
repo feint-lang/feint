@@ -1,4 +1,9 @@
+use std::rc::Rc;
+
+use num_traits::cast::ToPrimitive;
+
 use crate::ast;
+use crate::types::builtins;
 use crate::util::BinaryOperator;
 use crate::vm::{format_instructions, Instruction, Instructions};
 
@@ -10,7 +15,7 @@ pub fn compile(program: ast::Program, debug: bool) -> CompilationResult {
         eprintln!("COMPILING:\n{:?}", program);
     }
 
-    let instructions = Visitor::walk(program);
+    let instructions = Visitor::visit(program);
 
     if debug {
         eprintln!("INSTRUCTIONS:\n{}", format_instructions(&instructions));
@@ -28,16 +33,17 @@ impl Visitor {
         Self { instructions }
     }
 
-    fn walk(program: ast::Program) -> Instructions {
-        let mut walker = Visitor::default();
-        walker.visit_program(program);
-        walker.instructions
+    fn visit(program: ast::Program) -> Instructions {
+        let mut visitor = Visitor::default();
+        visitor.visit_program(program);
+        visitor.instructions
     }
 
     fn visit_program(&mut self, node: ast::Program) {
         for statement in node.statements {
             self.visit_statement(statement);
         }
+        self.instructions.push(Instruction::Print);
         self.instructions.push(Instruction::Halt(0));
     }
 
@@ -64,15 +70,18 @@ impl Visitor {
         op: BinaryOperator,
         expr_b: ast::Expr,
     ) {
-        let a = self.visit_expr(expr_a);
-        let b = self.visit_expr(expr_b);
-        // TODO
+        self.visit_expr(expr_a);
+        self.visit_expr(expr_b);
+        self.instructions.push(Instruction::BinaryOp(op));
     }
 
     fn visit_literal(&mut self, node: ast::Literal) {
         match node.kind {
-            ast::LiteralKind::Float(value) => eprintln!("LITERAL: {}", value),
-            ast::LiteralKind::Int(value) => eprintln!("LITERAL: {}", value),
+            // ast::LiteralKind::Float(value) => self.instructions.push(value),
+            ast::LiteralKind::Int(value) => {
+                let value = Rc::new(builtins::Int::from(value));
+                self.instructions.push(Instruction::StoreConst(value));
+            }
             _ => panic!("Unhandled literal: {:?}", node),
         }
     }

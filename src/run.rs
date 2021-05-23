@@ -164,10 +164,7 @@ mod tests {
     #[test]
     fn test_run_text() {
         let source = "1 + 2";
-        if let (Ok(_)) = run_text(source, true) {
-            assert!(true);
-        } else {
-            assert!(false);
-        }
+        let result = run_text(source, true);
+        assert!(result.is_ok(), format!("{:?}", result.err()));
     }
 }

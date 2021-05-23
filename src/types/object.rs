@@ -89,12 +89,12 @@ impl PartialEq for dyn Object {
 
 impl fmt::Display for dyn Object {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Object")
+        write!(f, "{}()", self.class())
     }
 }
 
 impl fmt::Debug for dyn Object {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Object")
+        write!(f, "{} object @ {:?}", self.class(), self.id())
     }
 }

@@ -1,5 +1,7 @@
 use std::fmt;
+use std::rc::Rc;
 
+use crate::types::Object;
 use crate::util::{BinaryOperator, UnaryOperator};
 
 pub type Instructions = Vec<Instruction>;
@@ -11,12 +13,13 @@ pub enum Instruction {
     Jump(usize),        // Jump unconditionally
     JumpIfTrue(usize),  // Jump if top of stack is true
     JumpIfFalse(usize), // Jump if top of stack is false
-    UnaryOperation(UnaryOperator),
-    BinaryOperation(BinaryOperator),
+    UnaryOp(UnaryOperator),
+    BinaryOp(BinaryOperator),
     Return,
-    StoreConst(usize),
+    StoreConst(Rc<Object>),
     LoadConst(usize),
     Halt(i32),
+    Print, // Print value at top of stack
 }
 
 impl fmt::Display for Instruction {
@@ -24,12 +27,8 @@ impl fmt::Display for Instruction {
         let string = match self {
             Self::StoreConst(v) => format_aligned("STORE_CONST", v),
             Self::LoadConst(v) => format_aligned("LOAD_CONST", v),
-            Self::UnaryOperation(operator) => {
-                format_aligned("UNARY_OPERATION", operator.to_string())
-            }
-            Self::BinaryOperation(operator) => {
-                format_aligned("BINARY_OPERATION", operator.to_string())
-            }
+            Self::UnaryOp(operator) => format_aligned("UNARY_OP", operator),
+            Self::BinaryOp(operator) => format_aligned("BINARY_OP", operator),
             Self::Return => format!("RETURN"),
             i => format!("{:?}", i),
         };
@@ -58,33 +57,4 @@ pub fn format_instructions(instructions: &Instructions) -> String {
         })
         .collect::<Vec<String>>()
         .join("\n")
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    /// This isn't a very useful test...
-    fn test_format_instructions() {
-        let instructions: Instructions = vec![
-            Instruction::StoreConst(1), // value
-            Instruction::StoreConst(2), // value
-            Instruction::LoadConst(0),  // index
-            Instruction::LoadConst(1),  // index
-            Instruction::BinaryOperation(BinaryOperator::Add),
-            Instruction::Return,
-        ];
-        let string = format_instructions(&instructions);
-        assert_eq!(
-            string,
-            "\
-0000 STORE_CONST        1
-0001 STORE_CONST        2
-0002 LOAD_CONST         0
-0003 LOAD_CONST         1
-0004 BINARY_OPERATION   +
-0005 RETURN"
-        )
-    }
 }
