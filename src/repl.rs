@@ -134,6 +134,7 @@ impl<'a> Repl<'a> {
             VMState::Halted(code) => {
                 Some(Err((code, format!("Halted abnormally: {}", code))))
             }
+            VMState::Running => unreachable!(),
         }
     }
 

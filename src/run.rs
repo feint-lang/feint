@@ -54,6 +54,7 @@ impl Runner {
                 Err((code, format!("Halted abnormally: {}", code)))
             }
             VMState::Idle => Err((-1, "Never halted".to_owned())),
+            VMState::Running => unreachable!(),
         }
     }
 

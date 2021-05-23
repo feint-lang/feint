@@ -12,25 +12,27 @@ use super::arena::ObjectStore;
 use super::frame::Frame;
 use super::instruction::{Instruction, Instructions};
 use super::namespace::Namespace;
-use super::result::{ExecutionError, ExecutionErrorKind, ExecutionResult, VMState};
+use super::result::{
+    ExecutionError, ExecutionErrorKind, ExecutionResult as Result, VMState,
+};
 
 /// Execute source text.
-pub fn execute_text(text: &str, debug: bool) -> ExecutionResult {
+pub fn execute_text(text: &str, debug: bool) -> Result {
     execute_parse_result(parser::parse_text(text), debug)
 }
 
 /// Execute source from file.
-pub fn execute_file(file_path: &str, debug: bool) -> ExecutionResult {
+pub fn execute_file(file_path: &str, debug: bool) -> Result {
     execute_parse_result(parser::parse_file(file_path), debug)
 }
 
 /// Execute source from stdin.
-pub fn execute_stdin(debug: bool) -> ExecutionResult {
+pub fn execute_stdin(debug: bool) -> Result {
     execute_parse_result(parser::parse_stdin(), debug)
 }
 
 /// Execute parse result.
-fn execute_parse_result(result: ParseResult, debug: bool) -> ExecutionResult {
+fn execute_parse_result(result: ParseResult, debug: bool) -> Result {
     match result {
         Ok(program) => execute_program(program, debug),
         Err(err) => Err(ExecutionError::new(ExecutionErrorKind::ParserError(err))),
@@ -38,7 +40,7 @@ fn execute_parse_result(result: ParseResult, debug: bool) -> ExecutionResult {
 }
 
 /// Create a new VM and execute AST program.
-fn execute_program(program: ast::Program, debug: bool) -> ExecutionResult {
+fn execute_program(program: ast::Program, debug: bool) -> Result {
     match compile(program, debug) {
         Ok(instructions) => {
             let mut vm = VM::default();
@@ -93,14 +95,15 @@ impl VM {
     /// When a HALT instruction is encountered, the VM's state will be
     /// cleared; it can be "restarted" by passing more instructions to
     /// execute.
-    pub fn execute(&mut self, instructions: Instructions) -> ExecutionResult {
+    pub fn execute(&mut self, instructions: Instructions) -> Result {
         let mut instruction_pointer = 0;
         loop {
             if let Some(instruction) = instructions.get(instruction_pointer) {
                 instruction_pointer += 1;
-                if let Some(result) = self.execute_instruction(instruction) {
-                    return result;
-                };
+                let result = self.execute_instruction(instruction)?;
+                if let VMState::Halted(_) = result {
+                    break Ok(result);
+                }
             } else {
                 // No instructions left. Note that from the point of
                 // view of the VM, this is not an error.
@@ -109,11 +112,12 @@ impl VM {
         }
     }
 
+    fn err(&self, kind: ExecutionErrorKind) -> Result {
+        Err(ExecutionError::new(kind))
+    }
+
     /// Run the specified instruction and return the VM's state.
-    pub fn execute_instruction(
-        &mut self,
-        instruction: &Instruction,
-    ) -> Option<ExecutionResult> {
+    pub fn execute_instruction(&mut self, instruction: &Instruction) -> Result {
         match instruction {
             Instruction::Print => {
                 eprintln!("{:?}", self.stack.peek().unwrap_or(&0usize));
@@ -143,9 +147,7 @@ impl VM {
                     };
                     self.stack.push(value);
                 } else {
-                    return Some(Err(ExecutionError::new(
-                        ExecutionErrorKind::NotEnoughValuesOnStack,
-                    )));
+                    self.err(ExecutionErrorKind::NotEnoughValuesOnStack)?;
                 };
             }
             Instruction::BinaryOp(operator) => {
@@ -162,9 +164,7 @@ impl VM {
                     };
                     self.stack.push(value);
                 } else {
-                    return Some(Err(ExecutionError::new(
-                        ExecutionErrorKind::NotEnoughValuesOnStack,
-                    )));
+                    self.err(ExecutionErrorKind::NotEnoughValuesOnStack)?;
                 };
             }
             Instruction::Return => {
@@ -176,13 +176,14 @@ impl VM {
             }
             Instruction::Halt(code) => {
                 self.halt();
-                return Some(Ok(VMState::Halted(*code)));
+                return Ok(VMState::Halted(*code));
             }
-            _ => {
-                todo!();
+            instruction => {
+                let message = format!("{:?}", instruction);
+                self.err(ExecutionErrorKind::UnhandledInstruction(message))?;
             }
         }
-        None
+        Ok(VMState::Running)
     }
 
     fn push(&mut self, item: usize) {

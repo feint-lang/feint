@@ -3,6 +3,7 @@ use std::fmt::Formatter;
 
 use crate::compiler::CompilationError;
 use crate::parser::ParseError;
+use crate::vm::Instruction;
 
 pub type ExecutionResult = Result<VMState, ExecutionError>;
 
@@ -29,6 +30,7 @@ pub enum ExecutionErrorKind {
     NotEnoughValuesOnStack,
     ParserError(ParseError),
     CompilationError(CompilationError),
+    UnhandledInstruction(String),
 }
 
 impl fmt::Display for ExecutionErrorKind {
@@ -39,6 +41,7 @@ impl fmt::Display for ExecutionErrorKind {
 
 #[derive(Debug, PartialEq)]
 pub enum VMState {
+    Running,
     Idle,
     Halted(i32),
 }
