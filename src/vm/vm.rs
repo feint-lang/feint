@@ -4,13 +4,15 @@ use std::rc::Rc;
 use num_bigint::BigInt;
 
 use crate::ast;
+use crate::compiler::compile;
 use crate::parser::{self, ParseResult};
 use crate::util::{BinaryOperator, Stack, UnaryOperator};
 
-use super::{
-    compile, ExecutionError, ExecutionErrorKind, ExecutionResult, Frame, Instruction,
-    Instructions, Namespace, ObjectStore, VMState,
-};
+use super::arena::ObjectStore;
+use super::frame::Frame;
+use super::instruction::{Instruction, Instructions};
+use super::namespace::Namespace;
+use super::result::{ExecutionError, ExecutionErrorKind, ExecutionResult, VMState};
 
 /// Execute source text.
 pub fn execute_text(text: &str, debug: bool) -> ExecutionResult {

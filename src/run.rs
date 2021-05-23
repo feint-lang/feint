@@ -1,10 +1,11 @@
 //! # FeInt
 
+use crate::compiler::CompilationErrorKind;
 use crate::parser::{self, ParseError, ParseErrorKind};
 use crate::result::ExitResult;
 use crate::scanner::{ScanError, ScanErrorKind, TokenWithLocation};
 use crate::util::Location;
-use crate::vm;
+use crate::vm::{self, ExecutionErrorKind, ExecutionResult, VMState, VM};
 
 /// Run text source.
 pub fn run_text(text: &str, debug: bool) -> ExitResult {
@@ -35,7 +36,7 @@ impl Runner {
 
     /// Take result from VM execution and return an appropriate exit
     /// result.
-    fn exit(&mut self, result: vm::ExecutionResult) -> ExitResult {
+    fn exit(&mut self, result: ExecutionResult) -> ExitResult {
         match result {
             Ok(vm_state) => self.vm_state_to_exit_result(vm_state),
             Err(err) => self.handle_execution_err(err.kind),
@@ -43,25 +44,25 @@ impl Runner {
     }
 
     /// Convert VM state to exit result.
-    fn vm_state_to_exit_result(&self, vm_state: vm::VMState) -> ExitResult {
+    fn vm_state_to_exit_result(&self, vm_state: VMState) -> ExitResult {
         if self.debug {
             eprintln!("VM STATE:\n{:?}", vm_state);
         }
         match vm_state {
-            vm::VMState::Halted(0) => Ok(None),
-            vm::VMState::Halted(code) => {
+            VMState::Halted(0) => Ok(None),
+            VMState::Halted(code) => {
                 Err((code, format!("Halted abnormally: {}", code)))
             }
-            vm::VMState::Idle => Err((-1, "Never halted".to_owned())),
+            VMState::Idle => Err((-1, "Never halted".to_owned())),
         }
     }
 
-    fn handle_execution_err(&mut self, kind: vm::ExecutionErrorKind) -> ExitResult {
+    fn handle_execution_err(&mut self, kind: ExecutionErrorKind) -> ExitResult {
         let message = match kind {
-            vm::ExecutionErrorKind::CompilationError(err) => {
+            ExecutionErrorKind::CompilationError(err) => {
                 return self.handle_compilation_err(err.kind);
             }
-            vm::ExecutionErrorKind::ParserError(err) => {
+            ExecutionErrorKind::ParserError(err) => {
                 return self.handle_parse_err(err.kind);
             }
             err => format!("Unhandled execution error: {:?}", err),
@@ -69,7 +70,7 @@ impl Runner {
         Err((4, message))
     }
 
-    fn handle_compilation_err(&mut self, kind: vm::CompilationErrorKind) -> ExitResult {
+    fn handle_compilation_err(&mut self, kind: CompilationErrorKind) -> ExitResult {
         let message = match kind {
             err => format!("Unhandled compilation error: {:?}", err),
         };

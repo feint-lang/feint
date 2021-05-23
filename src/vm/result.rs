@@ -1,8 +1,8 @@
 use std::fmt;
 use std::fmt::Formatter;
 
+use crate::compiler::CompilationError;
 use crate::parser::ParseError;
-use crate::vm::compiler::CompilationError;
 
 pub type ExecutionResult = Result<VMState, ExecutionError>;
 

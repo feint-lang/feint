@@ -5,11 +5,12 @@ use std::path::{Path, PathBuf};
 use dirs;
 use rustyline::error::ReadlineError;
 
+use crate::compiler::{compile, CompilationErrorKind};
 use crate::parser::{self, ParseError, ParseErrorKind};
 use crate::result::ExitResult;
 use crate::scanner::ScanErrorKind;
 use crate::util::Location;
-use crate::vm::{compile, CompilationErrorKind, ExecutionErrorKind, VMState, VM};
+use crate::vm::{ExecutionErrorKind, VMState, VM};
 
 /// Run FeInt REPL until user exits.
 pub fn run(history_path: Option<&Path>, debug: bool) -> ExitResult {
