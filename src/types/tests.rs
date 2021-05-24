@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::rc::Rc;
 
 use super::builtins::Builtins;
@@ -20,8 +21,8 @@ fn test_float() {
     assert_ne!(float2.id(), float3.id());
 
     // compare concrete types
-    assert_eq!(*float1, *float2);
-    assert_ne!(*float1, *float3);
+    assert!(float1.is_equal(float2));
+    assert!(!float1.is_equal(float3));
 
     // compare via trait
     // assert!(Object::eq(*float1 as Object, *float2 as Object));
@@ -35,8 +36,8 @@ fn test_compare_float_to_int() {
     let float = builtins.new_float(1.0);
     let int = builtins.new_int(1u8);
 
-    // assert!(Object::eq(&int, &float)); // compare via trait
-    // assert!(Object::eq(&float, &int)); // compare via trait
+    assert!(float.is_equal(int.clone()));
+    assert!(int.is_equal(float.clone()));
 }
 
 #[test]
@@ -53,6 +54,6 @@ fn test_custom() {
     let value_2 = builtins.new_int(1);
     obj_2.set_attribute("value", value_2);
 
-    assert_eq!(obj_1, obj_2); // compare concrete types
-    assert!(Object::eq(&obj_1, &obj_2)); // compare via trait
+    // FIXME: ???
+    assert!(obj_1.is_equal(Rc::new(obj_2)))
 }

@@ -4,7 +4,7 @@ use std::rc::Rc;
 use builtin_object_derive::BuiltinObject;
 
 use super::super::class::Type;
-use super::super::object::Object;
+use super::super::object::{Object, ObjectExt};
 
 /// Built in boolean type
 #[derive(Debug, PartialEq, BuiltinObject)]
@@ -20,18 +20,6 @@ impl Bool {
 
     pub fn value(&self) -> &bool {
         &self.value
-    }
-}
-
-// Binary operations ---------------------------------------------------
-
-impl PartialEq<dyn Object> for Bool {
-    fn eq(&self, rhs: &dyn Object) -> bool {
-        if let Some(rhs) = rhs.as_any().downcast_ref::<Bool>() {
-            self == rhs
-        } else {
-            panic!("Could not compare Bool to {}", rhs.class());
-        }
     }
 }
 

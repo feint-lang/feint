@@ -48,10 +48,6 @@ impl<'a> Visitor<'a> {
     }
 
     fn visit_program(&mut self, node: ast::Program) -> VisitResult {
-        // Add singletons to bottom of stack for easy reference
-        self.object_store.add(self.builtins.nil_obj.clone()); // 0
-        self.object_store.add(self.builtins.true_obj.clone()); // 1
-        self.object_store.add(self.builtins.false_obj.clone()); // 2
         for statement in node.statements {
             self.visit_statement(statement)?;
         }

@@ -39,6 +39,6 @@ mod tests {
         let retrieved = store.get(index).unwrap();
         assert_eq!(retrieved.class().id(), int_copy.class().id());
         assert_eq!(retrieved.id(), int_copy.id());
-        assert_eq!(retrieved, &int_copy);
+        assert!(retrieved.is_equal(int_copy));
     }
 }

@@ -47,14 +47,15 @@ impl fmt::Debug for UnaryOperator {
 /// Binary operators
 #[derive(PartialEq)]
 pub enum BinaryOperator {
-    Assign,
-    Add,
-    Subtract,
+    Raise,
     Multiply,
     Divide,
     FloorDiv,
     Modulo,
-    Raise,
+    Add,
+    Subtract,
+    Equality,
+    Assign,
 }
 
 impl str::FromStr for BinaryOperator {
@@ -62,14 +63,15 @@ impl str::FromStr for BinaryOperator {
 
     fn from_str(op: &str) -> Result<Self, Self::Err> {
         let op = match op {
-            "=" => Self::Assign,
-            "+" => Self::Add,
-            "-" => Self::Subtract,
+            "^" => Self::Raise,
             "*" => Self::Multiply,
             "/" => Self::Divide,
             "//" => Self::FloorDiv,
             "%" => Self::Modulo,
-            "^" => Self::Raise,
+            "+" => Self::Add,
+            "-" => Self::Subtract,
+            "==" => Self::Equality,
+            "=" => Self::Assign,
             _ => {
                 return Err(format!("Unknown binary operator: {}", op));
             }
@@ -81,14 +83,15 @@ impl str::FromStr for BinaryOperator {
 impl fmt::Display for BinaryOperator {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let string = match self {
-            Self::Assign => "=",
-            Self::Add => "+",
-            Self::Subtract => "-",
+            Self::Raise => "^",
             Self::Multiply => "*",
             Self::Divide => "/",
             Self::FloorDiv => "//",
             Self::Modulo => "%",
-            Self::Raise => "^",
+            Self::Add => "+",
+            Self::Subtract => "-",
+            Self::Assign => "=",
+            Self::Equality => "==",
         };
         write!(f, "{}", string)
     }

@@ -5,7 +5,7 @@ use std::rc::Rc;
 use builtin_object_derive::BuiltinObject;
 
 use super::super::class::Type;
-use super::super::object::Object;
+use super::super::object::{Object, ObjectExt};
 
 /// Built in nil type
 #[derive(Debug, PartialEq, BuiltinObject)]

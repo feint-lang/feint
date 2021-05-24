@@ -5,6 +5,7 @@ use std::any::Any;
 use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::fmt;
+use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 
 use super::class::Type;
@@ -31,6 +32,14 @@ impl Object for ComplexObject {
         self
     }
 
+    fn is_equal(&self, rhs: Rc<dyn Object>) -> bool {
+        if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
+            // FIXME: attribute comparison is borked
+            return self.is(rhs) || self.attributes == rhs.attributes;
+        }
+        panic!("Could not compare {} to {}", self.class(), rhs.class());
+    }
+
     fn get_attribute(&self, name: &str) -> Result<&Rc<dyn Object>, ObjectError> {
         if let Some(value) = self.attributes.get(name) {
             return Ok(value);
@@ -45,27 +54,6 @@ impl Object for ComplexObject {
     ) -> Result<(), ObjectError> {
         self.attributes.insert(name.to_owned(), value.clone());
         Ok(())
-    }
-}
-
-// Binary operations ---------------------------------------------------
-
-impl PartialEq for ComplexObject {
-    fn eq(&self, other: &Self) -> bool {
-        if self.is(other) {
-            return true;
-        }
-        self.attributes == other.attributes
-    }
-}
-
-impl PartialEq<dyn Object> for ComplexObject {
-    fn eq(&self, rhs: &dyn Object) -> bool {
-        if let Some(rhs) = rhs.as_any().downcast_ref::<ComplexObject>() {
-            self == rhs
-        } else {
-            panic!("Could not compare {} to {}", self.class(), rhs.class());
-        }
     }
 }
 

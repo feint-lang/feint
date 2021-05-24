@@ -33,6 +33,13 @@ fn impl_builtin_object_derive(ast: &syn::DeriveInput) -> TokenStream {
             fn as_any(&self) -> &dyn Any {
                 self
             }
+
+            fn is_equal(&self, rhs: Rc<dyn Object>) -> bool {
+                if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
+                    return self.is(rhs) || self == rhs;
+                }
+                panic!("Could not compare {} to {}", self.class(), rhs.class());
+            }
         }
     };
     gen.into()

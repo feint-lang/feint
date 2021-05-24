@@ -7,14 +7,6 @@ use super::class::Type;
 use super::complex::ComplexObject;
 use super::result::{ObjectError, ObjectErrorKind};
 
-macro_rules! binop {
-    ( $lhs:ident, $op:tt, $rhs:ident, $($LHS:ty),+ ) => { $(
-        if let Some(lhs) = $lhs.as_any().downcast_ref::<$LHS>() {
-            return lhs $op $rhs;
-        }
-    )+ };
-}
-
 /// Represents an instance of some type (AKA "class").
 pub trait Object {
     fn class(&self) -> &Rc<Type>;
@@ -30,26 +22,28 @@ pub trait Object {
         self.class().name().to_owned()
     }
 
+    fn is_equal(&self, rhs: Rc<dyn Object>) -> bool {
+        // This should catch Bool (when both true or both false) and Nil
+        // (always), since they're singletons.
+        panic!("is_equal not implemented for type: {}", self.class());
+    }
+
     // Binary operations -----------------------------------------------
 
     fn mul(&self, rhs: Rc<dyn Object>) -> Rc<dyn Object> {
-        binop!(self, *, rhs, Float, Int);
-        panic!("Could not multiply items: {} + {}", self.class(), rhs.class());
+        panic!("mul not implemented for type: {}", self.class());
     }
 
     fn div(&self, rhs: Rc<dyn Object>) -> Rc<dyn Object> {
-        binop!(self, /, rhs, Float, Int);
-        panic!("Could not divide items: {} + {}", self.class(), rhs.class());
+        panic!("div not implemented for type: {}", self.class());
     }
 
     fn add(&self, rhs: Rc<dyn Object>) -> Rc<dyn Object> {
-        binop!(self, +, rhs, Float, Int);
-        panic!("Could not add items: {} + {}", self.class(), rhs.class());
+        panic!("add not implemented for type: {}", self.class());
     }
 
     fn sub(&self, rhs: Rc<dyn Object>) -> Rc<dyn Object> {
-        binop!(self, -, rhs, Float, Int);
-        panic!("Could not subtract items: {} - {}", self.class(), rhs.class());
+        panic!("sub not implemented for type: {}", self.class());
     }
 
     // Attributes ------------------------------------------------------
@@ -82,14 +76,15 @@ impl<T: Object + ?Sized> ObjectExt for T {}
 
 /// Delegate to concrete type by downcasting.
 impl PartialEq for dyn Object {
-    fn eq(&self, other: &Self) -> bool {
+    fn eq(&self, rhs: &Self) -> bool {
         // This should catch Bool (when both true or both false) and Nil
         // (always), since they're singletons.
-        if self.is(other) {
+        if self.is(rhs) {
             return true;
         }
-        binop!(self, ==, other, Bool, Float, Int, ComplexObject);
-        panic!("Could not compare {:?} and {:?}", self, other);
+        // FIXME:
+        // self.is_equal(rhs)
+        false
     }
 }
 

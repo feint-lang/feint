@@ -68,7 +68,10 @@ impl Default for VM {
     fn default() -> Self {
         let builtins = Builtins::new();
         let namespace = Namespace::new(None);
-        let object_store = ObjectStore::new();
+        let mut object_store = ObjectStore::new();
+        object_store.add(builtins.nil_obj.clone()); // 0
+        object_store.add(builtins.true_obj.clone()); // 1
+        object_store.add(builtins.false_obj.clone()); // 2
         VM::new(builtins, object_store, namespace)
     }
 }
@@ -140,7 +143,10 @@ impl VM {
             }
             Instruction::Pop => {
                 // TODO: Check if empty and return err if so
-                self.stack.pop().unwrap();
+                if self.stack.is_empty() {
+                    panic!("Stack is empty");
+                }
+                self.stack.pop();
             }
             Instruction::LoadConst(index) => {
                 self.stack.push(*index);
@@ -166,6 +172,11 @@ impl VM {
                     let b = b.clone();
                     let value = match op {
                         // BinaryOperator::Assign => 1,
+                        BinaryOperator::Equality => {
+                            let result = a.is_equal(b);
+                            self.stack.push(if result { 1 } else { 2 });
+                            return Ok(VMState::Running);
+                        }
                         BinaryOperator::Add => a.add(b),
                         BinaryOperator::Subtract => a.sub(b),
                         BinaryOperator::Multiply => a.mul(b),
@@ -249,11 +260,11 @@ mod tests {
     fn execute_simple_program() {
         let builtins = Builtins::new();
         let mut vm = VM::default();
-        vm.object_store.add(vm.builtins.new_int(1));
-        vm.object_store.add(vm.builtins.new_int(2));
+        let i = vm.object_store.add(vm.builtins.new_int(1));
+        let j = vm.object_store.add(vm.builtins.new_int(2));
         let instructions: Instructions = vec![
-            Instruction::LoadConst(1),
-            Instruction::LoadConst(0),
+            Instruction::LoadConst(i),
+            Instruction::LoadConst(j),
             Instruction::BinaryOp(BinaryOperator::Add),
             Instruction::Print,
             Instruction::Halt(0),
