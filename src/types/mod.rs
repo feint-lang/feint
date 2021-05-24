@@ -1,4 +1,4 @@
-pub(crate) use builtins::{BUILTIN_TYPES, FALSE, NIL, TRUE};
+pub(crate) use builtins::Builtins;
 pub(crate) use class::Type;
 pub(crate) use object::{Object, ObjectExt};
 

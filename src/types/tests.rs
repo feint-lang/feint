@@ -1,16 +1,17 @@
 use std::rc::Rc;
-use std::sync::Arc;
 
-use super::builtins;
+use super::builtins::Builtins;
 use super::class::Type;
 use super::complex::ComplexObject;
 use super::object::Object;
 
 #[test]
 fn test_float() {
-    let float1 = builtins::Float::from(0.0);
-    let float2 = builtins::Float::from(0.0);
-    let float3 = builtins::Float::from(1.0);
+    let builtins = Builtins::new();
+
+    let float1 = builtins.new_float(0.0);
+    let float2 = builtins.new_float(0.0);
+    let float3 = builtins.new_float(1.0);
 
     assert!(float1.class().is(&float2.class()));
     assert!(float2.class().is(&float3.class()));
@@ -29,22 +30,27 @@ fn test_float() {
 
 #[test]
 fn test_compare_float_to_int() {
-    let float = builtins::Float::from(1.0);
-    let int = builtins::Int::from(1u8);
+    let builtins = Builtins::new();
+
+    let float = builtins.new_float(1.0);
+    let int = builtins.new_int(1u8);
+
     assert!(Object::eq(&int, &float)); // compare via trait
     assert!(Object::eq(&float, &int)); // compare via trait
 }
 
 #[test]
 fn test_custom() {
-    let type_1 = Arc::new(Type::new("test", "Custom1"));
-    let mut obj_1 = ComplexObject::new(type_1.clone());
-    let value_1 = Rc::new(builtins::Int::from(1));
+    let builtins = Builtins::new();
+
+    let type_1 = Rc::new(Type::new("test", "Custom1"));
+    let mut obj_1 = ComplexObject::new(type_1);
+    let value_1 = Rc::new(builtins.new_int(1));
     obj_1.set_attribute("value", value_1);
 
-    let type_2 = Arc::new(Type::new("test", "Custom2"));
-    let mut obj_2 = ComplexObject::new(type_2.clone());
-    let value_2 = Rc::new(builtins::Int::from(1));
+    let type_2 = Rc::new(Type::new("test", "Custom2"));
+    let mut obj_2 = ComplexObject::new(type_2);
+    let value_2 = Rc::new(builtins.new_int(1));
     obj_2.set_attribute("value", value_2);
 
     assert_eq!(obj_1, obj_2); // compare concrete types

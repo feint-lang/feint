@@ -24,16 +24,14 @@ fn impl_builtin_object_derive(ast: &syn::DeriveInput) -> TokenStream {
     let name = &ast.ident;
     let gen = quote! {
         use std::any::Any;
-        use std::sync::Arc;
+        use std::rc::Rc;
 
         use super::super::object::Object;
         use super::super::class::Type;
 
-        use super::BUILTIN_TYPES;
-
         impl Object for #name {
-            fn class(&self) -> &Arc<Type> {
-                BUILTIN_TYPES.get(stringify!(#name))
+            fn class(&self) -> &Rc<Type> {
+                &self.class
             }
 
             fn as_any(&self) -> &dyn Any {

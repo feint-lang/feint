@@ -6,6 +6,7 @@ use num_bigint::BigInt;
 use crate::ast;
 use crate::compiler::compile;
 use crate::parser::{self, ParseResult};
+use crate::types::Builtins;
 use crate::util::{BinaryOperator, Stack, UnaryOperator};
 
 use super::arena::ObjectStore;
@@ -41,16 +42,18 @@ fn execute_parse_result(result: ParseResult, debug: bool) -> Result {
 
 /// Create a new VM and execute AST program.
 fn execute_program(program: ast::Program, debug: bool) -> Result {
-    match compile(program, debug) {
-        Ok(instructions) => {
-            let mut vm = VM::default();
-            vm.execute(instructions)
-        }
+    let mut vm = VM::default();
+    let result = compile(&vm.builtins, &vm.object_store, program, debug);
+    match result {
+        Ok(instructions) => vm.execute(instructions),
         Err(err) => Err(ExecutionError::new(ExecutionErrorKind::CompilationError(err))),
     }
 }
 
 pub struct VM {
+    pub builtins: Builtins,
+    pub object_store: ObjectStore,
+
     namespace: Namespace,
 
     // Items are pushed onto or popped from the stack as instructions
@@ -59,14 +62,14 @@ pub struct VM {
 
     // A new stack frame is pushed for each call
     call_stack: Stack<Frame>,
-
-    object_store: ObjectStore,
 }
 
 impl Default for VM {
     fn default() -> Self {
+        let builtins = Builtins::new();
         let namespace = Namespace::new(None);
-        VM::new(namespace)
+        let object_store = ObjectStore::new();
+        VM::new(builtins, object_store, namespace)
     }
 }
 
@@ -74,12 +77,17 @@ impl Default for VM {
 /// then, implicitly, goes idle until it's passed some instructions to
 /// execute. After instructions are executed
 impl VM {
-    pub fn new(namespace: Namespace) -> Self {
+    pub fn new(
+        builtins: Builtins,
+        object_store: ObjectStore,
+        namespace: Namespace,
+    ) -> Self {
         VM {
+            builtins,
             namespace,
             stack: Stack::new(),
             call_stack: Stack::new(),
-            object_store: ObjectStore::new(),
+            object_store,
         }
     }
 
@@ -224,14 +232,15 @@ impl VM {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::builtins::Int;
+    use crate::types::Builtins;
 
     #[test]
     fn execute_simple_program() {
+        let builtins = Builtins::new();
         let mut vm = VM::default();
         let instructions: Instructions = vec![
-            Instruction::StoreConst(Rc::new(Int::from(1))),
-            Instruction::StoreConst(Rc::new(Int::from(2))),
+            Instruction::StoreConst(Rc::new(builtins.new_int(1))),
+            Instruction::StoreConst(Rc::new(builtins.new_int(2))),
             Instruction::LoadConst(1),
             Instruction::LoadConst(0),
             Instruction::BinaryOp(BinaryOperator::Add),

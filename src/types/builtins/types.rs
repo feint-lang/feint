@@ -1,39 +1,62 @@
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::rc::Rc;
 
-use lazy_static::lazy_static;
+use num_bigint::BigInt;
 
 use super::super::{Object, Type};
-use super::{Bool, Nil};
 
-lazy_static! {
-    pub static ref BUILTIN_TYPES: Builtins = {
-        let mut builtins = Builtins::new();
-        builtins.add("Bool");
-        builtins.add("Float");
-        builtins.add("Int");
-        builtins.add("Nil");
-        builtins
-    };
+pub struct Builtins {
+    types: HashMap<&'static str, Rc<Type>>,
+    pub nil_obj: Rc<super::Nil>,
+    pub true_obj: Rc<super::Bool>,
+    pub false_obj: Rc<super::Bool>,
 }
 
-pub struct Builtins(HashMap<&'static str, Arc<Type>>);
-
 impl Builtins {
-    fn new() -> Self {
-        Self(HashMap::new())
+    pub fn new() -> Self {
+        let mut types = HashMap::new();
+
+        // Singleton types
+        let nil_type = Self::create_type("Nil");
+        let bool_type = Self::create_type("Bool");
+
+        // Singletons
+        let nil_obj = Rc::new(super::Nil::new(nil_type.clone()));
+        let true_obj = Rc::new(super::Bool::new(bool_type.clone(), true));
+        let false_obj = Rc::new(super::Bool::new(bool_type.clone(), false));
+
+        // All the builtin types
+        types.insert("Nil", nil_type);
+        types.insert("Bool", bool_type);
+        types.insert("Float", Self::create_type("Float"));
+        types.insert("Int", Self::create_type("Int"));
+
+        Self { types, nil_obj, true_obj, false_obj }
     }
 
-    fn add(&mut self, name: &'static str) {
-        let class = Arc::new(Type::new("builtins", name));
-        self.0.insert(name, class);
+    fn create_type(name: &'static str) -> Rc<Type> {
+        Rc::new(Type::new("builtins", name))
     }
 
     /// Get builtin type by name. Panic if a type doesn't exist with the
     /// specified name.
-    pub fn get(&self, name: &str) -> &Arc<Type> {
+    fn get_type(&self, name: &str) -> &Rc<Type> {
         let message = format!("Unknown builtin type: {}", name);
-        let class = self.0.get(name).expect(message.as_str());
+        let class = self.types.get(name).expect(message.as_str());
         class
+    }
+
+    // Builtin type constructors
+
+    pub fn new_float<F: Into<f64>>(&self, value: F) -> super::Float {
+        let class = self.get_type("Float").clone();
+        let value = value.into();
+        super::Float::new(class, value)
+    }
+
+    pub fn new_int<I: Into<BigInt>>(&self, value: I) -> super::Int {
+        let class = self.get_type("Float").clone();
+        let value = value.into();
+        super::Int::new(class, value)
     }
 }

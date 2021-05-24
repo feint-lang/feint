@@ -14,7 +14,7 @@ impl ObjectStore {
 
     pub fn add(&mut self, object: Rc<dyn Object>) -> usize {
         let index = self.storage.len();
-        self.storage.push(object);
+        self.storage.push(object.clone());
         return index;
     }
 
@@ -26,19 +26,21 @@ impl ObjectStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{builtins, Object};
+    use crate::types::builtins::Int;
+    use crate::types::{Builtins, Object};
 
     #[test]
     fn test_add_retrieve() {
+        let builtins = Builtins::new();
         let mut store = ObjectStore::new();
 
-        let int = Rc::new(builtins::Int::from(0));
+        let int = Rc::new(builtins.new_int(0));
         let int_copy = int.clone();
 
         let index = store.add(int);
 
         let retrieved = store.get(index).unwrap();
-        let retrieved = retrieved.as_any().downcast_ref::<builtins::Int>().unwrap();
+        let retrieved = retrieved.as_any().downcast_ref::<Int>().unwrap();
 
         assert_eq!(retrieved.class().id(), int_copy.class().id());
         assert_eq!(retrieved.id(), int_copy.id());

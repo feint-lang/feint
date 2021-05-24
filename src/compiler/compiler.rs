@@ -3,52 +3,55 @@ use std::rc::Rc;
 use num_traits::cast::ToPrimitive;
 
 use crate::ast;
-use crate::types::builtins;
+use crate::types::builtins::Builtins;
 use crate::util::BinaryOperator;
-use crate::vm::{format_instructions, Instruction, Instructions};
+use crate::vm::{format_instructions, Instruction, Instructions, ObjectStore};
 
 use super::result::{CompilationError, CompilationErrorKind, CompilationResult};
 
 type VisitResult = Result<(), CompilationError>;
 
 /// Compile AST to VM instructions.
-pub fn compile(program: ast::Program, debug: bool) -> CompilationResult {
+pub fn compile(
+    builtins: &Builtins,
+    object_store: &ObjectStore,
+    program: ast::Program,
+    debug: bool,
+) -> CompilationResult {
     if debug {
         eprintln!("COMPILING:\n{:?}", program);
     }
 
-    let instructions = Visitor::visit(program)?;
+    let mut visitor = Visitor::new(builtins, object_store);
+    visitor.visit_program(program)?;
 
     if debug {
-        eprintln!("INSTRUCTIONS:\n{}", format_instructions(&instructions));
+        eprintln!("INSTRUCTIONS:\n{}", format_instructions(&visitor.instructions));
     }
 
-    Ok(instructions)
+    Ok(visitor.instructions)
 }
 
-struct Visitor {
+struct Visitor<'a> {
+    builtins: &'a Builtins,
+    object_store: &'a ObjectStore,
     instructions: Instructions,
 }
 
-impl Visitor {
-    fn new(instructions: Instructions) -> Self {
-        Self { instructions }
+impl<'a> Visitor<'a> {
+    fn new(builtins: &'a Builtins, object_store: &'a ObjectStore) -> Self {
+        Self { builtins, object_store, instructions: Instructions::new() }
     }
 
     fn err(&self, message: String) -> VisitResult {
         Err(CompilationError::new(CompilationErrorKind::VisitationError(message)))
     }
 
-    fn visit(program: ast::Program) -> Result<Instructions, CompilationError> {
-        let mut visitor = Visitor::default();
-        visitor.visit_program(program)?;
-        Ok(visitor.instructions)
-    }
-
     fn visit_program(&mut self, node: ast::Program) -> VisitResult {
-        // self.instructions.push(Instruction::StoreConst(builtins::NIL.clone()));
-        // self.instructions.push(Instruction::StoreConst(builtins::TRUE.clone()));
-        // self.instructions.push(Instruction::StoreConst(builtins::FALSE.clone()));
+        self.instructions.push(Instruction::StoreConst(self.builtins.nil_obj.clone()));
+        self.instructions.push(Instruction::StoreConst(self.builtins.true_obj.clone()));
+        self.instructions
+            .push(Instruction::StoreConst(self.builtins.false_obj.clone()));
         for statement in node.statements {
             self.visit_statement(statement)?;
         }
@@ -92,18 +95,11 @@ impl Visitor {
         match node.kind {
             // ast::LiteralKind::Float(value) => self.instructions.push(value),
             ast::LiteralKind::Int(value) => {
-                let value = Rc::new(builtins::Int::from(value));
-                let index = self.instructions.push(Instruction::StoreConst(value));
+                let value = Rc::new(self.builtins.new_int(value));
+                // let index = self.instructions.push(Instruction::StoreConst(value));
             }
             _ => self.err(format!("Unhandled literal: {:?}", node))?,
         }
         Ok(())
-    }
-}
-
-impl Default for Visitor {
-    fn default() -> Self {
-        let instructions = Instructions::new();
-        Visitor::new(instructions)
     }
 }

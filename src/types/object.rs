@@ -1,7 +1,6 @@
 use std::any::Any;
 use std::fmt;
 use std::rc::Rc;
-use std::sync::Arc;
 
 use super::builtins::{Bool, Float, Int};
 use super::class::Type;
@@ -10,7 +9,7 @@ use super::result::{ObjectError, ObjectErrorKind};
 
 /// Represents an instance of some type (AKA "class").
 pub trait Object {
-    fn class(&self) -> &Arc<Type>;
+    fn class(&self) -> &Rc<Type>;
 
     fn get_attribute(&self, name: &str) -> Result<&Rc<dyn Object>, ObjectError> {
         Err(ObjectError::new(ObjectErrorKind::AttributeDoesNotExist(name.to_owned())))

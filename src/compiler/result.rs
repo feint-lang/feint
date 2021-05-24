@@ -1,4 +1,5 @@
-use crate::vm::Instructions;
+use crate::types::Builtins;
+use crate::vm::{Instructions, ObjectStore};
 
 pub type CompilationResult = Result<Instructions, CompilationError>;
 

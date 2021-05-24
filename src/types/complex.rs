@@ -6,25 +6,24 @@ use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::fmt;
 use std::rc::Rc;
-use std::sync::Arc;
 
 use super::class::Type;
 use super::object::{Object, ObjectExt};
 use super::result::{ObjectError, ObjectErrorKind};
 
 pub struct ComplexObject {
-    class: Arc<Type>,
+    class: Rc<Type>,
     attributes: HashMap<String, Rc<dyn Object>>,
 }
 
 impl ComplexObject {
-    pub fn new(class: Arc<Type>) -> Self {
+    pub fn new(class: Rc<Type>) -> Self {
         Self { class: class.clone(), attributes: HashMap::new() }
     }
 }
 
 impl Object for ComplexObject {
-    fn class(&self) -> &Arc<Type> {
+    fn class(&self) -> &Rc<Type> {
         &self.class
     }
 

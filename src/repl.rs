@@ -95,7 +95,12 @@ impl<'a> Repl<'a> {
         }
 
         match parser::parse_text(text) {
-            Ok(program) => match compile(program, self.debug) {
+            Ok(program) => match compile(
+                &self.vm.builtins,
+                &self.vm.object_store,
+                program,
+                self.debug,
+            ) {
                 Ok(instructions) => match self.vm.execute(instructions) {
                     Ok(state) => self.vm_state_to_exit_result(state),
                     Err(err) => Some(self.handle_execution_err(err.kind)),
