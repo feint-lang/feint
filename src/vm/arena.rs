@@ -33,17 +33,12 @@ mod tests {
     fn test_add_retrieve() {
         let builtins = Builtins::new();
         let mut store = ObjectStore::new();
-
-        let int = Rc::new(builtins.new_int(0));
+        let int = builtins.new_int(0);
         let int_copy = int.clone();
-
         let index = store.add(int);
-
         let retrieved = store.get(index).unwrap();
-        let retrieved = retrieved.as_any().downcast_ref::<Int>().unwrap();
-
         assert_eq!(retrieved.class().id(), int_copy.class().id());
         assert_eq!(retrieved.id(), int_copy.id());
-        assert_eq!(retrieved, int_copy.as_ref());
+        assert_eq!(retrieved, &int_copy);
     }
 }

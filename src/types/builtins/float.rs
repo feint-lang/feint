@@ -1,4 +1,7 @@
 use std::fmt;
+use std::ops::{Add, Sub};
+
+use num_traits::ToPrimitive;
 
 use builtin_object_derive::BuiltinObject;
 
@@ -26,6 +29,48 @@ impl Float {
         eq_int_float(int, self)
     }
 }
+
+// Binary operations ---------------------------------------------------
+
+impl PartialEq<dyn Object> for Float {
+    fn eq(&self, rhs: &dyn Object) -> bool {
+        if let Some(rhs) = rhs.as_any().downcast_ref::<Float>() {
+            self == rhs
+        } else if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
+            self.eq_int(rhs)
+        } else {
+            panic!("Could not compare Float to {}", rhs.class());
+        }
+    }
+}
+
+fn rhs_to_f64(rhs: Rc<dyn Object>) -> f64 {
+    if let Some(rhs) = rhs.as_any().downcast_ref::<Float>() {
+        *rhs.value()
+    } else if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
+        rhs.value().to_f64().unwrap()
+    } else {
+        panic!("Could not convert {} to f64", rhs.class());
+    }
+}
+
+impl<'a> Add<Rc<dyn Object>> for &'a Float {
+    type Output = Rc<dyn Object>;
+    fn add(self, rhs: Rc<dyn Object>) -> Self::Output {
+        let value = &self.value + rhs_to_f64(rhs);
+        Rc::new(Float::new(self.class.clone(), value))
+    }
+}
+
+impl<'a> Sub<Rc<dyn Object>> for &'a Float {
+    type Output = Rc<dyn Object>;
+    fn sub(self, rhs: Rc<dyn Object>) -> Self::Output {
+        let value = &self.value - rhs_to_f64(rhs);
+        Rc::new(Float::new(self.class.clone(), value))
+    }
+}
+
+// Display -------------------------------------------------------------
 
 impl fmt::Display for Float {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

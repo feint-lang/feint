@@ -14,7 +14,7 @@ type VisitResult = Result<(), CompilationError>;
 /// Compile AST to VM instructions.
 pub fn compile(
     builtins: &Builtins,
-    object_store: &ObjectStore,
+    object_store: &mut ObjectStore,
     program: ast::Program,
     debug: bool,
 ) -> CompilationResult {
@@ -34,12 +34,12 @@ pub fn compile(
 
 struct Visitor<'a> {
     builtins: &'a Builtins,
-    object_store: &'a ObjectStore,
+    object_store: &'a mut ObjectStore,
     instructions: Instructions,
 }
 
 impl<'a> Visitor<'a> {
-    fn new(builtins: &'a Builtins, object_store: &'a ObjectStore) -> Self {
+    fn new(builtins: &'a Builtins, object_store: &'a mut ObjectStore) -> Self {
         Self { builtins, object_store, instructions: Instructions::new() }
     }
 
@@ -48,10 +48,10 @@ impl<'a> Visitor<'a> {
     }
 
     fn visit_program(&mut self, node: ast::Program) -> VisitResult {
-        self.instructions.push(Instruction::StoreConst(self.builtins.nil_obj.clone()));
-        self.instructions.push(Instruction::StoreConst(self.builtins.true_obj.clone()));
-        self.instructions
-            .push(Instruction::StoreConst(self.builtins.false_obj.clone()));
+        // Add singletons to bottom of stack for easy reference
+        self.object_store.add(self.builtins.nil_obj.clone()); // 0
+        self.object_store.add(self.builtins.true_obj.clone()); // 1
+        self.object_store.add(self.builtins.false_obj.clone()); // 2
         for statement in node.statements {
             self.visit_statement(statement)?;
         }
@@ -92,14 +92,16 @@ impl<'a> Visitor<'a> {
     }
 
     fn visit_literal(&mut self, node: ast::Literal) -> VisitResult {
-        match node.kind {
-            // ast::LiteralKind::Float(value) => self.instructions.push(value),
-            ast::LiteralKind::Int(value) => {
-                let value = Rc::new(self.builtins.new_int(value));
-                // let index = self.instructions.push(Instruction::StoreConst(value));
-            }
-            _ => self.err(format!("Unhandled literal: {:?}", node))?,
-        }
+        let value = match node.kind {
+            // ast::LiteralKind::Nil => self.builtins.nil_obj,
+            // ast::LiteralKind::Bool(true) => self.builtins.true_obj,
+            // ast::LiteralKind::Bool(false) => self.builtins.false_obj,
+            ast::LiteralKind::Float(value) => self.builtins.new_float(value),
+            ast::LiteralKind::Int(value) => self.builtins.new_int(value),
+            _ => return self.err(format!("Unhandled literal: {:?}", node)),
+        };
+        let index = self.object_store.add(value);
+        self.instructions.push(Instruction::LoadConst(index));
         Ok(())
     }
 }

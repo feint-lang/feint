@@ -27,7 +27,8 @@ impl fmt::Display for ExecutionError {
 #[derive(Debug)]
 pub enum ExecutionErrorKind {
     GenericError(String),
-    NotEnoughValuesOnStack,
+    ObjectStoreIndexError(usize),
+    NotEnoughValuesOnStack(String),
     ParserError(ParseError),
     CompilationError(CompilationError),
     UnhandledInstruction(String),

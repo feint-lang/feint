@@ -97,7 +97,7 @@ impl<'a> Repl<'a> {
         match parser::parse_text(text) {
             Ok(program) => match compile(
                 &self.vm.builtins,
-                &self.vm.object_store,
+                &mut self.vm.object_store,
                 program,
                 self.debug,
             ) {

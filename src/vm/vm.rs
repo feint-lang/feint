@@ -43,7 +43,7 @@ fn execute_parse_result(result: ParseResult, debug: bool) -> Result {
 /// Create a new VM and execute AST program.
 fn execute_program(program: ast::Program, debug: bool) -> Result {
     let mut vm = VM::default();
-    let result = compile(&vm.builtins, &vm.object_store, program, debug);
+    let result = compile(&vm.builtins, &mut vm.object_store, program, debug);
     match result {
         Ok(instructions) => vm.execute(instructions),
         Err(err) => Err(ExecutionError::new(ExecutionErrorKind::CompilationError(err))),
@@ -127,9 +127,13 @@ impl VM {
     /// Run the specified instruction and return the VM's state.
     pub fn execute_instruction(&mut self, instruction: &Instruction) -> Result {
         match instruction {
-            Instruction::Print => {
-                eprintln!("{:?}", self.stack.peek().unwrap_or(&0usize));
-            }
+            Instruction::Print => match self.stack.peek() {
+                Some(index) => {
+                    let value = self.object_store.get(*index).unwrap();
+                    eprintln!("{}", value);
+                }
+                None => eprintln!("Stack is empty"),
+            },
             Instruction::Push(value) => {
                 // TODO: Check if empty and return err if so
                 self.stack.push(*value);
@@ -138,16 +142,12 @@ impl VM {
                 // TODO: Check if empty and return err if so
                 self.stack.pop().unwrap();
             }
-            Instruction::StoreConst(obj) => {
-                let index = self.object_store.add(obj.clone());
-                self.stack.push(index);
-            }
             Instruction::LoadConst(index) => {
-                let obj = self.object_store.get(*index).unwrap();
+                self.stack.push(*index);
             }
-            Instruction::UnaryOp(operator) => {
+            Instruction::UnaryOp(op) => {
                 if let Some(a) = self.pop() {
-                    let value = match operator {
+                    let value = match op {
                         UnaryOperator::Plus => a,
                         // FIXME: Can't negate usize
                         UnaryOperator::Negate => a,
@@ -155,24 +155,34 @@ impl VM {
                     };
                     self.stack.push(value);
                 } else {
-                    self.err(ExecutionErrorKind::NotEnoughValuesOnStack)?;
+                    let message = format!("Unary op: {}", op);
+                    self.err(ExecutionErrorKind::NotEnoughValuesOnStack(message))?;
                 };
             }
-            Instruction::BinaryOp(operator) => {
-                if let Some((b, a)) = self.pop_top_two() {
-                    let value = match operator {
-                        BinaryOperator::Assign => 1,
-                        BinaryOperator::Add => a + b,
-                        BinaryOperator::Subtract => a - b,
-                        BinaryOperator::Multiply => a * b,
-                        BinaryOperator::Divide => a / b,
-                        BinaryOperator::FloorDiv => a / b,
-                        BinaryOperator::Modulo => a % b,
-                        BinaryOperator::Raise => a.pow(b as u32),
+            Instruction::BinaryOp(op) => {
+                if let Some((j, i)) = self.pop_top_two() {
+                    let a = self.object_store.get(i).unwrap();
+                    let b = self.object_store.get(j).unwrap();
+                    let value = match op {
+                        // BinaryOperator::Assign => 1,
+                        BinaryOperator::Add => a.add(b.clone()),
+                        BinaryOperator::Subtract => a.sub(b.clone()),
+                        // BinaryOperator::Multiply => a * b,
+                        // BinaryOperator::Divide => a / b,
+                        // BinaryOperator::FloorDiv => a / b,
+                        // BinaryOperator::Modulo => a % b,
+                        // BinaryOperator::Raise => a.pow(b as u32),
+                        _ => {
+                            return self.err(ExecutionErrorKind::UnhandledInstruction(
+                                format!("BinaryOp: {}", op),
+                            ));
+                        }
                     };
-                    self.stack.push(value);
+                    let index = self.object_store.add(value);
+                    self.stack.push(index);
                 } else {
-                    self.err(ExecutionErrorKind::NotEnoughValuesOnStack)?;
+                    let message = format!("Binary op: {}", op);
+                    self.err(ExecutionErrorKind::NotEnoughValuesOnStack(message))?;
                 };
             }
             Instruction::Return => {
@@ -238,9 +248,9 @@ mod tests {
     fn execute_simple_program() {
         let builtins = Builtins::new();
         let mut vm = VM::default();
+        vm.object_store.add(vm.builtins.new_int(1));
+        vm.object_store.add(vm.builtins.new_int(2));
         let instructions: Instructions = vec![
-            Instruction::StoreConst(Rc::new(builtins.new_int(1))),
-            Instruction::StoreConst(Rc::new(builtins.new_int(2))),
             Instruction::LoadConst(1),
             Instruction::LoadConst(0),
             Instruction::BinaryOp(BinaryOperator::Add),

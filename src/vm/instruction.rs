@@ -16,7 +16,6 @@ pub enum Instruction {
     UnaryOp(UnaryOperator),
     BinaryOp(BinaryOperator),
     Return,
-    StoreConst(Rc<Object>),
     LoadConst(usize),
     Halt(i32),
     Print, // Print value at top of stack
@@ -25,7 +24,6 @@ pub enum Instruction {
 impl fmt::Display for Instruction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let string = match self {
-            Self::StoreConst(v) => format_aligned("STORE_CONST", v),
             Self::LoadConst(v) => format_aligned("LOAD_CONST", v),
             Self::UnaryOp(operator) => format_aligned("UNARY_OP", operator),
             Self::BinaryOp(operator) => format_aligned("BINARY_OP", operator),
@@ -37,7 +35,7 @@ impl fmt::Display for Instruction {
 }
 
 fn format_aligned<T: fmt::Display>(name: &str, value: T) -> String {
-    format!("{: <w$}{: >x$}", name, value, w = 16, x = 4)
+    format!("{: <w$}{: <x$}", name, value, w = 16, x = 4)
 }
 
 /// Return a nicely formatted string of instructions.

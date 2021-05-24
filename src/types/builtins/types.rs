@@ -48,15 +48,15 @@ impl Builtins {
 
     // Builtin type constructors
 
-    pub fn new_float<F: Into<f64>>(&self, value: F) -> super::Float {
+    pub fn new_float<F: Into<f64>>(&self, value: F) -> Rc<dyn Object> {
         let class = self.get_type("Float").clone();
         let value = value.into();
-        super::Float::new(class, value)
+        Rc::new(super::Float::new(class, value))
     }
 
-    pub fn new_int<I: Into<BigInt>>(&self, value: I) -> super::Int {
+    pub fn new_int<I: Into<BigInt>>(&self, value: I) -> Rc<dyn Object> {
         let class = self.get_type("Float").clone();
         let value = value.into();
-        super::Int::new(class, value)
+        Rc::new(super::Int::new(class, value))
     }
 }

@@ -48,6 +48,8 @@ impl Object for ComplexObject {
     }
 }
 
+// Binary operations ---------------------------------------------------
+
 impl PartialEq for ComplexObject {
     fn eq(&self, other: &Self) -> bool {
         if self.is(other) {
@@ -56,6 +58,18 @@ impl PartialEq for ComplexObject {
         self.attributes == other.attributes
     }
 }
+
+impl PartialEq<dyn Object> for ComplexObject {
+    fn eq(&self, rhs: &dyn Object) -> bool {
+        if let Some(rhs) = rhs.as_any().downcast_ref::<ComplexObject>() {
+            self == rhs
+        } else {
+            panic!("Could not compare {} to {}", self.class(), rhs.class());
+        }
+    }
+}
+
+// Display -------------------------------------------------------------
 
 impl fmt::Debug for ComplexObject {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
