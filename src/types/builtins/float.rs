@@ -34,7 +34,7 @@ impl Float {
     }
 }
 
-// Binary operations ---------------------------------------------------
+// Equality ------------------------------------------------------------
 
 impl PartialEq<dyn Object> for Float {
     fn eq(&self, rhs: &dyn Object) -> bool {
@@ -48,47 +48,31 @@ impl PartialEq<dyn Object> for Float {
     }
 }
 
-fn rhs_to_f64(rhs: Rc<dyn Object>) -> f64 {
-    if let Some(rhs) = rhs.as_any().downcast_ref::<Float>() {
-        *rhs.value()
-    } else if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
-        rhs.value().to_f64().unwrap()
-    } else {
-        panic!("Could not convert {} to f64", rhs.class());
-    }
+// Binary operations ---------------------------------------------------
+
+macro_rules! make_op {
+    ( $trait:ident, $meth:ident, $op:tt, $message:literal ) => {
+        impl<'a> $trait<Rc<dyn Object>> for &'a Float {
+            type Output = Rc<dyn Object>;
+            fn $meth(self, rhs: Rc<dyn Object>) -> Self::Output {
+                let value = if let Some(rhs) = rhs.as_any().downcast_ref::<Float>() {
+                    *rhs.value()
+                } else if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
+                    rhs.value().to_f64().unwrap()
+                } else {
+                    panic!($message, rhs.class());
+                };
+                let value = &self.value $op value;
+                Rc::new(Float::new(self.class.clone(), value))
+            }
+        }
+    };
 }
 
-impl<'a> Mul<Rc<dyn Object>> for &'a Float {
-    type Output = Rc<dyn Object>;
-    fn mul(self, rhs: Rc<dyn Object>) -> Self::Output {
-        let value = &self.value * rhs_to_f64(rhs);
-        Rc::new(Float::new(self.class.clone(), value))
-    }
-}
-
-impl<'a> Div<Rc<dyn Object>> for &'a Float {
-    type Output = Rc<dyn Object>;
-    fn div(self, rhs: Rc<dyn Object>) -> Self::Output {
-        let value = &self.value / rhs_to_f64(rhs);
-        Rc::new(Float::new(self.class.clone(), value))
-    }
-}
-
-impl<'a> Add<Rc<dyn Object>> for &'a Float {
-    type Output = Rc<dyn Object>;
-    fn add(self, rhs: Rc<dyn Object>) -> Self::Output {
-        let value = &self.value + rhs_to_f64(rhs);
-        Rc::new(Float::new(self.class.clone(), value))
-    }
-}
-
-impl<'a> Sub<Rc<dyn Object>> for &'a Float {
-    type Output = Rc<dyn Object>;
-    fn sub(self, rhs: Rc<dyn Object>) -> Self::Output {
-        let value = &self.value - rhs_to_f64(rhs);
-        Rc::new(Float::new(self.class.clone(), value))
-    }
-}
+make_op!(Mul, mul, *, "Could not multiply {:?} with Float");
+make_op!(Div, div, /, "Could not divide {:?} into Float");
+make_op!(Add, add, +, "Could not add {:?} to Float");
+make_op!(Sub, sub, -, "Could not subtract {:?} from Float");
 
 // Display -------------------------------------------------------------
 

@@ -35,7 +35,7 @@ impl Int {
     }
 }
 
-// Binary operations ---------------------------------------------------
+// Equality ------------------------------------------------------------
 
 impl PartialEq<dyn Object> for Int {
     fn eq(&self, rhs: &dyn Object) -> bool {
@@ -49,65 +49,33 @@ impl PartialEq<dyn Object> for Int {
     }
 }
 
-impl<'a> Mul<Rc<dyn Object>> for &'a Int {
-    type Output = Rc<dyn Object>;
-    fn mul(self, rhs: Rc<dyn Object>) -> Self::Output {
-        if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
-            let value = self.value() * rhs.value();
-            Rc::new(Int::new(self.class.clone(), value))
-        } else if let Some(rhs) = rhs.as_any().downcast_ref::<Float>() {
-            let value = self.value().to_f64().unwrap() * rhs.value();
-            Rc::new(Float::new(rhs.class().clone(), value))
-        } else {
-            panic!("Could not multiply {:?} with Int", rhs.class());
+// Binary operations ---------------------------------------------------
+
+macro_rules! make_op {
+    ( $trait:ident, $meth:ident, $op:tt, $message:literal ) => {
+        impl<'a> $trait<Rc<dyn Object>> for &'a Int {
+            type Output = Rc<dyn Object>;
+            fn $meth(self, rhs: Rc<dyn Object>) -> Self::Output {
+                if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
+                    // XXX: Return Int
+                    let value = self.value() $op rhs.value();
+                    Rc::new(Int::new(self.class.clone(), value))
+                } else if let Some(rhs) = rhs.as_any().downcast_ref::<Float>() {
+                    // XXX: Return Float
+                    let value = self.value().to_f64().unwrap() $op rhs.value();
+                    Rc::new(Float::new(rhs.class().clone(), value))
+                } else {
+                    panic!($message, rhs.class());
+                }
+            }
         }
-    }
+    };
 }
 
-impl<'a> Div<Rc<dyn Object>> for &'a Int {
-    type Output = Rc<dyn Object>;
-    fn div(self, rhs: Rc<dyn Object>) -> Self::Output {
-        if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
-            let value = self.value() / rhs.value();
-            Rc::new(Int::new(self.class.clone(), value))
-        } else if let Some(rhs) = rhs.as_any().downcast_ref::<Float>() {
-            let value = self.value().to_f64().unwrap() / rhs.value();
-            Rc::new(Float::new(rhs.class().clone(), value))
-        } else {
-            panic!("Could not divide {:?} into Int", rhs.class());
-        }
-    }
-}
-
-impl<'a> Add<Rc<dyn Object>> for &'a Int {
-    type Output = Rc<dyn Object>;
-    fn add(self, rhs: Rc<dyn Object>) -> Self::Output {
-        if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
-            let value = self.value() + rhs.value();
-            Rc::new(Int::new(self.class.clone(), value))
-        } else if let Some(rhs) = rhs.as_any().downcast_ref::<Float>() {
-            let value = self.value().to_f64().unwrap() + rhs.value();
-            Rc::new(Float::new(rhs.class().clone(), value))
-        } else {
-            panic!("Could not add {:?} to Int", rhs.class());
-        }
-    }
-}
-
-impl<'a> Sub<Rc<dyn Object>> for &'a Int {
-    type Output = Rc<dyn Object>;
-    fn sub(self, rhs: Rc<dyn Object>) -> Self::Output {
-        if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
-            let value = self.value() - rhs.value();
-            Rc::new(Int::new(self.class.clone(), value))
-        } else if let Some(rhs) = rhs.as_any().downcast_ref::<Float>() {
-            let value = self.value().to_f64().unwrap() - rhs.value();
-            Rc::new(Float::new(rhs.class().clone(), value))
-        } else {
-            panic!("Could not subtract {:?} from Int", rhs.class());
-        }
-    }
-}
+make_op!(Mul, mul, *, "Could not multiply {:?} with Int");
+make_op!(Div, div, /, "Could not divide {:?} into Int");
+make_op!(Add, add, +, "Could not add {:?} to Int");
+make_op!(Sub, sub, -, "Could not subtract {:?} from Int");
 
 // Display -------------------------------------------------------------
 
