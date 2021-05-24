@@ -27,6 +27,10 @@ impl Object for ComplexObject {
         &self.class
     }
 
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
     fn get_attribute(&self, name: &str) -> Result<&Rc<dyn Object>, ObjectError> {
         if let Some(value) = self.attributes.get(name) {
             return Ok(value);
@@ -41,10 +45,6 @@ impl Object for ComplexObject {
     ) -> Result<(), ObjectError> {
         self.attributes.insert(name.to_owned(), value.clone());
         Ok(())
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
     }
 }
 

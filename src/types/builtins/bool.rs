@@ -1,6 +1,10 @@
 use std::fmt;
+use std::rc::Rc;
 
 use builtin_object_derive::BuiltinObject;
+
+use super::super::class::Type;
+use super::super::object::Object;
 
 /// Built in boolean type
 #[derive(Debug, PartialEq, BuiltinObject)]

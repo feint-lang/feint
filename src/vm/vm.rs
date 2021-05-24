@@ -163,12 +163,13 @@ impl VM {
                 if let Some((j, i)) = self.pop_top_two() {
                     let a = self.object_store.get(i).unwrap();
                     let b = self.object_store.get(j).unwrap();
+                    let b = b.clone();
                     let value = match op {
                         // BinaryOperator::Assign => 1,
-                        BinaryOperator::Add => a.add(b.clone()),
-                        BinaryOperator::Subtract => a.sub(b.clone()),
-                        // BinaryOperator::Multiply => a * b,
-                        // BinaryOperator::Divide => a / b,
+                        BinaryOperator::Add => a.add(b),
+                        BinaryOperator::Subtract => a.sub(b),
+                        BinaryOperator::Multiply => a.mul(b),
+                        BinaryOperator::Divide => a.div(b),
                         // BinaryOperator::FloorDiv => a / b,
                         // BinaryOperator::Modulo => a % b,
                         // BinaryOperator::Raise => a.pow(b as u32),

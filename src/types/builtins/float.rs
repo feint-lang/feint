@@ -1,9 +1,13 @@
 use std::fmt;
-use std::ops::{Add, Sub};
+use std::ops::{Add, Div, Mul, Sub};
+use std::rc::Rc;
 
 use num_traits::ToPrimitive;
 
 use builtin_object_derive::BuiltinObject;
+
+use super::super::class::Type;
+use super::super::object::Object;
 
 use super::cmp::eq_int_float;
 use super::int::Int;
@@ -54,6 +58,22 @@ fn rhs_to_f64(rhs: Rc<dyn Object>) -> f64 {
     }
 }
 
+impl<'a> Mul<Rc<dyn Object>> for &'a Float {
+    type Output = Rc<dyn Object>;
+    fn mul(self, rhs: Rc<dyn Object>) -> Self::Output {
+        let value = &self.value * rhs_to_f64(rhs);
+        Rc::new(Float::new(self.class.clone(), value))
+    }
+}
+
+impl<'a> Div<Rc<dyn Object>> for &'a Float {
+    type Output = Rc<dyn Object>;
+    fn div(self, rhs: Rc<dyn Object>) -> Self::Output {
+        let value = &self.value / rhs_to_f64(rhs);
+        Rc::new(Float::new(self.class.clone(), value))
+    }
+}
+
 impl<'a> Add<Rc<dyn Object>> for &'a Float {
     type Output = Rc<dyn Object>;
     fn add(self, rhs: Rc<dyn Object>) -> Self::Output {
@@ -77,29 +97,3 @@ impl fmt::Display for Float {
         write!(f, "{}", self.value)
     }
 }
-
-// macro_rules! float_from {
-//     ($($T:ty),+) => { $(
-//         impl From<$T> for Float {
-//             fn from(value: $T) -> Self {
-//                 let value = value as f64;
-//                 Float::new(value)
-//             }
-//         }
-//     )+ };
-// }
-//
-// float_from!(f32, f64, i8, u8, i16, u16, i32, u32, i64, u64, i128, u128);
-//
-// macro_rules! float_from_string {
-//     ($($T:ty),+) => { $(
-//         impl From<$T> for Float {
-//             fn from(value: $T) -> Self {
-//                 let value = value.parse::<f64>().unwrap();
-//                 Float::new(value)
-//             }
-//         }
-//     )+ };
-// }
-//
-// float_from_string!(&str, String, &String);

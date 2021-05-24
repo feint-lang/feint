@@ -18,6 +18,29 @@ macro_rules! binop {
 /// Represents an instance of some type (AKA "class").
 pub trait Object {
     fn class(&self) -> &Rc<Type>;
+    fn as_any(&self) -> &dyn Any;
+
+    fn id(&self) -> usize {
+        let p = self as *const Self;
+        let p = p as *const () as usize;
+        p
+    }
+
+    fn name(&self) -> String {
+        self.class().name().to_owned()
+    }
+
+    // Binary operations -----------------------------------------------
+
+    fn mul(&self, rhs: Rc<dyn Object>) -> Rc<dyn Object> {
+        binop!(self, *, rhs, Float, Int);
+        panic!("Could not multiply items: {} + {}", self.class(), rhs.class());
+    }
+
+    fn div(&self, rhs: Rc<dyn Object>) -> Rc<dyn Object> {
+        binop!(self, /, rhs, Float, Int);
+        panic!("Could not divide items: {} + {}", self.class(), rhs.class());
+    }
 
     fn add(&self, rhs: Rc<dyn Object>) -> Rc<dyn Object> {
         binop!(self, +, rhs, Float, Int);
@@ -28,6 +51,8 @@ pub trait Object {
         binop!(self, -, rhs, Float, Int);
         panic!("Could not subtract items: {} - {}", self.class(), rhs.class());
     }
+
+    // Attributes ------------------------------------------------------
 
     fn get_attribute(&self, name: &str) -> Result<&Rc<dyn Object>, ObjectError> {
         Err(ObjectError::new(ObjectErrorKind::AttributeDoesNotExist(name.to_owned())))
@@ -40,18 +65,6 @@ pub trait Object {
     ) -> Result<(), ObjectError> {
         Err(ObjectError::new(ObjectErrorKind::AttributeCannotBeSet(name.to_owned())))
     }
-
-    fn id(&self) -> usize {
-        let p = self as *const Self;
-        let p = p as *const () as usize;
-        p
-    }
-
-    fn name(&self) -> String {
-        self.class().name().to_owned()
-    }
-
-    fn as_any(&self) -> &dyn Any;
 }
 
 // Object extensions ---------------------------------------------------
@@ -67,7 +80,7 @@ impl<T: Object + ?Sized> ObjectExt for T {}
 
 // Equality ------------------------------------------------------------
 
-/// Defer to concrete type by downcasting.
+/// Delegate to concrete type by downcasting.
 impl PartialEq for dyn Object {
     fn eq(&self, other: &Self) -> bool {
         // This should catch Bool (when both true or both false) and Nil
