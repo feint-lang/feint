@@ -1,6 +1,6 @@
 pub(crate) use builtins::Builtins;
-pub(crate) use class::Type;
-pub(crate) use object::{Object, ObjectExt};
+pub(crate) use class::{Type, TypeRef};
+pub(crate) use object::{Object, ObjectExt, ObjectRef};
 
 pub(crate) mod builtins;
 

@@ -6,8 +6,8 @@ use std::rc::Rc;
 use num_bigint::BigInt;
 use num_traits::{FromPrimitive, ToPrimitive};
 
-use super::super::class::Type;
-use super::super::object::{Object, ObjectExt};
+use super::super::class::{Type, TypeRef};
+use super::super::object::{Object, ObjectExt, ObjectRef};
 
 use super::cmp::eq_int_float;
 use super::float::Float;
@@ -15,12 +15,12 @@ use super::float::Float;
 /// Built in integer type
 #[derive(Debug, PartialEq)]
 pub struct Int {
-    class: Rc<Type>,
+    class: TypeRef,
     value: BigInt,
 }
 
 impl Int {
-    pub fn new(class: Rc<Type>, value: BigInt) -> Self {
+    pub fn new(class: TypeRef, value: BigInt) -> Self {
         Self { class: class.clone(), value }
     }
 
@@ -36,7 +36,7 @@ impl Int {
 
 macro_rules! make_op {
     ( $meth:ident, $op:tt, $message:literal ) => {
-        fn $meth(&self, rhs: Rc<dyn Object>) -> Rc<dyn Object> {
+        fn $meth(&self, rhs: ObjectRef) -> ObjectRef {
             if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
                 // XXX: Return Int
                 let value = self.value() $op rhs.value();
@@ -53,7 +53,7 @@ macro_rules! make_op {
 }
 
 impl Object for Int {
-    fn class(&self) -> &Rc<Type> {
+    fn class(&self) -> &TypeRef {
         &self.class
     }
 
@@ -61,7 +61,7 @@ impl Object for Int {
         self
     }
 
-    fn is_equal(&self, rhs: Rc<dyn Object>) -> bool {
+    fn is_equal(&self, rhs: ObjectRef) -> bool {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
             return self.is(rhs) || self == rhs;
         } else if let Some(rhs) = rhs.as_any().downcast_ref::<Float>() {

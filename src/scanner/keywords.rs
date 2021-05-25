@@ -7,6 +7,7 @@ use super::{Token, Token::*};
 lazy_static! {
     /// Map of keywords to their respective Tokens.
     pub static ref KEYWORDS: HashMap<&'static str, Token> = [
+        ("nil", Nil),
         ("true", True),
         ("false", False),
         ("import", Import),
@@ -24,6 +25,7 @@ lazy_static! {
         ("while", While),     // ???
         ("break", Break),
         ("continue", Continue),
+        ("print", Print),
     ]
     .iter()
     .cloned()

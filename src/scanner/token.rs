@@ -64,8 +64,9 @@ pub enum Token {
     BlockEnd,   // End of indented block
 
     // Keywords
-    True,     //true
-    False,    //false
+    Nil,      // nil
+    True,     // true
+    False,    // false
     Import,   // import <module>
     From,     // import from <module>: x, y, z
     Package,  // import from package.<module>: x, y, z
@@ -81,6 +82,7 @@ pub enum Token {
     While,    // ??? or use <-
     Break,    // break
     Continue, // continue
+    Print,    // print (TEMP)
 
     // Identifiers
     Identifier(String),              // name

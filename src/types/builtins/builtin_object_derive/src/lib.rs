@@ -26,7 +26,7 @@ fn impl_builtin_object_derive(ast: &syn::DeriveInput) -> TokenStream {
         use std::any::Any;
 
         impl Object for #name {
-            fn class(&self) -> &Rc<Type> {
+            fn class(&self) -> &TypeRef {
                 &self.class
             }
 
@@ -34,7 +34,7 @@ fn impl_builtin_object_derive(ast: &syn::DeriveInput) -> TokenStream {
                 self
             }
 
-            fn is_equal(&self, rhs: Rc<dyn Object>) -> bool {
+            fn is_equal(&self, rhs: ObjectRef) -> bool {
                 if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
                     return self.is(rhs) || self == rhs;
                 }

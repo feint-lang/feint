@@ -3,7 +3,7 @@ use std::rc::Rc;
 use num_traits::cast::ToPrimitive;
 
 use crate::ast;
-use crate::types::builtins::Builtins;
+use crate::types::{builtins::Builtins, ObjectRef};
 use crate::util::BinaryOperator;
 use crate::vm::{format_instructions, Instruction, Instructions, ObjectStore};
 
@@ -47,17 +47,27 @@ impl<'a> Visitor<'a> {
         Err(CompilationError::new(CompilationErrorKind::VisitationError(message)))
     }
 
+    /// Push instruction
+    fn push(&mut self, instruction: Instruction) {
+        self.instructions.push(instruction);
+    }
+
     fn visit_program(&mut self, node: ast::Program) -> VisitResult {
         for statement in node.statements {
             self.visit_statement(statement)?;
         }
-        self.instructions.push(Instruction::Print);
-        self.instructions.push(Instruction::Halt(0));
+        self.push(Instruction::Halt(0));
         Ok(())
     }
 
     fn visit_statement(&mut self, node: ast::Statement) -> VisitResult {
         match node.kind {
+            ast::StatementKind::Print(maybe_expr) => {
+                if let Some(expr) = maybe_expr {
+                    self.visit_expr(*expr)?;
+                }
+                self.push(Instruction::Print);
+            }
             ast::StatementKind::Expr(expr) => self.visit_expr(*expr)?,
             _ => self.err(format!("Unhandled statement: {:?}", node))?,
         }
@@ -83,21 +93,32 @@ impl<'a> Visitor<'a> {
     ) -> VisitResult {
         self.visit_expr(expr_a)?;
         self.visit_expr(expr_b)?;
-        self.instructions.push(Instruction::BinaryOp(op));
+        self.push(Instruction::BinaryOp(op));
         Ok(())
     }
 
+    fn push_const(&mut self, index: usize) {
+        self.push(Instruction::LoadConst(index));
+    }
+
+    fn add_const(&mut self, val: ObjectRef) {
+        let index = self.object_store.add(val);
+        self.push_const(index);
+    }
+
     fn visit_literal(&mut self, node: ast::Literal) -> VisitResult {
-        let value = match node.kind {
-            // ast::LiteralKind::Nil => self.builtins.nil_obj,
-            // ast::LiteralKind::Bool(true) => self.builtins.true_obj,
-            // ast::LiteralKind::Bool(false) => self.builtins.false_obj,
-            ast::LiteralKind::Float(value) => self.builtins.new_float(value),
-            ast::LiteralKind::Int(value) => self.builtins.new_int(value),
+        match node.kind {
+            ast::LiteralKind::Nil => self.push_const(0),
+            ast::LiteralKind::Bool(true) => self.push_const(1),
+            ast::LiteralKind::Bool(false) => self.push_const(2),
+            ast::LiteralKind::Float(value) => {
+                self.add_const(self.builtins.new_float(value))
+            }
+            ast::LiteralKind::Int(value) => {
+                self.add_const(self.builtins.new_int(value))
+            }
             _ => return self.err(format!("Unhandled literal: {:?}", node)),
-        };
-        let index = self.object_store.add(value);
-        self.instructions.push(Instruction::LoadConst(index));
+        }
         Ok(())
     }
 }

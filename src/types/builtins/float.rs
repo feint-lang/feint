@@ -5,8 +5,8 @@ use std::rc::Rc;
 
 use num_traits::ToPrimitive;
 
-use super::super::class::Type;
-use super::super::object::{Object, ObjectExt};
+use super::super::class::{Type, TypeRef};
+use super::super::object::{Object, ObjectExt, ObjectRef};
 
 use super::cmp::eq_int_float;
 use super::int::Int;
@@ -14,12 +14,12 @@ use super::int::Int;
 /// Built in 64-bit float type
 #[derive(Debug, PartialEq)]
 pub struct Float {
-    class: Rc<Type>,
+    class: TypeRef,
     value: f64,
 }
 
 impl Float {
-    pub fn new(class: Rc<Type>, value: f64) -> Self {
+    pub fn new(class: TypeRef, value: f64) -> Self {
         Self { class: class.clone(), value }
     }
 
@@ -35,7 +35,7 @@ impl Float {
 
 macro_rules! make_op {
     ( $meth:ident, $op:tt, $message:literal ) => {
-        fn $meth(&self, rhs: Rc<dyn Object>) -> Rc<dyn Object> {
+        fn $meth(&self, rhs: ObjectRef) -> ObjectRef {
             let value = if let Some(rhs) = rhs.as_any().downcast_ref::<Float>() {
                 *rhs.value()
             } else if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
@@ -50,7 +50,7 @@ macro_rules! make_op {
 }
 
 impl Object for Float {
-    fn class(&self) -> &Rc<Type> {
+    fn class(&self) -> &TypeRef {
         &self.class
     }
 
@@ -58,7 +58,7 @@ impl Object for Float {
         self
     }
 
-    fn is_equal(&self, rhs: Rc<dyn Object>) -> bool {
+    fn is_equal(&self, rhs: ObjectRef) -> bool {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
             return self.is(rhs) || self == rhs;
         } else if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {

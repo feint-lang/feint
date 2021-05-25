@@ -37,11 +37,20 @@ pub struct Statement {
 #[derive(PartialEq)]
 pub enum StatementKind {
     Expr(Box<Expr>),
+    Print(Option<Box<Expr>>),
 }
 
 impl Statement {
     pub fn new(kind: StatementKind) -> Self {
         Self { kind }
+    }
+
+    pub fn new_print(expr: Option<Expr>) -> Self {
+        let arg = match expr {
+            None => None,
+            Some(expr) => Some(Box::new(expr)),
+        };
+        Self { kind: StatementKind::Print(arg) }
     }
 
     pub fn new_expr(expr: Expr) -> Self {
@@ -58,9 +67,8 @@ impl fmt::Debug for Statement {
 impl fmt::Debug for StatementKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Expr(expr) => {
-                write!(f, "Expr({:?})", expr)
-            }
+            Self::Expr(expr) => write!(f, "Expr({:?})", expr),
+            Self::Print(expr) => write!(f, "Print({:?})", expr),
         }
     }
 }
@@ -156,6 +164,8 @@ pub struct Literal {
 
 #[derive(PartialEq)]
 pub enum LiteralKind {
+    Nil,
+    Bool(bool),
     Float(f64),
     Int(BigInt),
 }
@@ -163,6 +173,14 @@ pub enum LiteralKind {
 impl Literal {
     pub fn new(kind: LiteralKind) -> Self {
         Self { kind }
+    }
+
+    pub fn new_nil() -> Self {
+        Self { kind: LiteralKind::Nil }
+    }
+
+    pub fn new_bool(value: bool) -> Self {
+        Self { kind: LiteralKind::Bool(value) }
     }
 
     pub fn new_float(value: f64) -> Self {
@@ -183,6 +201,8 @@ impl fmt::Debug for Literal {
 impl fmt::Debug for LiteralKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let string = match self {
+            Self::Nil => "nil".to_string(),
+            Self::Bool(value) => value.to_string(),
             Self::Float(value) => value.to_string(),
             Self::Int(value) => value.to_string(),
         };

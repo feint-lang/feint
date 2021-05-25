@@ -130,13 +130,24 @@ impl<T: BufRead> Parser<T> {
     fn statements(&mut self) -> Result<Vec<ast::Statement>, ParseError> {
         let mut statements = vec![];
         loop {
-            if self.peek_token()?.is_none() {
-                break;
-            }
-            if let Some(expr) = self.expr(0)? {
-                let statement = ast::Statement::new_expr(expr);
-                statements.push(statement);
-            }
+            let peek = self.peek_token()?;
+            match peek {
+                None => break,
+                Some(TokenWithLocation {token: Token::Print, ..}) => {
+                    self.next_token();
+                    let statement = match self.expr(0)? {
+                        Some(expr) => ast::Statement::new_print(Some(expr)),
+                        None => ast::Statement::new_print(None),
+                    };
+                    statements.push(statement);
+                },
+                _ => {
+                    if let Some(expr) = self.expr(0)? {
+                        let statement = ast::Statement::new_expr(expr);
+                        statements.push(statement);
+                    };
+                }
+            };
         }
         Ok(statements)
     }
@@ -153,6 +164,9 @@ impl<T: BufRead> Parser<T> {
             }
             // First, try for a literal or identifier, since they're
             // leaf nodes.
+            Token::Nil => ast::Expr::new_literal(ast::Literal::new_nil()),
+            Token::True => ast::Expr::new_literal(ast::Literal::new_bool(true)),
+            Token::False => ast::Expr::new_literal(ast::Literal::new_bool(false)),
             Token::Float(value) => {
                 ast::Expr::new_literal(ast::Literal::new_float(value))
             }

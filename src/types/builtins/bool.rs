@@ -3,18 +3,18 @@ use std::rc::Rc;
 
 use builtin_object_derive::BuiltinObject;
 
-use super::super::class::Type;
-use super::super::object::{Object, ObjectExt};
+use super::super::class::{Type, TypeRef};
+use super::super::object::{Object, ObjectExt, ObjectRef};
 
 /// Built in boolean type
 #[derive(Debug, PartialEq, BuiltinObject)]
 pub struct Bool {
-    class: Rc<Type>,
+    class: TypeRef,
     value: bool,
 }
 
 impl Bool {
-    pub fn new(class: Rc<Type>, value: bool) -> Self {
+    pub fn new(class: TypeRef, value: bool) -> Self {
         Self { class: class.clone(), value }
     }
 

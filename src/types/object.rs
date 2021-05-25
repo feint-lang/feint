@@ -3,13 +3,15 @@ use std::fmt;
 use std::rc::Rc;
 
 use super::builtins::{Bool, Float, Int, Nil};
-use super::class::Type;
+use super::class::{Type, TypeRef};
 use super::complex::ComplexObject;
 use super::result::{ObjectError, ObjectErrorKind};
 
+pub type ObjectRef = Rc<dyn Object>;
+
 /// Represents an instance of some type (AKA "class").
 pub trait Object {
-    fn class(&self) -> &Rc<Type>;
+    fn class(&self) -> &TypeRef;
     fn as_any(&self) -> &dyn Any;
 
     fn id(&self) -> usize {
@@ -22,7 +24,7 @@ pub trait Object {
         self.class().name().to_owned()
     }
 
-    fn is_equal(&self, rhs: Rc<dyn Object>) -> bool {
+    fn is_equal(&self, rhs: ObjectRef) -> bool {
         // This should catch Bool (when both true or both false) and Nil
         // (always), since they're singletons.
         panic!("is_equal not implemented for type: {}", self.class());
@@ -30,32 +32,32 @@ pub trait Object {
 
     // Binary operations -----------------------------------------------
 
-    fn mul(&self, rhs: Rc<dyn Object>) -> Rc<dyn Object> {
+    fn mul(&self, rhs: ObjectRef) -> ObjectRef {
         panic!("mul not implemented for type: {}", self.class());
     }
 
-    fn div(&self, rhs: Rc<dyn Object>) -> Rc<dyn Object> {
+    fn div(&self, rhs: ObjectRef) -> ObjectRef {
         panic!("div not implemented for type: {}", self.class());
     }
 
-    fn add(&self, rhs: Rc<dyn Object>) -> Rc<dyn Object> {
+    fn add(&self, rhs: ObjectRef) -> ObjectRef {
         panic!("add not implemented for type: {}", self.class());
     }
 
-    fn sub(&self, rhs: Rc<dyn Object>) -> Rc<dyn Object> {
+    fn sub(&self, rhs: ObjectRef) -> ObjectRef {
         panic!("sub not implemented for type: {}", self.class());
     }
 
     // Attributes ------------------------------------------------------
 
-    fn get_attribute(&self, name: &str) -> Result<&Rc<dyn Object>, ObjectError> {
+    fn get_attribute(&self, name: &str) -> Result<&ObjectRef, ObjectError> {
         Err(ObjectError::new(ObjectErrorKind::AttributeDoesNotExist(name.to_owned())))
     }
 
     fn set_attribute(
         &mut self,
         name: &str,
-        _value: Rc<dyn Object>,
+        _value: ObjectRef,
     ) -> Result<(), ObjectError> {
         Err(ObjectError::new(ObjectErrorKind::AttributeCannotBeSet(name.to_owned())))
     }
@@ -71,22 +73,6 @@ pub trait ObjectExt: Object {
 }
 
 impl<T: Object + ?Sized> ObjectExt for T {}
-
-// Equality ------------------------------------------------------------
-
-/// Delegate to concrete type by downcasting.
-impl PartialEq for dyn Object {
-    fn eq(&self, rhs: &Self) -> bool {
-        // This should catch Bool (when both true or both false) and Nil
-        // (always), since they're singletons.
-        if self.is(rhs) {
-            return true;
-        }
-        // FIXME:
-        // self.is_equal(rhs)
-        false
-    }
-}
 
 // Display -------------------------------------------------------------
 

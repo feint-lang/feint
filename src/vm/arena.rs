@@ -1,10 +1,10 @@
 use std::rc::Rc;
 
-use crate::types::Object;
+use crate::types::ObjectRef;
 
 /// Object store
 pub struct ObjectStore {
-    storage: Vec<Rc<dyn Object>>,
+    storage: Vec<ObjectRef>,
 }
 
 impl ObjectStore {
@@ -12,13 +12,13 @@ impl ObjectStore {
         Self { storage: Vec::new() }
     }
 
-    pub fn add(&mut self, object: Rc<dyn Object>) -> usize {
+    pub fn add(&mut self, object: ObjectRef) -> usize {
         let index = self.storage.len();
         self.storage.push(object.clone());
         return index;
     }
 
-    pub fn get(&self, index: usize) -> Option<&Rc<dyn Object>> {
+    pub fn get(&self, index: usize) -> Option<&ObjectRef> {
         self.storage.get(index)
     }
 }

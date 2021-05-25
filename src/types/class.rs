@@ -4,6 +4,9 @@
 
 use std::collections::HashMap;
 use std::fmt;
+use std::rc::Rc;
+
+pub type TypeRef = Rc<Type>;
 
 pub struct Function {
     module: String,

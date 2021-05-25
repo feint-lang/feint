@@ -20,13 +20,8 @@ fn test_float() {
     assert_ne!(float1.id(), float2.id());
     assert_ne!(float2.id(), float3.id());
 
-    // compare concrete types
     assert!(float1.is_equal(float2));
     assert!(!float1.is_equal(float3));
-
-    // compare via trait
-    // assert!(Object::eq(*float1 as Object, *float2 as Object));
-    // assert!(!Object::eq(*float1 as Object, *float3 as Object));
 }
 
 #[test]

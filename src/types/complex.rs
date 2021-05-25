@@ -1,6 +1,6 @@
-//! A complex object may have builtin objects and other custom objects
-//! as attributes. This is opposed to fundamental types, like `Bool` and
-//! `Float` that wrap Rust primitives.
+//! A complex object may have builtin objects and other custom/complex
+//! objects as attributes. This is opposed to fundamental/builtin types,
+//! like `Bool` and `Float` that wrap Rust primitives.
 use std::any::Any;
 use std::borrow::Borrow;
 use std::collections::HashMap;
@@ -8,23 +8,25 @@ use std::fmt;
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 
-use super::class::Type;
-use super::object::{Object, ObjectExt};
+use super::class::{Type, TypeRef};
+use super::object::{Object, ObjectExt, ObjectRef};
 use super::result::{ObjectError, ObjectErrorKind};
 
+pub type Attributes = HashMap<String, ObjectRef>;
+
 pub struct ComplexObject {
-    class: Rc<Type>,
-    attributes: HashMap<String, Rc<dyn Object>>,
+    class: TypeRef,
+    attributes: Attributes,
 }
 
 impl ComplexObject {
-    pub fn new(class: Rc<Type>) -> Self {
+    pub fn new(class: TypeRef) -> Self {
         Self { class: class.clone(), attributes: HashMap::new() }
     }
 }
 
 impl Object for ComplexObject {
-    fn class(&self) -> &Rc<Type> {
+    fn class(&self) -> &TypeRef {
         &self.class
     }
 
@@ -32,15 +34,15 @@ impl Object for ComplexObject {
         self
     }
 
-    fn is_equal(&self, rhs: Rc<dyn Object>) -> bool {
+    fn is_equal(&self, rhs: ObjectRef) -> bool {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
-            // FIXME: attribute comparison is borked
-            return self.is(rhs) || self.attributes == rhs.attributes;
+            self.is(rhs) || attributes_equal(&self.attributes, &rhs.attributes)
+        } else {
+            panic!("Could not compare {} to {}", self.class(), rhs.class());
         }
-        panic!("Could not compare {} to {}", self.class(), rhs.class());
     }
 
-    fn get_attribute(&self, name: &str) -> Result<&Rc<dyn Object>, ObjectError> {
+    fn get_attribute(&self, name: &str) -> Result<&ObjectRef, ObjectError> {
         if let Some(value) = self.attributes.get(name) {
             return Ok(value);
         }
@@ -50,7 +52,7 @@ impl Object for ComplexObject {
     fn set_attribute(
         &mut self,
         name: &str,
-        value: Rc<dyn Object>,
+        value: ObjectRef,
     ) -> Result<(), ObjectError> {
         self.attributes.insert(name.to_owned(), value.clone());
         Ok(())
@@ -71,4 +73,16 @@ impl fmt::Display for ComplexObject {
             self.attributes.iter().map(|(n, v)| format!("{}={}", n, v)).collect();
         write!(f, "{}({})", self.class.name(), names.join(", "))
     }
+}
+
+// Util ----------------------------------------------------------------
+
+/// Compare attributes for equality. The attribute maps are first
+/// checked to see if they have the same number of entries. Then, the
+/// keys are checked to see if they're all the same. If they are, only
+/// then are the values checked for equality.
+fn attributes_equal(lhs: &Attributes, rhs: &Attributes) -> bool {
+    lhs.len() == rhs.len()
+        && lhs.keys().all(|k| rhs.contains_key(k))
+        && lhs.iter().all(|(k, v)| v.is_equal(rhs[k].clone()))
 }

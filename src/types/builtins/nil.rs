@@ -4,17 +4,17 @@ use std::rc::Rc;
 
 use builtin_object_derive::BuiltinObject;
 
-use super::super::class::Type;
-use super::super::object::{Object, ObjectExt};
+use super::super::class::{Type, TypeRef};
+use super::super::object::{Object, ObjectExt, ObjectRef};
 
 /// Built in nil type
 #[derive(Debug, PartialEq, BuiltinObject)]
 pub struct Nil {
-    class: Rc<Type>,
+    class: TypeRef,
 }
 
 impl Nil {
-    pub fn new(class: Rc<Type>) -> Self {
+    pub fn new(class: TypeRef) -> Self {
         Self { class: class.clone() }
     }
 }
