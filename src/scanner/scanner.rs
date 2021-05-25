@@ -19,7 +19,8 @@ type NextThreeOption = Option<(char, char, char)>;
 /// the resulting tokens or error.
 pub fn scan_text(text: &str) -> Result<Vec<TokenWithLocation>, ScanError> {
     let scanner = Scanner::<Cursor<&str>>::from_text(text);
-    scanner.collect()
+    let tokens = scanner.collect();
+    tokens
 }
 
 /// Create a scanner from the specified file, scan its text, and return
@@ -291,6 +292,9 @@ impl<T: BufRead> Scanner<T> {
             Some(('*', _, _)) => Token::Star,
             Some(('/', Some('='), _)) => {
                 self.consume_char_and_return_token(Token::DivEqual)
+            }
+            Some(('/', Some('/'), _)) => {
+                self.consume_char_and_return_token(Token::DoubleSlash)
             }
             Some(('/', _, _)) => Token::Slash,
             Some(('+', Some('='), _)) => {

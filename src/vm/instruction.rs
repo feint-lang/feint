@@ -24,6 +24,7 @@ pub enum Instruction {
 impl fmt::Display for Instruction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let string = match self {
+            Self::Print => format!("PRINT"),
             Self::LoadConst(v) => format_aligned("LOAD_CONST", v),
             Self::UnaryOp(operator) => format_aligned("UNARY_OP", operator),
             Self::BinaryOp(operator) => format_aligned("BINARY_OP", operator),

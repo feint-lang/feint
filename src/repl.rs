@@ -33,7 +33,7 @@ impl<'a> Repl<'a> {
         println!("Welcome to the FeInt REPL (read/eval/print loop)");
         println!("Type a line of code, then hit Enter to evaluate it");
         self.load_history();
-        println!("Type .exit or .quit to exit");
+        println!("Type exit or quit to exit");
 
         loop {
             match self.read_line("→ ", true) {
@@ -90,8 +90,22 @@ impl<'a> Repl<'a> {
         self.add_history_entry(text);
 
         let result = match text.trim() {
-            ".exit" | ".halt" | ".quit" => return Some(Ok(None)),
-            _ => execute_text(&mut self.vm, text, self.debug),
+            "exit" | "quit" => return Some(Ok(None)),
+            _ => {
+                // FIXME: This feels like a really hacky way to handle
+                //        printing the result. Ideally, it would be
+                //        stored in a temporary local var and that's
+                //        what would be printed.
+                if text.starts_with("print ") {
+                    execute_text(&mut self.vm, text, self.debug)
+                } else {
+                    execute_text(
+                        &mut self.vm,
+                        format!("print {}", text).as_str(),
+                        self.debug,
+                    )
+                }
+            }
         };
 
         if let Ok(vm_state) = result {

@@ -58,10 +58,13 @@ impl<'a> Visitor<'a> {
     fn visit_statement(&mut self, node: ast::Statement) -> VisitResult {
         match node.kind {
             ast::StatementKind::Print(maybe_expr) => {
-                if let Some(expr) = maybe_expr {
-                    self.visit_expr(*expr)?;
+                match maybe_expr {
+                    Some(expr) => self.visit_expr(*expr)?,
+                    None => self.push_const(0),
                 }
                 self.push(Instruction::Print);
+                // XXX: This is sort of like the return value of print
+                self.push_const(0);
             }
             ast::StatementKind::Expr(expr) => self.visit_expr(*expr)?,
             _ => self.err(format!("Unhandled statement: {:?}", node))?,

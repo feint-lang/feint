@@ -42,6 +42,7 @@ impl fmt::Display for RuntimeError {
 #[derive(Debug)]
 pub enum RuntimeErrorKind {
     ObjectStoreIndexError(usize),
+    EmptyStack,
     NotEnoughValuesOnStack(String),
     ParseError(ParseError),
     CompilationError(CompilationError),

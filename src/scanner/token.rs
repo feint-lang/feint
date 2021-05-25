@@ -102,6 +102,7 @@ impl Token {
             Self::Minus => "-",
             Self::Star => "*",
             Self::Slash => "/",
+            Self::DoubleSlash => "//",
             Self::Caret => "^",
             Self::Bang => "!",
             Self::Identifier(s)

@@ -51,6 +51,13 @@ pub trait Object {
         )))
     }
 
+    fn floor_div(&self, _rhs: ObjectRef) -> RuntimeResult {
+        Err(RuntimeError::new_type_error(format!(
+            "floor_div not implemented for type: {}",
+            self.class().name()
+        )))
+    }
+
     fn add(&self, _rhs: ObjectRef) -> RuntimeResult {
         Err(RuntimeError::new_type_error(format!(
             "add not implemented for type: {}",

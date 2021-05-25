@@ -31,7 +31,7 @@ impl Float {
 }
 
 macro_rules! make_op {
-    ( $meth:ident, $op:tt, $message:literal ) => {
+    ( $meth:ident, $op:tt, $message:literal, $trunc:literal ) => {
         fn $meth(&self, rhs: ObjectRef) -> RuntimeResult {
             let value = if let Some(rhs) = rhs.as_any().downcast_ref::<Float>() {
                 *rhs.value()
@@ -40,7 +40,10 @@ macro_rules! make_op {
             } else {
                 return Err(RuntimeError::new_type_error(format!($message, rhs.class().name())));
             };
-            let value = &self.value $op value;
+            let mut value = &self.value $op value;
+            if $trunc {
+                value = value.trunc();
+            }
             Ok(Rc::new(Float::new(self.class.clone(), value)))
         }
     };
@@ -68,16 +71,21 @@ impl Object for Float {
         }
     }
 
-    make_op!(mul, *, "Could not multiply {} with Float");
-    make_op!(div, /, "Could not divide {} into Float");
-    make_op!(add, +, "Could not add {} to Float");
-    make_op!(sub, -, "Could not subtract {} from Float");
+    make_op!(mul, *, "Could not multiply {} with Float", false);
+    make_op!(div, /, "Could not divide {} into Float", false);
+    // Float floor division truncates
+    make_op!(floor_div, /, "Could not divide {} into Float", true);
+    make_op!(add, +, "Could not add {} to Float", false);
+    make_op!(sub, -, "Could not subtract {} from Float", false);
 }
 
 // Display -------------------------------------------------------------
 
 impl fmt::Display for Float {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.value)
+        match self.value.fract() {
+            0.0 => write!(f, "{}.0", self.value),
+            _ => write!(f, "{}", self.value),
+        }
     }
 }

@@ -56,6 +56,10 @@ impl Statement {
     pub fn new_expr(expr: Expr) -> Self {
         Self { kind: StatementKind::Expr(Box::new(expr)) }
     }
+
+    pub fn new_nil() -> Self {
+        Self::new_expr(Expr::new_literal(Literal::new_nil()))
+    }
 }
 
 impl fmt::Debug for Statement {

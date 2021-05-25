@@ -122,12 +122,16 @@ impl VM {
     /// Run the specified instruction and return the VM's state.
     pub fn execute_instruction(&mut self, instruction: &Instruction) -> Result {
         match instruction {
-            Instruction::Print => match self.stack.peek() {
+            Instruction::Print => match self.stack.pop() {
                 Some(index) => {
-                    let value = self.object_store.get(*index).unwrap();
-                    eprintln!("{}", value);
+                    if index != 0 {
+                        let value = self.object_store.get(index).unwrap();
+                        println!("{}", value);
+                    }
                 }
-                None => eprintln!("Stack is empty"),
+                None => {
+                    return self.err(RuntimeErrorKind::EmptyStack);
+                }
             },
             Instruction::Push(value) => {
                 // TODO: Check if empty and return err if so
@@ -173,7 +177,7 @@ impl VM {
                         BinaryOperator::Subtract => a.sub(b)?,
                         BinaryOperator::Multiply => a.mul(b)?,
                         BinaryOperator::Divide => a.div(b)?,
-                        // BinaryOperator::FloorDiv => a / b,
+                        BinaryOperator::FloorDiv => a.floor_div(b)?,
                         // BinaryOperator::Modulo => a % b,
                         // BinaryOperator::Raise => a.pow(b as u32),
                         _ => {
