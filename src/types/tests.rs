@@ -20,8 +20,8 @@ fn test_float() {
     assert_ne!(float1.id(), float2.id());
     assert_ne!(float2.id(), float3.id());
 
-    assert!(float1.is_equal(float2));
-    assert!(!float1.is_equal(float3));
+    assert!(float1.is_equal(float2).unwrap());
+    assert!(!float1.is_equal(float3).unwrap());
 }
 
 #[test]
@@ -31,8 +31,8 @@ fn test_compare_float_to_int() {
     let float = builtins.new_float(1.0);
     let int = builtins.new_int(1u8);
 
-    assert!(float.is_equal(int.clone()));
-    assert!(int.is_equal(float.clone()));
+    assert!(float.is_equal(int.clone()).unwrap());
+    assert!(int.is_equal(float.clone()).unwrap());
 }
 
 #[test]
@@ -50,5 +50,5 @@ fn test_custom() {
     obj_2.set_attribute("value", value_2);
 
     // FIXME: ???
-    assert!(obj_1.is_equal(Rc::new(obj_2)))
+    assert!(obj_1.is_equal(Rc::new(obj_2)).unwrap())
 }

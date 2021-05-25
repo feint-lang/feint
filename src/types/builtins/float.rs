@@ -5,6 +5,8 @@ use std::rc::Rc;
 
 use num_traits::ToPrimitive;
 
+use crate::vm::{RuntimeError, RuntimeResult};
+
 use super::super::class::{Type, TypeRef};
 use super::super::object::{Object, ObjectExt, ObjectRef};
 
@@ -26,25 +28,20 @@ impl Float {
     pub fn value(&self) -> &f64 {
         &self.value
     }
-
-    /// Is this Float equal to the specified Int?
-    pub fn eq_int(&self, int: &Int) -> bool {
-        eq_int_float(int, self)
-    }
 }
 
 macro_rules! make_op {
     ( $meth:ident, $op:tt, $message:literal ) => {
-        fn $meth(&self, rhs: ObjectRef) -> ObjectRef {
+        fn $meth(&self, rhs: ObjectRef) -> RuntimeResult {
             let value = if let Some(rhs) = rhs.as_any().downcast_ref::<Float>() {
                 *rhs.value()
             } else if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
                 rhs.value().to_f64().unwrap()
             } else {
-                panic!($message, rhs.class());
+                return Err(RuntimeError::new_type_error(format!($message, rhs.class().name())));
             };
             let value = &self.value $op value;
-            Rc::new(Float::new(self.class.clone(), value))
+            Ok(Rc::new(Float::new(self.class.clone(), value)))
         }
     };
 }
@@ -58,19 +55,23 @@ impl Object for Float {
         self
     }
 
-    fn is_equal(&self, rhs: ObjectRef) -> bool {
+    fn is_equal(&self, rhs: ObjectRef) -> Result<bool, RuntimeError> {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
-            return self.is(rhs) || self == rhs;
+            Ok(self.is(rhs) || self == rhs)
         } else if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
-            return self.eq_int(rhs);
+            Ok(eq_int_float(rhs, self))
+        } else {
+            Err(RuntimeError::new_type_error(format!(
+                "Could not compare Float to {}",
+                rhs.class().name()
+            )))
         }
-        panic!("Could not compare Float to {}", rhs.class());
     }
 
-    make_op!(mul, *, "Could not multiply {:?} with Float");
-    make_op!(div, /, "Could not divide {:?} into Float");
-    make_op!(add, +, "Could not add {:?} to Float");
-    make_op!(sub, -, "Could not subtract {:?} from Float");
+    make_op!(mul, *, "Could not multiply {} with Float");
+    make_op!(div, /, "Could not divide {} into Float");
+    make_op!(add, +, "Could not add {} to Float");
+    make_op!(sub, -, "Could not subtract {} from Float");
 }
 
 // Display -------------------------------------------------------------

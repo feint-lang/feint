@@ -2,6 +2,8 @@ use std::any::Any;
 use std::fmt;
 use std::rc::Rc;
 
+use crate::vm::{RuntimeError, RuntimeResult};
+
 use super::builtins::{Bool, Float, Int, Nil};
 use super::class::{Type, TypeRef};
 use super::complex::ComplexObject;
@@ -24,28 +26,43 @@ pub trait Object {
         self.class().name().to_owned()
     }
 
-    fn is_equal(&self, rhs: ObjectRef) -> bool {
+    fn is_equal(&self, _rhs: ObjectRef) -> Result<bool, RuntimeError> {
         // This should catch Bool (when both true or both false) and Nil
         // (always), since they're singletons.
-        panic!("is_equal not implemented for type: {}", self.class());
+        Err(RuntimeError::new_type_error(format!(
+            "is_equal not implemented for type: {}",
+            self.class().name()
+        )))
     }
 
     // Binary operations -----------------------------------------------
 
-    fn mul(&self, rhs: ObjectRef) -> ObjectRef {
-        panic!("mul not implemented for type: {}", self.class());
+    fn mul(&self, _rhs: ObjectRef) -> RuntimeResult {
+        Err(RuntimeError::new_type_error(format!(
+            "mul not implemented for type: {}",
+            self.class().name()
+        )))
     }
 
-    fn div(&self, rhs: ObjectRef) -> ObjectRef {
-        panic!("div not implemented for type: {}", self.class());
+    fn div(&self, _rhs: ObjectRef) -> RuntimeResult {
+        Err(RuntimeError::new_type_error(format!(
+            "div not implemented for type: {}",
+            self.class().name()
+        )))
     }
 
-    fn add(&self, rhs: ObjectRef) -> ObjectRef {
-        panic!("add not implemented for type: {}", self.class());
+    fn add(&self, _rhs: ObjectRef) -> RuntimeResult {
+        Err(RuntimeError::new_type_error(format!(
+            "add not implemented for type: {}",
+            self.class().name()
+        )))
     }
 
-    fn sub(&self, rhs: ObjectRef) -> ObjectRef {
-        panic!("sub not implemented for type: {}", self.class());
+    fn sub(&self, _rhs: ObjectRef) -> RuntimeResult {
+        Err(RuntimeError::new_type_error(format!(
+            "sub not implemented for type: {}",
+            self.class().name()
+        )))
     }
 
     // Attributes ------------------------------------------------------

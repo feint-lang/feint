@@ -6,6 +6,8 @@ use std::rc::Rc;
 use num_bigint::BigInt;
 use num_traits::{FromPrimitive, ToPrimitive};
 
+use crate::vm::{RuntimeError, RuntimeResult};
+
 use super::super::class::{Type, TypeRef};
 use super::super::object::{Object, ObjectExt, ObjectRef};
 
@@ -27,26 +29,21 @@ impl Int {
     pub fn value(&self) -> &BigInt {
         &self.value
     }
-
-    /// Is this Int equal to the specified Float?
-    pub fn eq_float(&self, float: &Float) -> bool {
-        eq_int_float(self, float)
-    }
 }
 
 macro_rules! make_op {
     ( $meth:ident, $op:tt, $message:literal ) => {
-        fn $meth(&self, rhs: ObjectRef) -> ObjectRef {
+        fn $meth(&self, rhs: ObjectRef) -> RuntimeResult {
             if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
                 // XXX: Return Int
                 let value = self.value() $op rhs.value();
-                Rc::new(Int::new(self.class.clone(), value))
+                Ok(Rc::new(Int::new(self.class.clone(), value)))
             } else if let Some(rhs) = rhs.as_any().downcast_ref::<Float>() {
                 // XXX: Return Float
                 let value = self.value().to_f64().unwrap() $op rhs.value();
-                Rc::new(Float::new(rhs.class().clone(), value))
+                Ok(Rc::new(Float::new(rhs.class().clone(), value)))
             } else {
-                panic!($message, rhs.class());
+                Err(RuntimeError::new_type_error(format!($message, rhs.class().name())))
             }
         }
     };
@@ -61,19 +58,23 @@ impl Object for Int {
         self
     }
 
-    fn is_equal(&self, rhs: ObjectRef) -> bool {
+    fn is_equal(&self, rhs: ObjectRef) -> Result<bool, RuntimeError> {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
-            return self.is(rhs) || self == rhs;
+            Ok(self.is(rhs) || self == rhs)
         } else if let Some(rhs) = rhs.as_any().downcast_ref::<Float>() {
-            return self.eq_float(rhs);
+            Ok(eq_int_float(self, rhs))
+        } else {
+            Err(RuntimeError::new_type_error(format!(
+                "Could not compare Int to {}",
+                rhs.class().name()
+            )))
         }
-        panic!("Could not compare Int to {}", rhs.class());
     }
 
-    make_op!(mul, *, "Could not multiply {:?} with Int");
-    make_op!(div, /, "Could not divide {:?} into Int");
-    make_op!(add, +, "Could not add {:?} to Int");
-    make_op!(sub, -, "Could not subtract {:?} from Int");
+    make_op!(mul, *, "Could not multiply {} with Int");
+    make_op!(div, /, "Could not divide {} into Int");
+    make_op!(add, +, "Could not add {} to Int");
+    make_op!(sub, -, "Could not subtract {} from Int");
 }
 
 // Display -------------------------------------------------------------

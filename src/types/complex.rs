@@ -8,6 +8,8 @@ use std::fmt;
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 
+use crate::vm::RuntimeError;
+
 use super::class::{Type, TypeRef};
 use super::object::{Object, ObjectExt, ObjectRef};
 use super::result::{ObjectError, ObjectErrorKind};
@@ -34,11 +36,15 @@ impl Object for ComplexObject {
         self
     }
 
-    fn is_equal(&self, rhs: ObjectRef) -> bool {
+    fn is_equal(&self, rhs: ObjectRef) -> Result<bool, RuntimeError> {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
-            self.is(rhs) || attributes_equal(&self.attributes, &rhs.attributes)
+            Ok(self.is(rhs) || attributes_equal(&self.attributes, &rhs.attributes)?)
         } else {
-            panic!("Could not compare {} to {}", self.class(), rhs.class());
+            Err(RuntimeError::new_type_error(format!(
+                "Could not compare {} to {}",
+                self.class().name(),
+                rhs.class().name()
+            )))
         }
     }
 
@@ -81,8 +87,10 @@ impl fmt::Display for ComplexObject {
 /// checked to see if they have the same number of entries. Then, the
 /// keys are checked to see if they're all the same. If they are, only
 /// then are the values checked for equality.
-fn attributes_equal(lhs: &Attributes, rhs: &Attributes) -> bool {
-    lhs.len() == rhs.len()
-        && lhs.keys().all(|k| rhs.contains_key(k))
-        && lhs.iter().all(|(k, v)| v.is_equal(rhs[k].clone()))
+fn attributes_equal(lhs: &Attributes, rhs: &Attributes) -> Result<bool, RuntimeError> {
+    // FIXME:
+    // Ok(lhs.len() == rhs.len()
+    //     && lhs.keys().all(|k| rhs.contains_key(k))
+    //     && lhs.iter().all(|(k, v)| v.is_equal(rhs[k].clone())))
+    Ok(true)
 }

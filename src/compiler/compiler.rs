@@ -5,24 +5,19 @@ use num_traits::cast::ToPrimitive;
 use crate::ast;
 use crate::types::{builtins::Builtins, ObjectRef};
 use crate::util::BinaryOperator;
-use crate::vm::{format_instructions, Instruction, Instructions, ObjectStore};
+use crate::vm::{format_instructions, Instruction, Instructions, ObjectStore, VM};
 
 use super::result::{CompilationError, CompilationErrorKind, CompilationResult};
 
 type VisitResult = Result<(), CompilationError>;
 
 /// Compile AST to VM instructions.
-pub fn compile(
-    builtins: &Builtins,
-    object_store: &mut ObjectStore,
-    program: ast::Program,
-    debug: bool,
-) -> CompilationResult {
+pub fn compile(vm: &mut VM, program: ast::Program, debug: bool) -> CompilationResult {
     if debug {
         eprintln!("COMPILING:\n{:?}", program);
     }
 
-    let mut visitor = Visitor::new(builtins, object_store);
+    let mut visitor = Visitor::new(&vm.builtins, &mut vm.object_store);
     visitor.visit_program(program)?;
 
     if debug {

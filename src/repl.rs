@@ -4,12 +4,12 @@ use std::path::Path;
 
 use rustyline::error::ReadlineError;
 
-use crate::compiler::{compile, CompilationErrorKind};
-use crate::parser::{self, ParseError, ParseErrorKind};
+use crate::compiler::CompilationErrorKind;
+use crate::parser::{ParseError, ParseErrorKind};
 use crate::result::ExitResult;
 use crate::scanner::ScanErrorKind;
 use crate::util::Location;
-use crate::vm::{ExecutionErrorKind, VMState, VM};
+use crate::vm::{execute_text, RuntimeErrorKind, VMState, VM};
 
 /// Run FeInt REPL until user exits.
 pub fn run(history_path: Option<&Path>, debug: bool) -> ExitResult {
@@ -83,49 +83,45 @@ impl<'a> Repl<'a> {
         }
     }
 
-    /// Evaluate text.
+    /// Evaluate text. Returns None to indicate to the main loop to
+    /// continue reading and evaluating input. Returns some result to
+    /// indicate to the main loop to exit.
     fn eval(&mut self, text: &str) -> Option<ExitResult> {
         self.add_history_entry(text);
 
-        match text.trim() {
-            ".exit" | ".halt" | ".quit" => {
-                return Some(Ok(None));
-            }
-            _ => (),
+        let result = match text.trim() {
+            ".exit" | ".halt" | ".quit" => return Some(Ok(None)),
+            _ => execute_text(&mut self.vm, text, self.debug),
+        };
+
+        if let Ok(vm_state) = result {
+            return self.vm_state_to_exit_result(vm_state);
         }
 
-        match parser::parse_text(text) {
-            Ok(program) => match compile(
-                &self.vm.builtins,
-                &mut self.vm.object_store,
-                program,
-                self.debug,
-            ) {
-                Ok(instructions) => match self.vm.execute(instructions) {
-                    Ok(state) => self.vm_state_to_exit_result(state),
-                    Err(err) => Some(self.handle_execution_err(err.kind)),
-                },
-                Err(err) => Some(self.handle_compilation_err(err.kind)),
-            },
-            Err(err) => {
-                if self.handle_parse_err(err.kind) {
-                    // Continue until valid input.
-                    match self.read_line("+ ", false) {
-                        Ok(None) => {
-                            let input = text.to_string() + "\n";
-                            self.eval(input.as_str())
-                        }
-                        Ok(Some(new_input)) => {
-                            let input = text.to_string() + "\n" + new_input.as_str();
-                            self.eval(input.as_str())
-                        }
-                        Err(err) => Some(Err((2, format!("{}", err)))),
+        let err = result.unwrap_err();
+
+        if let RuntimeErrorKind::ParseError(ParseError {
+            kind: ParseErrorKind::ScanError(scan_err),
+        }) = err.kind
+        {
+            if self.handle_scan_err(scan_err.kind, scan_err.location) {
+                match self.read_line("+ ", false) {
+                    Ok(None) => {
+                        let input = format!("{}\n", text);
+                        self.eval(input.as_str())
                     }
-                } else {
-                    // Bail.
-                    None
+                    Ok(Some(new_input)) => {
+                        let input = format!("{}\n{}", text, new_input);
+                        self.eval(input.as_str())
+                    }
+                    Err(err) => Some(Err((2, format!("{}", err)))),
                 }
+            } else {
+                None
             }
+        } else {
+            self.handle_execution_err(err.kind);
+            None
         }
     }
 
@@ -143,29 +139,38 @@ impl<'a> Repl<'a> {
         }
     }
 
-    /// Execution errors are all fatal for now.
-    fn handle_execution_err(&mut self, kind: ExecutionErrorKind) -> ExitResult {
+    /// Handle VM execution errors.
+    fn handle_execution_err(&mut self, kind: RuntimeErrorKind) {
         let message = match kind {
-            err => format!("Unhandled execution error: {:?}", err),
+            RuntimeErrorKind::ParseError(err) => {
+                return self.handle_parse_err(err.kind);
+            }
+            RuntimeErrorKind::CompilationError(err) => {
+                return self.handle_compilation_err(err.kind);
+            }
+            RuntimeErrorKind::TypeError(message) => {
+                format!("{}", message)
+            }
+            err => {
+                format!("Unhandled execution error: {:?}", err)
+            }
         };
-        Err((4, message))
+        eprintln!("{}", message);
     }
 
-    /// Compilation errors are all fatal for now.
-    fn handle_compilation_err(&mut self, kind: CompilationErrorKind) -> ExitResult {
+    /// Handle compilation errors.
+    fn handle_compilation_err(&mut self, kind: CompilationErrorKind) {
         let message = match kind {
             err => format!("Unhandled compilation error: {:?}", err),
         };
-        Err((3, message))
+        eprintln!("{}", message);
     }
 
-    /// Handle parse error. For now, true means the eval should continue
-    /// trying to add text to the original input while false means the
-    /// eval loop should give up on the input that caused the error.
-    fn handle_parse_err(&mut self, kind: ParseErrorKind) -> bool {
+    /// Handle parse errors.
+    fn handle_parse_err(&mut self, kind: ParseErrorKind) {
         match kind {
             ParseErrorKind::ScanError(err) => {
-                return self.handle_scan_err(err.kind, err.location);
+                self.handle_scan_err(err.kind, err.location);
             }
             ParseErrorKind::UnhandledToken(token) => {
                 let location = token.start;
@@ -179,10 +184,11 @@ impl<'a> Repl<'a> {
                 eprintln!("Unhandled parse error: {:?}", err);
             }
         }
-        false
     }
 
-    /// Handle scan error.
+    /// Handle scan errors. True means eval should continue trying to
+    /// add text to the original input while false means eval should
+    /// give up on the input that caused the error.
     fn handle_scan_err(&mut self, kind: ScanErrorKind, location: Location) -> bool {
         match kind {
             ScanErrorKind::UnexpectedCharacter(c) => {

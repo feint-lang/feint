@@ -5,24 +5,27 @@ use crate::parser::{self, ParseError, ParseErrorKind};
 use crate::result::ExitResult;
 use crate::scanner::{ScanError, ScanErrorKind, TokenWithLocation};
 use crate::util::Location;
-use crate::vm::{self, ExecutionErrorKind, ExecutionResult, VMState, VM};
+use crate::vm::{self, ExecutionResult, RuntimeErrorKind, VMState, VM};
 
 /// Run text source.
 pub fn run_text(text: &str, debug: bool) -> ExitResult {
+    let mut vm = VM::default();
     let mut runner = Runner::new(debug);
-    runner.exit(vm::execute_text(text, debug))
+    runner.exit(vm::execute_text(&mut vm, text, debug))
 }
 
 /// Run source from file.
 pub fn run_file(file_path: &str, debug: bool) -> ExitResult {
+    let mut vm = VM::default();
     let mut runner = Runner::new(debug);
-    runner.exit(vm::execute_file(file_path, debug))
+    runner.exit(vm::execute_file(&mut vm, file_path, debug))
 }
 
 /// Read and run source from stdin.
 pub fn run_stdin(debug: bool) -> ExitResult {
+    let mut vm = VM::default();
     let mut runner = Runner::new(debug);
-    runner.exit(vm::execute_stdin(debug))
+    runner.exit(vm::execute_stdin(&mut vm, debug))
 }
 
 struct Runner {
@@ -58,19 +61,23 @@ impl Runner {
         }
     }
 
-    fn handle_execution_err(&mut self, kind: ExecutionErrorKind) -> ExitResult {
+    fn handle_execution_err(&mut self, kind: RuntimeErrorKind) -> ExitResult {
         let message = match kind {
-            ExecutionErrorKind::CompilationError(err) => {
+            RuntimeErrorKind::CompilationError(err) => {
                 return self.handle_compilation_err(err.kind);
             }
-            ExecutionErrorKind::ParserError(err) => {
+            RuntimeErrorKind::ParseError(err) => {
                 return self.handle_parse_err(err.kind);
+            }
+            RuntimeErrorKind::TypeError(message) => {
+                return Err((5, message));
             }
             err => format!("Unhandled execution error: {:?}", err),
         };
         Err((4, message))
     }
 
+    /// Handle compilation errors.
     fn handle_compilation_err(&mut self, kind: CompilationErrorKind) -> ExitResult {
         let message = match kind {
             err => format!("Unhandled compilation error: {:?}", err),
@@ -78,7 +85,7 @@ impl Runner {
         Err((3, message))
     }
 
-    /// Handle parse error.
+    /// Handle parsing errors.
     fn handle_parse_err(&mut self, kind: ParseErrorKind) -> ExitResult {
         let message = match kind {
             ParseErrorKind::ScanError(err) => {
@@ -107,7 +114,7 @@ impl Runner {
         Err((2, message))
     }
 
-    /// Handle scan error.
+    /// Handle scan errors.
     fn handle_scan_err(
         &mut self,
         kind: ScanErrorKind,

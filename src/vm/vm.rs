@@ -14,39 +14,38 @@ use super::frame::Frame;
 use super::instruction::{Instruction, Instructions};
 use super::namespace::Namespace;
 use super::result::{
-    ExecutionError, ExecutionErrorKind, ExecutionResult as Result, VMState,
+    ExecutionResult as Result, RuntimeError, RuntimeErrorKind, VMState,
 };
 
 /// Execute source text.
-pub fn execute_text(text: &str, debug: bool) -> Result {
-    execute_parse_result(parser::parse_text(text), debug)
+pub fn execute_text(vm: &mut VM, text: &str, debug: bool) -> Result {
+    execute_parse_result(vm, parser::parse_text(text), debug)
 }
 
 /// Execute source from file.
-pub fn execute_file(file_path: &str, debug: bool) -> Result {
-    execute_parse_result(parser::parse_file(file_path), debug)
+pub fn execute_file(vm: &mut VM, file_path: &str, debug: bool) -> Result {
+    execute_parse_result(vm, parser::parse_file(file_path), debug)
 }
 
 /// Execute source from stdin.
-pub fn execute_stdin(debug: bool) -> Result {
-    execute_parse_result(parser::parse_stdin(), debug)
+pub fn execute_stdin(vm: &mut VM, debug: bool) -> Result {
+    execute_parse_result(vm, parser::parse_stdin(), debug)
 }
 
 /// Execute parse result.
-fn execute_parse_result(result: ParseResult, debug: bool) -> Result {
+fn execute_parse_result(vm: &mut VM, result: ParseResult, debug: bool) -> Result {
     match result {
-        Ok(program) => execute_program(program, debug),
-        Err(err) => Err(ExecutionError::new(ExecutionErrorKind::ParserError(err))),
+        Ok(program) => execute_program(vm, program, debug),
+        Err(err) => Err(RuntimeError::new(RuntimeErrorKind::ParseError(err))),
     }
 }
 
 /// Create a new VM and execute AST program.
-fn execute_program(program: ast::Program, debug: bool) -> Result {
-    let mut vm = VM::default();
-    let result = compile(&vm.builtins, &mut vm.object_store, program, debug);
+fn execute_program(vm: &mut VM, program: ast::Program, debug: bool) -> Result {
+    let result = compile(vm, program, debug);
     match result {
         Ok(instructions) => vm.execute(instructions),
-        Err(err) => Err(ExecutionError::new(ExecutionErrorKind::CompilationError(err))),
+        Err(err) => Err(RuntimeError::new(RuntimeErrorKind::CompilationError(err))),
     }
 }
 
@@ -107,24 +106,17 @@ impl VM {
     /// cleared; it can be "restarted" by passing more instructions to
     /// execute.
     pub fn execute(&mut self, instructions: Instructions) -> Result {
-        let mut instruction_pointer = 0;
-        loop {
-            if let Some(instruction) = instructions.get(instruction_pointer) {
-                instruction_pointer += 1;
-                let result = self.execute_instruction(instruction)?;
-                if let VMState::Halted(_) = result {
-                    break Ok(result);
-                }
-            } else {
-                // No instructions left. Note that from the point of
-                // view of the VM, this is not an error.
-                break Ok(VMState::Idle);
+        for instruction in instructions.iter() {
+            let result = self.execute_instruction(instruction)?;
+            if let VMState::Halted(_) = result {
+                return Ok(result);
             }
         }
+        Ok(VMState::Idle)
     }
 
-    fn err(&self, kind: ExecutionErrorKind) -> Result {
-        Err(ExecutionError::new(kind))
+    fn err(&self, kind: RuntimeErrorKind) -> Result {
+        Err(RuntimeError::new(kind))
     }
 
     /// Run the specified instruction and return the VM's state.
@@ -162,7 +154,7 @@ impl VM {
                     self.stack.push(value);
                 } else {
                     let message = format!("Unary op: {}", op);
-                    self.err(ExecutionErrorKind::NotEnoughValuesOnStack(message))?;
+                    self.err(RuntimeErrorKind::NotEnoughValuesOnStack(message))?;
                 };
             }
             Instruction::BinaryOp(op) => {
@@ -173,19 +165,19 @@ impl VM {
                     let value = match op {
                         // BinaryOperator::Assign => 1,
                         BinaryOperator::Equality => {
-                            let result = a.is_equal(b);
+                            let result = a.is_equal(b)?;
                             self.stack.push(if result { 1 } else { 2 });
                             return Ok(VMState::Running);
                         }
-                        BinaryOperator::Add => a.add(b),
-                        BinaryOperator::Subtract => a.sub(b),
-                        BinaryOperator::Multiply => a.mul(b),
-                        BinaryOperator::Divide => a.div(b),
+                        BinaryOperator::Add => a.add(b)?,
+                        BinaryOperator::Subtract => a.sub(b)?,
+                        BinaryOperator::Multiply => a.mul(b)?,
+                        BinaryOperator::Divide => a.div(b)?,
                         // BinaryOperator::FloorDiv => a / b,
                         // BinaryOperator::Modulo => a % b,
                         // BinaryOperator::Raise => a.pow(b as u32),
                         _ => {
-                            return self.err(ExecutionErrorKind::UnhandledInstruction(
+                            return self.err(RuntimeErrorKind::UnhandledInstruction(
                                 format!("BinaryOp: {}", op),
                             ));
                         }
@@ -194,7 +186,7 @@ impl VM {
                     self.stack.push(index);
                 } else {
                     let message = format!("Binary op: {}", op);
-                    self.err(ExecutionErrorKind::NotEnoughValuesOnStack(message))?;
+                    self.err(RuntimeErrorKind::NotEnoughValuesOnStack(message))?;
                 };
             }
             Instruction::Return => {
@@ -210,7 +202,7 @@ impl VM {
             }
             instruction => {
                 let message = format!("{:?}", instruction);
-                self.err(ExecutionErrorKind::UnhandledInstruction(message))?;
+                self.err(RuntimeErrorKind::UnhandledInstruction(message))?;
             }
         }
         Ok(VMState::Running)

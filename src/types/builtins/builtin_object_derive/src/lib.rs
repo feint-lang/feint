@@ -34,11 +34,15 @@ fn impl_builtin_object_derive(ast: &syn::DeriveInput) -> TokenStream {
                 self
             }
 
-            fn is_equal(&self, rhs: ObjectRef) -> bool {
+            fn is_equal(&self, rhs: ObjectRef) -> Result<bool, RuntimeError> {
                 if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
-                    return self.is(rhs) || self == rhs;
+                    Ok(self.is(rhs) || self == rhs)
+                } else {
+                    Err(RuntimeError::new_type_error(format!(
+                        "Could not compare {} to {}",
+                        self.class().name(), rhs.class().name()
+                    )))
                 }
-                panic!("Could not compare {} to {}", self.class(), rhs.class());
             }
         }
     };
