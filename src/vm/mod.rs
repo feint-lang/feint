@@ -6,7 +6,7 @@ pub(crate) use result::VMState;
 pub(crate) use result::{
     ExecutionResult, RuntimeError, RuntimeErrorKind, RuntimeResult,
 };
-pub(crate) use vm::{execute_file, execute_stdin, execute_text, VM};
+pub(crate) use vm::{execute_file, execute_stdin, execute_text, RuntimeContext, VM};
 
 mod arena;
 mod frame;

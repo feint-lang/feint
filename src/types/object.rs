@@ -2,7 +2,7 @@ use std::any::Any;
 use std::fmt;
 use std::rc::Rc;
 
-use crate::vm::{RuntimeError, RuntimeResult, VM};
+use crate::vm::{RuntimeContext, RuntimeError, RuntimeResult};
 
 use super::builtins::{Bool, Float, Int, Nil};
 use super::class::{Type, TypeRef};
@@ -26,7 +26,11 @@ pub trait Object {
         self.class().name().to_owned()
     }
 
-    fn is_equal(&self, _rhs: ObjectRef, _vm: &VM) -> Result<bool, RuntimeError> {
+    fn is_equal(
+        &self,
+        _rhs: ObjectRef,
+        _ctx: &RuntimeContext,
+    ) -> Result<bool, RuntimeError> {
         // This should catch Bool (when both true or both false) and Nil
         // (always), since they're singletons.
         Err(RuntimeError::new_type_error(format!(
@@ -37,35 +41,35 @@ pub trait Object {
 
     // Binary operations -----------------------------------------------
 
-    fn mul(&self, _rhs: ObjectRef, _vm: &VM) -> RuntimeResult {
+    fn mul(&self, _rhs: ObjectRef, _ctx: &RuntimeContext) -> RuntimeResult {
         Err(RuntimeError::new_type_error(format!(
             "mul not implemented for type: {}",
             self.class().name()
         )))
     }
 
-    fn div(&self, _rhs: ObjectRef, _vm: &VM) -> RuntimeResult {
+    fn div(&self, _rhs: ObjectRef, _ctx: &RuntimeContext) -> RuntimeResult {
         Err(RuntimeError::new_type_error(format!(
             "div not implemented for type: {}",
             self.class().name()
         )))
     }
 
-    fn floor_div(&self, _rhs: ObjectRef, _vm: &VM) -> RuntimeResult {
+    fn floor_div(&self, _rhs: ObjectRef, _ctx: &RuntimeContext) -> RuntimeResult {
         Err(RuntimeError::new_type_error(format!(
             "floor_div not implemented for type: {}",
             self.class().name()
         )))
     }
 
-    fn add(&self, _rhs: ObjectRef, _vm: &VM) -> RuntimeResult {
+    fn add(&self, _rhs: ObjectRef, _ctx: &RuntimeContext) -> RuntimeResult {
         Err(RuntimeError::new_type_error(format!(
             "add not implemented for type: {}",
             self.class().name()
         )))
     }
 
-    fn sub(&self, _rhs: ObjectRef, _vm: &VM) -> RuntimeResult {
+    fn sub(&self, _rhs: ObjectRef, _ctx: &RuntimeContext) -> RuntimeResult {
         Err(RuntimeError::new_type_error(format!(
             "sub not implemented for type: {}",
             self.class().name()

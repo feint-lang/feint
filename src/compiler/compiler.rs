@@ -3,13 +3,16 @@ use std::rc::Rc;
 use num_traits::cast::ToPrimitive;
 
 use crate::ast;
-use crate::types::{builtins::Builtins, ObjectRef};
+use crate::types::ObjectRef;
 use crate::util::BinaryOperator;
-use crate::vm::{format_instructions, Instruction, Instructions, ObjectStore, VM};
+use crate::vm::{
+    format_instructions, Instruction, Instructions, ObjectStore, RuntimeContext, VM,
+};
 
 use super::result::{CompilationError, CompilationErrorKind, CompilationResult};
+use std::borrow::BorrowMut;
 
-type VisitResult = Result<(), CompilationError>;
+// Compiler ------------------------------------------------------------
 
 /// Compile AST to VM instructions.
 pub fn compile(vm: &mut VM, program: ast::Program, debug: bool) -> CompilationResult {
@@ -17,7 +20,7 @@ pub fn compile(vm: &mut VM, program: ast::Program, debug: bool) -> CompilationRe
         eprintln!("COMPILING:\n{:?}", program);
     }
 
-    let mut visitor = Visitor::new(&vm.builtins, &mut vm.object_store);
+    let mut visitor = Visitor::new(&mut vm.ctx);
     visitor.visit_program(program)?;
 
     if debug {
@@ -27,15 +30,18 @@ pub fn compile(vm: &mut VM, program: ast::Program, debug: bool) -> CompilationRe
     Ok(visitor.instructions)
 }
 
+// Visitor -------------------------------------------------------------
+
+type VisitResult = Result<(), CompilationError>;
+
 struct Visitor<'a> {
-    builtins: &'a Builtins,
-    object_store: &'a mut ObjectStore,
+    ctx: &'a mut RuntimeContext,
     instructions: Instructions,
 }
 
 impl<'a> Visitor<'a> {
-    fn new(builtins: &'a Builtins, object_store: &'a mut ObjectStore) -> Self {
-        Self { builtins, object_store, instructions: Instructions::new() }
+    fn new(ctx: &'a mut RuntimeContext) -> Self {
+        Self { ctx, instructions: Instructions::new() }
     }
 
     fn err(&self, message: String) -> VisitResult {
@@ -100,7 +106,7 @@ impl<'a> Visitor<'a> {
     }
 
     fn add_const(&mut self, val: ObjectRef) {
-        let index = self.object_store.add(val);
+        let index = self.ctx.add_object(val);
         self.push_const(index);
     }
 
@@ -110,10 +116,10 @@ impl<'a> Visitor<'a> {
             ast::LiteralKind::Bool(true) => self.push_const(1),
             ast::LiteralKind::Bool(false) => self.push_const(2),
             ast::LiteralKind::Float(value) => {
-                self.add_const(self.builtins.new_float(value))
+                self.add_const(self.ctx.builtins.new_float(value))
             }
             ast::LiteralKind::Int(value) => {
-                self.add_const(self.builtins.new_int(value))
+                self.add_const(self.ctx.builtins.new_int(value))
             }
             _ => return self.err(format!("Unhandled literal: {:?}", node)),
         }

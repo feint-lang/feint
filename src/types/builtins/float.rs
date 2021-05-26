@@ -5,7 +5,7 @@ use std::rc::Rc;
 
 use num_traits::ToPrimitive;
 
-use crate::vm::{RuntimeError, RuntimeResult, VM};
+use crate::vm::{RuntimeContext, RuntimeError, RuntimeResult};
 
 use super::super::class::{Type, TypeRef};
 use super::super::object::{Object, ObjectExt, ObjectRef};
@@ -32,7 +32,7 @@ impl Float {
 
 macro_rules! make_op {
     ( $meth:ident, $op:tt, $message:literal, $trunc:literal ) => {
-        fn $meth(&self, rhs: ObjectRef, vm: &VM) -> RuntimeResult {
+        fn $meth(&self, rhs: ObjectRef, ctx: &RuntimeContext) -> RuntimeResult {
             let value = if let Some(rhs) = rhs.as_any().downcast_ref::<Float>() {
                 *rhs.value()
             } else if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
@@ -44,7 +44,7 @@ macro_rules! make_op {
             if $trunc {
                 value = value.trunc();
             }
-            let value = vm.builtins.new_float(value);
+            let value = ctx.builtins.new_float(value);
             Ok(value)
         }
     };
@@ -59,7 +59,11 @@ impl Object for Float {
         self
     }
 
-    fn is_equal(&self, rhs: ObjectRef, _vm: &VM) -> Result<bool, RuntimeError> {
+    fn is_equal(
+        &self,
+        rhs: ObjectRef,
+        _ctx: &RuntimeContext,
+    ) -> Result<bool, RuntimeError> {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
             Ok(self.is(rhs) || self == rhs)
         } else if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {

@@ -7,7 +7,7 @@ use crate::ast;
 use crate::compiler::compile;
 use crate::parser::{self, ParseResult};
 use crate::types::builtins::{Float, Int};
-use crate::types::Builtins;
+use crate::types::{Builtins, ObjectRef};
 use crate::util::{BinaryOperator, Stack, UnaryOperator};
 
 use super::arena::ObjectStore;
@@ -50,9 +50,38 @@ fn execute_program(vm: &mut VM, program: ast::Program, debug: bool) -> Result {
     }
 }
 
-pub struct VM {
+pub struct RuntimeContext {
     pub builtins: Builtins,
     pub object_store: ObjectStore,
+}
+
+impl RuntimeContext {
+    pub fn new(builtins: Builtins, object_store: ObjectStore) -> Self {
+        Self { builtins, object_store }
+    }
+
+    pub fn add_object(&mut self, object: ObjectRef) -> usize {
+        self.object_store.add(object)
+    }
+
+    pub fn get_object(&self, index: usize) -> Option<&ObjectRef> {
+        self.object_store.get(index)
+    }
+}
+
+impl Default for RuntimeContext {
+    fn default() -> Self {
+        let builtins = Builtins::new();
+        let mut object_store = ObjectStore::new();
+        object_store.add(builtins.nil_obj.clone()); // 0
+        object_store.add(builtins.true_obj.clone()); // 1
+        object_store.add(builtins.false_obj.clone()); // 2
+        RuntimeContext::new(builtins, object_store)
+    }
+}
+
+pub struct VM {
+    pub ctx: RuntimeContext,
 
     namespace: Namespace,
 
@@ -66,13 +95,9 @@ pub struct VM {
 
 impl Default for VM {
     fn default() -> Self {
-        let builtins = Builtins::new();
+        let ctx = RuntimeContext::default();
         let namespace = Namespace::new(None);
-        let mut object_store = ObjectStore::new();
-        object_store.add(builtins.nil_obj.clone()); // 0
-        object_store.add(builtins.true_obj.clone()); // 1
-        object_store.add(builtins.false_obj.clone()); // 2
-        VM::new(builtins, object_store, namespace)
+        VM::new(ctx, namespace)
     }
 }
 
@@ -80,18 +105,8 @@ impl Default for VM {
 /// then, implicitly, goes idle until it's passed some instructions to
 /// execute. After instructions are executed
 impl VM {
-    pub fn new(
-        builtins: Builtins,
-        object_store: ObjectStore,
-        namespace: Namespace,
-    ) -> Self {
-        VM {
-            builtins,
-            namespace,
-            stack: Stack::new(),
-            call_stack: Stack::new(),
-            object_store,
-        }
+    pub fn new(ctx: RuntimeContext, namespace: Namespace) -> Self {
+        VM { ctx, namespace, stack: Stack::new(), call_stack: Stack::new() }
     }
 
     pub fn halt(&mut self) {
@@ -126,7 +141,7 @@ impl VM {
             Instruction::Print => match self.stack.pop() {
                 Some(index) => {
                     if index != 0 {
-                        let value = self.object_store.get(index).unwrap();
+                        let value = self.ctx.get_object(index).unwrap();
                         println!("{}", value);
                     }
                 }
@@ -164,21 +179,21 @@ impl VM {
             }
             Instruction::BinaryOp(op) => {
                 if let Some((j, i)) = self.pop_top_two() {
-                    let a = self.object_store.get(i).unwrap();
-                    let b = self.object_store.get(j).unwrap();
+                    let a = self.ctx.get_object(i).unwrap();
+                    let b = self.ctx.get_object(j).unwrap();
                     let b = b.clone();
                     let value = match op {
                         // BinaryOperator::Assign => 1,
                         BinaryOperator::Equality => {
-                            let result = a.is_equal(b, &self)?;
+                            let result = a.is_equal(b, &self.ctx)?;
                             self.stack.push(if result { 1 } else { 2 });
                             return Ok(VMState::Running);
                         }
-                        BinaryOperator::Add => a.add(b, &self)?,
-                        BinaryOperator::Subtract => a.sub(b, &self)?,
-                        BinaryOperator::Multiply => a.mul(b, &self)?,
-                        BinaryOperator::Divide => a.div(b, &self)?,
-                        BinaryOperator::FloorDiv => a.floor_div(b, &self)?,
+                        BinaryOperator::Add => a.add(b, &self.ctx)?,
+                        BinaryOperator::Subtract => a.sub(b, &self.ctx)?,
+                        BinaryOperator::Multiply => a.mul(b, &self.ctx)?,
+                        BinaryOperator::Divide => a.div(b, &self.ctx)?,
+                        BinaryOperator::FloorDiv => a.floor_div(b, &self.ctx)?,
                         // BinaryOperator::Modulo => a.modulus(b, &self)?,
                         // BinaryOperator::Raise => a.raise(b, &self)?,
                         _ => {
@@ -187,7 +202,7 @@ impl VM {
                             ));
                         }
                     };
-                    let index = self.object_store.add(value);
+                    let index = self.ctx.add_object(value);
                     self.stack.push(index);
                 } else {
                     let message = format!("Binary op: {}", op);
@@ -257,8 +272,8 @@ mod tests {
     fn execute_simple_program() {
         let builtins = Builtins::new();
         let mut vm = VM::default();
-        let i = vm.object_store.add(vm.builtins.new_int(1));
-        let j = vm.object_store.add(vm.builtins.new_int(2));
+        let i = vm.ctx.add_object(vm.ctx.builtins.new_int(1));
+        let j = vm.ctx.add_object(vm.ctx.builtins.new_int(2));
         let instructions: Instructions = vec![
             Instruction::LoadConst(i),
             Instruction::LoadConst(j),
