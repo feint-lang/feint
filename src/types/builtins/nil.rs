@@ -4,7 +4,7 @@ use std::rc::Rc;
 
 use builtin_object_derive::BuiltinObject;
 
-use crate::vm::{RuntimeError, RuntimeResult};
+use crate::vm::{RuntimeError, RuntimeResult, VM};
 
 use super::super::class::{Type, TypeRef};
 use super::super::object::{Object, ObjectExt, ObjectRef};

@@ -5,7 +5,7 @@ use std::rc::Rc;
 
 use num_traits::ToPrimitive;
 
-use crate::vm::{RuntimeError, RuntimeResult};
+use crate::vm::{RuntimeError, RuntimeResult, VM};
 
 use super::super::class::{Type, TypeRef};
 use super::super::object::{Object, ObjectExt, ObjectRef};
@@ -32,7 +32,7 @@ impl Float {
 
 macro_rules! make_op {
     ( $meth:ident, $op:tt, $message:literal, $trunc:literal ) => {
-        fn $meth(&self, rhs: ObjectRef) -> RuntimeResult {
+        fn $meth(&self, rhs: ObjectRef, vm: &VM) -> RuntimeResult {
             let value = if let Some(rhs) = rhs.as_any().downcast_ref::<Float>() {
                 *rhs.value()
             } else if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
@@ -44,7 +44,8 @@ macro_rules! make_op {
             if $trunc {
                 value = value.trunc();
             }
-            Ok(Rc::new(Float::new(self.class.clone(), value)))
+            let value = vm.builtins.new_float(value);
+            Ok(value)
         }
     };
 }
@@ -58,7 +59,7 @@ impl Object for Float {
         self
     }
 
-    fn is_equal(&self, rhs: ObjectRef) -> Result<bool, RuntimeError> {
+    fn is_equal(&self, rhs: ObjectRef, _vm: &VM) -> Result<bool, RuntimeError> {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
             Ok(self.is(rhs) || self == rhs)
         } else if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
@@ -73,8 +74,7 @@ impl Object for Float {
 
     make_op!(mul, *, "Could not multiply {} with Float", false);
     make_op!(div, /, "Could not divide {} into Float", false);
-    // Float floor division truncates
-    make_op!(floor_div, /, "Could not divide {} into Float", true);
+    make_op!(floor_div, /, "Could not divide {} into Float", true); // truncates
     make_op!(add, +, "Could not add {} to Float", false);
     make_op!(sub, -, "Could not subtract {} from Float", false);
 }

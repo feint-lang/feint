@@ -34,7 +34,7 @@ fn impl_builtin_object_derive(ast: &syn::DeriveInput) -> TokenStream {
                 self
             }
 
-            fn is_equal(&self, rhs: ObjectRef) -> Result<bool, RuntimeError> {
+            fn is_equal(&self, rhs: ObjectRef, _vm: &VM) -> Result<bool, RuntimeError> {
                 if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
                     Ok(self.is(rhs) || self == rhs)
                 } else {

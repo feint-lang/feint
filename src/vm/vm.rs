@@ -6,6 +6,7 @@ use num_bigint::BigInt;
 use crate::ast;
 use crate::compiler::compile;
 use crate::parser::{self, ParseResult};
+use crate::types::builtins::{Float, Int};
 use crate::types::Builtins;
 use crate::util::{BinaryOperator, Stack, UnaryOperator};
 
@@ -169,17 +170,17 @@ impl VM {
                     let value = match op {
                         // BinaryOperator::Assign => 1,
                         BinaryOperator::Equality => {
-                            let result = a.is_equal(b)?;
+                            let result = a.is_equal(b, &self)?;
                             self.stack.push(if result { 1 } else { 2 });
                             return Ok(VMState::Running);
                         }
-                        BinaryOperator::Add => a.add(b)?,
-                        BinaryOperator::Subtract => a.sub(b)?,
-                        BinaryOperator::Multiply => a.mul(b)?,
-                        BinaryOperator::Divide => a.div(b)?,
-                        BinaryOperator::FloorDiv => a.floor_div(b)?,
-                        // BinaryOperator::Modulo => a % b,
-                        // BinaryOperator::Raise => a.pow(b as u32),
+                        BinaryOperator::Add => a.add(b, &self)?,
+                        BinaryOperator::Subtract => a.sub(b, &self)?,
+                        BinaryOperator::Multiply => a.mul(b, &self)?,
+                        BinaryOperator::Divide => a.div(b, &self)?,
+                        BinaryOperator::FloorDiv => a.floor_div(b, &self)?,
+                        // BinaryOperator::Modulo => a.modulus(b, &self)?,
+                        // BinaryOperator::Raise => a.raise(b, &self)?,
                         _ => {
                             return self.err(RuntimeErrorKind::UnhandledInstruction(
                                 format!("BinaryOp: {}", op),
