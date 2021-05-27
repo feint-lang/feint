@@ -126,16 +126,14 @@ impl<'a> Visitor<'a> {
         match name_expr.kind {
             ast::ExprKind::Identifier(ident) => match ident.kind {
                 ast::IdentifierKind::Identifier(name) => {
-                    // Point at the next expression
-                    // FIXME: This isn't correct
-                    let index = self.ctx.arena.size();
-                    self.ctx.arena.add_name(name, index);
+                    // Store the name so we can get at it later.
+                    let index = self.ctx.arena.add_name(name);
+                    self.push(Instruction::Push(index));
                 }
                 _ => return self.err("Expected identifier".to_owned()),
             },
             _ => return self.err("Expected identifier".to_owned()),
         }
-
         self.visit_expr(value_expr)?;
         self.push(Instruction::BinaryOp(BinaryOperator::Assign));
         Ok(())
@@ -146,10 +144,10 @@ impl<'a> Visitor<'a> {
     fn visit_identifier(&mut self, node: ast::Identifier) -> VisitResult {
         match node.kind {
             ast::IdentifierKind::Identifier(name) => {
-                self.push(Instruction::LoadConstByName(name))
+                self.push(Instruction::LoadByName(name))
             }
             ast::IdentifierKind::TypeIdentifier(name) => {
-                self.push(Instruction::LoadConstByName(name))
+                self.push(Instruction::LoadByName(name))
             }
         }
         Ok(())

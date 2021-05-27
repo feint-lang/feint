@@ -157,7 +157,7 @@ impl VM {
                 self.stack.push(*index);
             }
             // FIXME: Probably shouldn't be using const storage for this
-            Instruction::LoadConstByName(name) => {
+            Instruction::LoadByName(name) => {
                 let result = self.ctx.arena.get_index_for_name(name);
                 match result {
                     Some(index) => self.stack.push(*index),
@@ -184,16 +184,16 @@ impl VM {
                 };
             }
             Instruction::BinaryOp(op) if op == &BinaryOperator::Assign => {
-                ()
-                // if let Some(i) = self.pop_top_two() {
-                //     // i = name index
-                //     // j = value index
-                //     let name = self.ctx.arena.get(i).unwrap();
-                //     self.stack.push(j);
-                // } else {
-                //     let message = format!("Assignment");
-                //     self.err(RuntimeErrorKind::NotEnoughValuesOnStack(message))?;
-                // };
+                if let Some((i, j)) = self.pop_top_two() {
+                    // Point name at value
+                    self.ctx.arena.set_index_for_name(i, j);
+                    // The return value of an assignment is the assigned
+                    // value
+                    self.stack.push(j);
+                } else {
+                    let message = format!("Assignment");
+                    self.err(RuntimeErrorKind::NotEnoughValuesOnStack(message))?;
+                };
             }
             Instruction::BinaryOp(op) => {
                 if let Some((i, j)) = self.pop_top_two() {

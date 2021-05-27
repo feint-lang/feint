@@ -17,8 +17,7 @@ pub enum Instruction {
     BinaryOp(BinaryOperator),
     Return,
     LoadConst(usize),
-    Name(String),
-    LoadConstByName(String),
+    LoadByName(String),
     Halt(i32),
     Print, // Print value at top of stack
 }
