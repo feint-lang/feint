@@ -97,14 +97,15 @@ pub enum Token {
 impl Token {
     pub fn as_str(&self) -> &str {
         match self {
-            Self::Equal => "=",
-            Self::Plus => "+",
-            Self::Minus => "-",
+            Self::Caret => "^",
             Self::Star => "*",
             Self::Slash => "/",
             Self::DoubleSlash => "//",
-            Self::Caret => "^",
+            Self::Percent => "%",
+            Self::Plus => "+",
+            Self::Minus => "-",
             Self::Bang => "!",
+            Self::Equal => "=",
             Self::Identifier(s)
             | Self::TypeIdentifier(s)
             | Self::TypeMethodIdentifier(s)

@@ -92,7 +92,30 @@ impl Object for Int {
             )))
         }
     }
+    fn raise(&self, rhs: ObjectRef, ctx: &RuntimeContext) -> RuntimeResult {
+        if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
+            // XXX: Return Int
+            let base = self.value();
+            let exp = rhs.value().to_u32().unwrap();
+            let value = base.pow(exp);
+            let value = ctx.builtins.new_int(value);
+            Ok(value)
+        } else if let Some(rhs) = rhs.as_any().downcast_ref::<Float>() {
+            // XXX: Return Float
+            let base = self.value().to_f64().unwrap();
+            let exp = *rhs.value();
+            let value = base.powf(exp);
+            let value = ctx.builtins.new_float(value);
+            Ok(value)
+        } else {
+            Err(RuntimeError::new_type_error(format!(
+                "Could not raise Int by {}",
+                rhs.class().name()
+            )))
+        }
+    }
 
+    make_op!(modulo, %, "Could not divide {} with Int");
     make_op!(mul, *, "Could not multiply {} with Int");
     make_op!(add, +, "Could not add {} to Int");
     make_op!(sub, -, "Could not subtract {} from Int");
@@ -117,6 +140,6 @@ impl Object for Int {
 
 impl fmt::Display for Int {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.value)
+        write!(f, "{}", self.value())
     }
 }

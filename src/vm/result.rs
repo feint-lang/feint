@@ -48,6 +48,7 @@ pub enum RuntimeErrorKind {
     CompilationError(CompilationError),
     UnhandledInstruction(String),
     TypeError(String),
+    NameError(String),
 }
 
 impl fmt::Display for RuntimeErrorKind {

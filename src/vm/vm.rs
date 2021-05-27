@@ -17,6 +17,7 @@ use super::namespace::Namespace;
 use super::result::{
     ExecutionResult as Result, RuntimeError, RuntimeErrorKind, VMState,
 };
+use crate::vm::result::VMState::Running;
 
 /// Execute source text.
 pub fn execute_text(vm: &mut VM, text: &str, debug: bool) -> Result {
@@ -52,20 +53,12 @@ fn execute_program(vm: &mut VM, program: ast::Program, debug: bool) -> Result {
 
 pub struct RuntimeContext {
     pub builtins: Builtins,
-    pub object_store: ObjectStore,
+    pub arena: ObjectStore,
 }
 
 impl RuntimeContext {
-    pub fn new(builtins: Builtins, object_store: ObjectStore) -> Self {
-        Self { builtins, object_store }
-    }
-
-    pub fn add_object(&mut self, object: ObjectRef) -> usize {
-        self.object_store.add(object)
-    }
-
-    pub fn get_object(&self, index: usize) -> Option<&ObjectRef> {
-        self.object_store.get(index)
+    pub fn new(builtins: Builtins, arena: ObjectStore) -> Self {
+        Self { builtins, arena }
     }
 }
 
@@ -141,7 +134,7 @@ impl VM {
             Instruction::Print => match self.stack.pop() {
                 Some(index) => {
                     if index != 0 {
-                        let value = self.ctx.get_object(index).unwrap();
+                        let value = self.ctx.arena.get(index).unwrap();
                         println!("{}", value);
                     }
                 }
@@ -163,11 +156,24 @@ impl VM {
             Instruction::LoadConst(index) => {
                 self.stack.push(*index);
             }
+            // FIXME: Probably shouldn't be using const storage for this
+            Instruction::LoadConstByName(name) => {
+                let result = self.ctx.arena.get_index_for_name(name);
+                match result {
+                    Some(index) => self.stack.push(*index),
+                    _ => {
+                        return self.err(RuntimeErrorKind::NameError(format!(
+                            "Name not found: {}",
+                            name
+                        )))
+                    }
+                }
+            }
             Instruction::UnaryOp(op) => {
                 if let Some(a) = self.pop() {
                     let value = match op {
+                        // FIXME: Implement and call Object methods
                         UnaryOperator::Plus => a,
-                        // FIXME: Can't negate usize
                         UnaryOperator::Negate => a,
                         UnaryOperator::Not => !a,
                     };
@@ -177,32 +183,43 @@ impl VM {
                     self.err(RuntimeErrorKind::NotEnoughValuesOnStack(message))?;
                 };
             }
+            Instruction::BinaryOp(op) if op == &BinaryOperator::Assign => {
+                ()
+                // if let Some(i) = self.pop_top_two() {
+                //     // i = name index
+                //     // j = value index
+                //     let name = self.ctx.arena.get(i).unwrap();
+                //     self.stack.push(j);
+                // } else {
+                //     let message = format!("Assignment");
+                //     self.err(RuntimeErrorKind::NotEnoughValuesOnStack(message))?;
+                // };
+            }
             Instruction::BinaryOp(op) => {
-                if let Some((j, i)) = self.pop_top_two() {
-                    let a = self.ctx.get_object(i).unwrap();
-                    let b = self.ctx.get_object(j).unwrap();
+                if let Some((i, j)) = self.pop_top_two() {
+                    let a = self.ctx.arena.get(i).unwrap();
+                    let b = self.ctx.arena.get(j).unwrap();
                     let b = b.clone();
                     let value = match op {
-                        // BinaryOperator::Assign => 1,
                         BinaryOperator::Equality => {
                             let result = a.is_equal(b, &self.ctx)?;
                             self.stack.push(if result { 1 } else { 2 });
                             return Ok(VMState::Running);
                         }
-                        BinaryOperator::Add => a.add(b, &self.ctx)?,
-                        BinaryOperator::Subtract => a.sub(b, &self.ctx)?,
+                        BinaryOperator::Raise => a.raise(b, &self.ctx)?,
                         BinaryOperator::Multiply => a.mul(b, &self.ctx)?,
                         BinaryOperator::Divide => a.div(b, &self.ctx)?,
                         BinaryOperator::FloorDiv => a.floor_div(b, &self.ctx)?,
-                        // BinaryOperator::Modulo => a.modulus(b, &self)?,
-                        // BinaryOperator::Raise => a.raise(b, &self)?,
+                        BinaryOperator::Modulo => a.modulo(b, &self.ctx)?,
+                        BinaryOperator::Add => a.add(b, &self.ctx)?,
+                        BinaryOperator::Subtract => a.sub(b, &self.ctx)?,
                         _ => {
                             return self.err(RuntimeErrorKind::UnhandledInstruction(
                                 format!("BinaryOp: {}", op),
                             ));
                         }
                     };
-                    let index = self.ctx.add_object(value);
+                    let index = self.ctx.arena.add(value);
                     self.stack.push(index);
                 } else {
                     let message = format!("Binary op: {}", op);
@@ -238,10 +255,15 @@ impl VM {
 
     /// Pop top two items from stack *if* the stack has at least two
     /// items. If it doesn't, the stack remains unmodified.
+    ///
+    /// NOTE: The second item down the stack will be *first* and the
+    ///       first item will be *second* in the returned tuple. This
+    ///       puts the items in "logical" order instead of having to
+    ///       remember to swap them in them in the calling code.
     fn pop_top_two(&mut self) -> Option<(usize, usize)> {
         let stack = &mut self.stack;
         match (stack.pop(), stack.pop()) {
-            (Some(top), Some(next)) => Some((top, next)),
+            (Some(top), Some(next)) => Some((next, top)),
             (Some(top), None) => {
                 stack.push(top);
                 None
@@ -272,8 +294,8 @@ mod tests {
     fn execute_simple_program() {
         let builtins = Builtins::new();
         let mut vm = VM::default();
-        let i = vm.ctx.add_object(vm.ctx.builtins.new_int(1));
-        let j = vm.ctx.add_object(vm.ctx.builtins.new_int(2));
+        let i = vm.ctx.arena.add(vm.ctx.builtins.new_int(1));
+        let j = vm.ctx.arena.add(vm.ctx.builtins.new_int(2));
         let instructions: Instructions = vec![
             Instruction::LoadConst(i),
             Instruction::LoadConst(j),

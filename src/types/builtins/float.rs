@@ -76,6 +76,23 @@ impl Object for Float {
         }
     }
 
+    fn raise(&self, rhs: ObjectRef, ctx: &RuntimeContext) -> RuntimeResult {
+        let exp = if let Some(rhs) = rhs.as_any().downcast_ref::<Float>() {
+            *rhs.value()
+        } else if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
+            rhs.value().to_f64().unwrap()
+        } else {
+            return Err(RuntimeError::new_type_error(format!(
+                "Could not raise Float by {}",
+                rhs.class().name()
+            )));
+        };
+        let mut value = self.value().powf(exp);
+        let value = ctx.builtins.new_float(value);
+        Ok(value)
+    }
+
+    make_op!(modulo, %, "Could not divide {} with Float", false);
     make_op!(mul, *, "Could not multiply {} with Float", false);
     make_op!(div, /, "Could not divide {} into Float", false);
     make_op!(floor_div, /, "Could not divide {} into Float", true); // truncates
@@ -87,9 +104,9 @@ impl Object for Float {
 
 impl fmt::Display for Float {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.value.fract() {
-            0.0 => write!(f, "{}.0", self.value),
-            _ => write!(f, "{}", self.value),
+        match self.value().fract() {
+            0.0 => write!(f, "{}.0", self.value()),
+            _ => write!(f, "{}", self.value()),
         }
     }
 }

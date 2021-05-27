@@ -41,6 +41,20 @@ pub trait Object {
 
     // Binary operations -----------------------------------------------
 
+    fn raise(&self, _rhs: ObjectRef, _ctx: &RuntimeContext) -> RuntimeResult {
+        Err(RuntimeError::new_type_error(format!(
+            "raise not implemented for type: {}",
+            self.class().name()
+        )))
+    }
+
+    fn modulo(&self, _rhs: ObjectRef, _ctx: &RuntimeContext) -> RuntimeResult {
+        Err(RuntimeError::new_type_error(format!(
+            "modulo not implemented for type: {}",
+            self.class().name()
+        )))
+    }
+
     fn mul(&self, _rhs: ObjectRef, _ctx: &RuntimeContext) -> RuntimeResult {
         Err(RuntimeError::new_type_error(format!(
             "mul not implemented for type: {}",
