@@ -47,7 +47,7 @@ impl<'a> Visitor<'a> {
     // Utilities -------------------------------------------------------
 
     fn err(&self, message: String) -> VisitResult {
-        Err(CompilationError::new(CompilationErrorKind::VisitationError(message)))
+        Err(CompilationError::new(CompilationErrorKind::VisitError(message)))
     }
 
     fn push(&mut self, instruction: Instruction) {
@@ -75,15 +75,7 @@ impl<'a> Visitor<'a> {
 
     fn visit_statement(&mut self, node: ast::Statement) -> VisitResult {
         match node.kind {
-            ast::StatementKind::Print(maybe_expr) => {
-                match maybe_expr {
-                    Some(expr) => self.visit_expr(*expr)?,
-                    None => self.push_const(0),
-                }
-                self.push(Instruction::Print);
-                // XXX: This is sort of like the return value of print
-                self.push_const(0);
-            }
+            ast::StatementKind::Print => self.push(Instruction::Print),
             ast::StatementKind::Expr(expr) => self.visit_expr(*expr)?,
             _ => self.err(format!("Unhandled statement: {:?}", node))?,
         }
@@ -92,17 +84,15 @@ impl<'a> Visitor<'a> {
 
     fn visit_expr(&mut self, node: ast::Expr) -> VisitResult {
         match node.kind {
-            ast::ExprKind::BinaryOperation(a, op, b) => {
-                self.visit_binary_operation(*a, op, *b)?
-            }
-            ast::ExprKind::Identifier(ident) => self.visit_identifier(*ident)?,
+            ast::ExprKind::BinaryOp(a, op, b) => self.visit_binary_op(*a, op, *b)?,
+            ast::ExprKind::Ident(ident) => self.visit_ident(*ident)?,
             ast::ExprKind::Literal(literal) => self.visit_literal(*literal)?,
             _ => self.err(format!("Unhandled expression: {:?}", node))?,
         }
         Ok(())
     }
 
-    fn visit_binary_operation(
+    fn visit_binary_op(
         &mut self,
         expr_a: ast::Expr,
         op: BinaryOperator,
@@ -124,8 +114,8 @@ impl<'a> Visitor<'a> {
         value_expr: ast::Expr,
     ) -> VisitResult {
         match name_expr.kind {
-            ast::ExprKind::Identifier(ident) => match ident.kind {
-                ast::IdentifierKind::Identifier(name) => {
+            ast::ExprKind::Ident(ident) => match ident.kind {
+                ast::IdentKind::Ident(name) => {
                     // Store the name so we can get at it later.
                     let index = self.ctx.arena.add_name(name);
                     self.push(Instruction::Push(index));
@@ -141,14 +131,10 @@ impl<'a> Visitor<'a> {
 
     // Visit identifier as expression (i.e., not as part of an
     // assignment).
-    fn visit_identifier(&mut self, node: ast::Identifier) -> VisitResult {
+    fn visit_ident(&mut self, node: ast::Ident) -> VisitResult {
         match node.kind {
-            ast::IdentifierKind::Identifier(name) => {
-                self.push(Instruction::LoadByName(name))
-            }
-            ast::IdentifierKind::TypeIdentifier(name) => {
-                self.push(Instruction::LoadByName(name))
-            }
+            ast::IdentKind::Ident(name) => self.push(Instruction::LoadByName(name)),
+            ast::IdentKind::TypeIdent(name) => self.push(Instruction::LoadByName(name)),
         }
         Ok(())
     }

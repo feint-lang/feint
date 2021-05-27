@@ -85,10 +85,10 @@ pub enum Token {
     Print,    // print (TEMP)
 
     // Identifiers
-    Identifier(String),              // name
-    TypeIdentifier(String),          // Name
-    TypeMethodIdentifier(String),    // @name (called via type)
-    SpecialMethodIdentifier(String), // $name (e.g., $bool, $str)
+    Ident(String),              // name
+    TypeIdent(String),          // Name
+    TypeMethodIdent(String),    // @name (called via type)
+    SpecialMethodIdent(String), // $name (e.g., $bool, $str)
 
     EndOfStatement,
     EndOfInput,
@@ -106,10 +106,10 @@ impl Token {
             Self::Minus => "-",
             Self::Bang => "!",
             Self::Equal => "=",
-            Self::Identifier(s)
-            | Self::TypeIdentifier(s)
-            | Self::TypeMethodIdentifier(s)
-            | Self::SpecialMethodIdentifier(s) => s.as_str(),
+            Self::Ident(s)
+            | Self::TypeIdent(s)
+            | Self::TypeMethodIdent(s)
+            | Self::SpecialMethodIdent(s) => s.as_str(),
             Self::EndOfInput => "EOI",
             _ => unimplemented!(),
         }

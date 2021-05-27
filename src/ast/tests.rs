@@ -8,7 +8,7 @@ fn create_ast() {
     let program = Program::new(vec![
         // 1 + 2
         Statement::new_expr(
-            Expr::new_binary_operation(
+            Expr::new_binary_op(
                 Expr::new_literal(
                     Literal::new_int(BigInt::from(1))
                 ),
@@ -20,7 +20,7 @@ fn create_ast() {
         ),
         // 1 - 1
         Statement::new_expr(
-            Expr::new_binary_operation(
+            Expr::new_binary_op(
                 Expr::new_literal(
                     Literal::new_int(BigInt::from(1))
                 ),

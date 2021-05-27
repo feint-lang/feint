@@ -36,8 +36,8 @@ pub struct Statement {
 
 #[derive(PartialEq)]
 pub enum StatementKind {
+    Print,
     Expr(Box<Expr>),
-    Print(Option<Box<Expr>>),
 }
 
 impl Statement {
@@ -45,12 +45,8 @@ impl Statement {
         Self { kind }
     }
 
-    pub fn new_print(expr: Option<Expr>) -> Self {
-        let arg = match expr {
-            None => None,
-            Some(expr) => Some(Box::new(expr)),
-        };
-        Self { kind: StatementKind::Print(arg) }
+    pub fn new_print() -> Self {
+        Self { kind: StatementKind::Print }
     }
 
     pub fn new_expr(expr: Expr) -> Self {
@@ -72,7 +68,7 @@ impl fmt::Debug for StatementKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Expr(expr) => write!(f, "Expr({:?})", expr),
-            Self::Print(expr) => write!(f, "Print({:?})", expr),
+            Self::Print => write!(f, "Print"),
         }
     }
 }
@@ -85,12 +81,12 @@ pub struct Expr {
 
 #[derive(PartialEq)]
 pub enum ExprKind {
-    UnaryOperation(UnaryOperator, Box<Expr>),
-    BinaryOperation(Box<Expr>, BinaryOperator, Box<Expr>),
+    UnaryOp(UnaryOperator, Box<Expr>),
+    BinaryOp(Box<Expr>, BinaryOperator, Box<Expr>),
     Block(Box<Block>),
     Function(String, Box<Block>),
     Literal(Box<Literal>),
-    Identifier(Box<Identifier>),
+    Ident(Box<Ident>),
 }
 
 impl Expr {
@@ -102,24 +98,24 @@ impl Expr {
         Self { kind: ExprKind::Literal(Box::new(literal)) }
     }
 
-    pub fn new_identifier(identifier: Identifier) -> Self {
-        Self { kind: ExprKind::Identifier(Box::new(identifier)) }
+    pub fn new_ident(ident: Ident) -> Self {
+        Self { kind: ExprKind::Ident(Box::new(ident)) }
     }
 
-    pub fn new_unary_operation(operator: &str, a: Expr) -> Self {
+    pub fn new_unary_op(operator: &str, a: Expr) -> Self {
         let operator = match UnaryOperator::from_str(operator) {
             Ok(op) => op,
             Err(err) => panic!("{}", err),
         };
-        Self { kind: ExprKind::UnaryOperation(operator, Box::new(a)) }
+        Self { kind: ExprKind::UnaryOp(operator, Box::new(a)) }
     }
 
-    pub fn new_binary_operation(a: Expr, operator: &str, b: Expr) -> Self {
+    pub fn new_binary_op(a: Expr, operator: &str, b: Expr) -> Self {
         let operator = match BinaryOperator::from_str(operator) {
             Ok(op) => op,
             Err(err) => panic!("{}", err),
         };
-        Self { kind: ExprKind::BinaryOperation(Box::new(a), operator, Box::new(b)) }
+        Self { kind: ExprKind::BinaryOp(Box::new(a), operator, Box::new(b)) }
     }
 }
 
@@ -132,10 +128,10 @@ impl fmt::Debug for Expr {
 impl fmt::Debug for ExprKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::UnaryOperation(op, b) => write!(f, "({:?}{:?})", op, b),
-            Self::BinaryOperation(a, op, b) => write!(f, "({:?} {:?} {:?})", a, op, b),
+            Self::UnaryOp(op, b) => write!(f, "({:?}{:?})", op, b),
+            Self::BinaryOp(a, op, b) => write!(f, "({:?} {:?} {:?})", a, op, b),
             Self::Literal(literal) => write!(f, "{:?}", literal),
-            Self::Identifier(identifier) => write!(f, "{:?}", identifier),
+            Self::Ident(ident) => write!(f, "{:?}", ident),
             _ => unimplemented!(),
         }
     }
@@ -216,41 +212,41 @@ impl fmt::Debug for LiteralKind {
 
 /// Identifiers - names for variables, functions, types, and methods
 #[derive(PartialEq)]
-pub struct Identifier {
-    pub kind: IdentifierKind,
+pub struct Ident {
+    pub kind: IdentKind,
 }
 
 #[derive(PartialEq)]
-pub enum IdentifierKind {
-    Identifier(String),
-    TypeIdentifier(String),
+pub enum IdentKind {
+    Ident(String),
+    TypeIdent(String),
 }
 
-impl Identifier {
-    pub fn new(kind: IdentifierKind) -> Self {
+impl Ident {
+    pub fn new(kind: IdentKind) -> Self {
         Self { kind }
     }
 
-    pub fn new_identifier(name: String) -> Self {
-        Self { kind: IdentifierKind::Identifier(name) }
+    pub fn new_ident(name: String) -> Self {
+        Self { kind: IdentKind::Ident(name) }
     }
 
-    pub fn new_type_identifier(name: String) -> Self {
-        Self { kind: IdentifierKind::TypeIdentifier(name) }
+    pub fn new_type_ident(name: String) -> Self {
+        Self { kind: IdentKind::TypeIdent(name) }
     }
 }
 
-impl fmt::Debug for Identifier {
+impl fmt::Debug for Ident {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self.kind)
     }
 }
 
-impl fmt::Debug for IdentifierKind {
+impl fmt::Debug for IdentKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let name = match self {
-            Self::Identifier(name) => name,
-            Self::TypeIdentifier(name) => name,
+            Self::Ident(name) => name,
+            Self::TypeIdent(name) => name,
         };
         write!(f, "{}", name)
     }

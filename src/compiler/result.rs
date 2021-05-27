@@ -16,6 +16,5 @@ impl CompilationError {
 
 #[derive(Clone, Debug)]
 pub enum CompilationErrorKind {
-    GenericError(String),
-    VisitationError(String),
+    VisitError(String),
 }

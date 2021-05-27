@@ -96,7 +96,7 @@ impl<'a> Repl<'a> {
                 //        printing the result. Ideally, it would be
                 //        stored in a temporary local var and that's
                 //        what would be printed.
-                if text.starts_with("print ") {
+                if text == "print" || text.starts_with("print ") {
                     execute_text(&mut self.vm, text, self.debug)
                 } else {
                     execute_text(

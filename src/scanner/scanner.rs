@@ -341,20 +341,18 @@ impl<T: BufRead> Scanner<T> {
             },
             // Identifiers
             Some((c @ 'a'..='z', _, _)) => {
-                let identifier = self.read_identifier(c);
-                match KEYWORDS.get(identifier.as_str()) {
+                let ident = self.read_ident(c);
+                match KEYWORDS.get(ident.as_str()) {
                     Some(token) => token.clone(),
-                    _ => Token::Identifier(identifier),
+                    _ => Token::Ident(ident),
                 }
             }
-            Some((c @ 'A'..='Z', _, _)) => {
-                Token::TypeIdentifier(self.read_type_identifier(c))
-            }
+            Some((c @ 'A'..='Z', _, _)) => Token::TypeIdent(self.read_type_ident(c)),
             Some((c @ '@', Some('a'..='z'), _)) => {
-                Token::TypeMethodIdentifier(self.read_identifier(c))
+                Token::TypeMethodIdent(self.read_ident(c))
             }
             Some((c @ '$', Some('a'..='z'), _)) => {
-                Token::SpecialMethodIdentifier(self.read_identifier(c))
+                Token::SpecialMethodIdent(self.read_ident(c))
             }
             // Newlines
             Some(('\n', _, _)) => {
@@ -738,7 +736,7 @@ impl<T: BufRead> Scanner<T> {
     ///
     /// NOTE: Identifiers that don't end with a char as noted above will
     ///       cause an error later.
-    fn read_identifier(&mut self, first_char: char) -> String {
+    fn read_ident(&mut self, first_char: char) -> String {
         let mut string = first_char.to_string();
         loop {
             match self
@@ -756,7 +754,7 @@ impl<T: BufRead> Scanner<T> {
     ///
     /// - start with an upper case ASCII letter (A-Z)
     /// - contain ASCII letters and numbers
-    fn read_type_identifier(&mut self, first_char: char) -> String {
+    fn read_type_ident(&mut self, first_char: char) -> String {
         let mut string = first_char.to_string();
         loop {
             match self.next_char_if(|&c| c.is_ascii_alphabetic() || c.is_digit(10)) {
@@ -930,16 +928,16 @@ g (y) ->  # 6
         let mut token;
 
         // f
-        token = Token::Identifier("f".to_string());
+        token = Token::Ident("f".to_string());
         check_token(tokens.get(0), token, 1, 1, 1, 1);
         check_token(tokens.get(1), Token::LeftParen, 1, 3, 1, 3);
-        token = Token::Identifier("x".to_string());
+        token = Token::Ident("x".to_string());
         check_token(tokens.get(2), token, 1, 4, 1, 4);
         check_token(tokens.get(3), Token::RightParen, 1, 5, 1, 5);
         check_token(tokens.get(4), Token::FuncStart, 1, 7, 1, 8);
         check_token(tokens.get(5), Token::EndOfStatement, 1, 14, 1, 14);
         check_token(tokens.get(6), Token::BlockStart, 2, 0, 2, 0);
-        token = Token::Identifier("x".to_string());
+        token = Token::Ident("x".to_string());
         check_token(tokens.get(7), token, 2, 5, 2, 5);
         check_token(tokens.get(8), Token::EndOfStatement, 2, 14, 2, 14);
         check_token(tokens.get(9), Token::Int(BigInt::from(1)), 3, 5, 3, 5);
@@ -947,16 +945,16 @@ g (y) ->  # 6
         check_token(tokens.get(11), Token::BlockEnd, 6, 0, 6, 0);
 
         // g
-        token = Token::Identifier("g".to_string());
+        token = Token::Ident("g".to_string());
         check_token(tokens.get(12), token, 6, 1, 6, 1);
         check_token(tokens.get(13), Token::LeftParen, 6, 3, 6, 3);
-        token = Token::Identifier("y".to_string());
+        token = Token::Ident("y".to_string());
         check_token(tokens.get(14), token, 6, 4, 6, 4);
         check_token(tokens.get(15), Token::RightParen, 6, 5, 6, 5);
         check_token(tokens.get(16), Token::FuncStart, 6, 7, 6, 8);
         check_token(tokens.get(17), Token::EndOfStatement, 6, 14, 6, 14);
         check_token(tokens.get(18), Token::BlockStart, 7, 0, 7, 0);
-        token = Token::Identifier("y".to_string());
+        token = Token::Ident("y".to_string());
         check_token(tokens.get(19), token, 7, 5, 7, 5);
         check_token(tokens.get(20), Token::EndOfStatement, 7, 14, 7, 14);
         check_token(tokens.get(21), Token::BlockEnd, 8, 0, 8, 0);
@@ -995,7 +993,7 @@ b = 3
         println!("{:?}", tokens);
         let mut token;
         assert_eq!(num_tokens, 13);
-        token = Token::Identifier("a".to_string());
+        token = Token::Ident("a".to_string());
         check_token(tokens.get(0), token, 3, 1, 3, 1);
         check_token(tokens.get(1), Token::Equal, 3, 3, 3, 3);
         check_token(tokens.get(2), Token::LeftSquareBracket, 3, 5, 3, 5);
@@ -1005,7 +1003,7 @@ b = 3
         check_token(tokens.get(6), Token::Comma, 6, 4, 6, 4);
         check_token(tokens.get(7), Token::RightSquareBracket, 7, 1, 7, 1);
         check_token(tokens.get(8), Token::EndOfStatement, 7, 21, 7, 21);
-        token = Token::Identifier("b".to_string());
+        token = Token::Ident("b".to_string());
         check_token(tokens.get(9), token, 9, 1, 9, 1);
         check_token(tokens.get(10), Token::Equal, 9, 3, 9, 3);
         check_token(tokens.get(11), Token::Int(BigInt::from(3)), 9, 5, 9, 5);

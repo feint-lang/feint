@@ -126,21 +126,21 @@ impl<T: BufRead> Parser<T> {
 
     // Grammar
 
-    #[rustfmt::skip]
     fn statements(&mut self) -> Result<Vec<ast::Statement>, ParseError> {
         let mut statements = vec![];
         loop {
             let peek = self.peek_token()?;
             match peek {
                 None => break,
-                Some(TokenWithLocation {token: Token::Print, ..}) => {
+                Some(TokenWithLocation { token: Token::Print, .. }) => {
                     self.next_token();
                     let statement = match self.expr(0)? {
-                        Some(expr) => ast::Statement::new_print(Some(expr)),
-                        None => ast::Statement::new_print(None),
+                        Some(expr) => ast::Statement::new_expr(expr),
+                        None => ast::Statement::new_nil(),
                     };
                     statements.push(statement);
-                },
+                    statements.push(ast::Statement::new_print());
+                }
                 _ => {
                     if let Some(expr) = self.expr(0)? {
                         let statement = ast::Statement::new_expr(expr);
@@ -171,9 +171,7 @@ impl<T: BufRead> Parser<T> {
                 ast::Expr::new_literal(ast::Literal::new_float(value))
             }
             Token::Int(value) => ast::Expr::new_literal(ast::Literal::new_int(value)),
-            Token::Identifier(name) => {
-                ast::Expr::new_identifier(ast::Identifier::new_identifier(name))
-            }
+            Token::Ident(name) => ast::Expr::new_ident(ast::Ident::new_ident(name)),
             // The token isn't a leaf node, so it *must* be some other
             // kind of prefix token--a unary operation like -1 or !true.
             _ => self.unary_expression(&token)?,
@@ -192,7 +190,7 @@ impl<T: BufRead> Parser<T> {
                 }
                 if let Some(rhs) = self.expr(infix_precedence)? {
                     let op = infix_token.token.as_str();
-                    expr = ast::Expr::new_binary_operation(expr, op, rhs);
+                    expr = ast::Expr::new_binary_op(expr, op, rhs);
                 } else {
                     return Err(
                         self.err(ParseErrorKind::ExpectedExpression(infix_token))
@@ -217,7 +215,7 @@ impl<T: BufRead> Parser<T> {
         }
         if let Some(rhs) = self.expr(precedence)? {
             let operator = token.token.as_str();
-            return Ok(ast::Expr::new_unary_operation(operator, rhs));
+            return Ok(ast::Expr::new_unary_op(operator, rhs));
         }
         return Err(self.err(ParseErrorKind::ExpectedExpression(token.clone())));
     }
@@ -325,7 +323,7 @@ mod tests {
                     Box::new(
                         // 1 + 2
                         ast::Expr {
-                            kind: ast::ExprKind::BinaryOperation(
+                            kind: ast::ExprKind::BinaryOp(
                                 Box::new(
                                     // 1
                                     ast::Expr {
