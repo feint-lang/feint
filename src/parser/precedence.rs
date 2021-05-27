@@ -14,6 +14,7 @@ pub fn get_binary_precedence(token: &Token) -> u8 {
 pub fn is_right_associative(token: &Token) -> bool {
     match token {
         Token::Caret => true, // a ^ b (exponentiation)
+        Token::Equal => true, // a = b = c (assignment)
         _ => false,
     }
 }

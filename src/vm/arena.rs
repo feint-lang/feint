@@ -50,7 +50,6 @@ impl ObjectStore {
     pub fn set_index_for_name(&mut self, name_index: usize, index: usize) {
         let name = self.get_name(name_index);
         self.name_map.insert(name.clone(), index);
-        println!("{:?}", self.name_map);
     }
 
     /// This gets the pointer for a name so the referenced object can be
