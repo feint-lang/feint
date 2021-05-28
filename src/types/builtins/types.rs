@@ -5,7 +5,7 @@ use num_bigint::BigInt;
 use num_traits::Num;
 
 use super::super::class::{Type, TypeRef};
-use super::super::object::{Object, ObjectRef};
+use super::super::object::ObjectRef;
 
 pub struct Builtins {
     types: HashMap<&'static str, TypeRef>,

@@ -2,12 +2,13 @@ use std::any::Any;
 use std::fmt;
 use std::rc::Rc;
 
-use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeError, RuntimeResult};
+use crate::vm::{
+    RuntimeBoolResult, RuntimeContext, RuntimeError, RuntimeErrorKind, RuntimeResult,
+};
 
 use super::builtins::{Bool, Float, Int, Nil, String};
-use super::class::{Type, TypeRef};
+use super::class::TypeRef;
 use super::complex::ComplexObject;
-use super::result::{ObjectError, ObjectErrorKind};
 
 pub type RustString = std::string::String;
 pub type ObjectRef = Rc<dyn Object>;
@@ -77,16 +78,16 @@ pub trait Object {
 
     // Attributes ------------------------------------------------------
 
-    fn get_attribute(&self, name: &str) -> Result<&ObjectRef, ObjectError> {
-        Err(ObjectError::new(ObjectErrorKind::AttributeDoesNotExist(name.to_owned())))
+    fn get_attribute(&self, name: &str) -> Result<&ObjectRef, RuntimeError> {
+        Err(RuntimeError::new(RuntimeErrorKind::AttributeDoesNotExist(name.to_owned())))
     }
 
     fn set_attribute(
         &mut self,
         name: &str,
         _value: ObjectRef,
-    ) -> Result<(), ObjectError> {
-        Err(ObjectError::new(ObjectErrorKind::AttributeCannotBeSet(name.to_owned())))
+    ) -> Result<(), RuntimeError> {
+        Err(RuntimeError::new(RuntimeErrorKind::AttributeCannotBeSet(name.to_owned())))
     }
 }
 

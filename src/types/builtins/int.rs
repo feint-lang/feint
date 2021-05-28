@@ -1,14 +1,12 @@
 use std::any::Any;
 use std::fmt;
-use std::ops::{Add, Div, Mul, Sub};
-use std::rc::Rc;
 
 use num_bigint::BigInt;
 use num_traits::{FromPrimitive, ToPrimitive};
 
 use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeError, RuntimeResult};
 
-use super::super::class::{Type, TypeRef};
+use super::super::class::TypeRef;
 use super::super::object::{Object, ObjectExt, ObjectRef};
 use super::cmp::eq_int_float;
 use super::float::Float;

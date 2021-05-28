@@ -2,17 +2,13 @@
 //! objects as attributes. This is opposed to fundamental/builtin types,
 //! like `Bool` and `Float` that wrap Rust primitives.
 use std::any::Any;
-use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::fmt;
-use std::ops::{Deref, DerefMut};
-use std::rc::Rc;
 
-use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeError};
+use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeError, RuntimeErrorKind};
 
-use super::class::{Type, TypeRef};
+use super::class::TypeRef;
 use super::object::{Object, ObjectExt, ObjectRef};
-use super::result::{ObjectError, ObjectErrorKind};
 
 pub type Attributes = HashMap<String, ObjectRef>;
 
@@ -36,9 +32,9 @@ impl Object for ComplexObject {
         self
     }
 
-    fn is_equal(&self, rhs: ObjectRef, _ctx: &RuntimeContext) -> RuntimeBoolResult {
+    fn is_equal(&self, rhs: ObjectRef, ctx: &RuntimeContext) -> RuntimeBoolResult {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
-            Ok(self.is(rhs) || attributes_equal(&self.attributes, &rhs.attributes)?)
+            Ok(self.is(rhs) || attributes_equal(&self.attributes, &rhs.attributes, ctx)?)
         } else {
             Err(RuntimeError::new_type_error(format!(
                 "Could not compare {} to {}",
@@ -48,18 +44,18 @@ impl Object for ComplexObject {
         }
     }
 
-    fn get_attribute(&self, name: &str) -> Result<&ObjectRef, ObjectError> {
+    fn get_attribute(&self, name: &str) -> Result<&ObjectRef, RuntimeError> {
         if let Some(value) = self.attributes.get(name) {
             return Ok(value);
         }
-        Err(ObjectError::new(ObjectErrorKind::AttributeDoesNotExist(name.to_owned())))
+        Err(RuntimeError::new(RuntimeErrorKind::AttributeDoesNotExist(name.to_owned())))
     }
 
     fn set_attribute(
         &mut self,
         name: &str,
         value: ObjectRef,
-    ) -> Result<(), ObjectError> {
+    ) -> Result<(), RuntimeError> {
         self.attributes.insert(name.to_owned(), value.clone());
         Ok(())
     }
@@ -87,10 +83,18 @@ impl fmt::Display for ComplexObject {
 /// checked to see if they have the same number of entries. Then, the
 /// keys are checked to see if they're all the same. If they are, only
 /// then are the values checked for equality.
-fn attributes_equal(lhs: &Attributes, rhs: &Attributes) -> RuntimeBoolResult {
-    // FIXME:
-    // Ok(lhs.len() == rhs.len()
-    //     && lhs.keys().all(|k| rhs.contains_key(k))
-    //     && lhs.iter().all(|(k, v)| v.is_equal(rhs[k].clone())))
+fn attributes_equal(
+    lhs: &Attributes,
+    rhs: &Attributes,
+    ctx: &RuntimeContext,
+) -> RuntimeBoolResult {
+    if !(lhs.len() == rhs.len() && lhs.keys().all(|k| rhs.contains_key(k))) {
+        return Ok(false);
+    }
+    for (k, v) in lhs.iter() {
+        if !v.is_equal(rhs[k].clone(), ctx)? {
+            return Ok(false);
+        }
+    }
     Ok(true)
 }

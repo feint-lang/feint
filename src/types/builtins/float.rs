@@ -1,13 +1,11 @@
 use std::any::Any;
 use std::fmt;
-use std::ops::{Add, Div, Mul, Sub};
-use std::rc::Rc;
 
 use num_traits::ToPrimitive;
 
 use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeError, RuntimeResult};
 
-use super::super::class::{Type, TypeRef};
+use super::super::class::TypeRef;
 use super::super::object::{Object, ObjectExt, ObjectRef};
 use super::cmp::eq_int_float;
 use super::int::Int;
@@ -82,7 +80,7 @@ impl Object for Float {
                 rhs.class().name()
             )));
         };
-        let mut value = self.value().powf(exp);
+        let value = self.value().powf(exp);
         let value = ctx.builtins.new_float(value);
         Ok(value)
     }
@@ -99,9 +97,10 @@ impl Object for Float {
 
 impl fmt::Display for Float {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.value().fract() {
-            0.0 => write!(f, "{}.0", self.value()),
-            _ => write!(f, "{}", self.value()),
+        if self.value().fract() == 0.0 {
+            write!(f, "{}.0", self.value())
+        } else {
+            write!(f, "{}", self.value())
         }
     }
 }

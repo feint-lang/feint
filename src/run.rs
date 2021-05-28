@@ -1,9 +1,9 @@
 //! # FeInt
 
 use crate::compiler::CompilationErrorKind;
-use crate::parser::{self, ParseError, ParseErrorKind};
+use crate::parser::ParseErrorKind;
 use crate::result::ExitResult;
-use crate::scanner::{ScanError, ScanErrorKind, TokenWithLocation};
+use crate::scanner::ScanErrorKind;
 use crate::util::Location;
 use crate::vm::{self, ExecutionResult, RuntimeErrorKind, VMState, VM};
 
@@ -53,9 +53,7 @@ impl Runner {
         }
         match vm_state {
             VMState::Halted(0) => Ok(None),
-            VMState::Halted(code) => {
-                Err((code, format!("Halted abnormally: {}", code)))
-            }
+            VMState::Halted(code) => Err((code, format!("Halted abnormally: {}", code))),
             VMState::Idle => Err((-1, "Never halted".to_owned())),
             VMState::Running => unreachable!(),
         }
@@ -127,7 +125,10 @@ impl Runner {
             ScanErrorKind::UnexpectedCharacter(c) => {
                 format!(
                     "{:>width$}^\nSyntax error: unexpected character at column {}: '{}'",
-                    "", col, c, width = marker
+                    "",
+                    col,
+                    c,
+                    width = marker
                 )
             }
             ScanErrorKind::UnterminatedString(_) => {

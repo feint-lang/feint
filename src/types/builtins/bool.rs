@@ -1,11 +1,10 @@
 //! Built in boolean type
 use std::any::Any;
 use std::fmt;
-use std::rc::Rc;
 
 use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeError, RuntimeResult};
 
-use super::super::class::{Type, TypeRef};
+use super::super::class::TypeRef;
 use super::super::object::{Object, ObjectExt, ObjectRef};
 
 #[derive(Debug, PartialEq)]

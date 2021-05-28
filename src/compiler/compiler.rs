@@ -1,14 +1,7 @@
-use std::borrow::BorrowMut;
-use std::rc::Rc;
-
-use num_traits::cast::ToPrimitive;
-
 use crate::ast;
 use crate::types::ObjectRef;
 use crate::util::{BinaryOperator, UnaryOperator};
-use crate::vm::{
-    format_instructions, Constants, Instruction, Instructions, RuntimeContext, VM,
-};
+use crate::vm::{format_instructions, Instruction, Instructions, RuntimeContext, VM};
 
 use super::result::{CompilationError, CompilationErrorKind, CompilationResult};
 
@@ -86,7 +79,6 @@ impl<'a> Visitor<'a> {
         match node.kind {
             ast::StatementKind::Print => self.push(Instruction::Print),
             ast::StatementKind::Expr(expr) => self.visit_expr(*expr)?,
-            _ => self.err(format!("Unhandled statement: {:?}", node))?,
         }
         Ok(())
     }
@@ -104,7 +96,7 @@ impl<'a> Visitor<'a> {
     }
 
     fn visit_unary_op(&mut self, op: UnaryOperator, expr: ast::Expr) -> VisitResult {
-        self.visit_expr(expr);
+        self.visit_expr(expr)?;
         self.push(Instruction::UnaryOp(op));
         Ok(())
     }
@@ -171,7 +163,6 @@ impl<'a> Visitor<'a> {
             ast::LiteralKind::String(value) => {
                 self.add_const(self.ctx.builtins.new_string(value))
             }
-            _ => return self.err(format!("Unhandled literal: {:?}", node)),
         }
         Ok(())
     }

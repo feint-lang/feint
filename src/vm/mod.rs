@@ -1,8 +1,5 @@
-pub(crate) use constants::Constants;
 pub(crate) use context::RuntimeContext;
-pub(crate) use frame::Frame;
 pub(crate) use instruction::{format_instructions, Instruction, Instructions};
-pub(crate) use namespace::Namespace;
 pub(crate) use result::VMState;
 pub(crate) use result::{
     ExecutionResult, RuntimeBoolResult, RuntimeError, RuntimeErrorKind, RuntimeResult,

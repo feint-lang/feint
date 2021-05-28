@@ -4,7 +4,6 @@ use std::fmt::Formatter;
 use crate::compiler::CompilationError;
 use crate::parser::ParseError;
 use crate::types::ObjectRef;
-use crate::vm::Instruction;
 
 pub type ExecutionResult = Result<VMState, RuntimeError>;
 pub type RuntimeResult = Result<ObjectRef, RuntimeError>;
@@ -42,12 +41,13 @@ impl fmt::Display for RuntimeError {
 
 #[derive(Debug)]
 pub enum RuntimeErrorKind {
-    ObjectStoreIndexError(usize),
     EmptyStack,
     NotEnoughValuesOnStack(String),
     ParseError(ParseError),
     CompilationError(CompilationError),
     UnhandledInstruction(String),
+    AttributeDoesNotExist(String),
+    AttributeCannotBeSet(String),
     TypeError(String),
     NameError(String),
 }

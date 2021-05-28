@@ -7,7 +7,6 @@ use super::context::RuntimeContext;
 use super::frame::Frame;
 use super::instruction::{Instruction, Instructions};
 use super::result::{ExecutionResult, RuntimeError, RuntimeErrorKind, VMState};
-use crate::vm::instruction::Instruction::UnaryOp;
 
 /// Execute source text.
 pub fn execute_text(vm: &mut VM, text: &str, debug: bool) -> ExecutionResult {

@@ -2,10 +2,10 @@
 use std::any::Any;
 use std::fmt;
 
-use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeError, RuntimeResult};
+use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeResult};
 
-use super::super::class::{Type, TypeRef};
-use super::super::object::{Object, ObjectExt, ObjectRef};
+use super::super::class::TypeRef;
+use super::super::object::Object;
 
 /// Built in nil type
 #[derive(Debug, PartialEq)]
@@ -34,7 +34,7 @@ impl Object for Nil {
         Ok(ctx.builtins.true_obj.clone())
     }
 
-    fn as_bool(&self, ctx: &RuntimeContext) -> RuntimeBoolResult {
+    fn as_bool(&self, _ctx: &RuntimeContext) -> RuntimeBoolResult {
         Ok(false)
     }
 }
