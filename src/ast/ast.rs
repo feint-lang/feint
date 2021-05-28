@@ -56,6 +56,10 @@ impl Statement {
     pub fn new_nil() -> Self {
         Self::new_expr(Expr::new_literal(Literal::new_nil()))
     }
+
+    pub fn new_string(value: &str) -> Self {
+        Self::new_expr(Expr::new_literal(Literal::new_string(value)))
+    }
 }
 
 impl fmt::Debug for Statement {

@@ -133,10 +133,8 @@ impl VM {
         match instruction {
             Instruction::Print => match self.stack.pop() {
                 Some(index) => {
-                    if index != 0 {
-                        let value = self.ctx.constants.get(index).unwrap();
-                        println!("{}", value);
-                    }
+                    let value = self.ctx.constants.get(index).unwrap();
+                    println!("{}", value);
                 }
                 None => {
                     return self.err(RuntimeErrorKind::EmptyStack);

@@ -133,10 +133,10 @@ impl<T: BufRead> Parser<T> {
             match peek {
                 None => break,
                 Some(TokenWithLocation { token: Token::Print, .. }) => {
-                    self.next_token();
+                    self.next_token()?;
                     let statement = match self.expr(0)? {
                         Some(expr) => ast::Statement::new_expr(expr),
-                        None => ast::Statement::new_nil(),
+                        None => ast::Statement::new_string(""),
                     };
                     statements.push(statement);
                     statements.push(ast::Statement::new_print());

@@ -68,6 +68,6 @@ impl Object for String {
 
 impl fmt::Display for String {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "\"{}\"", self.value())
+        write!(f, "{}", self.value())
     }
 }
