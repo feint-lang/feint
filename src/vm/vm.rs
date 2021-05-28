@@ -108,15 +108,6 @@ impl VM {
         instruction: &Instruction,
     ) -> ExecutionResult {
         match instruction {
-            Instruction::Print => match self.stack.pop() {
-                Some(index) => {
-                    let value = self.ctx.constants.get(index).unwrap();
-                    println!("{}", value);
-                }
-                None => {
-                    return self.err(RuntimeErrorKind::EmptyStack);
-                }
-            },
             Instruction::Push(value) => {
                 // TODO: Check if empty and return err if so
                 self.stack.push(*value);
@@ -130,6 +121,12 @@ impl VM {
             }
             Instruction::LoadConst(index) => {
                 self.stack.push(*index);
+            }
+            Instruction::DeclareVar(name) => {
+                // NOTE: Currently, declaration and assignment are
+                //       the same thing, so declaration doesn't
+                //       do anything particularly useful ATM.
+                self.ctx.declare_var(name.as_str());
             }
             Instruction::AssignVar(name) => {
                 if let Some(i) = self.pop() {
@@ -195,6 +192,21 @@ impl VM {
                     self.err(RuntimeErrorKind::NotEnoughValuesOnStack(message))?;
                 };
             }
+            Instruction::BlockStart => {
+                self.ctx.add_namespace();
+            }
+            Instruction::BlockEnd => {
+                self.ctx.pop_namespace();
+            }
+            Instruction::Print => match self.stack.pop() {
+                Some(index) => {
+                    let value = self.ctx.constants.get(index).unwrap();
+                    println!("{}", value);
+                }
+                None => {
+                    return self.err(RuntimeErrorKind::EmptyStack);
+                }
+            },
             Instruction::Return => {
                 // TODO: Implement actual return
                 match self.stack.pop() {

@@ -1,5 +1,6 @@
 use crate::ast;
 use crate::scanner::{ScanError, TokenWithLocation};
+use crate::util::Location;
 
 pub type ParseResult = Result<ast::Program, ParseError>;
 
@@ -20,4 +21,5 @@ pub enum ParseErrorKind {
     CouldNotOpenSourceFile(String, String),
     UnhandledToken(TokenWithLocation),
     ExpectedExpression(TokenWithLocation), // path, reason
+    SyntaxError(String, Location),
 }

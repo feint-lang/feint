@@ -47,13 +47,22 @@ impl RuntimeContext {
 
     pub fn assign_var(&mut self, name: &str, const_index: usize) {
         let namespace = self.current_namespace_mut();
-        // Assignment points the var at the actual value
+        // Assignment points the var at the actual constant value
         namespace.add(name, const_index);
     }
 
     pub fn get_var(&self, name: &str) -> Option<&usize> {
-        let mut namespace = self.current_namespace();
-        namespace.get(name)
+        let mut i = self.namespace_stack.len() - 1;
+        loop {
+            let namespace = &self.namespace_stack[i];
+            if let Some(usize) = namespace.get(name) {
+                break Some(usize);
+            }
+            if i == 0 {
+                break None;
+            }
+            i -= 1;
+        }
     }
 }
 

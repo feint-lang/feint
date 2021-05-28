@@ -15,12 +15,15 @@ pub enum Instruction {
     JumpIfFalse(usize), // Jump if top of stack is false
     UnaryOp(UnaryOperator),
     BinaryOp(BinaryOperator),
-    Return,
     LoadConst(usize),
+    DeclareVar(String),
     AssignVar(String),
     LoadVar(String),
-    Halt(i32),
+    BlockStart,
+    BlockEnd,
     Print, // Print value at top of stack
+    Return,
+    Halt(i32),
 }
 
 impl fmt::Display for Instruction {

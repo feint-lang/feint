@@ -10,6 +10,7 @@ use super::precedence::{
     get_binary_precedence, get_unary_precedence, is_right_associative,
 };
 use super::{ParseError, ParseErrorKind, ParseResult};
+use crate::util::Location;
 
 /// Create a parser from the specified text, scan the text into tokens,
 /// parse the tokens, and return the resulting AST or error.
@@ -74,7 +75,7 @@ impl<T: BufRead> Parser<T> {
     /// Walk AST -> instructions
     fn parse(&mut self) -> ParseResult {
         // A program is a list of statements.
-        let statements = self.statements()?;
+        let statements = self.statements(false)?;
         let program = ast::Program::new(statements);
         Ok(program)
     }
@@ -114,6 +115,18 @@ impl<T: BufRead> Parser<T> {
         Ok(None)
     }
 
+    fn peek_token_if(
+        &mut self,
+        func: impl FnOnce(&Token) -> bool,
+    ) -> Result<Option<&TokenWithLocation>, ParseError> {
+        if let Some(t) = self.peek_token()? {
+            if func(&t.token) {
+                return Ok(Some(t));
+            }
+        }
+        Ok(None)
+    }
+
     /// Create a new ParseError of the specified kind.
     fn err(&self, kind: ParseErrorKind) -> ParseError {
         ParseError::new(kind)
@@ -126,12 +139,16 @@ impl<T: BufRead> Parser<T> {
 
     // Grammar ---------------------------------------------------------
 
-    fn statements(&mut self) -> Result<Vec<ast::Statement>, ParseError> {
+    fn statements(&mut self, block: bool) -> Result<Vec<ast::Statement>, ParseError> {
         let mut statements = vec![];
         loop {
             let peek = self.peek_token()?;
             match peek {
                 None => break,
+                Some(TokenWithLocation { token: Token::BlockEnd, .. }) if block => {
+                    self.next_token()?;
+                    break;
+                }
                 Some(TokenWithLocation { token: Token::Print, .. }) => {
                     self.next_token()?;
                     let statement = match self.expr(0)? {
@@ -175,6 +192,42 @@ impl<T: BufRead> Parser<T> {
                 ast::Expr::new_literal(ast::Literal::new_string(value))
             }
             Token::Ident(name) => ast::Expr::new_ident(ast::Ident::new_ident(name)),
+            Token::Block => {
+                // block keyword
+                // TODO: This logic should be extracted
+                return if let Ok(Some(_)) =
+                    self.next_token_if(|t| t == &Token::FuncStart)
+                {
+                    if let Ok(Some(_)) =
+                        self.next_token_if(|t| t == &Token::EndOfStatement)
+                    {
+                        if let Ok(Some(_)) =
+                            self.peek_token_if(|t| t == &Token::BlockStart)
+                        {
+                            self.expr(precedence)
+                        } else {
+                            Err(self.err(ParseErrorKind::SyntaxError(
+                                "Expected block".to_owned(),
+                                Location::new(token.start.line + 1, 1),
+                            )))
+                        }
+                    } else {
+                        Err(self.err(ParseErrorKind::SyntaxError(
+                            "Expected end of line after block ->".to_owned(),
+                            Location::new(token.start.line, token.end.col + 4),
+                        )))
+                    }
+                } else {
+                    Err(self.err(ParseErrorKind::SyntaxError(
+                        "Expected -> after block keyword".to_owned(),
+                        Location::new(token.start.line, token.end.col + 2),
+                    )))
+                };
+            }
+            Token::BlockStart => {
+                let statements = self.statements(true)?;
+                ast::Expr::new_block(statements)
+            }
             // The token isn't a leaf node, so it *must* be some other
             // kind of prefix token--a unary operation like -1 or !true.
             _ => self.unary_expression(&token)?,

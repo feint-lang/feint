@@ -28,6 +28,29 @@ impl fmt::Debug for Program {
     }
 }
 
+/// Block - a list of statements in a new scope.
+#[derive(PartialEq)]
+pub struct Block {
+    pub statements: Vec<Statement>,
+}
+
+impl Block {
+    pub fn new(statements: Vec<Statement>) -> Self {
+        Self { statements }
+    }
+}
+
+impl fmt::Debug for Block {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let items: Vec<String> = self
+            .statements
+            .iter()
+            .map(|statement| format!("{:?}", statement))
+            .collect();
+        write!(f, "Block ->\n{}", items.join("\n    "))
+    }
+}
+
 /// Statement - a logical chunk of code.
 #[derive(PartialEq)]
 pub struct Statement {
@@ -98,12 +121,8 @@ impl Expr {
         Self { kind }
     }
 
-    pub fn new_literal(literal: Literal) -> Self {
-        Self { kind: ExprKind::Literal(Box::new(literal)) }
-    }
-
-    pub fn new_ident(ident: Ident) -> Self {
-        Self { kind: ExprKind::Ident(Box::new(ident)) }
+    pub fn new_block(statements: Vec<Statement>) -> Self {
+        Self::new(ExprKind::Block(Box::new(Block::new(statements))))
     }
 
     pub fn new_unary_op(operator: &str, a: Expr) -> Self {
@@ -111,7 +130,7 @@ impl Expr {
             Ok(op) => op,
             Err(err) => panic!("{}", err),
         };
-        Self { kind: ExprKind::UnaryOp(operator, Box::new(a)) }
+        Self::new(ExprKind::UnaryOp(operator, Box::new(a)))
     }
 
     pub fn new_binary_op(a: Expr, operator: &str, b: Expr) -> Self {
@@ -119,7 +138,15 @@ impl Expr {
             Ok(op) => op,
             Err(err) => panic!("{}", err),
         };
-        Self { kind: ExprKind::BinaryOp(Box::new(a), operator, Box::new(b)) }
+        Self::new(ExprKind::BinaryOp(Box::new(a), operator, Box::new(b)))
+    }
+
+    pub fn new_ident(ident: Ident) -> Self {
+        Self::new(ExprKind::Ident(Box::new(ident)))
+    }
+
+    pub fn new_literal(literal: Literal) -> Self {
+        Self::new(ExprKind::Literal(Box::new(literal)))
     }
 }
 
@@ -138,24 +165,6 @@ impl fmt::Debug for ExprKind {
             Self::Ident(ident) => write!(f, "{:?}", ident),
             _ => unimplemented!(),
         }
-    }
-}
-
-/// Block - list of statements in a new scope.
-#[derive(PartialEq)]
-pub struct Block {
-    pub statements: Vec<Statement>,
-}
-
-impl Block {
-    pub fn new(statements: Vec<Statement>) -> Self {
-        Self { statements }
-    }
-}
-
-impl fmt::Debug for Block {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Block({:?})", self.statements)
     }
 }
 
@@ -181,23 +190,23 @@ impl Literal {
     }
 
     pub fn new_nil() -> Self {
-        Self { kind: LiteralKind::Nil }
+        Self::new(LiteralKind::Nil)
     }
 
     pub fn new_bool(value: bool) -> Self {
-        Self { kind: LiteralKind::Bool(value) }
+        Self::new(LiteralKind::Bool(value))
     }
 
     pub fn new_float(value: f64) -> Self {
-        Self { kind: LiteralKind::Float(value) }
+        Self::new(LiteralKind::Float(value))
     }
 
     pub fn new_int(value: BigInt) -> Self {
-        Self { kind: LiteralKind::Int(value) }
+        Self::new(LiteralKind::Int(value))
     }
 
     pub fn new_string<S: Into<String>>(value: S) -> Self {
-        Self { kind: LiteralKind::String(value.into()) }
+        Self::new(LiteralKind::String(value.into()))
     }
 }
 
@@ -238,11 +247,11 @@ impl Ident {
     }
 
     pub fn new_ident(name: String) -> Self {
-        Self { kind: IdentKind::Ident(name) }
+        Self::new(IdentKind::Ident(name))
     }
 
     pub fn new_type_ident(name: String) -> Self {
-        Self { kind: IdentKind::TypeIdent(name) }
+        Self::new(IdentKind::TypeIdent(name))
     }
 }
 

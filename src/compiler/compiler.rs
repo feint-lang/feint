@@ -73,6 +73,15 @@ impl<'a> Visitor<'a> {
         Ok(())
     }
 
+    fn visit_block(&mut self, node: ast::Block) -> VisitResult {
+        self.push(Instruction::BlockStart);
+        for statement in node.statements {
+            self.visit_statement(statement)?;
+        }
+        self.push(Instruction::BlockEnd);
+        Ok(())
+    }
+
     fn visit_statement(&mut self, node: ast::Statement) -> VisitResult {
         match node.kind {
             ast::StatementKind::Print => self.push(Instruction::Print),
@@ -84,6 +93,7 @@ impl<'a> Visitor<'a> {
 
     fn visit_expr(&mut self, node: ast::Expr) -> VisitResult {
         match node.kind {
+            ast::ExprKind::Block(block) => self.visit_block(*block)?,
             ast::ExprKind::BinaryOp(a, op, b) => self.visit_binary_op(*a, op, *b)?,
             ast::ExprKind::Ident(ident) => self.visit_ident(*ident)?,
             ast::ExprKind::Literal(literal) => self.visit_literal(*literal)?,
@@ -116,9 +126,12 @@ impl<'a> Visitor<'a> {
         match name_expr.kind {
             ast::ExprKind::Ident(ident) => match ident.kind {
                 ast::IdentKind::Ident(name) => {
+                    // NOTE: Currently, declaration and assignment are
+                    //       the same thing, so declaration doesn't
+                    //       do anything particularly useful ATM.
+                    self.push(Instruction::DeclareVar(name.clone()));
                     self.visit_expr(value_expr)?;
-                    self.ctx.declare_var(name.as_str());
-                    self.push(Instruction::AssignVar(name))
+                    self.push(Instruction::AssignVar(name));
                 }
                 _ => return self.err("Expected identifier".to_owned()),
             },

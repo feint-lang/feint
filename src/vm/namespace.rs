@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+#[derive(Debug)]
 pub struct Namespace {
     storage: HashMap<String, usize>,
 }

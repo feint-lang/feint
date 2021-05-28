@@ -1,0 +1,27 @@
+a = "a1"
+b = "b1"
+
+print "before block"
+print a
+print b
+
+a = block ->
+    print "in block"
+    print a
+    a = "a2"
+    print a
+    print b
+    block ->
+        print "in inner block"
+        c = "c3"
+        print a
+        print b
+        print c
+        "inner"
+
+print "after block"
+print a
+print b
+
+block ->
+    print "end"
