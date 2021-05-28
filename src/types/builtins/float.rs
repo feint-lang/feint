@@ -5,7 +5,7 @@ use std::rc::Rc;
 
 use num_traits::ToPrimitive;
 
-use crate::vm::{RuntimeContext, RuntimeError, RuntimeResult};
+use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeError, RuntimeResult};
 
 use super::super::class::{Type, TypeRef};
 use super::super::object::{Object, ObjectExt, ObjectRef};
@@ -59,11 +59,7 @@ impl Object for Float {
         self
     }
 
-    fn is_equal(
-        &self,
-        rhs: ObjectRef,
-        _ctx: &RuntimeContext,
-    ) -> Result<bool, RuntimeError> {
+    fn is_equal(&self, rhs: ObjectRef, _ctx: &RuntimeContext) -> RuntimeBoolResult {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
             Ok(self.is(rhs) || self == rhs)
         } else if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {

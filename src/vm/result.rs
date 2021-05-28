@@ -8,6 +8,7 @@ use crate::vm::Instruction;
 
 pub type ExecutionResult = Result<VMState, RuntimeError>;
 pub type RuntimeResult = Result<ObjectRef, RuntimeError>;
+pub type RuntimeBoolResult = Result<bool, RuntimeError>;
 
 #[derive(Debug, PartialEq)]
 pub enum VMState {

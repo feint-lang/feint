@@ -3,7 +3,7 @@ use std::any::Any;
 use std::fmt;
 use std::rc::Rc;
 
-use crate::vm::{RuntimeContext, RuntimeError, RuntimeResult};
+use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeError, RuntimeResult};
 
 use super::super::class::{Type, TypeRef};
 use super::super::object::{Object, ObjectExt, ObjectRef};
@@ -35,11 +35,7 @@ impl Object for String {
         self
     }
 
-    fn is_equal(
-        &self,
-        rhs: ObjectRef,
-        _ctx: &RuntimeContext,
-    ) -> Result<bool, RuntimeError> {
+    fn is_equal(&self, rhs: ObjectRef, _ctx: &RuntimeContext) -> RuntimeBoolResult {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
             Ok(self.is(rhs) || self.value() == rhs.value())
         } else {

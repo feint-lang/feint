@@ -8,7 +8,7 @@ use std::fmt;
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 
-use crate::vm::{RuntimeContext, RuntimeError};
+use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeError};
 
 use super::class::{Type, TypeRef};
 use super::object::{Object, ObjectExt, ObjectRef};
@@ -36,11 +36,7 @@ impl Object for ComplexObject {
         self
     }
 
-    fn is_equal(
-        &self,
-        rhs: ObjectRef,
-        _ctx: &RuntimeContext,
-    ) -> Result<bool, RuntimeError> {
+    fn is_equal(&self, rhs: ObjectRef, _ctx: &RuntimeContext) -> RuntimeBoolResult {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
             Ok(self.is(rhs) || attributes_equal(&self.attributes, &rhs.attributes)?)
         } else {
@@ -91,7 +87,7 @@ impl fmt::Display for ComplexObject {
 /// checked to see if they have the same number of entries. Then, the
 /// keys are checked to see if they're all the same. If they are, only
 /// then are the values checked for equality.
-fn attributes_equal(lhs: &Attributes, rhs: &Attributes) -> Result<bool, RuntimeError> {
+fn attributes_equal(lhs: &Attributes, rhs: &Attributes) -> RuntimeBoolResult {
     // FIXME:
     // Ok(lhs.len() == rhs.len()
     //     && lhs.keys().all(|k| rhs.contains_key(k))

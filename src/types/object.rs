@@ -2,7 +2,7 @@ use std::any::Any;
 use std::fmt;
 use std::rc::Rc;
 
-use crate::vm::{RuntimeContext, RuntimeError, RuntimeResult};
+use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeError, RuntimeResult};
 
 use super::builtins::{Bool, Float, Int, Nil, String};
 use super::class::{Type, TypeRef};
@@ -27,11 +27,7 @@ pub trait Object {
         self.class().name().to_owned()
     }
 
-    fn is_equal(
-        &self,
-        _rhs: ObjectRef,
-        _ctx: &RuntimeContext,
-    ) -> Result<bool, RuntimeError> {
+    fn is_equal(&self, _rhs: ObjectRef, _ctx: &RuntimeContext) -> RuntimeBoolResult {
         // This should catch Bool (when both true or both false) and Nil
         // (always), since they're singletons.
         Err(RuntimeError::new_type_error(format!(
