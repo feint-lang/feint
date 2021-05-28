@@ -9,7 +9,6 @@ use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeError, RuntimeResult};
 
 use super::super::class::{Type, TypeRef};
 use super::super::object::{Object, ObjectExt, ObjectRef};
-
 use super::cmp::eq_int_float;
 use super::int::Int;
 

@@ -11,31 +11,33 @@ use crate::types::{Builtins, ObjectRef};
 use crate::util::{BinaryOperator, Stack, UnaryOperator};
 
 use super::constants::Constants;
+use super::context::RuntimeContext;
 use super::frame::Frame;
 use super::instruction::{Instruction, Instructions};
 use super::namespace::Namespace;
-use super::result::{
-    ExecutionResult as Result, RuntimeError, RuntimeErrorKind, VMState,
-};
-use crate::vm::result::VMState::Running;
+use super::result::{ExecutionResult, RuntimeError, RuntimeErrorKind, VMState};
 
 /// Execute source text.
-pub fn execute_text(vm: &mut VM, text: &str, debug: bool) -> Result {
+pub fn execute_text(vm: &mut VM, text: &str, debug: bool) -> ExecutionResult {
     execute_parse_result(vm, parser::parse_text(text), debug)
 }
 
 /// Execute source from file.
-pub fn execute_file(vm: &mut VM, file_path: &str, debug: bool) -> Result {
+pub fn execute_file(vm: &mut VM, file_path: &str, debug: bool) -> ExecutionResult {
     execute_parse_result(vm, parser::parse_file(file_path), debug)
 }
 
 /// Execute source from stdin.
-pub fn execute_stdin(vm: &mut VM, debug: bool) -> Result {
+pub fn execute_stdin(vm: &mut VM, debug: bool) -> ExecutionResult {
     execute_parse_result(vm, parser::parse_stdin(), debug)
 }
 
 /// Execute parse result.
-fn execute_parse_result(vm: &mut VM, result: ParseResult, debug: bool) -> Result {
+fn execute_parse_result(
+    vm: &mut VM,
+    result: ParseResult,
+    debug: bool,
+) -> ExecutionResult {
     match result {
         Ok(program) => execute_program(vm, program, debug),
         Err(err) => Err(RuntimeError::new(RuntimeErrorKind::ParseError(err))),
@@ -43,39 +45,11 @@ fn execute_parse_result(vm: &mut VM, result: ParseResult, debug: bool) -> Result
 }
 
 /// Create a new VM and execute AST program.
-fn execute_program(vm: &mut VM, program: ast::Program, debug: bool) -> Result {
+fn execute_program(vm: &mut VM, program: ast::Program, debug: bool) -> ExecutionResult {
     let result = compile(vm, program, debug);
     match result {
         Ok(instructions) => vm.execute(instructions),
         Err(err) => Err(RuntimeError::new(RuntimeErrorKind::CompilationError(err))),
-    }
-}
-
-pub struct RuntimeContext {
-    pub builtins: Builtins,
-    pub constants: Constants,
-    pub globals: Namespace,
-}
-
-impl RuntimeContext {
-    pub fn new(builtins: Builtins, constants: Constants, globals: Namespace) -> Self {
-        Self { builtins, constants, globals }
-    }
-
-    pub fn reset(&mut self) {
-        self.globals.reset();
-    }
-}
-
-impl Default for RuntimeContext {
-    fn default() -> Self {
-        let builtins = Builtins::new();
-        let globals = Namespace::default();
-        let mut object_store = Constants::default();
-        object_store.add(builtins.nil_obj.clone()); // 0
-        object_store.add(builtins.true_obj.clone()); // 1
-        object_store.add(builtins.false_obj.clone()); // 2
-        RuntimeContext::new(builtins, object_store, globals)
     }
 }
 
@@ -114,7 +88,7 @@ impl VM {
     /// When a HALT instruction is encountered, the VM's state will be
     /// cleared; it can be "restarted" by passing more instructions to
     /// execute.
-    pub fn execute(&mut self, instructions: Instructions) -> Result {
+    pub fn execute(&mut self, instructions: Instructions) -> ExecutionResult {
         for instruction in instructions.iter() {
             let result = self.execute_instruction(instruction)?;
             if let VMState::Halted(_) = result {
@@ -124,12 +98,15 @@ impl VM {
         Ok(VMState::Idle)
     }
 
-    fn err(&self, kind: RuntimeErrorKind) -> Result {
+    fn err(&self, kind: RuntimeErrorKind) -> ExecutionResult {
         Err(RuntimeError::new(kind))
     }
 
     /// Run the specified instruction and return the VM's state.
-    pub fn execute_instruction(&mut self, instruction: &Instruction) -> Result {
+    pub fn execute_instruction(
+        &mut self,
+        instruction: &Instruction,
+    ) -> ExecutionResult {
         match instruction {
             Instruction::Print => match self.stack.pop() {
                 Some(index) => {
@@ -156,7 +133,7 @@ impl VM {
             }
             Instruction::AssignVar(name) => {
                 if let Some(i) = self.pop() {
-                    self.ctx.globals.add(name, i);
+                    self.ctx.assign_var(name, i);
                     self.stack.push(i);
                 } else {
                     let message = format!("Assignment");
@@ -164,7 +141,7 @@ impl VM {
                 };
             }
             Instruction::LoadVar(name) => {
-                if let Some(index) = self.ctx.globals.get(name) {
+                if let Some(index) = self.ctx.get_var(name) {
                     self.stack.push(*index);
                 } else {
                     return self.err(RuntimeErrorKind::NameError(format!(
@@ -279,8 +256,9 @@ impl VM {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::types::Builtins;
+
+    use super::*;
 
     #[test]
     fn execute_simple_program() {

@@ -1,3 +1,4 @@
+use std::borrow::BorrowMut;
 use std::rc::Rc;
 
 use num_traits::cast::ToPrimitive;
@@ -10,7 +11,6 @@ use crate::vm::{
 };
 
 use super::result::{CompilationError, CompilationErrorKind, CompilationResult};
-use std::borrow::BorrowMut;
 
 // Compiler ------------------------------------------------------------
 
@@ -117,7 +117,7 @@ impl<'a> Visitor<'a> {
             ast::ExprKind::Ident(ident) => match ident.kind {
                 ast::IdentKind::Ident(name) => {
                     self.visit_expr(value_expr)?;
-                    self.ctx.globals.add(name.as_str(), 0); // nil
+                    self.ctx.declare_var(name.as_str());
                     self.push(Instruction::AssignVar(name))
                 }
                 _ => return self.err("Expected identifier".to_owned()),
