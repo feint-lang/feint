@@ -12,6 +12,32 @@ use super::result::{ObjectError, ObjectErrorKind};
 pub type RustString = std::string::String;
 pub type ObjectRef = Rc<dyn Object>;
 
+macro_rules! make_bin_op {
+    ( $meth:ident, $op:literal, $result:ty ) => {
+        fn $meth(&self, _rhs: ObjectRef, _ctx: &RuntimeContext) -> $result {
+            Err(RuntimeError::new_type_error(format!(
+                "Binary operator {} ({}) not implemented for type {}",
+                $op,
+                stringify!($meth),
+                self.class().name()
+            )))
+        }
+    };
+}
+
+macro_rules! make_unary_op {
+    ( $meth:ident, $op:literal, $result:ty ) => {
+        fn $meth(&self, _ctx: &RuntimeContext) -> $result {
+            Err(RuntimeError::new_type_error(format!(
+                "Unary operator {} ({}) not implemented for type {}",
+                $op,
+                stringify!($meth),
+                self.class().name()
+            )))
+        }
+    };
+}
+
 /// Represents an instance of some type (AKA "class").
 pub trait Object {
     fn class(&self) -> &TypeRef;
@@ -27,65 +53,27 @@ pub trait Object {
         self.class().name().to_owned()
     }
 
-    fn is_equal(&self, _rhs: ObjectRef, _ctx: &RuntimeContext) -> RuntimeBoolResult {
-        // This should catch Bool (when both true or both false) and Nil
-        // (always), since they're singletons.
-        Err(RuntimeError::new_type_error(format!(
-            "is_equal not implemented for type: {}",
-            self.class().name()
-        )))
-    }
+    // Unary operations ------------------------------------------------
+
+    make_unary_op!(negate, "-", RuntimeResult);
+    make_unary_op!(not, "!", RuntimeResult);
+    make_unary_op!(as_bool, "!!", RuntimeBoolResult);
 
     // Binary operations -----------------------------------------------
 
-    fn raise(&self, _rhs: ObjectRef, _ctx: &RuntimeContext) -> RuntimeResult {
-        Err(RuntimeError::new_type_error(format!(
-            "raise not implemented for type: {}",
-            self.class().name()
-        )))
+    make_bin_op!(pow, "^", RuntimeResult);
+    make_bin_op!(modulo, "%", RuntimeResult);
+    make_bin_op!(mul, "*", RuntimeResult);
+    make_bin_op!(div, "/", RuntimeResult);
+    make_bin_op!(floor_div, "//", RuntimeResult);
+    make_bin_op!(add, "+", RuntimeResult);
+    make_bin_op!(sub, "-", RuntimeResult);
+    make_bin_op!(is_equal, "==", RuntimeBoolResult);
+    fn not_equal(&self, rhs: ObjectRef, ctx: &RuntimeContext) -> RuntimeBoolResult {
+        self.is_equal(rhs, ctx).map(|equal| !equal)
     }
-
-    fn modulo(&self, _rhs: ObjectRef, _ctx: &RuntimeContext) -> RuntimeResult {
-        Err(RuntimeError::new_type_error(format!(
-            "modulo not implemented for type: {}",
-            self.class().name()
-        )))
-    }
-
-    fn mul(&self, _rhs: ObjectRef, _ctx: &RuntimeContext) -> RuntimeResult {
-        Err(RuntimeError::new_type_error(format!(
-            "mul not implemented for type: {}",
-            self.class().name()
-        )))
-    }
-
-    fn div(&self, _rhs: ObjectRef, _ctx: &RuntimeContext) -> RuntimeResult {
-        Err(RuntimeError::new_type_error(format!(
-            "div not implemented for type: {}",
-            self.class().name()
-        )))
-    }
-
-    fn floor_div(&self, _rhs: ObjectRef, _ctx: &RuntimeContext) -> RuntimeResult {
-        Err(RuntimeError::new_type_error(format!(
-            "floor_div not implemented for type: {}",
-            self.class().name()
-        )))
-    }
-
-    fn add(&self, _rhs: ObjectRef, _ctx: &RuntimeContext) -> RuntimeResult {
-        Err(RuntimeError::new_type_error(format!(
-            "add not implemented for type: {}",
-            self.class().name()
-        )))
-    }
-
-    fn sub(&self, _rhs: ObjectRef, _ctx: &RuntimeContext) -> RuntimeResult {
-        Err(RuntimeError::new_type_error(format!(
-            "sub not implemented for type: {}",
-            self.class().name()
-        )))
-    }
+    make_bin_op!(and, "&&", RuntimeBoolResult);
+    make_bin_op!(or, "||", RuntimeBoolResult);
 
     // Attributes ------------------------------------------------------
 

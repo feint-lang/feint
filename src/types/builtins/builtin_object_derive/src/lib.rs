@@ -39,7 +39,7 @@ fn impl_builtin_object_derive(ast: &syn::DeriveInput) -> TokenStream {
                     Ok(self.is(rhs) || self == rhs)
                 } else {
                     Err(RuntimeError::new_type_error(format!(
-                        "Could not compare {} to {}",
+                        "Could not compare types {} and {} for equality",
                         self.class().name(), rhs.class().name()
                     )))
                 }

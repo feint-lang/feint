@@ -65,13 +65,13 @@ impl Object for Float {
             Ok(eq_int_float(rhs, self))
         } else {
             Err(RuntimeError::new_type_error(format!(
-                "Could not compare Float to {}",
+                "Could not compare Float to {} for equality",
                 rhs.class().name()
             )))
         }
     }
 
-    fn raise(&self, rhs: ObjectRef, ctx: &RuntimeContext) -> RuntimeResult {
+    fn pow(&self, rhs: ObjectRef, ctx: &RuntimeContext) -> RuntimeResult {
         let exp = if let Some(rhs) = rhs.as_any().downcast_ref::<Float>() {
             *rhs.value()
         } else if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {

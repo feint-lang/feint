@@ -5,7 +5,7 @@ use num_traits::cast::ToPrimitive;
 
 use crate::ast;
 use crate::types::ObjectRef;
-use crate::util::BinaryOperator;
+use crate::util::{BinaryOperator, UnaryOperator};
 use crate::vm::{
     format_instructions, Constants, Instruction, Instructions, RuntimeContext, VM,
 };
@@ -94,11 +94,18 @@ impl<'a> Visitor<'a> {
     fn visit_expr(&mut self, node: ast::Expr) -> VisitResult {
         match node.kind {
             ast::ExprKind::Block(block) => self.visit_block(*block)?,
+            ast::ExprKind::UnaryOp(op, b) => self.visit_unary_op(op, *b)?,
             ast::ExprKind::BinaryOp(a, op, b) => self.visit_binary_op(*a, op, *b)?,
             ast::ExprKind::Ident(ident) => self.visit_ident(*ident)?,
             ast::ExprKind::Literal(literal) => self.visit_literal(*literal)?,
             _ => self.err(format!("Unhandled expression: {:?}", node))?,
         }
+        Ok(())
+    }
+
+    fn visit_unary_op(&mut self, op: UnaryOperator, expr: ast::Expr) -> VisitResult {
+        self.visit_expr(expr);
+        self.push(Instruction::UnaryOp(op));
         Ok(())
     }
 

@@ -1,21 +1,13 @@
-use std::collections::HashMap;
-use std::rc::Rc;
-
-use num_bigint::BigInt;
-
 use crate::ast;
 use crate::compiler::compile;
 use crate::parser::{self, ParseResult};
-use crate::types::builtins::{Float, Int};
-use crate::types::{Builtins, ObjectRef};
 use crate::util::{BinaryOperator, Stack, UnaryOperator};
 
-use super::constants::Constants;
 use super::context::RuntimeContext;
 use super::frame::Frame;
 use super::instruction::{Instruction, Instructions};
-use super::namespace::Namespace;
 use super::result::{ExecutionResult, RuntimeError, RuntimeErrorKind, VMState};
+use crate::vm::instruction::Instruction::UnaryOp;
 
 /// Execute source text.
 pub fn execute_text(vm: &mut VM, text: &str, debug: bool) -> ExecutionResult {
@@ -103,19 +95,14 @@ impl VM {
     }
 
     /// Run the specified instruction and return the VM's state.
-    pub fn execute_instruction(
-        &mut self,
-        instruction: &Instruction,
-    ) -> ExecutionResult {
+    pub fn execute_instruction(&mut self, instruction: &Instruction) -> ExecutionResult {
         match instruction {
             Instruction::Push(value) => {
-                // TODO: Check if empty and return err if so
                 self.stack.push(*value);
             }
             Instruction::Pop => {
-                // TODO: Check if empty and return err if so
                 if self.stack.is_empty() {
-                    panic!("Stack is empty");
+                    self.err(RuntimeErrorKind::EmptyStack)?;
                 }
                 self.stack.pop();
             }
@@ -141,21 +128,31 @@ impl VM {
                 if let Some(index) = self.ctx.get_var(name) {
                     self.stack.push(*index);
                 } else {
-                    return self.err(RuntimeErrorKind::NameError(format!(
+                    self.err(RuntimeErrorKind::NameError(format!(
                         "Name not found: {}",
                         name
-                    )));
+                    )))?;
                 }
             }
             Instruction::UnaryOp(op) => {
-                if let Some(a) = self.pop() {
+                if let Some(i) = self.pop() {
+                    let a = self.ctx.constants.get(i).unwrap();
                     let value = match op {
-                        // FIXME: Implement and call Object methods
-                        UnaryOperator::Plus => a,
-                        UnaryOperator::Negate => a,
-                        UnaryOperator::Not => !a,
+                        UnaryOperator::Plus => a.clone(), // no-op
+                        UnaryOperator::Negate => a.negate(&self.ctx)?,
+                        UnaryOperator::Not => a.not(&self.ctx)?,
+                        op => {
+                            // Operators that return bool
+                            let result = match op {
+                                UnaryOperator::AsBool => a.as_bool(&self.ctx)?,
+                                _ => unreachable!(),
+                            };
+                            self.stack.push(if result { 1 } else { 2 });
+                            return Ok(VMState::Running);
+                        }
                     };
-                    self.stack.push(value);
+                    let index = self.ctx.constants.add(value);
+                    self.stack.push(index);
                 } else {
                     let message = format!("Unary op: {}", op);
                     self.err(RuntimeErrorKind::NotEnoughValuesOnStack(message))?;
@@ -167,22 +164,24 @@ impl VM {
                     let b = self.ctx.constants.get(j).unwrap();
                     let b = b.clone();
                     let value = match op {
-                        BinaryOperator::Equality => {
-                            let result = a.is_equal(b, &self.ctx)?;
+                        BinaryOperator::Pow => a.pow(b, &self.ctx)?,
+                        BinaryOperator::Mul => a.mul(b, &self.ctx)?,
+                        BinaryOperator::Div => a.div(b, &self.ctx)?,
+                        BinaryOperator::FloorDiv => a.floor_div(b, &self.ctx)?,
+                        BinaryOperator::Mod => a.modulo(b, &self.ctx)?,
+                        BinaryOperator::Add => a.add(b, &self.ctx)?,
+                        BinaryOperator::Sub => a.sub(b, &self.ctx)?,
+                        op => {
+                            // Operators that return bool
+                            let result = match op {
+                                BinaryOperator::IsEqual => a.is_equal(b, &self.ctx)?,
+                                BinaryOperator::NotEqual => a.not_equal(b, &self.ctx)?,
+                                BinaryOperator::And => a.and(b, &self.ctx)?,
+                                BinaryOperator::Or => a.or(b, &self.ctx)?,
+                                _ => unreachable!(),
+                            };
                             self.stack.push(if result { 1 } else { 2 });
                             return Ok(VMState::Running);
-                        }
-                        BinaryOperator::Raise => a.raise(b, &self.ctx)?,
-                        BinaryOperator::Multiply => a.mul(b, &self.ctx)?,
-                        BinaryOperator::Divide => a.div(b, &self.ctx)?,
-                        BinaryOperator::FloorDiv => a.floor_div(b, &self.ctx)?,
-                        BinaryOperator::Modulo => a.modulo(b, &self.ctx)?,
-                        BinaryOperator::Add => a.add(b, &self.ctx)?,
-                        BinaryOperator::Subtract => a.sub(b, &self.ctx)?,
-                        _ => {
-                            return self.err(RuntimeErrorKind::UnhandledInstruction(
-                                format!("BinaryOp: {}", op),
-                            ));
                         }
                     };
                     let index = self.ctx.constants.add(value);
@@ -204,7 +203,7 @@ impl VM {
                     println!("{}", value);
                 }
                 None => {
-                    return self.err(RuntimeErrorKind::EmptyStack);
+                    self.err(RuntimeErrorKind::EmptyStack)?;
                 }
             },
             Instruction::Return => {

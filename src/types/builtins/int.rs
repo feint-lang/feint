@@ -76,18 +76,19 @@ impl Object for Int {
     }
 
     fn is_equal(&self, rhs: ObjectRef, _ctx: &RuntimeContext) -> RuntimeBoolResult {
-        if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
+        if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
             Ok(self.is(rhs) || self == rhs)
         } else if let Some(rhs) = rhs.as_any().downcast_ref::<Float>() {
             Ok(eq_int_float(self, rhs))
         } else {
             Err(RuntimeError::new_type_error(format!(
-                "Could not compare Int to {}",
+                "Could not compare Int to {} for equality",
                 rhs.class().name()
             )))
         }
     }
-    fn raise(&self, rhs: ObjectRef, ctx: &RuntimeContext) -> RuntimeResult {
+
+    fn pow(&self, rhs: ObjectRef, ctx: &RuntimeContext) -> RuntimeResult {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
             // XXX: Return Int
             let base = self.value();

@@ -105,8 +105,12 @@ impl Token {
             Self::Plus => "+",
             Self::Minus => "-",
             Self::Bang => "!",
-            Self::Equal => "=",
+            Self::AsBool => "!!",
             Self::EqualEqual => "==",
+            Self::NotEqual => "!=",
+            Self::And => "&&",
+            Self::Or => "||",
+            Self::Equal => "=",
             Self::Ident(s)
             | Self::TypeIdent(s)
             | Self::TypeMethodIdent(s)

@@ -40,7 +40,7 @@ impl Object for String {
             Ok(self.is(rhs) || self.value() == rhs.value())
         } else {
             Err(RuntimeError::new_type_error(format!(
-                "Could not compare String to {}",
+                "Could not compare String to {} for equality",
                 rhs.class().name()
             )))
         }
