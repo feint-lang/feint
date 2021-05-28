@@ -124,7 +124,7 @@ impl<T: BufRead> Parser<T> {
         self.err(ParseErrorKind::ScanError(err))
     }
 
-    // Grammar
+    // Grammar ---------------------------------------------------------
 
     fn statements(&mut self) -> Result<Vec<ast::Statement>, ParseError> {
         let mut statements = vec![];

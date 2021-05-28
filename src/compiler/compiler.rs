@@ -6,7 +6,7 @@ use crate::ast;
 use crate::types::ObjectRef;
 use crate::util::BinaryOperator;
 use crate::vm::{
-    format_instructions, Instruction, Instructions, ObjectStore, RuntimeContext, VM,
+    format_instructions, Constants, Instruction, Instructions, RuntimeContext, VM,
 };
 
 use super::result::{CompilationError, CompilationErrorKind, CompilationResult};
@@ -59,7 +59,7 @@ impl<'a> Visitor<'a> {
     }
 
     fn add_const(&mut self, val: ObjectRef) {
-        let index = self.ctx.arena.add(val);
+        let index = self.ctx.constants.add(val);
         self.push_const(index);
     }
 
@@ -116,16 +116,14 @@ impl<'a> Visitor<'a> {
         match name_expr.kind {
             ast::ExprKind::Ident(ident) => match ident.kind {
                 ast::IdentKind::Ident(name) => {
-                    // Store the name so we can get at it later.
-                    let index = self.ctx.arena.add_name(name);
-                    self.push(Instruction::Push(index));
+                    self.visit_expr(value_expr)?;
+                    self.ctx.globals.add(name.as_str(), 0); // nil
+                    self.push(Instruction::AssignVar(name))
                 }
                 _ => return self.err("Expected identifier".to_owned()),
             },
             _ => return self.err("Expected identifier".to_owned()),
         }
-        self.visit_expr(value_expr)?;
-        self.push(Instruction::BinaryOp(BinaryOperator::Assign));
         Ok(())
     }
 
@@ -133,8 +131,8 @@ impl<'a> Visitor<'a> {
     // assignment).
     fn visit_ident(&mut self, node: ast::Ident) -> VisitResult {
         match node.kind {
-            ast::IdentKind::Ident(name) => self.push(Instruction::LoadByName(name)),
-            ast::IdentKind::TypeIdent(name) => self.push(Instruction::LoadByName(name)),
+            ast::IdentKind::Ident(name) => self.push(Instruction::LoadVar(name)),
+            ast::IdentKind::TypeIdent(name) => self.push(Instruction::LoadVar(name)),
         }
         Ok(())
     }

@@ -10,7 +10,7 @@ use crate::types::builtins::{Float, Int};
 use crate::types::{Builtins, ObjectRef};
 use crate::util::{BinaryOperator, Stack, UnaryOperator};
 
-use super::arena::ObjectStore;
+use super::constants::Constants;
 use super::frame::Frame;
 use super::instruction::{Instruction, Instructions};
 use super::namespace::Namespace;
@@ -53,30 +53,34 @@ fn execute_program(vm: &mut VM, program: ast::Program, debug: bool) -> Result {
 
 pub struct RuntimeContext {
     pub builtins: Builtins,
-    pub arena: ObjectStore,
+    pub constants: Constants,
+    pub globals: Namespace,
 }
 
 impl RuntimeContext {
-    pub fn new(builtins: Builtins, arena: ObjectStore) -> Self {
-        Self { builtins, arena }
+    pub fn new(builtins: Builtins, constants: Constants, globals: Namespace) -> Self {
+        Self { builtins, constants, globals }
+    }
+
+    pub fn reset(&mut self) {
+        self.globals.reset();
     }
 }
 
 impl Default for RuntimeContext {
     fn default() -> Self {
         let builtins = Builtins::new();
-        let mut object_store = ObjectStore::new();
+        let globals = Namespace::default();
+        let mut object_store = Constants::default();
         object_store.add(builtins.nil_obj.clone()); // 0
         object_store.add(builtins.true_obj.clone()); // 1
         object_store.add(builtins.false_obj.clone()); // 2
-        RuntimeContext::new(builtins, object_store)
+        RuntimeContext::new(builtins, object_store, globals)
     }
 }
 
 pub struct VM {
     pub ctx: RuntimeContext,
-
-    namespace: Namespace,
 
     // Items are pushed onto or popped from the stack as instructions
     // are executed in the instruction list.
@@ -88,9 +92,7 @@ pub struct VM {
 
 impl Default for VM {
     fn default() -> Self {
-        let ctx = RuntimeContext::default();
-        let namespace = Namespace::new(None);
-        VM::new(ctx, namespace)
+        VM::new(RuntimeContext::default())
     }
 }
 
@@ -98,14 +100,12 @@ impl Default for VM {
 /// then, implicitly, goes idle until it's passed some instructions to
 /// execute. After instructions are executed
 impl VM {
-    pub fn new(ctx: RuntimeContext, namespace: Namespace) -> Self {
-        VM { ctx, namespace, stack: Stack::new(), call_stack: Stack::new() }
+    pub fn new(ctx: RuntimeContext) -> Self {
+        VM { ctx, stack: Stack::new(), call_stack: Stack::new() }
     }
 
     pub fn halt(&mut self) {
-        self.namespace.reset();
-        self.stack.clear();
-        self.call_stack.clear();
+        // TODO: Not sure if this is needed or, if so, what it should do
     }
 
     /// Execute the specified instructions and return the VM's state. If
@@ -134,7 +134,7 @@ impl VM {
             Instruction::Print => match self.stack.pop() {
                 Some(index) => {
                     if index != 0 {
-                        let value = self.ctx.arena.get(index).unwrap();
+                        let value = self.ctx.constants.get(index).unwrap();
                         println!("{}", value);
                     }
                 }
@@ -156,17 +156,23 @@ impl VM {
             Instruction::LoadConst(index) => {
                 self.stack.push(*index);
             }
-            // FIXME: Probably shouldn't be using const storage for this
-            Instruction::LoadByName(name) => {
-                let result = self.ctx.arena.get_index_for_name(name);
-                match result {
-                    Some(index) => self.stack.push(*index),
-                    _ => {
-                        return self.err(RuntimeErrorKind::NameError(format!(
-                            "Name not found: {}",
-                            name
-                        )))
-                    }
+            Instruction::AssignVar(name) => {
+                if let Some(i) = self.pop() {
+                    self.ctx.globals.add(name, i);
+                    self.stack.push(i);
+                } else {
+                    let message = format!("Assignment");
+                    self.err(RuntimeErrorKind::NotEnoughValuesOnStack(message))?;
+                };
+            }
+            Instruction::LoadVar(name) => {
+                if let Some(index) = self.ctx.globals.get(name) {
+                    self.stack.push(*index);
+                } else {
+                    return self.err(RuntimeErrorKind::NameError(format!(
+                        "Name not found: {}",
+                        name
+                    )));
                 }
             }
             Instruction::UnaryOp(op) => {
@@ -183,22 +189,10 @@ impl VM {
                     self.err(RuntimeErrorKind::NotEnoughValuesOnStack(message))?;
                 };
             }
-            Instruction::BinaryOp(op) if op == &BinaryOperator::Assign => {
-                if let Some((i, j)) = self.pop_top_two() {
-                    // Point name at value
-                    self.ctx.arena.set_index_for_name(i, j);
-                    // The return value of an assignment is the assigned
-                    // value
-                    self.stack.push(j);
-                } else {
-                    let message = format!("Assignment");
-                    self.err(RuntimeErrorKind::NotEnoughValuesOnStack(message))?;
-                };
-            }
             Instruction::BinaryOp(op) => {
                 if let Some((i, j)) = self.pop_top_two() {
-                    let a = self.ctx.arena.get(i).unwrap();
-                    let b = self.ctx.arena.get(j).unwrap();
+                    let a = self.ctx.constants.get(i).unwrap();
+                    let b = self.ctx.constants.get(j).unwrap();
                     let b = b.clone();
                     let value = match op {
                         BinaryOperator::Equality => {
@@ -219,7 +213,7 @@ impl VM {
                             ));
                         }
                     };
-                    let index = self.ctx.arena.add(value);
+                    let index = self.ctx.constants.add(value);
                     self.stack.push(index);
                 } else {
                     let message = format!("Binary op: {}", op);
@@ -294,8 +288,8 @@ mod tests {
     fn execute_simple_program() {
         let builtins = Builtins::new();
         let mut vm = VM::default();
-        let i = vm.ctx.arena.add(vm.ctx.builtins.new_int(1));
-        let j = vm.ctx.arena.add(vm.ctx.builtins.new_int(2));
+        let i = vm.ctx.constants.add(vm.ctx.builtins.new_int(1));
+        let j = vm.ctx.constants.add(vm.ctx.builtins.new_int(2));
         let instructions: Instructions = vec![
             Instruction::LoadConst(i),
             Instruction::LoadConst(j),
