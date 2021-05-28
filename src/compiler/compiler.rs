@@ -150,6 +150,9 @@ impl<'a> Visitor<'a> {
             ast::LiteralKind::Int(value) => {
                 self.add_const(self.ctx.builtins.new_int(value))
             }
+            ast::LiteralKind::String(value) => {
+                self.add_const(self.ctx.builtins.new_string(value))
+            }
             _ => return self.err(format!("Unhandled literal: {:?}", node)),
         }
         Ok(())

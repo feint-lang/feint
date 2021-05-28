@@ -31,21 +31,23 @@ pub fn is_right_associative(token: &Token) -> bool {
 ///       more complicated than this.
 pub fn get_operator_precedence(token: &Token) -> (u8, u8) {
     match token {
-        | Token::Equal =>     (0, 1),  // a = b
+        | Token::Equal =>      (0, 1), // a = b
+        
+        | Token::EqualEqual => (0, 2), // a == b
         
         | Token::Plus                  // +a, a + b
-        | Token::Minus =>     (5, 2),  // -a, a - b
+        | Token::Minus =>      (6, 3), // -a, a - b
         
         | Token::Star                  // a * b
         | Token::Slash                 // a / b   (floating point div)
         | Token::DoubleSlash           // a // b  (floor div)
-        | Token::Percent =>   (0, 3),  // a % b
+        | Token::Percent =>    (0, 4), // a % b
        
-        | Token::Caret =>     (0, 4),  // a ^ b   (exponentiation)
+        | Token::Caret =>      (0, 5), // a ^ b   (exponentiation)
         
-        | Token::Bang =>      (5, 0),  // !a      (logical not)
+        | Token::Bang =>       (6, 0), // !a      (logical not)
         
         // Not an operator
-        _ =>                  (0, 0),
+        _ =>                   (0, 0),
     }
 }

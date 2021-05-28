@@ -4,11 +4,12 @@ use std::rc::Rc;
 
 use crate::vm::{RuntimeContext, RuntimeError, RuntimeResult};
 
-use super::builtins::{Bool, Float, Int, Nil};
+use super::builtins::{Bool, Float, Int, Nil, String};
 use super::class::{Type, TypeRef};
 use super::complex::ComplexObject;
 use super::result::{ObjectError, ObjectErrorKind};
 
+pub type RustString = std::string::String;
 pub type ObjectRef = Rc<dyn Object>;
 
 /// Represents an instance of some type (AKA "class").
@@ -22,7 +23,7 @@ pub trait Object {
         p
     }
 
-    fn name(&self) -> String {
+    fn name(&self) -> RustString {
         self.class().name().to_owned()
     }
 
@@ -129,7 +130,8 @@ macro_rules! write_instance {
 
 impl fmt::Display for dyn Object {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write_instance!(f, self, Nil, Bool, Float, Int, ComplexObject);
+        write_instance!(f, self, Nil, Bool, Float, Int, String, ComplexObject);
+        // Fallback
         write!(f, "{}()", self.class())
     }
 }

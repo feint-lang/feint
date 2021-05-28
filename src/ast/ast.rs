@@ -168,6 +168,7 @@ pub enum LiteralKind {
     Bool(bool),
     Float(f64),
     Int(BigInt),
+    String(String),
 }
 
 impl Literal {
@@ -190,6 +191,10 @@ impl Literal {
     pub fn new_int(value: BigInt) -> Self {
         Self { kind: LiteralKind::Int(value) }
     }
+
+    pub fn new_string<S: Into<String>>(value: S) -> Self {
+        Self { kind: LiteralKind::String(value.into()) }
+    }
 }
 
 impl fmt::Debug for Literal {
@@ -205,6 +210,7 @@ impl fmt::Debug for LiteralKind {
             Self::Bool(value) => value.to_string(),
             Self::Float(value) => value.to_string(),
             Self::Int(value) => value.to_string(),
+            Self::String(value) => value.clone(),
         };
         write!(f, "{}", string)
     }

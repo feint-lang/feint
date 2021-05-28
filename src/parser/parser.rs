@@ -171,6 +171,9 @@ impl<T: BufRead> Parser<T> {
                 ast::Expr::new_literal(ast::Literal::new_float(value))
             }
             Token::Int(value) => ast::Expr::new_literal(ast::Literal::new_int(value)),
+            Token::String(value) => {
+                ast::Expr::new_literal(ast::Literal::new_string(value))
+            }
             Token::Ident(name) => ast::Expr::new_ident(ast::Ident::new_ident(name)),
             // The token isn't a leaf node, so it *must* be some other
             // kind of prefix token--a unary operation like -1 or !true.

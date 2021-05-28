@@ -106,12 +106,13 @@ impl Token {
             Self::Minus => "-",
             Self::Bang => "!",
             Self::Equal => "=",
+            Self::EqualEqual => "==",
             Self::Ident(s)
             | Self::TypeIdent(s)
             | Self::TypeMethodIdent(s)
             | Self::SpecialMethodIdent(s) => s.as_str(),
             Self::EndOfInput => "EOI",
-            _ => unimplemented!(),
+            _ => panic!("{:?} (need to implement Token.as_str() for {})", self, self),
         }
     }
 }

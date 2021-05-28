@@ -32,6 +32,7 @@ impl Builtins {
         types.insert("Bool", bool_type);
         types.insert("Float", Self::create_type("Float"));
         types.insert("Int", Self::create_type("Int"));
+        types.insert("String", Self::create_type("String"));
 
         Self { types, nil_obj, true_obj, false_obj }
     }
@@ -72,5 +73,11 @@ impl Builtins {
         let value = value.into();
         let value = BigInt::from_str_radix(value.as_ref(), 10).unwrap();
         self.new_int(value)
+    }
+
+    pub fn new_string<S: Into<String>>(&self, value: S) -> ObjectRef {
+        let class = self.get_type("String").clone();
+        let value = value.into();
+        Rc::new(super::String::new(class, value))
     }
 }
