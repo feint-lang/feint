@@ -13,4 +13,3 @@ num-bigint = "~0.4.0"
 num-traits = "~0.2.14"
 regex = "~1.4.6"
 rustyline = "~8.0.0"
-builtin_object_derive = { path = "./src/types/builtins/builtin_object_derive" }
