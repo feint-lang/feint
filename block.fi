@@ -7,17 +7,18 @@ print b
 
 a = block ->
     print "    in block"
-    print a
+    print $"    ${a}"
     a = "a2"
-    print a
-    print b
+    print $"    ${a}"
+    print $"    ${b}"
     block ->
         print "        in inner block"
         c = "c3"
         print $"        ${a}"
-        print b
-        print c
+        print $"        ${b}"
+        print $"        ${c}"
         "inner"
+    print "after inner block"
 
 print "after block"
 print a
@@ -38,6 +39,7 @@ a:
 print "label: a"
 
 block ->
+    # jump out
     jump b
 
 b:

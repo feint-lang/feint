@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use crate::ast;
 use crate::compiler::compile;
 use crate::parser::{self, ParseResult};
@@ -7,6 +9,7 @@ use super::context::RuntimeContext;
 use super::frame::Frame;
 use super::instruction::{Instruction, Instructions};
 use super::result::{ExecutionResult, RuntimeError, RuntimeErrorKind, VMState};
+use crate::types::builtins::String;
 use crate::vm::result::InstructionResult;
 
 /// Execute source text.
@@ -99,7 +102,16 @@ impl VM {
                     self.stack.pop();
                 }
                 Instruction::LoadConst(index) => {
-                    self.stack.push(*index);
+                    if let Some(obj) = self.ctx.constants.get(*index) {
+                        if let Some(str) = obj.as_any().downcast_ref::<String>() {
+                            if str.is_format_string() {
+                                let formatted = str.format(&self.ctx)?;
+                                let formatted = Rc::new(formatted);
+                                self.ctx.constants.replace(*index, formatted);
+                            }
+                        }
+                        self.stack.push(*index);
+                    }
                 }
                 Instruction::DeclareVar(name) => {
                     // NOTE: Currently, declaration and assignment are
@@ -117,8 +129,17 @@ impl VM {
                     };
                 }
                 Instruction::LoadVar(name) => {
-                    if let Some(index) = self.ctx.get_var(name) {
-                        self.stack.push(*index);
+                    if let Some(&index) = self.ctx.get_obj_index(name) {
+                        if let Some(obj) = self.ctx.constants.get(index) {
+                            if let Some(str) = obj.as_any().downcast_ref::<String>() {
+                                if str.is_format_string() {
+                                    let formatted = str.format(&self.ctx)?;
+                                    let formatted = Rc::new(formatted);
+                                    self.ctx.constants.replace(index, formatted);
+                                }
+                            }
+                        }
+                        self.stack.push(index);
                     } else {
                         self.err(RuntimeErrorKind::NameError(format!(
                             "Name not found: {}",

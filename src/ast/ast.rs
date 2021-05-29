@@ -188,6 +188,7 @@ pub enum LiteralKind {
     Float(f64),
     Int(BigInt),
     String(String),
+    FormatString(String),
 }
 
 impl Literal {
@@ -214,6 +215,10 @@ impl Literal {
     pub fn new_string<S: Into<String>>(value: S) -> Self {
         Self::new(LiteralKind::String(value.into()))
     }
+
+    pub fn new_format_string<S: Into<String>>(value: S) -> Self {
+        Self::new(LiteralKind::FormatString(value.into()))
+    }
 }
 
 impl fmt::Debug for Literal {
@@ -230,6 +235,7 @@ impl fmt::Debug for LiteralKind {
             Self::Float(value) => value.to_string(),
             Self::Int(value) => value.to_string(),
             Self::String(value) => value.clone(),
+            Self::FormatString(value) => value.clone(),
         };
         write!(f, "{}", string)
     }

@@ -1,4 +1,4 @@
-use crate::types::Builtins;
+use crate::types::{Builtins, ObjectRef};
 
 use super::constants::Constants;
 use super::namespace::Namespace;
@@ -53,7 +53,7 @@ impl RuntimeContext {
         namespace.add(name, const_index);
     }
 
-    pub fn get_var(&self, name: &str) -> Option<&usize> {
+    pub fn get_obj_index(&self, name: &str) -> Option<&usize> {
         let mut i = self.namespace_stack.len() - 1;
         loop {
             let namespace = &self.namespace_stack[i];
@@ -64,6 +64,22 @@ impl RuntimeContext {
                 break None;
             }
             i -= 1;
+        }
+    }
+
+    pub fn get_obj(&self, index: usize) -> Option<ObjectRef> {
+        if let Some(obj) = self.constants.get(index) {
+            Some(obj.clone())
+        } else {
+            None
+        }
+    }
+
+    pub fn get_obj_by_name(&self, name: &str) -> Option<ObjectRef> {
+        if let Some(&index) = self.get_obj_index(name) {
+            self.get_obj(index)
+        } else {
+            None
         }
     }
 

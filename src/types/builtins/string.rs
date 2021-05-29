@@ -2,7 +2,9 @@
 use std::any::Any;
 use std::fmt;
 
-use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeError, RuntimeResult};
+use crate::vm::{
+    RuntimeBoolResult, RuntimeContext, RuntimeError, RuntimeErrorKind, RuntimeResult,
+};
 
 use super::super::class::TypeRef;
 use super::super::object::{Object, ObjectExt, ObjectRef};
@@ -13,15 +15,65 @@ pub type RustString = std::string::String;
 pub struct String {
     class: TypeRef,
     value: RustString,
+    is_format_string: bool, // is this a format string?
 }
 
 impl String {
-    pub fn new<S: Into<RustString>>(class: TypeRef, value: S) -> Self {
-        Self { class: class.clone(), value: value.into() }
+    pub fn new<S: Into<RustString>>(class: TypeRef, value: S, format: bool) -> Self {
+        Self { class: class.clone(), value: value.into(), is_format_string: format }
     }
 
     pub fn value(&self) -> &str {
         self.value.as_str()
+    }
+
+    pub fn is_format_string(&self) -> bool {
+        self.is_format_string
+    }
+
+    pub fn format(&self, ctx: &RuntimeContext) -> Result<Self, RuntimeError> {
+        assert!(self.is_format_string, "String is not a format string: {}", self);
+        let mut formatted = RustString::new();
+        let mut chars = self.value().chars();
+        let mut peek_chars = self.value.chars();
+        peek_chars.next();
+        loop {
+            if let Some(c) = chars.next() {
+                let d = peek_chars.next();
+                if let ('$', Some('{')) = (c, d) {
+                    chars.next();
+                    peek_chars.next();
+                    let mut name = RustString::new();
+                    loop {
+                        if let Some(c) = chars.next() {
+                            peek_chars.next();
+                            if c == '}' {
+                                if let Some(obj) = ctx.get_obj_by_name(name.as_str()) {
+                                    formatted.push_str(obj.to_string().as_str());
+                                } else {
+                                    return Err(RuntimeError::new(
+                                        RuntimeErrorKind::NameError(format!(
+                                            "Name not found: {}",
+                                            name
+                                        )),
+                                    ));
+                                }
+                                break;
+                            } else {
+                                name.push(c);
+                            }
+                        } else {
+                            break;
+                        }
+                    }
+                } else {
+                    formatted.push(c);
+                }
+            } else {
+                break;
+            }
+        }
+        Ok(Self::new(self.class().clone(), formatted, false))
     }
 }
 
@@ -52,7 +104,7 @@ impl Object for String {
             let mut value = RustString::with_capacity(a.len() + b.len());
             value.push_str(a);
             value.push_str(b);
-            let value = ctx.builtins.new_string(value);
+            let value = ctx.builtins.new_string(value, false);
             Ok(value)
         } else {
             Err(RuntimeError::new_type_error(format!(

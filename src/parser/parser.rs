@@ -229,8 +229,7 @@ impl<T: BufRead> Parser<T> {
                 ast::Expr::new_literal(ast::Literal::new_string(value))
             }
             Token::FormatString(value) => {
-                // FIXME: Do formatting
-                ast::Expr::new_literal(ast::Literal::new_string(value))
+                ast::Expr::new_literal(ast::Literal::new_format_string(value))
             }
             Token::Ident(name) => ast::Expr::new_ident(ast::Ident::new_ident(name)),
             Token::Block => return self.block(precedence, token.end),

@@ -165,7 +165,10 @@ impl<'a> Visitor<'a> {
                 self.add_const(self.ctx.builtins.new_int(value))
             }
             ast::LiteralKind::String(value) => {
-                self.add_const(self.ctx.builtins.new_string(value))
+                self.add_const(self.ctx.builtins.new_string(value, false))
+            }
+            ast::LiteralKind::FormatString(value) => {
+                self.add_const(self.ctx.builtins.new_string(value, true))
             }
         }
         Ok(())
