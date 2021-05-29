@@ -78,6 +78,10 @@ impl<'a> Visitor<'a> {
     fn visit_statement(&mut self, node: ast::Statement) -> VisitResult {
         match node.kind {
             ast::StatementKind::Print => self.push(Instruction::Print),
+            ast::StatementKind::Label(name) => self.push(Instruction::StoreLabel(name)),
+            ast::StatementKind::JumpToLabel(name) => {
+                self.push(Instruction::JumpToLabel(name))
+            }
             ast::StatementKind::Expr(expr) => self.visit_expr(*expr)?,
         }
         Ok(())

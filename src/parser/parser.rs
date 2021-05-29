@@ -5,12 +5,18 @@ use std::iter::Peekable;
 
 use crate::ast;
 use crate::scanner::{ScanError, Scanner, Token, TokenWithLocation};
+use crate::util::Location;
 
 use super::precedence::{
     get_binary_precedence, get_unary_precedence, is_right_associative,
 };
-use super::{ParseError, ParseErrorKind, ParseResult};
-use crate::util::Location;
+use super::result::{
+    ExprOptionResult, NextTokenResult, ParseError, ParseErrorKind, ParseResult,
+    StatementResult,
+};
+use crate::parser::result::{
+    ExprResult, NextInfixResult, PeekTokenResult, StatementsResult,
+};
 
 /// Create a parser from the specified text, scan the text into tokens,
 /// parse the tokens, and return the resulting AST or error.
@@ -70,6 +76,8 @@ impl<T: BufRead> Parser<T> {
         Parser::new(scanner)
     }
 
+    // Parse entry point -----------------------------------------------
+
     /// Scan source -> tokens
     /// Parse tokens -> AST
     /// Walk AST -> instructions
@@ -80,19 +88,18 @@ impl<T: BufRead> Parser<T> {
         Ok(program)
     }
 
-    fn next_token(&mut self) -> Result<Option<TokenWithLocation>, ParseError> {
+    // Tokens ----------------------------------------------------------
+
+    fn next_token(&mut self) -> NextTokenResult {
         if let Some(result) = self.token_stream.next() {
             return result
                 .map(|token_with_location| Some(token_with_location))
-                .map_err(|err| self.scan_err(err));
+                .map_err(|err| ParseError::new(ParseErrorKind::ScanError(err.clone())));
         }
         Ok(None)
     }
 
-    fn next_token_if(
-        &mut self,
-        func: impl FnOnce(&Token) -> bool,
-    ) -> Result<Option<TokenWithLocation>, ParseError> {
+    fn next_token_if(&mut self, func: impl FnOnce(&Token) -> bool) -> NextTokenResult {
         if let Some(t) = self.peek_token()? {
             if func(&t.token) {
                 return Ok(self.next_token()?);
@@ -101,24 +108,32 @@ impl<T: BufRead> Parser<T> {
         Ok(None)
     }
 
-    fn peek_token(&mut self) -> Result<Option<&TokenWithLocation>, ParseError> {
+    /// Return the next token along with its precedence *if* it's both
+    /// an infix operator *and* its precedence is greater than the
+    /// current precedence level.
+    fn next_infix_token(&mut self, current_precedence: u8) -> NextInfixResult {
+        if let Some(token) = self.next_token_if(|t| {
+            let p = get_binary_precedence(t);
+            p > 0 && p > current_precedence
+        })? {
+            let precedence = get_binary_precedence(&token.token);
+            return Ok(Some((token, precedence)));
+        }
+        Ok(None)
+    }
+
+    fn peek_token(&mut self) -> PeekTokenResult {
         // peek() returns Option<ScanResult>
         if let Some(result) = self.token_stream.peek() {
             return result
                 .as_ref()
                 .map(|token_with_location| Some(token_with_location))
-                .map_err(|err| {
-                    // XXX: Can't use self.scan_err() here???
-                    ParseError::new(ParseErrorKind::ScanError(err.clone()))
-                });
+                .map_err(|err| ParseError::new(ParseErrorKind::ScanError(err.clone())));
         }
         Ok(None)
     }
 
-    fn peek_token_if(
-        &mut self,
-        func: impl FnOnce(&Token) -> bool,
-    ) -> Result<Option<&TokenWithLocation>, ParseError> {
+    fn peek_token_if(&mut self, func: impl FnOnce(&Token) -> bool) -> PeekTokenResult {
         if let Some(t) = self.peek_token()? {
             if func(&t.token) {
                 return Ok(Some(t));
@@ -127,49 +142,71 @@ impl<T: BufRead> Parser<T> {
         Ok(None)
     }
 
+    // Error utilities -------------------------------------------------
+
     /// Create a new ParseError of the specified kind.
     fn err(&self, kind: ParseErrorKind) -> ParseError {
         ParseError::new(kind)
     }
 
-    /// Create a new ParseError that wraps a ScanError.
-    fn scan_err(&self, err: ScanError) -> ParseError {
-        self.err(ParseErrorKind::ScanError(err))
-    }
-
     // Grammar ---------------------------------------------------------
 
-    fn statements(&mut self, block: bool) -> Result<Vec<ast::Statement>, ParseError> {
+    fn statements(&mut self, block: bool) -> StatementsResult {
         let mut statements = vec![];
         loop {
-            let peek = self.peek_token()?;
-            match peek {
-                None => break,
-                Some(TokenWithLocation { token: Token::BlockEnd, .. }) if block => {
-                    self.next_token()?;
-                    break;
-                }
-                Some(TokenWithLocation { token: Token::Print, .. }) => {
-                    self.next_token()?;
-                    let statement = match self.expr(0)? {
-                        Some(expr) => ast::Statement::new_expr(expr),
-                        None => ast::Statement::new_string(""),
-                    };
-                    statements.push(statement);
-                    statements.push(ast::Statement::new_print());
-                }
-                _ => {
-                    if let Some(expr) = self.expr(0)? {
-                        let statement = ast::Statement::new_expr(expr);
+            let peek_result = self.peek_token()?;
+            if let Some(token) = peek_result {
+                match &token.token {
+                    Token::BlockEnd if block => {
+                        self.next_token()?;
+                        break;
+                    }
+                    Token::Print => {
+                        self.next_token()?;
+                        let statement = match self.expr(0)? {
+                            Some(expr) => ast::Statement::new_expr(expr),
+                            None => ast::Statement::new_string(""),
+                        };
                         statements.push(statement);
-                    };
+                        statements.push(ast::Statement::new_print());
+                    }
+                    Token::Label(name) => {
+                        statements.push(ast::Statement::new_label(name));
+                        self.next_token()?;
+                    }
+                    Token::Jump => {
+                        self.next_token()?;
+                        if let Some(token) = self.next_token()? {
+                            match token.token {
+                                Token::Ident(name) => {
+                                    let st = ast::Statement::new_jump_to_label(name);
+                                    statements.push(st);
+                                }
+                                _ => {
+                                    return Err(self.err(
+                                        ParseErrorKind::ExpectedIdentifier(
+                                            "jump label".to_owned(),
+                                        ),
+                                    ))
+                                }
+                            }
+                        };
+                    }
+                    _ => {
+                        if let Some(expr) = self.expr(0)? {
+                            let statement = ast::Statement::new_expr(expr);
+                            statements.push(statement);
+                        }
+                    }
                 }
-            };
+            } else {
+                break;
+            }
         }
         Ok(statements)
     }
 
-    fn expr(&mut self, precedence: u8) -> Result<Option<ast::Expr>, ParseError> {
+    fn expr(&mut self, precedence: u8) -> ExprOptionResult {
         let token = match self.next_token()? {
             Some(token) => token,
             None => return Ok(None),
@@ -191,39 +228,12 @@ impl<T: BufRead> Parser<T> {
             Token::String(value) => {
                 ast::Expr::new_literal(ast::Literal::new_string(value))
             }
-            Token::Ident(name) => ast::Expr::new_ident(ast::Ident::new_ident(name)),
-            Token::Block => {
-                // block keyword
-                // TODO: This logic should be extracted
-                return if let Ok(Some(_)) =
-                    self.next_token_if(|t| t == &Token::FuncStart)
-                {
-                    if let Ok(Some(_)) =
-                        self.next_token_if(|t| t == &Token::EndOfStatement)
-                    {
-                        if let Ok(Some(_)) =
-                            self.peek_token_if(|t| t == &Token::BlockStart)
-                        {
-                            self.expr(precedence)
-                        } else {
-                            Err(self.err(ParseErrorKind::SyntaxError(
-                                "Expected block".to_owned(),
-                                Location::new(token.start.line + 1, 1),
-                            )))
-                        }
-                    } else {
-                        Err(self.err(ParseErrorKind::SyntaxError(
-                            "Expected end of line after block ->".to_owned(),
-                            Location::new(token.start.line, token.end.col + 4),
-                        )))
-                    }
-                } else {
-                    Err(self.err(ParseErrorKind::SyntaxError(
-                        "Expected -> after block keyword".to_owned(),
-                        Location::new(token.start.line, token.end.col + 2),
-                    )))
-                };
+            Token::FormatString(value) => {
+                // FIXME: Do formatting
+                ast::Expr::new_literal(ast::Literal::new_string(value))
             }
+            Token::Ident(name) => ast::Expr::new_ident(ast::Ident::new_ident(name)),
+            Token::Block => return self.block(precedence, token.end),
             Token::BlockStart => {
                 let statements = self.statements(true)?;
                 ast::Expr::new_block(statements)
@@ -261,10 +271,7 @@ impl<T: BufRead> Parser<T> {
     }
 
     /// Get unary expr for the current unary operator token.
-    fn unary_expression(
-        &mut self,
-        token: &TokenWithLocation,
-    ) -> Result<ast::Expr, ParseError> {
+    fn unary_expression(&mut self, token: &TokenWithLocation) -> ExprResult {
         let precedence = get_unary_precedence(&token.token);
         if precedence == 0 {
             return Err(self.err(ParseErrorKind::UnhandledToken(token.clone())));
@@ -276,21 +283,29 @@ impl<T: BufRead> Parser<T> {
         return Err(self.err(ParseErrorKind::ExpectedExpression(token.clone())));
     }
 
-    /// Return the next token along with its precedence *if* it's both
-    /// an infix operator *and* its precedence is greater than the
-    /// current precedence level.
-    fn next_infix_token(
-        &mut self,
-        current_precedence: u8,
-    ) -> Result<Option<(TokenWithLocation, u8)>, ParseError> {
-        if let Some(token) = self.next_token_if(|t| {
-            let p = get_binary_precedence(t);
-            p > 0 && p > current_precedence
-        })? {
-            let precedence = get_binary_precedence(&token.token);
-            return Ok(Some((token, precedence)));
+    fn block(&mut self, precedence: u8, end: Location) -> ExprOptionResult {
+        if let Ok(Some(_)) = self.next_token_if(|t| t == &Token::FuncStart) {
+            if let Ok(Some(_)) = self.next_token_if(|t| t == &Token::EndOfStatement) {
+                if let Ok(Some(_)) = self.peek_token_if(|t| t == &Token::BlockStart) {
+                    self.expr(precedence)
+                } else {
+                    Err(self.err(ParseErrorKind::SyntaxError(
+                        "Expected block".to_owned(),
+                        Location::new(end.line + 1, 1),
+                    )))
+                }
+            } else {
+                Err(self.err(ParseErrorKind::SyntaxError(
+                    "Expected end of line after ->".to_owned(),
+                    Location::new(end.line, end.col + 4),
+                )))
+            }
+        } else {
+            Err(self.err(ParseErrorKind::SyntaxError(
+                "Expected ->".to_owned(),
+                Location::new(end.line, end.col + 2),
+            )))
         }
-        Ok(None)
     }
 }
 

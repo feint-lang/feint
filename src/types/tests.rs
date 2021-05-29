@@ -42,13 +42,13 @@ fn test_custom() {
     let type_1 = Rc::new(Type::new("test", "Custom1"));
     let mut obj_1 = ComplexObject::new(type_1);
     let value_1 = ctx.builtins.new_int(1);
-    obj_1.set_attribute("value", value_1);
+    obj_1.set_attribute("value", value_1).expect("Could not set attribute");
 
     let type_2 = Rc::new(Type::new("test", "Custom2"));
     let mut obj_2 = ComplexObject::new(type_2);
     let value_2 = ctx.builtins.new_int(1);
-    obj_2.set_attribute("value", value_2);
+    obj_2.set_attribute("value", value_2).expect("Could not set attribute");
 
     // FIXME: ???
-    assert!(obj_1.is_equal(Rc::new(obj_2), &ctx).unwrap())
+    assert!(obj_1.is_equal(Rc::new(obj_2), &ctx).expect("Could not compare objects"))
 }

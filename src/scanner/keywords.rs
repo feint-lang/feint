@@ -25,6 +25,7 @@ lazy_static! {
         ("while", While),     // ???
         ("break", Break),
         ("continue", Continue),
+        ("jump", Jump),       // goto label
         ("print", Print),
     ]
     .iter()

@@ -7,6 +7,7 @@ use super::context::RuntimeContext;
 use super::frame::Frame;
 use super::instruction::{Instruction, Instructions};
 use super::result::{ExecutionResult, RuntimeError, RuntimeErrorKind, VMState};
+use crate::vm::result::InstructionResult;
 
 /// Execute source text.
 pub fn execute_text(vm: &mut VM, text: &str, debug: bool) -> ExecutionResult {
@@ -70,7 +71,11 @@ impl VM {
     }
 
     pub fn halt(&mut self) {
-        // TODO: Not sure if this is needed or, if so, what it should do
+        // TODO: Not sure what this should do or if it's even needed
+    }
+
+    fn err(&self, kind: RuntimeErrorKind) -> ExecutionResult {
+        Err(RuntimeError::new(kind))
     }
 
     /// Execute the specified instructions and return the VM's state. If
@@ -80,148 +85,186 @@ impl VM {
     /// cleared; it can be "restarted" by passing more instructions to
     /// execute.
     pub fn execute(&mut self, instructions: Instructions) -> ExecutionResult {
-        for instruction in instructions.iter() {
-            let result = self.execute_instruction(instruction)?;
-            if let VMState::Halted(_) = result {
-                return Ok(result);
-            }
-        }
-        Ok(VMState::Idle)
-    }
+        let mut ip: usize = 0;
 
-    fn err(&self, kind: RuntimeErrorKind) -> ExecutionResult {
-        Err(RuntimeError::new(kind))
-    }
-
-    /// Run the specified instruction and return the VM's state.
-    pub fn execute_instruction(&mut self, instruction: &Instruction) -> ExecutionResult {
-        match instruction {
-            Instruction::Push(value) => {
-                self.stack.push(*value);
-            }
-            Instruction::Pop => {
-                if self.stack.is_empty() {
-                    self.err(RuntimeErrorKind::EmptyStack)?;
+        loop {
+            match &instructions[ip] {
+                Instruction::Push(value) => {
+                    self.stack.push(*value);
                 }
-                self.stack.pop();
-            }
-            Instruction::LoadConst(index) => {
-                self.stack.push(*index);
-            }
-            Instruction::DeclareVar(name) => {
-                // NOTE: Currently, declaration and assignment are
-                //       the same thing, so declaration doesn't
-                //       do anything particularly useful ATM.
-                self.ctx.declare_var(name.as_str());
-            }
-            Instruction::AssignVar(name) => {
-                if let Some(i) = self.pop() {
-                    self.ctx.assign_var(name, i);
-                    self.stack.push(i);
-                } else {
-                    let message = format!("Assignment");
-                    self.err(RuntimeErrorKind::NotEnoughValuesOnStack(message))?;
-                };
-            }
-            Instruction::LoadVar(name) => {
-                if let Some(index) = self.ctx.get_var(name) {
+                Instruction::Pop => {
+                    if self.stack.is_empty() {
+                        self.err(RuntimeErrorKind::EmptyStack)?;
+                    }
+                    self.stack.pop();
+                }
+                Instruction::LoadConst(index) => {
                     self.stack.push(*index);
-                } else {
-                    self.err(RuntimeErrorKind::NameError(format!(
-                        "Name not found: {}",
-                        name
-                    )))?;
                 }
-            }
-            Instruction::UnaryOp(op) => {
-                if let Some(i) = self.pop() {
-                    let a = self.ctx.constants.get(i).unwrap();
-                    let value = match op {
-                        UnaryOperator::Plus => a.clone(), // no-op
-                        UnaryOperator::Negate => a.negate(&self.ctx)?,
-                        UnaryOperator::Not => a.not(&self.ctx)?,
-                        op => {
-                            // Operators that return bool
-                            let result = match op {
-                                UnaryOperator::AsBool => a.as_bool(&self.ctx)?,
-                                _ => unreachable!(),
-                            };
-                            self.stack.push(if result { 1 } else { 2 });
-                            return Ok(VMState::Running);
-                        }
+                Instruction::DeclareVar(name) => {
+                    // NOTE: Currently, declaration and assignment are
+                    //       the same thing, so declaration doesn't
+                    //       do anything particularly useful ATM.
+                    self.ctx.declare_var(name.as_str());
+                }
+                Instruction::AssignVar(name) => {
+                    if let Some(i) = self.pop() {
+                        self.ctx.assign_var(name, i);
+                        self.stack.push(i);
+                    } else {
+                        let message = format!("Assignment");
+                        self.err(RuntimeErrorKind::NotEnoughValuesOnStack(message))?;
                     };
-                    let index = self.ctx.constants.add(value);
-                    self.stack.push(index);
-                } else {
-                    let message = format!("Unary op: {}", op);
-                    self.err(RuntimeErrorKind::NotEnoughValuesOnStack(message))?;
-                };
-            }
-            Instruction::BinaryOp(op) => {
-                if let Some((i, j)) = self.pop_top_two() {
-                    let a = self.ctx.constants.get(i).unwrap();
-                    let b = self.ctx.constants.get(j).unwrap();
-                    let b = b.clone();
-                    let value = match op {
-                        BinaryOperator::Pow => a.pow(b, &self.ctx)?,
-                        BinaryOperator::Mul => a.mul(b, &self.ctx)?,
-                        BinaryOperator::Div => a.div(b, &self.ctx)?,
-                        BinaryOperator::FloorDiv => a.floor_div(b, &self.ctx)?,
-                        BinaryOperator::Mod => a.modulo(b, &self.ctx)?,
-                        BinaryOperator::Add => a.add(b, &self.ctx)?,
-                        BinaryOperator::Sub => a.sub(b, &self.ctx)?,
-                        op => {
-                            // Operators that return bool
-                            let result = match op {
-                                BinaryOperator::IsEqual => a.is_equal(b, &self.ctx)?,
-                                BinaryOperator::NotEqual => a.not_equal(b, &self.ctx)?,
-                                BinaryOperator::And => a.and(b, &self.ctx)?,
-                                BinaryOperator::Or => a.or(b, &self.ctx)?,
-                                _ => unreachable!(),
-                            };
-                            self.stack.push(if result { 1 } else { 2 });
-                            return Ok(VMState::Running);
+                }
+                Instruction::LoadVar(name) => {
+                    if let Some(index) = self.ctx.get_var(name) {
+                        self.stack.push(*index);
+                    } else {
+                        self.err(RuntimeErrorKind::NameError(format!(
+                            "Name not found: {}",
+                            name
+                        )))?;
+                    }
+                }
+                Instruction::StoreLabel(name) => {
+                    // This allows labels with no corresponding jumps.
+                    self.ctx.add_label(name, ip + 1);
+                }
+                Instruction::JumpToLabel(name) => {
+                    if let Some(&new_ip) = self.ctx.get_label(name) {
+                        ip = new_ip;
+                        continue;
+                    }
+                    // Skip ahead until the label is found and store the
+                    // label. After that, re-run the jump instruction,
+                    // which will jump ahead to the next instruction
+                    // after the label.
+                    let starting_block_depth = self.ctx.block_depth();
+                    let mut block_depth = self.ctx.block_depth();
+                    loop {
+                        ip += 1;
+                        if ip == instructions.len() {
+                            self.err(RuntimeErrorKind::LabelError(format!(
+                                "Label not found: {}",
+                                name
+                            )))?;
                         }
+                        match &instructions[ip] {
+                            Instruction::BlockStart => block_depth += 1,
+                            Instruction::BlockEnd => block_depth -= 1,
+                            Instruction::StoreLabel(label) => {
+                                if block_depth <= starting_block_depth {
+                                    if label == name {
+                                        break self.ctx.add_label(name, ip);
+                                    }
+                                }
+                            }
+                            _ => (),
+                        }
+                    }
+                    // Rewind and re-run the jump-to-label instruction
+                    // now that the label has been found.
+                    ip -= 1;
+                }
+                Instruction::UnaryOp(op) => {
+                    if let Some(i) = self.pop() {
+                        let a = self.ctx.constants.get(i).unwrap();
+                        let value = match op {
+                            UnaryOperator::Plus => a.clone(), // no-op
+                            UnaryOperator::Negate => a.negate(&self.ctx)?,
+                            UnaryOperator::Not => a.not(&self.ctx)?,
+                            op => {
+                                // Operators that return bool
+                                let result = match op {
+                                    UnaryOperator::AsBool => a.as_bool(&self.ctx)?,
+                                    _ => unreachable!(),
+                                };
+                                self.stack.push(if result { 1 } else { 2 });
+                                continue;
+                            }
+                        };
+                        let index = self.ctx.constants.add(value);
+                        self.stack.push(index);
+                    } else {
+                        let message = format!("Unary op: {}", op);
+                        self.err(RuntimeErrorKind::NotEnoughValuesOnStack(message))?;
                     };
-                    let index = self.ctx.constants.add(value);
-                    self.stack.push(index);
-                } else {
-                    let message = format!("Binary op: {}", op);
-                    self.err(RuntimeErrorKind::NotEnoughValuesOnStack(message))?;
-                };
-            }
-            Instruction::BlockStart => {
-                self.ctx.add_namespace();
-            }
-            Instruction::BlockEnd => {
-                self.ctx.pop_namespace();
-            }
-            Instruction::Print => match self.stack.pop() {
-                Some(index) => {
-                    let value = self.ctx.constants.get(index).unwrap();
-                    println!("{}", value);
                 }
-                None => {
-                    self.err(RuntimeErrorKind::EmptyStack)?;
+                Instruction::BinaryOp(op) => {
+                    if let Some((i, j)) = self.pop_top_two() {
+                        let a = self.ctx.constants.get(i).unwrap();
+                        let b = self.ctx.constants.get(j).unwrap();
+                        let b = b.clone();
+                        let value = match op {
+                            BinaryOperator::Pow => a.pow(b, &self.ctx)?,
+                            BinaryOperator::Mul => a.mul(b, &self.ctx)?,
+                            BinaryOperator::Div => a.div(b, &self.ctx)?,
+                            BinaryOperator::FloorDiv => a.floor_div(b, &self.ctx)?,
+                            BinaryOperator::Mod => a.modulo(b, &self.ctx)?,
+                            BinaryOperator::Add => a.add(b, &self.ctx)?,
+                            BinaryOperator::Sub => a.sub(b, &self.ctx)?,
+                            op => {
+                                // Operators that return bool
+                                let result = match op {
+                                    BinaryOperator::IsEqual => {
+                                        a.is_equal(b, &self.ctx)?
+                                    }
+                                    BinaryOperator::NotEqual => {
+                                        a.not_equal(b, &self.ctx)?
+                                    }
+                                    BinaryOperator::And => a.and(b, &self.ctx)?,
+                                    BinaryOperator::Or => a.or(b, &self.ctx)?,
+                                    _ => unreachable!(),
+                                };
+                                self.stack.push(if result { 1 } else { 2 });
+                                continue;
+                            }
+                        };
+                        let index = self.ctx.constants.add(value);
+                        self.stack.push(index);
+                    } else {
+                        let message = format!("Binary op: {}", op);
+                        self.err(RuntimeErrorKind::NotEnoughValuesOnStack(message))?;
+                    };
                 }
-            },
-            Instruction::Return => {
-                // TODO: Implement actual return
-                match self.stack.pop() {
-                    Some(v) => println!("{}", v),
-                    None => eprintln!("Stack is empty!"),
+                Instruction::BlockStart => {
+                    self.ctx.enter_block();
+                }
+                Instruction::BlockEnd => {
+                    self.ctx.exit_block();
+                }
+                Instruction::Print => match self.stack.pop() {
+                    Some(index) => {
+                        let value = self.ctx.constants.get(index).unwrap();
+                        println!("{}", value);
+                    }
+                    None => {
+                        self.err(RuntimeErrorKind::EmptyStack)?;
+                    }
+                },
+                Instruction::Return => {
+                    // TODO: Implement actual return
+                    match self.stack.pop() {
+                        Some(v) => println!("{}", v),
+                        None => eprintln!("Stack is empty!"),
+                    }
+                }
+                Instruction::Halt(code) => {
+                    self.halt();
+                    break Ok(VMState::Halted(*code));
+                }
+                instruction => {
+                    let message = format!("{:?}", instruction);
+                    self.err(RuntimeErrorKind::UnhandledInstruction(message))?;
                 }
             }
-            Instruction::Halt(code) => {
-                self.halt();
-                return Ok(VMState::Halted(*code));
-            }
-            instruction => {
-                let message = format!("{:?}", instruction);
-                self.err(RuntimeErrorKind::UnhandledInstruction(message))?;
+
+            ip += 1;
+
+            if ip == instructions.len() {
+                break Ok(VMState::Idle);
             }
         }
-        Ok(VMState::Running)
     }
 
     fn push(&mut self, item: usize) {

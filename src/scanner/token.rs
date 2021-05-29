@@ -64,25 +64,27 @@ pub enum Token {
     BlockEnd,   // End of indented block
 
     // Keywords
-    Nil,      // nil
-    True,     // true
-    False,    // false
-    Import,   // import <module>
-    From,     // import from <module>: x, y, z
-    Package,  // import from package.<module>: x, y, z
-    As,       // import <module> as <name>
-    Is,       // Identity (use === instead?)
-    Let,      // let (???)
-    Block,    // block
-    If,       // if
-    ElseIf,   // elif
-    Else,     // else
-    Loop,     // ??? (while true, like Rust)
-    For,      // ??? or use <-
-    While,    // ??? or use <-
-    Break,    // break
-    Continue, // continue
-    Print,    // print (TEMP)
+    Nil,           // nil
+    True,          // true
+    False,         // false
+    Import,        // import <module>
+    From,          // import from <module>: x, y, z
+    Package,       // import from package.<module>: x, y, z
+    As,            // import <module> as <name>
+    Is,            // Identity (use === instead?)
+    Let,           // let (???)
+    Block,         // block
+    If,            // if
+    ElseIf,        // elif
+    Else,          // else
+    Loop,          // ??? (while true, like Rust)
+    For,           // ??? or use <-
+    While,         // ??? or use <-
+    Break,         // break
+    Continue,      // continue
+    Jump,          // jump label
+    Label(String), // label:
+    Print,         // print (TEMP)
 
     // Identifiers
     Ident(String),              // name
@@ -111,6 +113,8 @@ impl Token {
             Self::And => "&&",
             Self::Or => "||",
             Self::Equal => "=",
+            Self::Jump => "jump",
+            Self::Label(name) => "label",
             Self::Ident(s)
             | Self::TypeIdent(s)
             | Self::TypeMethodIdent(s)

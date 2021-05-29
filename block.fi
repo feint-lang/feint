@@ -6,15 +6,15 @@ print a
 print b
 
 a = block ->
-    print "in block"
+    print "    in block"
     print a
     a = "a2"
     print a
     print b
     block ->
-        print "in inner block"
+        print "        in inner block"
         c = "c3"
-        print a
+        print $"        ${a}"
         print b
         print c
         "inner"
@@ -23,5 +23,22 @@ print "after block"
 print a
 print b
 
+print "before jump"
+jump a
+
+print "this should be skipped"
+
 block ->
-    print "end"
+    print "this should be skipped too"
+    jump a
+    a: block ->
+        print "skipped"
+
+a:
+print "label: a"
+
+block ->
+    jump b
+
+b:
+print "label: b"

@@ -6,6 +6,7 @@ use crate::parser::ParseError;
 use crate::types::ObjectRef;
 
 pub type ExecutionResult = Result<VMState, RuntimeError>;
+pub type InstructionResult = Result<(VMState, Option<usize>), RuntimeError>;
 pub type RuntimeResult = Result<ObjectRef, RuntimeError>;
 pub type RuntimeBoolResult = Result<bool, RuntimeError>;
 
@@ -50,6 +51,8 @@ pub enum RuntimeErrorKind {
     AttributeCannotBeSet(String),
     TypeError(String),
     NameError(String),
+    LabelError(String),
+    CannotJumpBack,
 }
 
 impl fmt::Display for RuntimeErrorKind {

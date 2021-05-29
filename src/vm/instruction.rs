@@ -8,6 +8,8 @@ pub type Instructions = Vec<Instruction>;
 pub enum Instruction {
     Push(usize),
     Pop,
+    StoreLabel(String),
+    JumpToLabel(String),
     Jump(usize),        // Jump unconditionally
     JumpIfTrue(usize),  // Jump if top of stack is true
     JumpIfFalse(usize), // Jump if top of stack is false

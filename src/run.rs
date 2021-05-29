@@ -174,6 +174,6 @@ mod tests {
     fn test_run_text() {
         let source = "1 + 2";
         let result = run_text(source, true);
-        assert!(result.is_ok(), format!("{:?}", result.err()));
+        assert!(result.is_ok(), "{:?}", result.err());
     }
 }

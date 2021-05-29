@@ -19,11 +19,8 @@ impl Program {
 
 impl fmt::Debug for Program {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let items: Vec<String> = self
-            .statements
-            .iter()
-            .map(|statement| format!("{:?}", statement))
-            .collect();
+        let items: Vec<String> =
+            self.statements.iter().map(|statement| format!("{:?}", statement)).collect();
         write!(f, "{}", items.join("\n"))
     }
 }
@@ -42,11 +39,8 @@ impl Block {
 
 impl fmt::Debug for Block {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let items: Vec<String> = self
-            .statements
-            .iter()
-            .map(|statement| format!("{:?}", statement))
-            .collect();
+        let items: Vec<String> =
+            self.statements.iter().map(|statement| format!("{:?}", statement)).collect();
         write!(f, "Block ->\n{}", items.join("\n    "))
     }
 }
@@ -60,6 +54,8 @@ pub struct Statement {
 #[derive(PartialEq)]
 pub enum StatementKind {
     Print,
+    Label(String),
+    JumpToLabel(String),
     Expr(Box<Expr>),
 }
 
@@ -69,11 +65,19 @@ impl Statement {
     }
 
     pub fn new_print() -> Self {
-        Self { kind: StatementKind::Print }
+        Self::new(StatementKind::Print)
+    }
+
+    pub fn new_label<S: Into<String>>(name: S) -> Self {
+        Self::new(StatementKind::Label(name.into()))
+    }
+
+    pub fn new_jump_to_label<S: Into<String>>(name: S) -> Self {
+        Self::new(StatementKind::JumpToLabel(name.into()))
     }
 
     pub fn new_expr(expr: Expr) -> Self {
-        Self { kind: StatementKind::Expr(Box::new(expr)) }
+        Self::new(StatementKind::Expr(Box::new(expr)))
     }
 
     pub fn new_nil() -> Self {
@@ -96,6 +100,8 @@ impl fmt::Debug for StatementKind {
         match self {
             Self::Expr(expr) => write!(f, "Expr({:?})", expr),
             Self::Print => write!(f, "Print"),
+            Self::Label(name) => write!(f, "Label: {}", name),
+            Self::JumpToLabel(name) => write!(f, "Jump: {}", name),
         }
     }
 }
