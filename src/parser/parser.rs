@@ -45,11 +45,17 @@ struct Parser<T: BufRead> {
     /// Keep track of tokens until a valid statement is encountered.
     /// TODO: ???
     token_queue: VecDeque<TokenWithLocation>,
+
+    expecting_block: bool,
 }
 
 impl<T: BufRead> Parser<T> {
     fn new(scanner: Scanner<T>) -> Self {
-        Self { token_stream: scanner.peekable(), token_queue: VecDeque::new() }
+        Self {
+            token_stream: scanner.peekable(),
+            token_queue: VecDeque::new(),
+            expecting_block: false,
+        }
     }
 
     pub fn from_text(text: &str) -> Parser<Cursor<&str>> {
@@ -83,7 +89,7 @@ impl<T: BufRead> Parser<T> {
     /// Walk AST -> instructions
     fn parse(&mut self) -> ParseResult {
         // A program is a list of statements.
-        let statements = self.statements(false)?;
+        let statements = self.statements()?;
         let program = ast::Program::new(statements);
         Ok(program)
     }
@@ -151,14 +157,15 @@ impl<T: BufRead> Parser<T> {
 
     // Grammar ---------------------------------------------------------
 
-    fn statements(&mut self, block: bool) -> StatementsResult {
+    fn statements(&mut self) -> StatementsResult {
         let mut statements = vec![];
         loop {
             let peek_result = self.peek_token()?;
             if let Some(token) = peek_result {
                 match &token.token {
-                    Token::BlockEnd if block => {
+                    Token::BlockEnd => {
                         self.next_token()?;
+                        self.expecting_block = false;
                         break;
                     }
                     Token::Print => {
@@ -232,9 +239,15 @@ impl<T: BufRead> Parser<T> {
                 ast::Expr::new_literal(ast::Literal::new_format_string(value))
             }
             Token::Ident(name) => ast::Expr::new_ident(ast::Ident::new_ident(name)),
-            Token::Block => return self.block(precedence, token.end),
+            Token::Block => {
+                self.expecting_block = true;
+                return self.block(precedence, token.end);
+            }
             Token::BlockStart => {
-                let statements = self.statements(true)?;
+                if !self.expecting_block {
+                    return Err(self.err(ParseErrorKind::UnexpectedBlock(token.end)));
+                }
+                let statements = self.statements()?;
                 ast::Expr::new_block(statements)
             }
             // The token isn't a leaf node, so it *must* be some other
@@ -258,7 +271,7 @@ impl<T: BufRead> Parser<T> {
                     expr = ast::Expr::new_binary_op(expr, op, rhs);
                 } else {
                     return Err(
-                        self.err(ParseErrorKind::ExpectedExpression(infix_token))
+                        self.err(ParseErrorKind::ExpectedExpression(infix_token.end))
                     );
                 }
             } else {
@@ -279,7 +292,7 @@ impl<T: BufRead> Parser<T> {
             let operator = token.token.as_str();
             return Ok(ast::Expr::new_unary_op(operator, rhs));
         }
-        return Err(self.err(ParseErrorKind::ExpectedExpression(token.clone())));
+        return Err(self.err(ParseErrorKind::ExpectedExpression(token.end)));
     }
 
     fn block(&mut self, precedence: u8, end: Location) -> ExprOptionResult {

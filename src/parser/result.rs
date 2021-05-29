@@ -27,7 +27,8 @@ pub enum ParseErrorKind {
     ScanError(ScanError),
     CouldNotOpenSourceFile(String, String),
     UnhandledToken(TokenWithLocation),
-    ExpectedExpression(TokenWithLocation),
+    ExpectedExpression(Location),
     ExpectedIdentifier(String),
     SyntaxError(String, Location),
+    UnexpectedBlock(Location),
 }

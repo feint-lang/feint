@@ -35,8 +35,7 @@ block ->
     a: block ->
         print "skipped"
 
-a:
-print "label: a"
+a: print "label: a"
 
 block ->
     # jump out
