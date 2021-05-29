@@ -43,3 +43,10 @@ block ->
 
 b:
 print "label: b"
+
+block ->
+    x = "x"
+    jump out
+    y = "y"
+    print "skipped y"
+    out: print $"    jumped out: ${x}"
