@@ -201,6 +201,7 @@ impl VM {
                                     _ => unreachable!(),
                                 };
                                 self.stack.push(if result { 1 } else { 2 });
+                                ip += 1;
                                 continue;
                             }
                         };
@@ -238,6 +239,7 @@ impl VM {
                                     _ => unreachable!(),
                                 };
                                 self.stack.push(if result { 1 } else { 2 });
+                                ip += 1;
                                 continue;
                             }
                         };
