@@ -73,6 +73,14 @@ impl Object for Int {
         self
     }
 
+    fn negate(&self, ctx: &RuntimeContext) -> RuntimeResult {
+        Ok(ctx.builtins.new_int(-self.value()))
+    }
+
+    fn as_bool(&self, _ctx: &RuntimeContext) -> RuntimeBoolResult {
+        Ok(if *self.value() == BigInt::from(0) { false } else { true })
+    }
+
     fn is_equal(&self, rhs: ObjectRef, _ctx: &RuntimeContext) -> RuntimeBoolResult {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
             Ok(self.is(rhs) || self == rhs)

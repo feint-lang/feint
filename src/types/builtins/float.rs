@@ -56,6 +56,14 @@ impl Object for Float {
         self
     }
 
+    fn negate(&self, ctx: &RuntimeContext) -> RuntimeResult {
+        Ok(ctx.builtins.new_float(-self.value()))
+    }
+
+    fn as_bool(&self, _ctx: &RuntimeContext) -> RuntimeBoolResult {
+        Ok(if *self.value() == 0.0 { false } else { true })
+    }
+
     fn is_equal(&self, rhs: ObjectRef, _ctx: &RuntimeContext) -> RuntimeBoolResult {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
             Ok(self.is(rhs) || self == rhs)

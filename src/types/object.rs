@@ -62,6 +62,11 @@ pub trait Object {
 
     // Binary operations -----------------------------------------------
 
+    make_bin_op!(is_equal, "==", RuntimeBoolResult);
+    fn not_equal(&self, rhs: ObjectRef, ctx: &RuntimeContext) -> RuntimeBoolResult {
+        self.is_equal(rhs, ctx).map(|equal| !equal)
+    }
+
     make_bin_op!(pow, "^", RuntimeResult);
     make_bin_op!(modulo, "%", RuntimeResult);
     make_bin_op!(mul, "*", RuntimeResult);
@@ -69,10 +74,6 @@ pub trait Object {
     make_bin_op!(floor_div, "//", RuntimeResult);
     make_bin_op!(add, "+", RuntimeResult);
     make_bin_op!(sub, "-", RuntimeResult);
-    make_bin_op!(is_equal, "==", RuntimeBoolResult);
-    fn not_equal(&self, rhs: ObjectRef, ctx: &RuntimeContext) -> RuntimeBoolResult {
-        self.is_equal(rhs, ctx).map(|equal| !equal)
-    }
     make_bin_op!(and, "&&", RuntimeBoolResult);
     make_bin_op!(or, "||", RuntimeBoolResult);
 
