@@ -9,7 +9,7 @@ use super::context::RuntimeContext;
 use super::frame::Frame;
 use super::instruction::{Instruction, Instructions};
 use super::result::{ExecutionResult, RuntimeError, RuntimeErrorKind, VMState};
-use crate::types::builtins::String;
+use crate::types::String;
 use crate::vm::result::InstructionResult;
 
 /// Execute source text.

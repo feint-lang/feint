@@ -4,14 +4,14 @@ use std::rc::Rc;
 use num_bigint::BigInt;
 use num_traits::Num;
 
-use super::super::class::{Type, TypeRef};
-use super::super::object::ObjectRef;
+use super::class::{Type, TypeRef};
+use super::object::{Object, ObjectExt, ObjectRef};
 
 pub struct Builtins {
     types: HashMap<&'static str, TypeRef>,
-    pub nil_obj: Rc<super::Nil>,
-    pub true_obj: Rc<super::Bool>,
-    pub false_obj: Rc<super::Bool>,
+    pub nil_obj: Rc<super::nil::Nil>,
+    pub true_obj: Rc<super::bool::Bool>,
+    pub false_obj: Rc<super::bool::Bool>,
 }
 
 impl Builtins {
@@ -23,9 +23,9 @@ impl Builtins {
         let bool_type = Self::create_type("Bool");
 
         // Singletons
-        let nil_obj = Rc::new(super::Nil::new(nil_type.clone()));
-        let true_obj = Rc::new(super::Bool::new(bool_type.clone(), true));
-        let false_obj = Rc::new(super::Bool::new(bool_type.clone(), false));
+        let nil_obj = Rc::new(super::nil::Nil::new(nil_type.clone()));
+        let true_obj = Rc::new(super::bool::Bool::new(bool_type.clone(), true));
+        let false_obj = Rc::new(super::bool::Bool::new(bool_type.clone(), false));
 
         // All the builtin types
         types.insert("Nil", nil_type);
@@ -54,7 +54,7 @@ impl Builtins {
     pub fn new_float<F: Into<f64>>(&self, value: F) -> ObjectRef {
         let class = self.get_type("Float").clone();
         let value = value.into();
-        Rc::new(super::Float::new(class, value))
+        Rc::new(super::float::Float::new(class, value))
     }
 
     pub fn new_float_from_string<S: Into<String>>(&self, value: S) -> ObjectRef {
@@ -66,7 +66,7 @@ impl Builtins {
     pub fn new_int<I: Into<BigInt>>(&self, value: I) -> ObjectRef {
         let class = self.get_type("Int").clone();
         let value = value.into();
-        Rc::new(super::Int::new(class, value))
+        Rc::new(super::int::Int::new(class, value))
     }
 
     pub fn new_int_from_string<S: Into<String>>(&self, value: S) -> ObjectRef {
@@ -78,6 +78,6 @@ impl Builtins {
     pub fn new_string<S: Into<String>>(&self, value: S, format: bool) -> ObjectRef {
         let class = self.get_type("String").clone();
         let value = value.into();
-        Rc::new(super::String::new(class, value, format))
+        Rc::new(super::string::String::new(class, value, format))
     }
 }

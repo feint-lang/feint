@@ -5,10 +5,10 @@ use num_traits::ToPrimitive;
 
 use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeError, RuntimeResult};
 
-use super::super::class::TypeRef;
-use super::super::object::{Object, ObjectExt, ObjectRef};
-use super::cmp::eq_int_float;
+use super::class::TypeRef;
 use super::int::Int;
+use super::object::{Object, ObjectExt, ObjectRef};
+use super::util::eq_int_float;
 
 /// Built in 64-bit float type
 #[derive(Debug, PartialEq)]

@@ -4,8 +4,8 @@ use std::fmt;
 
 use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeResult};
 
-use super::super::class::TypeRef;
-use super::super::object::Object;
+use super::class::TypeRef;
+use super::object::{Object, ObjectExt};
 
 /// Built in nil type
 #[derive(Debug, PartialEq)]

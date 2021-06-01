@@ -6,9 +6,7 @@ use crate::vm::{
     RuntimeBoolResult, RuntimeContext, RuntimeError, RuntimeErrorKind, RuntimeResult,
 };
 
-use super::builtins::{Bool, Float, Int, Nil, String};
 use super::class::TypeRef;
-use super::complex::ComplexObject;
 
 pub type RustString = std::string::String;
 pub type ObjectRef = Rc<dyn Object>;
@@ -123,7 +121,16 @@ macro_rules! write_instance {
 
 impl fmt::Display for dyn Object {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write_instance!(f, self, Nil, Bool, Float, Int, String, ComplexObject);
+        write_instance!(
+            f,
+            self,
+            super::nil::Nil,
+            super::bool::Bool,
+            super::float::Float,
+            super::int::Int,
+            super::string::String,
+            super::complex::ComplexObject
+        );
         // Fallback
         write!(f, "{}()", self.class())
     }

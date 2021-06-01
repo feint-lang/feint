@@ -4,8 +4,8 @@ use std::fmt;
 
 use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeError, RuntimeResult};
 
-use super::super::class::TypeRef;
-use super::super::object::{Object, ObjectExt, ObjectRef};
+use super::class::TypeRef;
+use super::object::{Object, ObjectExt, ObjectRef};
 
 #[derive(Debug, PartialEq)]
 pub struct Bool {

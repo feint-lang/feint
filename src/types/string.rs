@@ -6,8 +6,8 @@ use crate::vm::{
     RuntimeBoolResult, RuntimeContext, RuntimeError, RuntimeErrorKind, RuntimeResult,
 };
 
-use super::super::class::TypeRef;
-use super::super::object::{Object, ObjectExt, ObjectRef};
+use crate::types::class::TypeRef;
+use crate::types::object::{Object, ObjectExt, ObjectRef};
 
 pub type RustString = std::string::String;
 
