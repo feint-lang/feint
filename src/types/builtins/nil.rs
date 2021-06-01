@@ -30,10 +30,6 @@ impl Object for Nil {
 
     // Unary operations -----------------------------------------------
 
-    fn not(&self, ctx: &RuntimeContext) -> RuntimeResult {
-        Ok(ctx.builtins.true_obj.clone())
-    }
-
     fn as_bool(&self, _ctx: &RuntimeContext) -> RuntimeBoolResult {
         Ok(false)
     }

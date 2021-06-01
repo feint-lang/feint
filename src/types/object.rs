@@ -57,8 +57,15 @@ pub trait Object {
     // Unary operations ------------------------------------------------
 
     make_unary_op!(negate, "-", RuntimeResult);
-    make_unary_op!(not, "!", RuntimeResult);
     make_unary_op!(as_bool, "!!", RuntimeBoolResult);
+
+    fn not(&self, ctx: &RuntimeContext) -> RuntimeBoolResult {
+        match self.as_bool(ctx) {
+            Ok(true) => Ok(false),
+            Ok(false) => Ok(true),
+            err => err,
+        }
+    }
 
     // Binary operations -----------------------------------------------
 

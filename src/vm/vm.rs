@@ -193,11 +193,11 @@ impl VM {
                         let value = match op {
                             UnaryOperator::Plus => a.clone(), // no-op
                             UnaryOperator::Negate => a.negate(&self.ctx)?,
-                            UnaryOperator::Not => a.not(&self.ctx)?,
                             op => {
                                 // Operators that return bool
                                 let result = match op {
                                     UnaryOperator::AsBool => a.as_bool(&self.ctx)?,
+                                    UnaryOperator::Not => a.not(&self.ctx)?,
                                     _ => unreachable!(),
                                 };
                                 self.stack.push(if result { 1 } else { 2 });

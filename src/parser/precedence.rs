@@ -52,7 +52,7 @@ pub fn get_operator_precedence(token: &Token) -> (u8, u8) {
        
         | Token::Caret       => (0, 8), // a ^ b     (exponentiation)
 
-        | Token::AsBool                 // !!a       (as bool)
+        | Token::BangBang               // !!a       (as bool)
         | Token::Bang        => (9, 0), // !a        (logical not)
         
         _                    => (0, 0), // not an operator

@@ -34,14 +34,6 @@ impl Object for Bool {
 
     // Unary operations -----------------------------------------------
 
-    fn not(&self, ctx: &RuntimeContext) -> RuntimeResult {
-        if *self.value() {
-            Ok(ctx.builtins.false_obj.clone())
-        } else {
-            Ok(ctx.builtins.true_obj.clone())
-        }
-    }
-
     fn as_bool(&self, _ctx: &RuntimeContext) -> RuntimeBoolResult {
         Ok(*self.value())
     }

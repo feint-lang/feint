@@ -295,7 +295,12 @@ impl<T: BufRead> Scanner<T> {
             Some(('+', Some('='), _)) => {
                 self.consume_char_and_return_token(Token::PlusEqual)
             }
-            Some(('+', _, _)) => Token::Plus,
+            Some(('+', _, _)) => {
+                // Collapse contiguous plus signs down to a single +.
+                // This is safe because + is effectively a no-op.
+                self.consume_contiguous('+');
+                Token::Plus
+            }
             Some(('-', Some('='), _)) => {
                 self.consume_char_and_return_token(Token::MinusEqual)
             }
@@ -306,10 +311,17 @@ impl<T: BufRead> Scanner<T> {
             Some(('!', Some('='), _)) => {
                 self.consume_char_and_return_token(Token::NotEqual)
             }
-            Some(('!', Some('!'), _)) => {
-                self.consume_char_and_return_token(Token::AsBool)
+            Some(('!', _, _)) => {
+                // Collapse contiguous bangs down to a single ! or !!.
+                // This is mainly to ensure !!!x is interpreted as
+                // !(!!(x)) instead of !!(!(x)).
+                let count = self.consume_contiguous('!');
+                match count % 2 {
+                    0 => Token::BangBang,
+                    1 => Token::Bang,
+                    _ => unreachable!(),
+                }
             }
-            Some(('!', _, _)) => Token::Bang,
             Some(('.', Some('.'), Some('.'))) => {
                 self.consume_two_chars_and_return_token(Token::RangeInclusive)
             }
@@ -550,6 +562,15 @@ impl<T: BufRead> Scanner<T> {
     /// Consume comment characters up to newline.
     fn consume_comment(&mut self) {
         while self.next_char_if(|&c| c != '\n').is_some() {}
+    }
+
+    /// Consume contiguous chars and return count.
+    fn consume_contiguous(&mut self, c: char) -> u8 {
+        let mut count = 1;
+        while self.next_char_if(|&next_char| next_char == c).is_some() {
+            count += 1;
+        }
+        count
     }
 
     /// Returns the number of contiguous space characters at the start

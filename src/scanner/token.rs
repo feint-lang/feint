@@ -48,7 +48,7 @@ pub enum Token {
     LoopFeed,           // <-
     Range,              // ..
     RangeInclusive,     // ...
-    AsBool,             // !! (the boolean evaluation of an object)
+    BangBang,           // !! (the boolean evaluation of an object)
 
     // In-place operators
     // TODO: If reassignment isn't allowed, these don't make sense
@@ -107,7 +107,7 @@ impl Token {
             Self::Plus => "+",
             Self::Minus => "-",
             Self::Bang => "!",
-            Self::AsBool => "!!",
+            Self::BangBang => "!!",
             Self::EqualEqual => "==",
             Self::NotEqual => "!=",
             Self::And => "&&",
