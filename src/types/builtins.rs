@@ -6,6 +6,7 @@ use num_traits::Num;
 
 use super::class::{Type, TypeRef};
 use super::object::{Object, ObjectExt, ObjectRef};
+use crate::vm::Instructions;
 
 pub struct Builtins {
     types: HashMap<&'static str, TypeRef>,
@@ -31,6 +32,7 @@ impl Builtins {
         types.insert("Nil", nil_type);
         types.insert("Bool", bool_type);
         types.insert("Float", Self::create_type("Float"));
+        types.insert("Function", Self::create_type("Function"));
         types.insert("Int", Self::create_type("Int"));
         types.insert("String", Self::create_type("String"));
 
@@ -61,6 +63,16 @@ impl Builtins {
         let value = value.into();
         let value = value.parse::<f64>().unwrap();
         self.new_float(value)
+    }
+
+    pub fn new_function<S: Into<String>>(
+        &self,
+        name: S,
+        parameters: Vec<String>,
+        instructions: Instructions,
+    ) -> ObjectRef {
+        let class = self.get_type("Function").clone();
+        Rc::new(super::function::Function::new(class, name, parameters, instructions))
     }
 
     pub fn new_int<I: Into<BigInt>>(&self, value: I) -> ObjectRef {

@@ -8,6 +8,7 @@ mod builtins;
 mod class;
 mod complex;
 mod float;
+mod function;
 mod int;
 mod nil;
 mod object;

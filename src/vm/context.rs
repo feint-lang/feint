@@ -7,9 +7,7 @@ pub struct RuntimeContext {
     pub builtins: Builtins,
     pub constants: Constants,
     // Pointers from var names to constant indexes
-    pub namespace_stack: Vec<Namespace>,
-    // Pointers from label names to instruction indexes
-    pub label_stack: Vec<Namespace>,
+    namespace_stack: Vec<Namespace>,
 }
 
 impl RuntimeContext {
@@ -17,26 +15,23 @@ impl RuntimeContext {
         builtins: Builtins,
         constants: Constants,
         namespace_stack: Vec<Namespace>,
-        label_stack: Vec<Namespace>,
     ) -> Self {
-        Self { builtins, constants, namespace_stack, label_stack }
+        Self { builtins, constants, namespace_stack }
     }
 
-    pub fn block_depth(&self) -> usize {
+    pub fn depth(&self) -> usize {
         self.namespace_stack.len()
     }
 
     pub fn enter_block(&mut self) {
         self.namespace_stack.push(Namespace::new());
-        self.label_stack.push(Namespace::new());
     }
 
     pub fn exit_block(&mut self) {
-        if self.namespace_stack.len() == 1 {
+        if self.depth() == 1 {
             panic!("Can't remove global namespace");
         }
         self.namespace_stack.pop();
-        self.label_stack.pop();
     }
 
     // Vars ------------------------------------------------------------
@@ -54,7 +49,7 @@ impl RuntimeContext {
     }
 
     pub fn get_obj_index(&self, name: &str) -> Option<&usize> {
-        let mut i = self.namespace_stack.len() - 1;
+        let mut i = self.depth() - 1;
         loop {
             let namespace = &self.namespace_stack[i];
             if let Some(usize) = namespace.get(name) {
@@ -84,25 +79,8 @@ impl RuntimeContext {
     }
 
     fn current_namespace(&mut self) -> &mut Namespace {
-        let index = self.namespace_stack.len() - 1;
+        let index = self.depth() - 1;
         &mut self.namespace_stack[index]
-    }
-
-    // Labels ----------------------------------------------------------
-
-    pub fn add_label(&mut self, name: &str, ip: usize) {
-        let label_space = self.current_label_space();
-        label_space.add(name, ip);
-    }
-
-    pub fn get_label(&mut self, name: &str) -> Option<&usize> {
-        let label_space = self.current_label_space();
-        label_space.get(name)
-    }
-
-    fn current_label_space(&mut self) -> &mut Namespace {
-        let index = self.label_stack.len() - 1;
-        &mut self.label_stack[index]
     }
 }
 
@@ -117,6 +95,6 @@ impl Default for RuntimeContext {
         constants.add(builtins.false_obj.clone()); // 2
         namespace_stack.push(Namespace::new());
         label_stack.push(Namespace::new());
-        RuntimeContext::new(builtins, constants, namespace_stack, label_stack)
+        RuntimeContext::new(builtins, constants, namespace_stack)
     }
 }

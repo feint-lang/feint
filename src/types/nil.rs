@@ -8,14 +8,14 @@ use super::class::TypeRef;
 use super::object::{Object, ObjectExt};
 
 /// Built in nil type
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct Nil {
     class: TypeRef,
 }
 
 impl Nil {
     pub fn new(class: TypeRef) -> Self {
-        Self { class: class.clone() }
+        Self { class }
     }
 }
 

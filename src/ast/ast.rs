@@ -19,8 +19,11 @@ impl Program {
 
 impl fmt::Debug for Program {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let items: Vec<String> =
-            self.statements.iter().map(|statement| format!("{:?}", statement)).collect();
+        let items: Vec<String> = self
+            .statements
+            .iter()
+            .map(|statement| format!("{:?}", statement))
+            .collect();
         write!(f, "{}", items.join("\n"))
     }
 }
@@ -39,8 +42,11 @@ impl Block {
 
 impl fmt::Debug for Block {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let items: Vec<String> =
-            self.statements.iter().map(|statement| format!("{:?}", statement)).collect();
+        let items: Vec<String> = self
+            .statements
+            .iter()
+            .map(|statement| format!("{:?}", statement))
+            .collect();
         write!(f, "Block ->\n{}", items.join("\n    "))
     }
 }

@@ -10,7 +10,7 @@ use super::frame::Frame;
 use super::instruction::{Instruction, Instructions};
 use super::result::{ExecutionResult, RuntimeError, RuntimeErrorKind, VMState};
 use crate::types::String;
-use crate::vm::result::InstructionResult;
+use std::cmp::max;
 
 /// Execute source text.
 pub fn execute_text(vm: &mut VM, text: &str, debug: bool) -> ExecutionResult {
@@ -81,6 +81,29 @@ impl VM {
         Err(RuntimeError::new(kind))
     }
 
+    fn store_label(&mut self, name: &str, address: usize) -> Result<(), RuntimeError> {
+        if self.ctx.get_label(name, true).is_some() {
+            let message = format!("Label redefined: {}", name);
+            self.err(RuntimeErrorKind::LabelError(message))?;
+        }
+        self.ctx.add_label(name, address);
+        Ok(())
+    }
+
+    /// Format String with vars from current context.
+    fn format_string(&mut self, const_index: usize) -> Result<(), RuntimeError> {
+        if let Some(obj) = self.ctx.get_obj(const_index) {
+            if let Some(string) = obj.as_any().downcast_ref::<String>() {
+                if string.is_format_string() {
+                    let formatted = string.format(&self.ctx)?;
+                    let formatted = Rc::new(formatted);
+                    self.ctx.constants.replace(const_index, formatted);
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Execute the specified instructions and return the VM's state. If
     /// a HALT instruction isn't encountered, the VM will go "idle"; it
     /// will maintain its internal state and await further instructions.
@@ -92,6 +115,9 @@ impl VM {
 
         loop {
             match &instructions[ip] {
+                Instruction::NoOp => {
+                    // do nothing
+                }
                 Instruction::Push(value) => {
                     self.stack.push(*value);
                 }
@@ -101,17 +127,13 @@ impl VM {
                     }
                     self.stack.pop();
                 }
+                Instruction::Jump(address) => {
+                    ip = *address;
+                    continue;
+                }
                 Instruction::LoadConst(index) => {
-                    if let Some(obj) = self.ctx.constants.get(*index) {
-                        if let Some(str) = obj.as_any().downcast_ref::<String>() {
-                            if str.is_format_string() {
-                                let formatted = str.format(&self.ctx)?;
-                                let formatted = Rc::new(formatted);
-                                self.ctx.constants.replace(*index, formatted);
-                            }
-                        }
-                        self.stack.push(*index);
-                    }
+                    self.format_string(*index);
+                    self.stack.push(*index);
                 }
                 Instruction::DeclareVar(name) => {
                     // NOTE: Currently, declaration and assignment are
@@ -130,15 +152,7 @@ impl VM {
                 }
                 Instruction::LoadVar(name) => {
                     if let Some(&index) = self.ctx.get_obj_index(name) {
-                        if let Some(obj) = self.ctx.constants.get(index) {
-                            if let Some(str) = obj.as_any().downcast_ref::<String>() {
-                                if str.is_format_string() {
-                                    let formatted = str.format(&self.ctx)?;
-                                    let formatted = Rc::new(formatted);
-                                    self.ctx.constants.replace(index, formatted);
-                                }
-                            }
-                        }
+                        self.format_string(index);
                         self.stack.push(index);
                     } else {
                         self.err(RuntimeErrorKind::NameError(format!(
@@ -148,44 +162,50 @@ impl VM {
                     }
                 }
                 Instruction::StoreLabel(name) => {
-                    // This allows labels with no corresponding jumps.
-                    self.ctx.add_label(name, ip + 1);
+                    self.store_label(name, ip);
                 }
                 Instruction::JumpToLabel(name) => {
-                    if let Some(&new_ip) = self.ctx.get_label(name) {
-                        ip = new_ip;
+                    if let Some(&label_ip) = self.ctx.get_label(name, false) {
+                        ip = label_ip + 1;
                         continue;
                     }
                     // Skip ahead until the label is found and store the
                     // label. After that, re-run the jump instruction,
                     // which will jump ahead to the next instruction
                     // after the label.
-                    let starting_block_depth = self.ctx.block_depth();
-                    let mut block_depth = self.ctx.block_depth();
+                    let mut max_depth = self.ctx.depth();
+                    let mut current_depth = self.ctx.depth();
+                    let mut search_ip = ip;
                     loop {
-                        ip += 1;
-                        if ip == instructions.len() {
+                        search_ip += 1;
+                        if search_ip == instructions.len() {
                             self.err(RuntimeErrorKind::LabelError(format!(
                                 "Label not found: {}",
                                 name
                             )))?;
                         }
-                        match &instructions[ip] {
-                            Instruction::BlockStart => block_depth += 1,
-                            Instruction::BlockEnd => block_depth -= 1,
+                        match &instructions[search_ip] {
+                            Instruction::BlockStart => {
+                                current_depth += 1;
+                            }
+                            Instruction::BlockEnd => {
+                                current_depth -= 1;
+                                if current_depth < max_depth {
+                                    max_depth = current_depth;
+                                }
+                            }
                             Instruction::StoreLabel(label) => {
-                                if block_depth <= starting_block_depth {
-                                    if label == name {
-                                        break self.ctx.add_label(name, ip);
-                                    }
+                                if current_depth <= max_depth && label == name {
+                                    self.store_label(name, search_ip);
+                                    break;
                                 }
                             }
                             _ => (),
                         }
                     }
-                    // Rewind and re-run the jump-to-label instruction
-                    // now that the label has been found.
-                    ip -= 1;
+                    // Re-run jump instruction now that label has been
+                    // found.
+                    continue;
                 }
                 Instruction::UnaryOp(op) => {
                     if let Some(i) = self.pop() {

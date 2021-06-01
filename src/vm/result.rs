@@ -52,7 +52,7 @@ pub enum RuntimeErrorKind {
     TypeError(String),
     NameError(String),
     LabelError(String),
-    CannotJumpBack,
+    CannotJumpBack(String),
 }
 
 impl fmt::Display for RuntimeErrorKind {

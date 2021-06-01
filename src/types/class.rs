@@ -1,7 +1,6 @@
 //! "Class" and "type" are used interchangeably and mean exactly the
 //! same thing. Lower case "class" is used instead of "type" because the
 //! latter is a Rust keyword.
-
 use std::collections::HashMap;
 use std::fmt;
 use std::rc::Rc;

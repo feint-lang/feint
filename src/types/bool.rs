@@ -7,7 +7,7 @@ use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeError, RuntimeResult};
 use super::class::TypeRef;
 use super::object::{Object, ObjectExt, ObjectRef};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct Bool {
     class: TypeRef,
     value: bool,
@@ -15,7 +15,7 @@ pub struct Bool {
 
 impl Bool {
     pub fn new(class: TypeRef, value: bool) -> Self {
-        Self { class: class.clone(), value }
+        Self { class, value }
     }
 
     pub fn value(&self) -> &bool {

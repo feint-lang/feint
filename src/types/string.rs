@@ -11,7 +11,7 @@ use crate::types::object::{Object, ObjectExt, ObjectRef};
 
 pub type RustString = std::string::String;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct String {
     class: TypeRef,
     value: RustString,
@@ -20,7 +20,7 @@ pub struct String {
 
 impl String {
     pub fn new<S: Into<RustString>>(class: TypeRef, value: S, format: bool) -> Self {
-        Self { class: class.clone(), value: value.into(), is_format_string: format }
+        Self { class, value: value.into(), is_format_string: format }
     }
 
     pub fn value(&self) -> &str {

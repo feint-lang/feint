@@ -47,6 +47,7 @@ struct Parser<T: BufRead> {
     token_queue: VecDeque<TokenWithLocation>,
 
     expecting_block: bool,
+    precedence: u8,
 }
 
 impl<T: BufRead> Parser<T> {
@@ -55,6 +56,7 @@ impl<T: BufRead> Parser<T> {
             token_stream: scanner.peekable(),
             token_queue: VecDeque::new(),
             expecting_block: false,
+            precedence: 0,
         }
     }
 
@@ -117,7 +119,8 @@ impl<T: BufRead> Parser<T> {
     /// Return the next token along with its precedence *if* it's both
     /// an infix operator *and* its precedence is greater than the
     /// current precedence level.
-    fn next_infix_token(&mut self, current_precedence: u8) -> NextInfixResult {
+    fn next_infix_token(&mut self) -> NextInfixResult {
+        let current_precedence = self.precedence;
         if let Some(token) = self.next_token_if(|t| {
             let p = get_binary_precedence(t);
             p > 0 && p > current_precedence
@@ -160,6 +163,7 @@ impl<T: BufRead> Parser<T> {
     fn statements(&mut self) -> StatementsResult {
         let mut statements = vec![];
         loop {
+            self.precedence = 0;
             let peek_result = self.peek_token()?;
             if let Some(token) = peek_result {
                 match &token.token {
@@ -170,7 +174,7 @@ impl<T: BufRead> Parser<T> {
                     }
                     Token::Print => {
                         self.next_token()?;
-                        let statement = match self.expr(0)? {
+                        let statement = match self.expr()? {
                             Some(expr) => ast::Statement::new_expr(expr),
                             None => ast::Statement::new_string(""),
                         };
@@ -200,7 +204,7 @@ impl<T: BufRead> Parser<T> {
                         };
                     }
                     _ => {
-                        if let Some(expr) = self.expr(0)? {
+                        if let Some(expr) = self.expr()? {
                             let statement = ast::Statement::new_expr(expr);
                             statements.push(statement);
                         }
@@ -213,7 +217,7 @@ impl<T: BufRead> Parser<T> {
         Ok(statements)
     }
 
-    fn expr(&mut self, precedence: u8) -> ExprOptionResult {
+    fn expr(&mut self) -> ExprOptionResult {
         let token = match self.next_token()? {
             Some(token) => token,
             None => return Ok(None),
@@ -241,7 +245,7 @@ impl<T: BufRead> Parser<T> {
             Token::Ident(name) => ast::Expr::new_ident(ast::Ident::new_ident(name)),
             Token::Block => {
                 self.expecting_block = true;
-                return self.block(precedence, token.end);
+                return self.block(token.end);
             }
             Token::BlockStart => {
                 if !self.expecting_block {
@@ -252,21 +256,33 @@ impl<T: BufRead> Parser<T> {
             }
             // The token isn't a leaf node, so it *must* be some other
             // kind of prefix token--a unary operation like -1 or !true.
-            _ => self.unary_expression(&token)?,
+            _ => {
+                let precedence = get_unary_precedence(&token.token);
+                if precedence == 0 {
+                    return Err(self.err(ParseErrorKind::UnhandledToken(token.clone())));
+                }
+                if let Some(rhs) = self.expr()? {
+                    let operator = token.token.as_str();
+                    return Ok(Some(ast::Expr::new_unary_op(operator, rhs)));
+                } else {
+                    return Err(self.err(ParseErrorKind::ExpectedExpression(token.end)));
+                }
+            }
         };
 
         // See if the expr from above is followed by an infix
         // operator. If so, get the RHS expr and return a binary
         // operation. If not, just return the original expr.
         loop {
-            let next = self.next_infix_token(precedence)?;
+            let next = self.next_infix_token()?;
             if let Some((infix_token, mut infix_precedence)) = next {
                 // Lower precedence of right-associative operator when
                 // fetching its RHS expr.
                 if is_right_associative(&infix_token.token) {
                     infix_precedence -= 1;
                 }
-                if let Some(rhs) = self.expr(infix_precedence)? {
+                self.precedence = infix_precedence;
+                if let Some(rhs) = self.expr()? {
                     let op = infix_token.token.as_str();
                     expr = ast::Expr::new_binary_op(expr, op, rhs);
                 } else {
@@ -282,24 +298,11 @@ impl<T: BufRead> Parser<T> {
         Ok(Some(expr))
     }
 
-    /// Get unary expr for the current unary operator token.
-    fn unary_expression(&mut self, token: &TokenWithLocation) -> ExprResult {
-        let precedence = get_unary_precedence(&token.token);
-        if precedence == 0 {
-            return Err(self.err(ParseErrorKind::UnhandledToken(token.clone())));
-        }
-        if let Some(rhs) = self.expr(precedence)? {
-            let operator = token.token.as_str();
-            return Ok(ast::Expr::new_unary_op(operator, rhs));
-        }
-        return Err(self.err(ParseErrorKind::ExpectedExpression(token.end)));
-    }
-
-    fn block(&mut self, precedence: u8, end: Location) -> ExprOptionResult {
+    fn block(&mut self, end: Location) -> ExprOptionResult {
         if let Ok(Some(_)) = self.next_token_if(|t| t == &Token::FuncStart) {
             if let Ok(Some(_)) = self.next_token_if(|t| t == &Token::EndOfStatement) {
                 if let Ok(Some(_)) = self.peek_token_if(|t| t == &Token::BlockStart) {
-                    self.expr(precedence)
+                    self.expr()
                 } else {
                     Err(self.err(ParseErrorKind::SyntaxError(
                         "Expected block".to_owned(),

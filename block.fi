@@ -1,3 +1,5 @@
+print "start =========="
+
 a = "a1"
 b = "b1"
 
@@ -17,8 +19,7 @@ a = block ->
         print $"        ${a}"
         print $"        ${b}"
         print $"        ${c}"
-        "inner"
-    print "after inner block"
+    print "    after inner block"
 
 print "after block"
 print a
@@ -40,6 +41,7 @@ a: print "label: a"
 block ->
     # jump out
     jump b
+    b: print "leave block"
 
 b:
 print "label: b"
@@ -50,3 +52,8 @@ block ->
     y = "y"
     print "skipped y"
     out: print $"    jumped out: ${x}"
+
+jump c
+c:
+
+print "end =========="

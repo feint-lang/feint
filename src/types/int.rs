@@ -12,7 +12,7 @@ use super::object::{Object, ObjectExt, ObjectRef};
 use super::util::eq_int_float;
 
 /// Built in integer type
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct Int {
     class: TypeRef,
     value: BigInt,
@@ -20,7 +20,7 @@ pub struct Int {
 
 impl Int {
     pub fn new(class: TypeRef, value: BigInt) -> Self {
-        Self { class: class.clone(), value }
+        Self { class, value }
     }
 
     pub fn value(&self) -> &BigInt {
@@ -83,7 +83,7 @@ impl Object for Int {
 
     fn is_equal(&self, rhs: ObjectRef, _ctx: &RuntimeContext) -> RuntimeBoolResult {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
-            Ok(self.is(rhs) || self == rhs)
+            Ok(self.is(rhs) || self.value() == rhs.value())
         } else if let Some(rhs) = rhs.as_any().downcast_ref::<Float>() {
             Ok(eq_int_float(self, rhs))
         } else {

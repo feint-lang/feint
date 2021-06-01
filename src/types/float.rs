@@ -11,7 +11,7 @@ use super::object::{Object, ObjectExt, ObjectRef};
 use super::util::eq_int_float;
 
 /// Built in 64-bit float type
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct Float {
     class: TypeRef,
     value: f64,
@@ -19,7 +19,7 @@ pub struct Float {
 
 impl Float {
     pub fn new(class: TypeRef, value: f64) -> Self {
-        Self { class: class.clone(), value }
+        Self { class, value }
     }
 
     pub fn value(&self) -> &f64 {
@@ -66,7 +66,7 @@ impl Object for Float {
 
     fn is_equal(&self, rhs: ObjectRef, _ctx: &RuntimeContext) -> RuntimeBoolResult {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
-            Ok(self.is(rhs) || self == rhs)
+            Ok(self.is(rhs) || self.value() == rhs.value())
         } else if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
             Ok(eq_int_float(rhs, self))
         } else {
