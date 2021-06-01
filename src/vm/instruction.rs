@@ -12,8 +12,6 @@ pub enum Instruction {
     Jump(usize),        // Jump unconditionally
     JumpIfTrue(usize),  // Jump if top of stack is true
     JumpIfFalse(usize), // Jump if top of stack is false
-    StoreLabel(String),
-    JumpToLabel(String),
     UnaryOp(UnaryOperator),
     BinaryOp(BinaryOperator),
     LoadConst(usize),

@@ -81,15 +81,6 @@ impl VM {
         Err(RuntimeError::new(kind))
     }
 
-    fn store_label(&mut self, name: &str, address: usize) -> Result<(), RuntimeError> {
-        if self.ctx.get_label(name, true).is_some() {
-            let message = format!("Label redefined: {}", name);
-            self.err(RuntimeErrorKind::LabelError(message))?;
-        }
-        self.ctx.add_label(name, address);
-        Ok(())
-    }
-
     /// Format String with vars from current context.
     fn format_string(&mut self, const_index: usize) -> Result<(), RuntimeError> {
         if let Some(obj) = self.ctx.get_obj(const_index) {
@@ -160,52 +151,6 @@ impl VM {
                             name
                         )))?;
                     }
-                }
-                Instruction::StoreLabel(name) => {
-                    self.store_label(name, ip);
-                }
-                Instruction::JumpToLabel(name) => {
-                    if let Some(&label_ip) = self.ctx.get_label(name, false) {
-                        ip = label_ip + 1;
-                        continue;
-                    }
-                    // Skip ahead until the label is found and store the
-                    // label. After that, re-run the jump instruction,
-                    // which will jump ahead to the next instruction
-                    // after the label.
-                    let mut max_depth = self.ctx.depth();
-                    let mut current_depth = self.ctx.depth();
-                    let mut search_ip = ip;
-                    loop {
-                        search_ip += 1;
-                        if search_ip == instructions.len() {
-                            self.err(RuntimeErrorKind::LabelError(format!(
-                                "Label not found: {}",
-                                name
-                            )))?;
-                        }
-                        match &instructions[search_ip] {
-                            Instruction::BlockStart => {
-                                current_depth += 1;
-                            }
-                            Instruction::BlockEnd => {
-                                current_depth -= 1;
-                                if current_depth < max_depth {
-                                    max_depth = current_depth;
-                                }
-                            }
-                            Instruction::StoreLabel(label) => {
-                                if current_depth <= max_depth && label == name {
-                                    self.store_label(name, search_ip);
-                                    break;
-                                }
-                            }
-                            _ => (),
-                        }
-                    }
-                    // Re-run jump instruction now that label has been
-                    // found.
-                    continue;
                 }
                 Instruction::UnaryOp(op) => {
                     if let Some(i) = self.pop() {

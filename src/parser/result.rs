@@ -31,4 +31,5 @@ pub enum ParseErrorKind {
     ExpectedIdentifier(String),
     SyntaxError(String, Location),
     UnexpectedBlock(Location),
+    DuplicateLabel(String),
 }

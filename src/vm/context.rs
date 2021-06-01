@@ -20,7 +20,7 @@ impl RuntimeContext {
     }
 
     pub fn depth(&self) -> usize {
-        self.namespace_stack.len()
+        self.namespace_stack.len() - 1
     }
 
     pub fn enter_block(&mut self) {
@@ -28,7 +28,7 @@ impl RuntimeContext {
     }
 
     pub fn exit_block(&mut self) {
-        if self.depth() == 1 {
+        if self.depth() == 0 {
             panic!("Can't remove global namespace");
         }
         self.namespace_stack.pop();
@@ -49,7 +49,7 @@ impl RuntimeContext {
     }
 
     pub fn get_obj_index(&self, name: &str) -> Option<&usize> {
-        let mut i = self.depth() - 1;
+        let mut i = self.depth();
         loop {
             let namespace = &self.namespace_stack[i];
             if let Some(usize) = namespace.get(name) {
@@ -79,7 +79,7 @@ impl RuntimeContext {
     }
 
     fn current_namespace(&mut self) -> &mut Namespace {
-        let index = self.depth() - 1;
+        let index = self.depth();
         &mut self.namespace_stack[index]
     }
 }

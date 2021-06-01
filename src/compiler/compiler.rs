@@ -4,6 +4,8 @@ use crate::util::{BinaryOperator, UnaryOperator};
 use crate::vm::{format_instructions, Instruction, Instructions, RuntimeContext, VM};
 
 use super::result::{CompilationError, CompilationErrorKind, CompilationResult};
+use crate::ast::LiteralKind::Int;
+use std::collections::HashMap;
 
 // Compiler ------------------------------------------------------------
 
@@ -30,11 +32,18 @@ type VisitResult = Result<(), CompilationError>;
 struct Visitor<'a> {
     ctx: &'a mut RuntimeContext,
     instructions: Instructions,
+    labels: HashMap<u8, usize>,
+    jumps: Vec<(u8, usize)>,
 }
 
 impl<'a> Visitor<'a> {
     fn new(ctx: &'a mut RuntimeContext) -> Self {
-        Self { ctx, instructions: Instructions::new() }
+        Self {
+            ctx,
+            instructions: Instructions::new(),
+            labels: HashMap::new(),
+            jumps: vec![],
+        }
     }
 
     // Utilities -------------------------------------------------------
@@ -62,7 +71,19 @@ impl<'a> Visitor<'a> {
         for statement in node.statements {
             self.visit_statement(statement)?;
         }
+
         self.push(Instruction::Halt(0));
+
+        // Update jump instructions with their corresponding label
+        // addresses.
+        for (label_index, jump_address) in self.jumps.iter() {
+            let label_address = *self.labels.get(label_index).unwrap();
+            std::mem::replace(
+                &mut self.instructions[*jump_address],
+                Instruction::Jump(label_address),
+            );
+        }
+
         Ok(())
     }
 
@@ -78,22 +99,32 @@ impl<'a> Visitor<'a> {
     fn visit_statement(&mut self, node: ast::Statement) -> VisitResult {
         match node.kind {
             ast::StatementKind::Print => self.push(Instruction::Print),
-            ast::StatementKind::Label(name) => self.push(Instruction::StoreLabel(name)),
-            ast::StatementKind::JumpToLabel(name) => {
-                self.push(Instruction::JumpToLabel(name))
+            ast::StatementKind::Label(label_index) => {
+                self.labels.insert(label_index, self.instructions.len());
+                self.push(Instruction::NoOp)
             }
-            ast::StatementKind::Expr(expr) => self.visit_expr(*expr)?,
+            ast::StatementKind::Jump(label_index) => {
+                // Insert placeholder jump instruction to be filled in
+                // with corresponding label address once labels have
+                // been processed.
+                self.jumps.push((label_index, self.instructions.len()));
+                self.push(Instruction::Jump(0));
+            }
+            ast::StatementKind::JumpToLabel(name) => {
+                self.err(format!("Label not found: {}", name))?;
+            }
+            ast::StatementKind::Expr(expr) => self.visit_expr(expr)?,
         }
         Ok(())
     }
 
     fn visit_expr(&mut self, node: ast::Expr) -> VisitResult {
         match node.kind {
-            ast::ExprKind::Block(block) => self.visit_block(*block)?,
+            ast::ExprKind::Block(block) => self.visit_block(block)?,
             ast::ExprKind::UnaryOp(op, b) => self.visit_unary_op(op, *b)?,
             ast::ExprKind::BinaryOp(a, op, b) => self.visit_binary_op(*a, op, *b)?,
-            ast::ExprKind::Ident(ident) => self.visit_ident(*ident)?,
-            ast::ExprKind::Literal(literal) => self.visit_literal(*literal)?,
+            ast::ExprKind::Ident(ident) => self.visit_ident(ident)?,
+            ast::ExprKind::Literal(literal) => self.visit_literal(literal)?,
             _ => self.err(format!("Unhandled expression: {:?}", node))?,
         }
         Ok(())

@@ -60,9 +60,10 @@ pub struct Statement {
 #[derive(PartialEq)]
 pub enum StatementKind {
     Print,
-    Label(String),
-    JumpToLabel(String),
-    Expr(Box<Expr>),
+    Label(u8),
+    Jump(u8),
+    JumpToLabel(String), // Converted to Jump
+    Expr(Expr),
 }
 
 impl Statement {
@@ -74,8 +75,12 @@ impl Statement {
         Self::new(StatementKind::Print)
     }
 
-    pub fn new_label<S: Into<String>>(name: S) -> Self {
-        Self::new(StatementKind::Label(name.into()))
+    pub fn new_label(index: u8) -> Self {
+        Self::new(StatementKind::Label(index))
+    }
+
+    pub fn new_jump(index: u8) -> Self {
+        Self::new(StatementKind::Jump(index))
     }
 
     pub fn new_jump_to_label<S: Into<String>>(name: S) -> Self {
@@ -83,7 +88,7 @@ impl Statement {
     }
 
     pub fn new_expr(expr: Expr) -> Self {
-        Self::new(StatementKind::Expr(Box::new(expr)))
+        Self::new(StatementKind::Expr(expr))
     }
 
     pub fn new_nil() -> Self {
@@ -108,6 +113,7 @@ impl fmt::Debug for StatementKind {
             Self::Print => write!(f, "Print"),
             Self::Label(name) => write!(f, "Label: {}", name),
             Self::JumpToLabel(name) => write!(f, "Jump: {}", name),
+            Self::Jump(index) => write!(f, "Jump: {}", index),
         }
     }
 }
@@ -122,10 +128,10 @@ pub struct Expr {
 pub enum ExprKind {
     UnaryOp(UnaryOperator, Box<Expr>),
     BinaryOp(Box<Expr>, BinaryOperator, Box<Expr>),
-    Block(Box<Block>),
-    Function(String, Box<Block>),
-    Literal(Box<Literal>),
-    Ident(Box<Ident>),
+    Block(Block),
+    Function(String, Block),
+    Literal(Literal),
+    Ident(Ident),
 }
 
 impl Expr {
@@ -134,7 +140,7 @@ impl Expr {
     }
 
     pub fn new_block(statements: Vec<Statement>) -> Self {
-        Self::new(ExprKind::Block(Box::new(Block::new(statements))))
+        Self::new(ExprKind::Block(Block::new(statements)))
     }
 
     pub fn new_unary_op(operator: &str, a: Expr) -> Self {
@@ -154,11 +160,11 @@ impl Expr {
     }
 
     pub fn new_ident(ident: Ident) -> Self {
-        Self::new(ExprKind::Ident(Box::new(ident)))
+        Self::new(ExprKind::Ident(ident))
     }
 
     pub fn new_literal(literal: Literal) -> Self {
-        Self::new(ExprKind::Literal(Box::new(literal)))
+        Self::new(ExprKind::Literal(literal))
     }
 }
 
@@ -173,9 +179,10 @@ impl fmt::Debug for ExprKind {
         match self {
             Self::UnaryOp(op, b) => write!(f, "({:?}{:?})", op, b),
             Self::BinaryOp(a, op, b) => write!(f, "({:?} {:?} {:?})", a, op, b),
+            Self::Block(block) => write!(f, "Block {}", block.statements.len()),
             Self::Literal(literal) => write!(f, "{:?}", literal),
             Self::Ident(ident) => write!(f, "{:?}", ident),
-            _ => unimplemented!(),
+            Self::Function(name, _) => write!(f, "{}()", name),
         }
     }
 }

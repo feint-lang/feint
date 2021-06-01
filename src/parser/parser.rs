@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::collections::{HashSet, VecDeque};
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Cursor};
 use std::iter::Peekable;
@@ -48,6 +48,10 @@ struct Parser<T: BufRead> {
 
     expecting_block: bool,
     precedence: u8,
+    label_index: u8,
+
+    scopes: Vec<usize>,
+    current_scope: usize,
 }
 
 impl<T: BufRead> Parser<T> {
@@ -57,6 +61,9 @@ impl<T: BufRead> Parser<T> {
             token_queue: VecDeque::new(),
             expecting_block: false,
             precedence: 0,
+            label_index: 0,
+            scopes: vec![1],
+            current_scope: 0,
         }
     }
 
@@ -102,7 +109,9 @@ impl<T: BufRead> Parser<T> {
         if let Some(result) = self.token_stream.next() {
             return result
                 .map(|token_with_location| Some(token_with_location))
-                .map_err(|err| ParseError::new(ParseErrorKind::ScanError(err.clone())));
+                .map_err(|err| {
+                    ParseError::new(ParseErrorKind::ScanError(err.clone()))
+                });
         }
         Ok(None)
     }
@@ -137,7 +146,9 @@ impl<T: BufRead> Parser<T> {
             return result
                 .as_ref()
                 .map(|token_with_location| Some(token_with_location))
-                .map_err(|err| ParseError::new(ParseErrorKind::ScanError(err.clone())));
+                .map_err(|err| {
+                    ParseError::new(ParseErrorKind::ScanError(err.clone()))
+                });
         }
         Ok(None)
     }
@@ -160,58 +171,109 @@ impl<T: BufRead> Parser<T> {
 
     // Grammar ---------------------------------------------------------
 
+    fn label(
+        &self,
+        label_name: &str,
+        statements: Vec<ast::Statement>,
+    ) -> Vec<ast::Statement> {
+        let mut new_statements = vec![];
+        for s in statements {
+            if let ast::StatementKind::JumpToLabel(name) = s.kind {
+                if name == label_name {
+                    new_statements.push(ast::Statement::new_jump(self.label_index));
+                } else {
+                    new_statements.push(ast::Statement::new_jump_to_label(label_name));
+                }
+            } else if let ast::StatementKind::Expr(ast::Expr {
+                kind: ast::ExprKind::Block(mut block),
+            }) = s.kind
+            {
+                let new_block_statements = self.label(label_name, block.statements);
+                new_statements.push(ast::Statement::new_expr(ast::Expr::new_block(
+                    new_block_statements,
+                )));
+            } else {
+                new_statements.push(s);
+            }
+        }
+        new_statements
+    }
+
+    fn enter_scope(&mut self) {
+        self.current_scope += 1;
+
+        if self.scopes.len() < self.current_scope {
+            self.scopes.push(1);
+        } else {
+            self.scopes[self.current_scope] = self.scopes[self.current_scope] + 1;
+        }
+    }
+
+    fn exit_scope(&mut self) {
+        self.current_scope -= 1;
+    }
+
     fn statements(&mut self) -> StatementsResult {
         let mut statements = vec![];
+        let mut labels: HashSet<String> = HashSet::new();
+
         loop {
             self.precedence = 0;
-            let peek_result = self.peek_token()?;
-            if let Some(token) = peek_result {
-                match &token.token {
-                    Token::BlockEnd => {
-                        self.next_token()?;
-                        self.expecting_block = false;
-                        break;
-                    }
-                    Token::Print => {
-                        self.next_token()?;
-                        let statement = match self.expr()? {
-                            Some(expr) => ast::Statement::new_expr(expr),
-                            None => ast::Statement::new_string(""),
-                        };
-                        statements.push(statement);
-                        statements.push(ast::Statement::new_print());
-                    }
-                    Token::Label(name) => {
-                        statements.push(ast::Statement::new_label(name));
-                        self.next_token()?;
-                    }
-                    Token::Jump => {
-                        self.next_token()?;
-                        if let Some(token) = self.next_token()? {
-                            match token.token {
-                                Token::Ident(name) => {
-                                    let st = ast::Statement::new_jump_to_label(name);
-                                    statements.push(st);
-                                }
-                                _ => {
-                                    return Err(self.err(
-                                        ParseErrorKind::ExpectedIdentifier(
-                                            "jump label".to_owned(),
-                                        ),
-                                    ))
-                                }
-                            }
-                        };
-                    }
-                    _ => {
-                        if let Some(expr) = self.expr()? {
-                            let statement = ast::Statement::new_expr(expr);
-                            statements.push(statement);
-                        }
-                    }
-                }
+            let token = if let Some(token) = self.peek_token()? {
+                token.token.clone()
             } else {
                 break;
+            };
+            match token {
+                Token::BlockEnd => {
+                    self.next_token()?;
+                    self.expecting_block = false;
+                    self.exit_scope();
+                    break;
+                }
+                Token::Print => {
+                    self.next_token()?;
+                    let statement = match self.expr()? {
+                        Some(expr) => ast::Statement::new_expr(expr),
+                        None => ast::Statement::new_string(""),
+                    };
+                    statements.push(statement);
+                    statements.push(ast::Statement::new_print());
+                }
+                Token::Label(name) => {
+                    if labels.contains(name.as_str()) {
+                        return Err(self.err(ParseErrorKind::DuplicateLabel(name)));
+                    }
+                    statements = self.label(name.as_str(), statements);
+                    statements.push(ast::Statement::new_label(self.label_index));
+                    labels.insert(name);
+                    self.label_index += 1;
+                    self.next_token()?;
+                }
+                Token::Jump => {
+                    self.next_token()?;
+                    if let Some(token) = self.next_token()? {
+                        match token.token {
+                            Token::Ident(name) => {
+                                let st = ast::Statement::new_jump_to_label(name);
+                                statements.push(st);
+                            }
+                            _ => {
+                                return Err(self.err(
+                                    ParseErrorKind::ExpectedIdentifier(
+                                        "jump label".to_owned(),
+                                    ),
+                                ))
+                            }
+                        }
+                    };
+                }
+                _ => {
+                    if let Some(expr) = self.expr()? {
+                        let statement = ast::Statement::new_expr(expr);
+                        statements.push(statement);
+                    }
+                }
             }
         }
         Ok(statements)
@@ -353,19 +415,15 @@ mod tests {
             *statement,
             ast::Statement {
                 kind: ast::StatementKind::Expr(
-                    Box::new(
-                        ast::Expr {
-                            kind: ast::ExprKind::Literal(
-                                Box::new(
-                                    ast::Literal {
-                                        kind: ast::LiteralKind::Int(
-                                            BigInt::from(1)
-                                        )
-                                    }
+                    ast::Expr {
+                        kind: ast::ExprKind::Literal(
+                            ast::Literal {
+                                kind: ast::LiteralKind::Int(
+                                    BigInt::from(1)
                                 )
-                            )
-                        }
-                    )
+                            }
+                        )
+                    }
                 )
             }
         );
@@ -406,39 +464,33 @@ mod tests {
             *statement,
             ast::Statement {
                 kind: ast::StatementKind::Expr(
-                    Box::new(
-                        // 1 + 2
-                        ast::Expr {
-                            kind: ast::ExprKind::BinaryOp(
-                                Box::new(
-                                    // 1
-                                    ast::Expr {
-                                        kind: ast::ExprKind::Literal(
-                                            Box::new(
-                                                ast::Literal {
-                                                    kind: ast::LiteralKind::Int(BigInt::from(1))
-                                                }
-                                            )
-                                        )
-                                    }
-                                ),
-                                // +
-                                BinaryOperator::Add,
-                                Box::new(
-                                    // 2
-                                    ast::Expr {
-                                        kind: ast::ExprKind::Literal(
-                                            Box::new(
-                                                ast::Literal {
-                                                    kind: ast::LiteralKind::Int(BigInt::from(2))
-                                                }
-                                            )
-                                        )
-                                    }
-                                ),
-                            )
-                        }
-                    )
+                    // 1 + 2
+                    ast::Expr {
+                        kind: ast::ExprKind::BinaryOp(
+                            Box::new(
+                                // 1
+                                ast::Expr {
+                                    kind: ast::ExprKind::Literal(
+                                        ast::Literal {
+                                            kind: ast::LiteralKind::Int(BigInt::from(1))
+                                        }
+                                    )
+                                }
+                            ),
+                            // +
+                            BinaryOperator::Add,
+                            Box::new(
+                                // 2
+                                ast::Expr {
+                                    kind: ast::ExprKind::Literal(
+                                        ast::Literal {
+                                            kind: ast::LiteralKind::Int(BigInt::from(2))
+                                        }
+                                    )
+                                }
+                            ),
+                        )
+                    }
                 )
             }
         );
