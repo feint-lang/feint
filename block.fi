@@ -1,23 +1,23 @@
 print "start =========================================================="
 
-jump y                # 0,1
+jump y
 
 y: block ->
     print "in block y"
-    jump x            # 1,1
+    jump x
 
-x: print "found"      # 0,2
+x: print "found"
 
 block ->
-    block ->          # 1,2
-        jump z        # 2,1 - can jump to 2,1, 1,2, or 0,3+
     block ->
-        print "no"    # 2,2 - can jump to 2,2, 1,2, or 0,3+
+        jump z
+    block ->
+        print "no"
         jump z
         print "no"
-    z: print "z"      # 1,2
+    z: print "z"
 
-a = "a1"              # 0,3
+a = "a1"
 b = "b1"
 
 print "before block"
@@ -74,5 +74,7 @@ block ->
 
 out:
 print $"    jumped out"
+
+yyy: # do-nothing label
 
 print "end ============================================================"

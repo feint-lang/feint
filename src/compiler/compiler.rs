@@ -1,11 +1,13 @@
+use std::collections::HashMap;
+
 use crate::ast;
+use crate::ast::LiteralKind::Int;
 use crate::types::ObjectRef;
 use crate::util::{BinaryOperator, UnaryOperator};
 use crate::vm::{Instruction, Instructions, RuntimeContext, VM};
 
 use super::result::{CompilationError, CompilationErrorKind, CompilationResult};
-use crate::ast::LiteralKind::Int;
-use std::collections::HashMap;
+use super::scope::{Scope, ScopeTree};
 
 // Compiler ------------------------------------------------------------
 
@@ -51,12 +53,13 @@ impl<'a> Visitor<'a> {
     }
 
     fn enter_scope(&mut self) {
-        // Add child to current node, then make child the current node
-        self.scope_tree.add_node();
+        // Add child scope to current scope, then make child the current
+        // scope.
+        self.scope_tree.add();
     }
 
     fn exit_scope(&mut self) {
-        // Move up to the current node's parent node
+        // Move up to the parent scope of the current scope.
         self.scope_tree.move_up();
     }
 
@@ -66,64 +69,61 @@ impl<'a> Visitor<'a> {
         for statement in node.statements {
             self.visit_statement(statement)?;
         }
-        assert_eq!(self.scope_tree.pointer, 0);
-        self.fix_jumps(0, 0)?;
+        assert_eq!(self.scope_tree.pointer(), 0);
+        self.fix_jumps()?;
         self.push(Instruction::Halt(0));
         Ok(())
     }
 
     /// Update jump instructions with their corresponding label
     /// addresses.
-    fn fix_jumps(&mut self, index: usize, depth: usize) -> VisitResult {
-        let node = self.scope_tree.get_node(index);
+    fn fix_jumps(&mut self) -> VisitResult {
+        let mut scope_tree = &self.scope_tree;
+        let mut updated: HashMap<usize, Instruction> = HashMap::new();
 
-        for child_index in node.children.iter() {
-            self.fix_jumps(*child_index, depth + 1);
-        }
-
-        for (name, jump_addr) in node.jumps.iter() {
-            if let Some(label_addr) = node.labels.get(name) {
-                self.instructions[*jump_addr - 1] = match depth {
-                    0 => Instruction::NoOp,
-                    _ => Instruction::BlockEnd(depth),
-                };
-                self.instructions[*jump_addr] = Instruction::Jump(*label_addr);
+        scope_tree.walk_up(&mut |scope: &Scope, depth: usize| {
+            let all_jumps = scope_tree.all_jumps_for_scope(scope.index());
+            for jumps in all_jumps.iter() {
+                for (name, jump_addr) in jumps.iter() {
+                    if updated.contains_key(jump_addr) {
+                        // The label for this jump was already found in
+                        // a nested scope.
+                        continue;
+                    }
+                    if let Some(label_addr) = scope.labels().get(name) {
+                        updated.insert(
+                            *jump_addr - 1,
+                            match depth {
+                                0 => Instruction::NoOp,
+                                _ => Instruction::BlockEnd(depth),
+                            },
+                        );
+                        updated.insert(*jump_addr, Instruction::Jump(*label_addr));
+                    }
+                }
             }
+            true
+        });
+
+        let mut not_found: Option<(String, usize)> = None;
+        scope_tree.walk_up(&mut |scope: &Scope, depth: usize| {
+            for (name, jump_addr) in scope.jumps().iter() {
+                if !updated.contains_key(jump_addr) {
+                    not_found = Some((name.clone(), jump_addr.clone()));
+                    return false;
+                }
+            }
+            true
+        });
+
+        if let Some(item) = not_found {
+            return self.err(format!("Label not found for jump {}", item.0));
         }
 
-        // for (name, scope, count, jump_address) in self.jumps.iter() {
-        //     let jump_scope = scope.clone();
-        //     let mut curr_scope = scope.clone();
-        //     let mut curr_count = count.clone();
-        //     loop {
-        //         let label_opt =
-        //             self.labels.get(&(name.clone(), curr_scope, curr_count));
-        //         if let Some(label_address) = label_opt {
-        //             if label_address > jump_address {
-        //                 let scope_depth = jump_scope - curr_scope;
-        //                 self.instructions[*jump_address - 1] = match scope_depth {
-        //                     0 => Instruction::NoOp,
-        //                     _ => Instruction::BlockEnd(scope_depth),
-        //                 };
-        //                 self.instructions[*jump_address] =
-        //                     Instruction::Jump(*label_address);
-        //                 break;
-        //             }
-        //         }
-        //         if curr_scope == 0 {
-        //             if curr_count == global_count {
-        //                 self.err(format!("Label not found after jump: {}", name))?;
-        //             }
-        //             curr_count += 1;
-        //         } else {
-        //             curr_scope -= 1;
-        //             if curr_scope == 0 {
-        //                 // Check global scopes *after* current scope
-        //                 curr_count += 1;
-        //             }
-        //         }
-        //     }
-        // }
+        for (addr, inst) in updated {
+            self.instructions[addr] = inst;
+        }
+
         Ok(())
     }
 
@@ -248,78 +248,5 @@ impl<'a> Visitor<'a> {
             }
         }
         Ok(())
-    }
-}
-
-// Scope tree ----------------------------------------------------------
-
-struct ScopeTree {
-    arena: Vec<ScopeNode>,
-    pointer: usize,
-}
-
-impl ScopeTree {
-    fn new() -> Self {
-        Self { arena: vec![ScopeNode::new(0, None)], pointer: 0 }
-    }
-
-    fn add_node(&mut self) -> usize {
-        let index = self.arena.len();
-        self.arena.push(ScopeNode::new(index, Some(self.pointer)));
-        self.arena[self.pointer].children.push(index);
-        self.pointer = index;
-        index
-    }
-
-    fn get_node(&self, index: usize) -> &ScopeNode {
-        &self.arena[index]
-    }
-
-    fn get_parent_index(&self) -> Option<usize> {
-        match self.pointer {
-            0 => None,
-            pointer => match self.arena.get(pointer) {
-                Some(node) => node.parent,
-                None => None,
-            },
-        }
-    }
-
-    fn move_up(&mut self) {
-        match self.get_parent_index() {
-            Some(parent_index) => self.pointer = parent_index,
-            None => panic!("Could not move up from {}", self.pointer),
-        };
-    }
-
-    fn add_jump(&mut self, name: &str, addr: usize) -> Option<usize> {
-        let node = &mut self.arena[self.pointer];
-        node.jumps.insert(name.to_owned(), addr)
-    }
-
-    fn add_label(&mut self, name: &str, addr: usize) -> Option<usize> {
-        let node = &mut self.arena[self.pointer];
-        node.labels.insert(name.to_owned(), addr)
-    }
-}
-
-#[derive(Debug)]
-struct ScopeNode {
-    index: usize,
-    parent: Option<usize>,
-    children: Vec<usize>,
-    labels: HashMap<String, usize>,
-    jumps: HashMap<String, usize>,
-}
-
-impl ScopeNode {
-    fn new(index: usize, parent: Option<usize>) -> Self {
-        Self {
-            index,
-            parent,
-            children: vec![],
-            labels: HashMap::new(),
-            jumps: HashMap::new(),
-        }
     }
 }
