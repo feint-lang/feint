@@ -76,9 +76,9 @@ impl<'a> Visitor<'a> {
         let global_count = self
             .labels
             .iter()
-            .filter(|e| e.0 .1 == 0)
-            .max_by(|a, b| a.0 .2.cmp(&b.0 .2))
-            .map(|e| e.0 .2)
+            .filter(|(k, _)| k.1 == 0) // global scope
+            .max_by(|(k1, _), (k2, _)| k1.2.cmp(&k2.2)) // count
+            .map(|(k, _)| k.2) // count
             .unwrap_or(0);
 
         for (name, scope, count, jump_address) in self.jumps.iter() {

@@ -112,10 +112,9 @@ impl<T: BufRead> Parser<T> {
     }
 
     fn enter_scope(&mut self) {
-        let current_count = self.scopes[self.current_scope];
         self.current_scope += 1;
         if self.scopes.len() <= self.current_scope {
-            self.scopes.push(current_count);
+            self.scopes.push(1);
         } else {
             self.scopes[self.current_scope] += 1;
         }

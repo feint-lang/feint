@@ -1,24 +1,24 @@
 print "start =========================================================="
 
-jump y
+jump y                # 0,1
 
-x: print "not found"  # 0, 1
+x: print "not found"
 
 y: block ->
-    jump x            # 1, 1
+    jump x            # 1,1
 
-x: print "found"      # 0, 2
+x: print "found"      # 0,2
 
 block ->
-    block ->          # 1, 2
-        jump z        # 2, 2
+    block ->          # 1,2
+        jump z        # 2,1 - can jump to 2,1, 1,2, or 0,3+
     block ->
-        print "no"    # 2, 3
+        print "no"    # 2,2 - can jump to 2,2, 1,2, or 0,3+
         jump z
         print "no"
-    z: print "z"      # 1, 2
+    z: print "z"      # 1,2
 
-a = "a1"
+a = "a1"              # 0,3
 b = "b1"
 
 print "before block"
