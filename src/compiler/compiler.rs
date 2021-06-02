@@ -77,6 +77,20 @@ impl<'a> Visitor<'a> {
     fn fix_jumps(&mut self, index: usize, depth: usize) -> VisitResult {
         let node = self.scope_tree.get_node(index);
 
+        for child_index in node.children.iter() {
+            self.fix_jumps(*child_index, depth + 1);
+        }
+
+        for (name, jump_addr) in node.jumps.iter() {
+            if let Some(label_addr) = node.labels.get(name) {
+                self.instructions[*jump_addr - 1] = match depth {
+                    0 => Instruction::NoOp,
+                    _ => Instruction::BlockEnd(depth),
+                };
+                self.instructions[*jump_addr] = Instruction::Jump(*label_addr);
+            }
+        }
+
         // for (name, scope, count, jump_address) in self.jumps.iter() {
         //     let jump_scope = scope.clone();
         //     let mut curr_scope = scope.clone();
@@ -257,7 +271,7 @@ impl ScopeTree {
         index
     }
 
-    fn get_node(&mut self, index: usize) -> &ScopeNode {
+    fn get_node(&self, index: usize) -> &ScopeNode {
         &self.arena[index]
     }
 

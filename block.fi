@@ -2,9 +2,8 @@ print "start =========================================================="
 
 jump y                # 0,1
 
-x: print "not found"
-
 y: block ->
+    print "in block y"
     jump x            # 1,1
 
 x: print "found"      # 0,2
