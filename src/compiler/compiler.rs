@@ -23,18 +23,12 @@ type VisitResult = Result<(), CompilationError>;
 struct Visitor<'a> {
     ctx: &'a mut RuntimeContext,
     instructions: Instructions,
-    labels: HashMap<(String, usize, usize), usize>,
-    jumps: Vec<(String, usize, usize, usize)>,
+    scope_tree: ScopeTree,
 }
 
 impl<'a> Visitor<'a> {
     fn new(ctx: &'a mut RuntimeContext) -> Self {
-        Self {
-            ctx,
-            instructions: Instructions::new(),
-            labels: HashMap::new(),
-            jumps: vec![],
-        }
+        Self { ctx, instructions: Instructions::new(), scope_tree: ScopeTree::new() }
     }
 
     // Utilities -------------------------------------------------------
@@ -56,94 +50,99 @@ impl<'a> Visitor<'a> {
         self.push_const(index);
     }
 
+    fn enter_scope(&mut self) {
+        // Add child to current node, then make child the current node
+        self.scope_tree.add_node();
+    }
+
+    fn exit_scope(&mut self) {
+        // Move up to the current node's parent node
+        self.scope_tree.move_up();
+    }
+
     // Visitors --------------------------------------------------------
 
     fn visit_program(&mut self, node: ast::Program) -> VisitResult {
         for statement in node.statements {
             self.visit_statement(statement)?;
         }
-        self.fix_jumps()?;
+        assert_eq!(self.scope_tree.pointer, 0);
+        self.fix_jumps(0, 0)?;
         self.push(Instruction::Halt(0));
         Ok(())
     }
 
     /// Update jump instructions with their corresponding label
     /// addresses.
-    fn fix_jumps(&mut self) -> VisitResult {
-        // Extract the count of times the global scope was entered. This
-        // is used to search *ahead* in the global scope when a label
-        // isn't found in a local scope.
-        let global_count = self
-            .labels
-            .iter()
-            .filter(|(k, _)| k.1 == 0) // global scope
-            .max_by(|(k1, _), (k2, _)| k1.2.cmp(&k2.2)) // count
-            .map(|(k, _)| k.2) // count
-            .unwrap_or(0);
+    fn fix_jumps(&mut self, index: usize, depth: usize) -> VisitResult {
+        let node = self.scope_tree.get_node(index);
 
-        for (name, scope, count, jump_address) in self.jumps.iter() {
-            let jump_scope = scope.clone();
-            let mut curr_scope = scope.clone();
-            let mut curr_count = count.clone();
-            loop {
-                let label_opt =
-                    self.labels.get(&(name.clone(), curr_scope, curr_count));
-                if let Some(label_address) = label_opt {
-                    if label_address > jump_address {
-                        let scope_depth = jump_scope - curr_scope;
-                        self.instructions[*jump_address - 1] = match scope_depth {
-                            0 => Instruction::NoOp,
-                            _ => Instruction::BlockEnd(scope_depth),
-                        };
-                        self.instructions[*jump_address] =
-                            Instruction::Jump(*label_address);
-                        break;
-                    }
-                }
-                if curr_scope == 0 {
-                    if curr_count == global_count {
-                        self.err(format!("Label not found after jump: {}", name))?;
-                    }
-                    curr_count += 1;
-                } else {
-                    curr_scope -= 1;
-                    if curr_scope == 0 {
-                        // Check global scopes *after* current scope
-                        curr_count += 1;
-                    }
-                }
-            }
-        }
+        // for (name, scope, count, jump_address) in self.jumps.iter() {
+        //     let jump_scope = scope.clone();
+        //     let mut curr_scope = scope.clone();
+        //     let mut curr_count = count.clone();
+        //     loop {
+        //         let label_opt =
+        //             self.labels.get(&(name.clone(), curr_scope, curr_count));
+        //         if let Some(label_address) = label_opt {
+        //             if label_address > jump_address {
+        //                 let scope_depth = jump_scope - curr_scope;
+        //                 self.instructions[*jump_address - 1] = match scope_depth {
+        //                     0 => Instruction::NoOp,
+        //                     _ => Instruction::BlockEnd(scope_depth),
+        //                 };
+        //                 self.instructions[*jump_address] =
+        //                     Instruction::Jump(*label_address);
+        //                 break;
+        //             }
+        //         }
+        //         if curr_scope == 0 {
+        //             if curr_count == global_count {
+        //                 self.err(format!("Label not found after jump: {}", name))?;
+        //             }
+        //             curr_count += 1;
+        //         } else {
+        //             curr_scope -= 1;
+        //             if curr_scope == 0 {
+        //                 // Check global scopes *after* current scope
+        //                 curr_count += 1;
+        //             }
+        //         }
+        //     }
+        // }
         Ok(())
     }
 
     fn visit_block(&mut self, node: ast::Block) -> VisitResult {
         self.push(Instruction::BlockStart);
+        self.enter_scope();
         for statement in node.statements {
             self.visit_statement(statement)?;
         }
         self.push(Instruction::BlockEnd(1));
+        self.exit_scope();
         Ok(())
     }
 
     fn visit_statement(&mut self, node: ast::Statement) -> VisitResult {
         match node.kind {
             ast::StatementKind::Print => self.push(Instruction::Print),
-            ast::StatementKind::Jump(name, scope, count) => {
+            ast::StatementKind::Jump(name) => {
                 // Insert placeholder jump instruction to be filled in
                 // with corresponding label address once labels have
                 // been processed.
                 self.push(Instruction::BlockEnd(1));
                 self.push(Instruction::Jump(0));
-                self.jumps.push((name, scope, count, self.instructions.len() - 1));
+                self.scope_tree.add_jump(name.as_str(), self.instructions.len() - 1);
             }
-            ast::StatementKind::Label(name, scope, count) => {
-                let key = (name, scope, count);
-                if self.labels.contains_key(&key) {
-                    self.err(format!("Duplicate label in scope: {}", key.0))?;
-                }
+            ast::StatementKind::Label(name) => {
                 self.push(Instruction::NoOp);
-                self.labels.insert(key, self.instructions.len() - 1);
+                let result = self
+                    .scope_tree
+                    .add_label(name.as_str(), self.instructions.len() - 1);
+                if result.is_some() {
+                    self.err(format!("Duplicate label in scope: {}", name))?;
+                }
             }
             ast::StatementKind::Expr(expr) => self.visit_expr(expr)?,
         }
@@ -235,5 +234,78 @@ impl<'a> Visitor<'a> {
             }
         }
         Ok(())
+    }
+}
+
+// Scope tree ----------------------------------------------------------
+
+struct ScopeTree {
+    arena: Vec<ScopeNode>,
+    pointer: usize,
+}
+
+impl ScopeTree {
+    fn new() -> Self {
+        Self { arena: vec![ScopeNode::new(0, None)], pointer: 0 }
+    }
+
+    fn add_node(&mut self) -> usize {
+        let index = self.arena.len();
+        self.arena.push(ScopeNode::new(index, Some(self.pointer)));
+        self.arena[self.pointer].children.push(index);
+        self.pointer = index;
+        index
+    }
+
+    fn get_node(&mut self, index: usize) -> &ScopeNode {
+        &self.arena[index]
+    }
+
+    fn get_parent_index(&self) -> Option<usize> {
+        match self.pointer {
+            0 => None,
+            pointer => match self.arena.get(pointer) {
+                Some(node) => node.parent,
+                None => None,
+            },
+        }
+    }
+
+    fn move_up(&mut self) {
+        match self.get_parent_index() {
+            Some(parent_index) => self.pointer = parent_index,
+            None => panic!("Could not move up from {}", self.pointer),
+        };
+    }
+
+    fn add_jump(&mut self, name: &str, addr: usize) -> Option<usize> {
+        let node = &mut self.arena[self.pointer];
+        node.jumps.insert(name.to_owned(), addr)
+    }
+
+    fn add_label(&mut self, name: &str, addr: usize) -> Option<usize> {
+        let node = &mut self.arena[self.pointer];
+        node.labels.insert(name.to_owned(), addr)
+    }
+}
+
+#[derive(Debug)]
+struct ScopeNode {
+    index: usize,
+    parent: Option<usize>,
+    children: Vec<usize>,
+    labels: HashMap<String, usize>,
+    jumps: HashMap<String, usize>,
+}
+
+impl ScopeNode {
+    fn new(index: usize, parent: Option<usize>) -> Self {
+        Self {
+            index,
+            parent,
+            children: vec![],
+            labels: HashMap::new(),
+            jumps: HashMap::new(),
+        }
     }
 }

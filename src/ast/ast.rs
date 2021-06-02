@@ -60,8 +60,8 @@ pub struct Statement {
 #[derive(PartialEq)]
 pub enum StatementKind {
     Print,
-    Jump(String, usize, usize),
-    Label(String, usize, usize),
+    Jump(String),
+    Label(String),
     Expr(Expr),
 }
 
@@ -74,12 +74,12 @@ impl Statement {
         Self::new(StatementKind::Print)
     }
 
-    pub fn new_jump(name: String, scope: usize, count: usize) -> Self {
-        Self::new(StatementKind::Jump(name, scope, count))
+    pub fn new_jump(name: String) -> Self {
+        Self::new(StatementKind::Jump(name))
     }
 
-    pub fn new_label(name: String, scope: usize, count: usize) -> Self {
-        Self::new(StatementKind::Label(name, scope, count))
+    pub fn new_label(name: String) -> Self {
+        Self::new(StatementKind::Label(name))
     }
 
     pub fn new_expr(expr: Expr) -> Self {
@@ -106,12 +106,8 @@ impl fmt::Debug for StatementKind {
         match self {
             Self::Expr(expr) => write!(f, "Expr({:?})", expr),
             Self::Print => write!(f, "Print"),
-            Self::Label(name, scope, count) => {
-                write!(f, "Label: {}/{}/{}", name, scope, count)
-            }
-            Self::Jump(name, scope, count) => {
-                write!(f, "Jump: {}/{}/{}", name, scope, count)
-            }
+            Self::Label(label_index) => write!(f, "Label: {}", label_index),
+            Self::Jump(label_index) => write!(f, "Jump: {}", label_index),
         }
     }
 }

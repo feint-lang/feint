@@ -1,7 +1,9 @@
-use std::collections::{HashSet, VecDeque};
+use std::cell::RefCell;
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Cursor};
 use std::iter::Peekable;
+use std::rc::Rc;
 
 use crate::ast;
 use crate::scanner::{ScanError, Scanner, Token, TokenWithLocation};
@@ -58,8 +60,6 @@ struct Parser<T: BufRead> {
     /// Current operator precedence
     precedence: u8,
 
-    scopes: Vec<usize>,
-    current_scope: usize,
     expecting_block: bool,
 }
 
@@ -69,8 +69,6 @@ impl<T: BufRead> Parser<T> {
             token_stream: scanner.peekable(),
             token_queue: VecDeque::new(),
             precedence: 0,
-            scopes: vec![1],
-            current_scope: 0,
             expecting_block: false,
         }
     }
@@ -112,21 +110,11 @@ impl<T: BufRead> Parser<T> {
     }
 
     fn enter_scope(&mut self) {
-        self.current_scope += 1;
-        if self.scopes.len() <= self.current_scope {
-            self.scopes.push(1);
-        } else {
-            self.scopes[self.current_scope] += 1;
-        }
         self.expecting_block = true;
     }
 
     fn exit_scope(&mut self) {
-        self.current_scope -= 1;
         self.expecting_block = false;
-        if self.current_scope == 0 {
-            self.scopes[0] += 1;
-        }
     }
 
     // Tokens ----------------------------------------------------------
@@ -226,10 +214,7 @@ impl<T: BufRead> Parser<T> {
                     if let Some(token) = self.next_token()? {
                         match token.token {
                             Token::Ident(name) => {
-                                let scope = self.current_scope;
-                                let count = self.scopes[scope];
-                                statements
-                                    .push(ast::Statement::new_jump(name, scope, count));
+                                statements.push(ast::Statement::new_jump(name));
                             }
                             _ => {
                                 return Err(
@@ -241,9 +226,7 @@ impl<T: BufRead> Parser<T> {
                 }
                 Token::Label(name) => {
                     self.next_token()?;
-                    let scope = self.current_scope;
-                    let count = self.scopes[scope];
-                    statements.push(ast::Statement::new_label(name, scope, count));
+                    statements.push(ast::Statement::new_label(name));
                 }
                 _ => {
                     if let Some(expr) = self.expr()? {
