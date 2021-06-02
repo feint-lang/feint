@@ -1,4 +1,22 @@
-print "start =========="
+print "start =========================================================="
+
+jump y
+
+x: print "not found"  # 0, 1
+
+y: block ->
+    jump x            # 1, 1
+
+x: print "found"      # 0, 2
+
+block ->
+    block ->          # 1, 2
+        jump z        # 2, 2
+    block ->
+        print "no"    # 2, 3
+        jump z
+        print "no"
+    z: print "z"      # 1, 2
 
 a = "a1"
 b = "b1"
@@ -39,13 +57,13 @@ block ->
 a: print "label: a"
 
 block ->
-    # jump out
     jump b
     print "skipped"
     b: print "leave block"
 
+print "before label: b"
 b:
-print "label: b"
+print "after label: b"
 
 block ->
     print "in last block"
@@ -56,6 +74,6 @@ block ->
     print "skipped y"
 
 out:
-print $"    jumped out: ${x}"
+print $"    jumped out"
 
-print "end =========="
+print "end ============================================================"

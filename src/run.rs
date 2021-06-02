@@ -8,24 +8,24 @@ use crate::util::Location;
 use crate::vm::{self, ExecutionResult, RuntimeErrorKind, VMState, VM};
 
 /// Run text source.
-pub fn run_text(text: &str, debug: bool) -> ExitResult {
+pub fn run_text(text: &str, disassemble: bool, debug: bool) -> ExitResult {
     let mut vm = VM::default();
     let mut runner = Runner::new(debug);
-    runner.exit(vm::execute_text(&mut vm, text, debug))
+    runner.exit(vm::execute_text(&mut vm, text, disassemble, debug))
 }
 
 /// Run source from file.
-pub fn run_file(file_path: &str, debug: bool) -> ExitResult {
+pub fn run_file(file_path: &str, disassemble: bool, debug: bool) -> ExitResult {
     let mut vm = VM::default();
     let mut runner = Runner::new(debug);
-    runner.exit(vm::execute_file(&mut vm, file_path, debug))
+    runner.exit(vm::execute_file(&mut vm, file_path, disassemble, debug))
 }
 
 /// Read and run source from stdin.
-pub fn run_stdin(debug: bool) -> ExitResult {
+pub fn run_stdin(disassemble: bool, debug: bool) -> ExitResult {
     let mut vm = VM::default();
     let mut runner = Runner::new(debug);
-    runner.exit(vm::execute_stdin(&mut vm, debug))
+    runner.exit(vm::execute_stdin(&mut vm, disassemble, debug))
 }
 
 struct Runner {
@@ -53,9 +53,10 @@ impl Runner {
         }
         match vm_state {
             VMState::Halted(0) => Ok(None),
-            VMState::Halted(code) => Err((code, format!("Halted abnormally: {}", code))),
+            VMState::Halted(code) => {
+                Err((code, format!("Halted abnormally: {}", code)))
+            }
             VMState::Idle => Err((-1, "Never halted".to_owned())),
-            VMState::Running => unreachable!(),
         }
     }
 
@@ -173,7 +174,7 @@ mod tests {
     #[test]
     fn test_run_text() {
         let source = "1 + 2";
-        let result = run_text(source, true);
+        let result = run_text(source, false, true);
         assert!(result.is_ok(), "{:?}", result.err());
     }
 }

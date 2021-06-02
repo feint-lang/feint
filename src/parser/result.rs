@@ -28,7 +28,7 @@ pub enum ParseErrorKind {
     CouldNotOpenSourceFile(String, String),
     UnhandledToken(TokenWithLocation),
     ExpectedExpression(Location),
-    ExpectedIdentifier(String),
+    ExpectedIdentifier(TokenWithLocation),
     SyntaxError(String, Location),
     UnexpectedBlock(Location),
     DuplicateLabel(String),

@@ -8,8 +8,8 @@ use crate::vm::{
 
 use super::class::TypeRef;
 
-pub type RustString = std::string::String;
 pub type ObjectRef = Rc<dyn Object>;
+type RustString = std::string::String;
 
 macro_rules! make_bin_op {
     ( $meth:ident, $op:literal, $result:ty ) => {

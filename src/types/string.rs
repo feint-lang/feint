@@ -9,7 +9,7 @@ use crate::vm::{
 use crate::types::class::TypeRef;
 use crate::types::object::{Object, ObjectExt, ObjectRef};
 
-pub type RustString = std::string::String;
+type RustString = std::string::String;
 
 #[derive(Debug)]
 pub struct String {

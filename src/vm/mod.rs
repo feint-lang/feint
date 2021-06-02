@@ -1,5 +1,5 @@
 pub(crate) use context::RuntimeContext;
-pub(crate) use instruction::{format_instructions, Instruction, Instructions};
+pub(crate) use instruction::{Instruction, Instructions};
 pub(crate) use result::VMState;
 pub(crate) use result::{
     ExecutionResult, RuntimeBoolResult, RuntimeError, RuntimeErrorKind, RuntimeResult,

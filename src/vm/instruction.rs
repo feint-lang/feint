@@ -19,45 +19,8 @@ pub enum Instruction {
     AssignVar(String),
     LoadVar(String),
     BlockStart,
-    BlockEnd,
+    BlockEnd(usize),
     Print, // Print value at top of stack
     Return,
     Halt(i32),
-}
-
-impl fmt::Display for Instruction {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let string = match self {
-            Self::Print => format!("PRINT"),
-            Self::LoadConst(v) => format_aligned("LOAD_CONST", v),
-            Self::UnaryOp(operator) => format_aligned("UNARY_OP", operator),
-            Self::BinaryOp(operator) => format_aligned("BINARY_OP", operator),
-            Self::Return => format!("RETURN"),
-            i => format!("{:?}", i),
-        };
-        write!(f, "{}", string)
-    }
-}
-
-fn format_aligned<T: fmt::Display>(name: &str, value: T) -> String {
-    format!("{: <w$}{: <x$}", name, value, w = 16, x = 4)
-}
-
-/// Return a nicely formatted string of instructions.
-///
-/// NOTE: We can't directly implement Display for Vec<Instruction> and
-///       creating a wrapper type just for that purpose seems like a
-///       pain.
-pub fn format_instructions(instructions: &Instructions) -> String {
-    let mut offset = 0;
-    instructions
-        .iter()
-        .map(|instruction| {
-            let result =
-                format!("{:0>offset_width$} {}", offset, instruction, offset_width = 4);
-            offset += 1;
-            result
-        })
-        .collect::<Vec<String>>()
-        .join("\n")
 }

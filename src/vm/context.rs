@@ -23,11 +23,11 @@ impl RuntimeContext {
         self.namespace_stack.len() - 1
     }
 
-    pub fn enter_block(&mut self) {
+    pub fn enter_scope(&mut self) {
         self.namespace_stack.push(Namespace::new());
     }
 
-    pub fn exit_block(&mut self) {
+    pub fn exit_scope(&mut self) {
         if self.depth() == 0 {
             panic!("Can't remove global namespace");
         }

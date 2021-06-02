@@ -20,23 +20,32 @@ use crate::parser::result::{
 
 /// Create a parser from the specified text, scan the text into tokens,
 /// parse the tokens, and return the resulting AST or error.
-pub fn parse_text(text: &str) -> ParseResult {
+pub fn parse_text(text: &str, debug: bool) -> ParseResult {
     let mut parser = Parser::<Cursor<&str>>::from_text(text);
-    parser.parse()
+    handle_result(parser.parse(), debug)
 }
 
 /// Create a parser from the specified file, scan its text into tokens,
 /// parse the tokens, and return the resulting AST or error.
-pub fn parse_file(file_path: &str) -> ParseResult {
+pub fn parse_file(file_path: &str, debug: bool) -> ParseResult {
     let mut parser = Parser::<BufReader<File>>::from_file(file_path)?;
-    parser.parse()
+    handle_result(parser.parse(), debug)
 }
 
 /// Create a parser from stdin, scan the text into tokens, parse the
 /// tokens, and return the resulting AST or error.
-pub fn parse_stdin() -> ParseResult {
+pub fn parse_stdin(debug: bool) -> ParseResult {
     let mut parser = Parser::<BufReader<io::Stdin>>::from_stdin();
-    parser.parse()
+    handle_result(parser.parse(), debug)
+}
+
+fn handle_result(result: ParseResult, debug: bool) -> ParseResult {
+    result.map(|program| {
+        if debug {
+            eprintln!("{:?}", program);
+        };
+        program
+    })
 }
 
 struct Parser<T: BufRead> {
@@ -46,12 +55,12 @@ struct Parser<T: BufRead> {
     /// TODO: ???
     token_queue: VecDeque<TokenWithLocation>,
 
-    expecting_block: bool,
+    /// Current operator precedence
     precedence: u8,
-    label_index: u8,
 
     scopes: Vec<usize>,
     current_scope: usize,
+    expecting_block: bool,
 }
 
 impl<T: BufRead> Parser<T> {
@@ -59,11 +68,10 @@ impl<T: BufRead> Parser<T> {
         Self {
             token_stream: scanner.peekable(),
             token_queue: VecDeque::new(),
-            expecting_block: false,
             precedence: 0,
-            label_index: 0,
             scopes: vec![1],
             current_scope: 0,
+            expecting_block: false,
         }
     }
 
@@ -101,6 +109,25 @@ impl<T: BufRead> Parser<T> {
         let statements = self.statements()?;
         let program = ast::Program::new(statements);
         Ok(program)
+    }
+
+    fn enter_scope(&mut self) {
+        let current_count = self.scopes[self.current_scope];
+        self.current_scope += 1;
+        if self.scopes.len() <= self.current_scope {
+            self.scopes.push(current_count);
+        } else {
+            self.scopes[self.current_scope] += 1;
+        }
+        self.expecting_block = true;
+    }
+
+    fn exit_scope(&mut self) {
+        self.current_scope -= 1;
+        self.expecting_block = false;
+        if self.current_scope == 0 {
+            self.scopes[0] += 1;
+        }
     }
 
     // Tokens ----------------------------------------------------------
@@ -171,52 +198,8 @@ impl<T: BufRead> Parser<T> {
 
     // Grammar ---------------------------------------------------------
 
-    fn label(
-        &self,
-        label_name: &str,
-        statements: Vec<ast::Statement>,
-    ) -> Vec<ast::Statement> {
-        let mut new_statements = vec![];
-        for s in statements {
-            if let ast::StatementKind::JumpToLabel(name) = s.kind {
-                if name == label_name {
-                    new_statements.push(ast::Statement::new_jump(self.label_index));
-                } else {
-                    new_statements.push(ast::Statement::new_jump_to_label(label_name));
-                }
-            } else if let ast::StatementKind::Expr(ast::Expr {
-                kind: ast::ExprKind::Block(mut block),
-            }) = s.kind
-            {
-                let new_block_statements = self.label(label_name, block.statements);
-                new_statements.push(ast::Statement::new_expr(ast::Expr::new_block(
-                    new_block_statements,
-                )));
-            } else {
-                new_statements.push(s);
-            }
-        }
-        new_statements
-    }
-
-    fn enter_scope(&mut self) {
-        self.current_scope += 1;
-
-        if self.scopes.len() < self.current_scope {
-            self.scopes.push(1);
-        } else {
-            self.scopes[self.current_scope] = self.scopes[self.current_scope] + 1;
-        }
-    }
-
-    fn exit_scope(&mut self) {
-        self.current_scope -= 1;
-    }
-
     fn statements(&mut self) -> StatementsResult {
         let mut statements = vec![];
-        let mut labels: HashSet<String> = HashSet::new();
-
         loop {
             self.precedence = 0;
             let token = if let Some(token) = self.peek_token()? {
@@ -227,7 +210,6 @@ impl<T: BufRead> Parser<T> {
             match token {
                 Token::BlockEnd => {
                     self.next_token()?;
-                    self.expecting_block = false;
                     self.exit_scope();
                     break;
                 }
@@ -240,33 +222,29 @@ impl<T: BufRead> Parser<T> {
                     statements.push(statement);
                     statements.push(ast::Statement::new_print());
                 }
-                Token::Label(name) => {
-                    if labels.contains(name.as_str()) {
-                        return Err(self.err(ParseErrorKind::DuplicateLabel(name)));
-                    }
-                    statements = self.label(name.as_str(), statements);
-                    statements.push(ast::Statement::new_label(self.label_index));
-                    labels.insert(name);
-                    self.label_index += 1;
-                    self.next_token()?;
-                }
                 Token::Jump => {
                     self.next_token()?;
                     if let Some(token) = self.next_token()? {
                         match token.token {
                             Token::Ident(name) => {
-                                let st = ast::Statement::new_jump_to_label(name);
-                                statements.push(st);
+                                let scope = self.current_scope;
+                                let count = self.scopes[scope];
+                                statements
+                                    .push(ast::Statement::new_jump(name, scope, count));
                             }
                             _ => {
-                                return Err(self.err(
-                                    ParseErrorKind::ExpectedIdentifier(
-                                        "jump label".to_owned(),
-                                    ),
-                                ))
+                                return Err(
+                                    self.err(ParseErrorKind::ExpectedIdentifier(token))
+                                )
                             }
                         }
                     };
+                }
+                Token::Label(name) => {
+                    self.next_token()?;
+                    let scope = self.current_scope;
+                    let count = self.scopes[scope];
+                    statements.push(ast::Statement::new_label(name, scope, count));
                 }
                 _ => {
                     if let Some(expr) = self.expr()? {
@@ -306,10 +284,14 @@ impl<T: BufRead> Parser<T> {
             }
             Token::Ident(name) => ast::Expr::new_ident(ast::Ident::new_ident(name)),
             Token::Block => {
-                self.expecting_block = true;
+                // block keyword:
+                //     block ->
+                //         ...
+                self.enter_scope();
                 return self.block(token.end);
             }
             Token::BlockStart => {
+                // Start of any indented block of statements.
                 if !self.expecting_block {
                     return Err(self.err(ParseErrorKind::UnexpectedBlock(token.end)));
                 }
@@ -394,7 +376,7 @@ mod tests {
 
     #[test]
     fn parse_empty() {
-        let result = parse_text("");
+        let result = parse_text("", true);
         if let Ok(program) = result {
             assert_eq!(program.statements.len(), 0);
         } else {
@@ -405,7 +387,7 @@ mod tests {
     #[test]
     #[rustfmt::skip]
     fn parse_int() {
-        let result = parse_text("1");
+        let result = parse_text("1", true);
         assert!(result.is_ok());
         let program = result.unwrap();
         let statements = program.statements;
@@ -436,7 +418,7 @@ mod tests {
         //      n=
         //      |
         //      1
-        let result = parse_text("n = 1");
+        let result = parse_text("n = 1", true);
         if let Ok(program) = result {
             assert_eq!(program.statements.len(), 1);
             // TODO: More checks
@@ -453,7 +435,7 @@ mod tests {
         //      +
         //     / \
         //    1   2
-        let result = parse_text("1 + 2");
+        let result = parse_text("1 + 2", true);
         assert!(result.is_ok());
         let program = result.unwrap();
         let statements = program.statements;
@@ -498,7 +480,7 @@ mod tests {
 
     #[test]
     fn parse_assign_to_addition() {
-        let result = parse_text("n = 1 + 2");
+        let result = parse_text("n = 1 + 2", true);
         if let Ok(program) = result {
             assert_eq!(program.statements.len(), 1);
             eprintln!("{:?}", program);
@@ -517,7 +499,7 @@ mod tests {
         //    1     +
         //         / \
         //        a   1
-        let result = parse_text("a = 1\nb = a + 2\n");
+        let result = parse_text("a = 1\nb = a + 2\n", true);
         if let Ok(program) = result {
             assert_eq!(program.statements.len(), 2);
             // TODO: More checks

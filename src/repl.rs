@@ -97,11 +97,12 @@ impl<'a> Repl<'a> {
                 //        stored in a temporary local var and that's
                 //        what would be printed.
                 if text == "print" || text.starts_with("print ") {
-                    execute_text(&mut self.vm, text, self.debug)
+                    execute_text(&mut self.vm, text, false, self.debug)
                 } else {
                     execute_text(
                         &mut self.vm,
                         format!("print {}", text).as_str(),
+                        false,
                         self.debug,
                     )
                 }
@@ -149,7 +150,6 @@ impl<'a> Repl<'a> {
             VMState::Halted(code) => {
                 Some(Err((code, format!("Halted abnormally: {}", code))))
             }
-            VMState::Running => unreachable!(),
         }
     }
 

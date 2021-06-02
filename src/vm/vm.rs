@@ -1,3 +1,4 @@
+use std::fmt;
 use std::rc::Rc;
 
 use crate::ast;
@@ -10,40 +11,60 @@ use super::frame::Frame;
 use super::instruction::{Instruction, Instructions};
 use super::result::{ExecutionResult, RuntimeError, RuntimeErrorKind, VMState};
 use crate::types::String;
-use std::cmp::max;
+
+type RustString = std::string::String;
 
 /// Execute source text.
-pub fn execute_text(vm: &mut VM, text: &str, debug: bool) -> ExecutionResult {
-    execute_parse_result(vm, parser::parse_text(text), debug)
+pub fn execute_text(
+    vm: &mut VM,
+    text: &str,
+    disassemble: bool,
+    debug: bool,
+) -> ExecutionResult {
+    execute_parse_result(vm, parser::parse_text(text, debug), disassemble, debug)
 }
 
 /// Execute source from file.
-pub fn execute_file(vm: &mut VM, file_path: &str, debug: bool) -> ExecutionResult {
-    execute_parse_result(vm, parser::parse_file(file_path), debug)
+pub fn execute_file(
+    vm: &mut VM,
+    file_path: &str,
+    disassemble: bool,
+    debug: bool,
+) -> ExecutionResult {
+    execute_parse_result(vm, parser::parse_file(file_path, debug), disassemble, debug)
 }
 
 /// Execute source from stdin.
-pub fn execute_stdin(vm: &mut VM, debug: bool) -> ExecutionResult {
-    execute_parse_result(vm, parser::parse_stdin(), debug)
+pub fn execute_stdin(vm: &mut VM, disassemble: bool, debug: bool) -> ExecutionResult {
+    execute_parse_result(vm, parser::parse_stdin(debug), disassemble, debug)
 }
 
 /// Execute parse result.
 fn execute_parse_result(
     vm: &mut VM,
     result: ParseResult,
+    disassemble: bool,
     debug: bool,
 ) -> ExecutionResult {
     match result {
-        Ok(program) => execute_program(vm, program, debug),
+        Ok(program) => execute_program(vm, program, disassemble, debug),
         Err(err) => Err(RuntimeError::new(RuntimeErrorKind::ParseError(err))),
     }
 }
 
 /// Create a new VM and execute AST program.
-fn execute_program(vm: &mut VM, program: ast::Program, debug: bool) -> ExecutionResult {
+fn execute_program(
+    vm: &mut VM,
+    program: ast::Program,
+    disassemble: bool,
+    debug: bool,
+) -> ExecutionResult {
     let result = compile(vm, program, debug);
     match result {
-        Ok(instructions) => vm.execute(instructions),
+        Ok(instructions) => match disassemble {
+            true => vm.disassemble(instructions),
+            false => vm.execute(instructions),
+        },
         Err(err) => Err(RuntimeError::new(RuntimeErrorKind::CompilationError(err))),
     }
 }
@@ -77,31 +98,13 @@ impl VM {
         // TODO: Not sure what this should do or if it's even needed
     }
 
-    fn err(&self, kind: RuntimeErrorKind) -> ExecutionResult {
-        Err(RuntimeError::new(kind))
-    }
-
-    /// Format String with vars from current context.
-    fn format_string(&mut self, const_index: usize) -> Result<(), RuntimeError> {
-        if let Some(obj) = self.ctx.get_obj(const_index) {
-            if let Some(string) = obj.as_any().downcast_ref::<String>() {
-                if string.is_format_string() {
-                    let formatted = string.format(&self.ctx)?;
-                    let formatted = Rc::new(formatted);
-                    self.ctx.constants.replace(const_index, formatted);
-                }
-            }
-        }
-        Ok(())
-    }
-
     /// Execute the specified instructions and return the VM's state. If
     /// a HALT instruction isn't encountered, the VM will go "idle"; it
     /// will maintain its internal state and await further instructions.
     /// When a HALT instruction is encountered, the VM's state will be
     /// cleared; it can be "restarted" by passing more instructions to
     /// execute.
-    pub fn execute(&mut self, instructions: Instructions) -> ExecutionResult {
+    fn execute(&mut self, instructions: Instructions) -> ExecutionResult {
         let mut ip: usize = 0;
 
         loop {
@@ -123,7 +126,7 @@ impl VM {
                     continue;
                 }
                 Instruction::LoadConst(index) => {
-                    self.format_string(*index);
+                    self.format_string(*index)?;
                     self.stack.push(*index);
                 }
                 Instruction::DeclareVar(name) => {
@@ -143,7 +146,7 @@ impl VM {
                 }
                 Instruction::LoadVar(name) => {
                     if let Some(&index) = self.ctx.get_obj_index(name) {
-                        self.format_string(index);
+                        self.format_string(index)?;
                         self.stack.push(index);
                     } else {
                         self.err(RuntimeErrorKind::NameError(format!(
@@ -216,10 +219,12 @@ impl VM {
                     };
                 }
                 Instruction::BlockStart => {
-                    self.ctx.enter_block();
+                    self.ctx.enter_scope();
                 }
-                Instruction::BlockEnd => {
-                    self.ctx.exit_block();
+                Instruction::BlockEnd(count) => {
+                    for _ in 0..*count {
+                        self.ctx.exit_scope();
+                    }
                 }
                 Instruction::Print => match self.stack.pop() {
                     Some(index) => {
@@ -255,12 +260,18 @@ impl VM {
         }
     }
 
+    // Stack -----------------------------------------------------------
+
     fn push(&mut self, item: usize) {
         self.stack.push(item);
     }
 
     fn pop(&mut self) -> Option<usize> {
         self.stack.pop()
+    }
+
+    fn peek(&self) -> Option<&usize> {
+        self.stack.peek()
     }
 
     /// Pop top two items from stack *if* the stack has at least two
@@ -282,9 +293,7 @@ impl VM {
         }
     }
 
-    pub fn peek(&self) -> Option<&usize> {
-        self.stack.peek()
-    }
+    // Call stack ------------------------------------------------------
 
     fn push_frame(&mut self, frame: Frame) {
         self.call_stack.push(frame);
@@ -292,6 +301,101 @@ impl VM {
 
     fn pop_frame(&mut self) -> Option<Frame> {
         self.call_stack.pop()
+    }
+
+    // Utilities -------------------------------------------------------
+
+    fn err(&self, kind: RuntimeErrorKind) -> ExecutionResult {
+        Err(RuntimeError::new(kind))
+    }
+
+    /// Format String with vars from current context.
+    fn format_string(&mut self, const_index: usize) -> Result<(), RuntimeError> {
+        if let Some(obj) = self.ctx.get_obj(const_index) {
+            if let Some(string) = obj.as_any().downcast_ref::<String>() {
+                if string.is_format_string() {
+                    let formatted = string.format(&self.ctx)?;
+                    let formatted = Rc::new(formatted);
+                    self.ctx.constants.replace(const_index, formatted);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    // Disassembler ----------------------------------------------------
+    //
+    // This is done here because we need the VM context in order to show
+    // more useful info like jump targets, values, etc.
+
+    fn disassemble(&mut self, instructions: Instructions) -> ExecutionResult {
+        let mut offset = 0;
+        for instruction in instructions.iter() {
+            eprintln!(
+                "{:0>offset_width$} {}",
+                offset,
+                self.format_instruction(&instructions, instruction),
+                offset_width = 4
+            );
+            offset += 1;
+        }
+        Ok(VMState::Halted(0))
+    }
+
+    fn format_instruction(
+        &self,
+        instructions: &Instructions,
+        instruction: &Instruction,
+    ) -> RustString {
+        use Instruction::*;
+        match instruction {
+            NoOp => format!("NOOP"),
+            Push(address) => self.format_aligned("PUSH", address),
+            Pop => format!("POP"),
+            Jump(address) => self.format_aligned(
+                "JUMP",
+                format!(
+                    "{} ({})",
+                    address,
+                    self.format_instruction(instructions, &instructions[*address])
+                ),
+            ),
+            JumpIfTrue(address) => match self.peek() {
+                Some(index) => {
+                    let obj = self.ctx.get_obj(*index).unwrap();
+                    self.format_aligned(
+                        "JUMP IF",
+                        format!("{} -> {} ({})", address, index, obj),
+                    )
+                }
+                None => {
+                    self.format_aligned("JUMP IF", format!("{} -> [EMPTY]", address))
+                }
+            },
+            LoadConst(index) => {
+                let obj = self.ctx.get_obj(*index).unwrap();
+                self.format_aligned("LOAD_CONST", format!("{} ({})", index, obj))
+            }
+            UnaryOp(operator) => self.format_aligned("UNARY_OP", operator),
+            BinaryOp(operator) => self.format_aligned("BINARY_OP", operator),
+            BlockStart => format!("BLOCK START"),
+            BlockEnd(count) => self.format_aligned("BLOCK END", count),
+            Print => match self.peek() {
+                Some(index) => {
+                    let obj = self.ctx.get_obj(*index).unwrap();
+                    self.format_aligned("PRINT", format!("{} ({})", index, obj))
+                }
+                None => self.format_aligned("PRINT", "[EMPTY]"),
+            },
+            Return => format!("RETURN"),
+            Halt(code) => self.format_aligned("HALT", code),
+            other => format!("{:?}", other),
+        }
+    }
+
+    /// Return a nicely formatted string of instructions.
+    fn format_aligned<T: fmt::Display>(&self, name: &str, value: T) -> RustString {
+        format!("{: <w$}{: <x$}", name, value, w = 16, x = 4)
     }
 }
 

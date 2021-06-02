@@ -1,7 +1,7 @@
 use crate::ast;
 use crate::types::ObjectRef;
 use crate::util::{BinaryOperator, UnaryOperator};
-use crate::vm::{format_instructions, Instruction, Instructions, RuntimeContext, VM};
+use crate::vm::{Instruction, Instructions, RuntimeContext, VM};
 
 use super::result::{CompilationError, CompilationErrorKind, CompilationResult};
 use crate::ast::LiteralKind::Int;
@@ -10,18 +10,9 @@ use std::collections::HashMap;
 // Compiler ------------------------------------------------------------
 
 /// Compile AST to VM instructions.
-pub fn compile(vm: &mut VM, program: ast::Program, debug: bool) -> CompilationResult {
-    if debug {
-        eprintln!("COMPILING:\n{:?}", program);
-    }
-
+pub fn compile(vm: &mut VM, program: ast::Program, _debug: bool) -> CompilationResult {
     let mut visitor = Visitor::new(&mut vm.ctx);
     visitor.visit_program(program)?;
-
-    if debug {
-        eprintln!("INSTRUCTIONS:\n{}", format_instructions(&visitor.instructions));
-    }
-
     Ok(visitor.instructions)
 }
 
@@ -32,8 +23,8 @@ type VisitResult = Result<(), CompilationError>;
 struct Visitor<'a> {
     ctx: &'a mut RuntimeContext,
     instructions: Instructions,
-    labels: HashMap<u8, usize>,
-    jumps: Vec<(u8, usize)>,
+    labels: HashMap<(String, usize, usize), usize>,
+    jumps: Vec<(String, usize, usize, usize)>,
 }
 
 impl<'a> Visitor<'a> {
@@ -71,19 +62,58 @@ impl<'a> Visitor<'a> {
         for statement in node.statements {
             self.visit_statement(statement)?;
         }
-
+        self.fix_jumps()?;
         self.push(Instruction::Halt(0));
+        Ok(())
+    }
 
-        // Update jump instructions with their corresponding label
-        // addresses.
-        for (label_index, jump_address) in self.jumps.iter() {
-            let label_address = *self.labels.get(label_index).unwrap();
-            std::mem::replace(
-                &mut self.instructions[*jump_address],
-                Instruction::Jump(label_address),
-            );
+    /// Update jump instructions with their corresponding label
+    /// addresses.
+    fn fix_jumps(&mut self) -> VisitResult {
+        // Extract the count of times the global scope was entered. This
+        // is used to search *ahead* in the global scope when a label
+        // isn't found in a local scope.
+        let global_count = self
+            .labels
+            .iter()
+            .filter(|e| e.0 .1 == 0)
+            .max_by(|a, b| a.0 .2.cmp(&b.0 .2))
+            .map(|e| e.0 .2)
+            .unwrap_or(0);
+
+        for (name, scope, count, jump_address) in self.jumps.iter() {
+            let jump_scope = scope.clone();
+            let mut curr_scope = scope.clone();
+            let mut curr_count = count.clone();
+            loop {
+                let label_opt =
+                    self.labels.get(&(name.clone(), curr_scope, curr_count));
+                if let Some(label_address) = label_opt {
+                    if label_address > jump_address {
+                        let scope_depth = jump_scope - curr_scope;
+                        self.instructions[*jump_address - 1] = match scope_depth {
+                            0 => Instruction::NoOp,
+                            _ => Instruction::BlockEnd(scope_depth),
+                        };
+                        self.instructions[*jump_address] =
+                            Instruction::Jump(*label_address);
+                        break;
+                    }
+                }
+                if curr_scope == 0 {
+                    if curr_count == global_count {
+                        self.err(format!("Label not found after jump: {}", name))?;
+                    }
+                    curr_count += 1;
+                } else {
+                    curr_scope -= 1;
+                    if curr_scope == 0 {
+                        // Check global scopes *after* current scope
+                        curr_count += 1;
+                    }
+                }
+            }
         }
-
         Ok(())
     }
 
@@ -92,26 +122,28 @@ impl<'a> Visitor<'a> {
         for statement in node.statements {
             self.visit_statement(statement)?;
         }
-        self.push(Instruction::BlockEnd);
+        self.push(Instruction::BlockEnd(1));
         Ok(())
     }
 
     fn visit_statement(&mut self, node: ast::Statement) -> VisitResult {
         match node.kind {
             ast::StatementKind::Print => self.push(Instruction::Print),
-            ast::StatementKind::Label(label_index) => {
-                self.labels.insert(label_index, self.instructions.len());
-                self.push(Instruction::NoOp)
-            }
-            ast::StatementKind::Jump(label_index) => {
+            ast::StatementKind::Jump(name, scope, count) => {
                 // Insert placeholder jump instruction to be filled in
                 // with corresponding label address once labels have
                 // been processed.
-                self.jumps.push((label_index, self.instructions.len()));
+                self.push(Instruction::BlockEnd(1));
                 self.push(Instruction::Jump(0));
+                self.jumps.push((name, scope, count, self.instructions.len() - 1));
             }
-            ast::StatementKind::JumpToLabel(name) => {
-                self.err(format!("Label not found: {}", name))?;
+            ast::StatementKind::Label(name, scope, count) => {
+                let key = (name, scope, count);
+                if self.labels.contains_key(&key) {
+                    self.err(format!("Duplicate label in scope: {}", key.0))?;
+                }
+                self.push(Instruction::NoOp);
+                self.labels.insert(key, self.instructions.len() - 1);
             }
             ast::StatementKind::Expr(expr) => self.visit_expr(expr)?,
         }

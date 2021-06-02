@@ -7,9 +7,9 @@ use num_traits::Num;
 
 use crate::util::{Location, Source, Stack};
 
-use super::KEYWORDS;
-use super::{ScanError, ScanErrorKind, ScanResult};
-use super::{Token, TokenWithLocation};
+use super::keywords::KEYWORDS;
+use super::result::{ScanError, ScanErrorKind, ScanResult, ScanTokensResult};
+use super::token::{Token, TokenWithLocation};
 
 type NextOption<'a> = Option<(char, Option<&'a char>, Option<&'a char>)>;
 type NextTwoOption<'a> = Option<(char, char, Option<&'a char>)>;
@@ -17,15 +17,14 @@ type NextThreeOption = Option<(char, char, char)>;
 
 /// Create a scanner from the specified text, scan the text, and return
 /// the resulting tokens or error.
-pub fn scan_text(text: &str) -> Result<Vec<TokenWithLocation>, ScanError> {
+pub fn scan_text(text: &str, debug: bool) -> ScanTokensResult {
     let scanner = Scanner::<Cursor<&str>>::from_text(text);
-    let tokens = scanner.collect();
-    tokens
+    handle_result(scanner.collect(), debug)
 }
 
 /// Create a scanner from the specified file, scan its text, and return
 /// the resulting tokens or error.
-pub fn scan_file(file_path: &str) -> Result<Vec<TokenWithLocation>, ScanError> {
+pub fn scan_file(file_path: &str, debug: bool) -> ScanTokensResult {
     let result = Scanner::<BufReader<File>>::from_file(file_path);
     let scanner = match result {
         Ok(scanner) => scanner,
@@ -39,23 +38,34 @@ pub fn scan_file(file_path: &str) -> Result<Vec<TokenWithLocation>, ScanError> {
             ));
         }
     };
-    scanner.collect()
+    handle_result(scanner.collect(), debug)
 }
 
 /// Create a scanner from stdin, scan the text into tokens, and return
 /// the resulting tokens or error.
-pub fn scan_stdin() -> Result<Vec<TokenWithLocation>, ScanError> {
+pub fn scan_stdin(debug: bool) -> ScanTokensResult {
     let scanner = Scanner::<BufReader<io::Stdin>>::from_stdin();
-    scanner.collect()
+    handle_result(scanner.collect(), debug)
 }
 
 /// Scan text and assume success, returning tokens in unwrapped form.
 /// Panic on error. Mainly useful for testing.
-pub fn scan_optimistic(text: &str) -> Vec<TokenWithLocation> {
-    match scan_text(text) {
+pub fn scan_optimistic(text: &str, debug: bool) -> Vec<TokenWithLocation> {
+    match scan_text(text, debug) {
         Ok(tokens) => tokens,
         Err(err) => panic!("Scan failed unexpectedly: {:?}", err),
     }
+}
+
+fn handle_result(result: ScanTokensResult, debug: bool) -> ScanTokensResult {
+    result.map(|tokens| {
+        if debug {
+            for token in tokens.iter() {
+                eprintln!("{:?}", token);
+            }
+        }
+        tokens
+    })
 }
 
 pub struct Scanner<T: BufRead> {
@@ -149,7 +159,10 @@ impl<T: BufRead> Scanner<T> {
         // Now we have 0 or more spaces followed by some other char.
         // First, make sure it's a valid indent.
         if num_spaces % 4 != 0 {
-            return Err(ScanError::new(ScanErrorKind::InvalidIndent(num_spaces), start));
+            return Err(ScanError::new(
+                ScanErrorKind::InvalidIndent(num_spaces),
+                start,
+            ));
         }
 
         // Next, make sure the indent isn't followed by additional non-
@@ -177,7 +190,10 @@ impl<T: BufRead> Scanner<T> {
                 self.indent_level = Some(0);
                 Ok(())
             } else {
-                Err(ScanError::new(ScanErrorKind::UnexpectedIndent(indent_level), start))
+                Err(ScanError::new(
+                    ScanErrorKind::UnexpectedIndent(indent_level),
+                    start,
+                ))
             };
         }
 
@@ -194,7 +210,11 @@ impl<T: BufRead> Scanner<T> {
             // Decreased by one or more levels
             while current_level > indent_level {
                 self.add_token_to_queue(Token::BlockEnd, location, Some(location));
-                self.add_token_to_queue(Token::EndOfStatement, location, Some(location));
+                self.add_token_to_queue(
+                    Token::EndOfStatement,
+                    location,
+                    Some(location),
+                );
                 current_level -= 1;
             }
             self.indent_level = Some(current_level);
@@ -339,9 +359,10 @@ impl<T: BufRead> Scanner<T> {
                     Token::Float(value)
                 }
                 (string, radix) => {
-                    let value = BigInt::from_str_radix(string.as_str(), radix).map_err(
-                        |err| ScanError::new(ScanErrorKind::ParseIntError(err), start),
-                    )?;
+                    let value = BigInt::from_str_radix(string.as_str(), radix)
+                        .map_err(|err| {
+                            ScanError::new(ScanErrorKind::ParseIntError(err), start)
+                        })?;
                     Token::Int(value)
                 }
             },
@@ -350,6 +371,9 @@ impl<T: BufRead> Scanner<T> {
                 let ident = self.read_ident(c);
                 let items = (&self.previous_token, self.source.peek());
                 if let (Token::EndOfStatement, Some(&':')) = items {
+                    self.next_char();
+                    Token::Label(ident)
+                } else if let (Token::BlockStart, Some(&':')) = items {
                     self.next_char();
                     Token::Label(ident)
                 } else {
@@ -671,7 +695,8 @@ impl<T: BufRead> Scanner<T> {
             match self.next_char_if(|&c| c.is_digit(radix)) {
                 Some((digit, _, _)) => digits.push(digit),
                 None => {
-                    match self.next_two_chars_if(|&c| c == '_', |&d| d.is_digit(radix)) {
+                    match self.next_two_chars_if(|&c| c == '_', |&d| d.is_digit(radix))
+                    {
                         Some((_, digit, _)) => digits.push(digit),
                         None => break digits,
                     }
@@ -803,13 +828,13 @@ mod tests {
 
     #[test]
     fn scan_empty() {
-        let tokens = scan_optimistic("");
+        let tokens = scan_optimistic("", true);
         assert_eq!(tokens.len(), 0);
     }
 
     #[test]
     fn scan_int() {
-        let tokens = scan_optimistic("123");
+        let tokens = scan_optimistic("123", true);
         assert_eq!(tokens.len(), 2);
         check_token(tokens.get(0), Token::Int(BigInt::from(123)), 1, 1, 1, 3);
         check_token(tokens.get(1), Token::EndOfStatement, 1, 4, 1, 4);
@@ -817,7 +842,7 @@ mod tests {
 
     #[test]
     fn scan_binary_number() {
-        let tokens = scan_optimistic("0b11"); // = 3
+        let tokens = scan_optimistic("0b11", true); // = 3
         assert_eq!(tokens.len(), 2);
         check_token(tokens.get(0), Token::Int(BigInt::from(3)), 1, 1, 1, 4);
         check_token(tokens.get(1), Token::EndOfStatement, 1, 5, 1, 5);
@@ -825,7 +850,7 @@ mod tests {
 
     #[test]
     fn scan_float() {
-        let tokens = scan_optimistic("123.1");
+        let tokens = scan_optimistic("123.1", true);
         assert_eq!(tokens.len(), 2);
         check_token(tokens.get(0), Token::Float(123.1 as f64), 1, 1, 1, 5);
         check_token(tokens.get(1), Token::EndOfStatement, 1, 6, 1, 6);
@@ -833,7 +858,7 @@ mod tests {
 
     #[test]
     fn scan_float_with_e_and_no_sign() {
-        let tokens = scan_optimistic("123.1e1");
+        let tokens = scan_optimistic("123.1e1", true);
         assert_eq!(tokens.len(), 2);
         let expected = Token::Float(123.1E+1);
         check_token(tokens.get(0), expected, 1, 1, 1, 7);
@@ -842,7 +867,7 @@ mod tests {
 
     #[test]
     fn scan_float_with_e_and_sign() {
-        let tokens = scan_optimistic("123.1e+1");
+        let tokens = scan_optimistic("123.1e+1", true);
         assert_eq!(tokens.len(), 2);
         let expected = Token::Float(123.1E+1);
         check_token(tokens.get(0), expected, 1, 1, 1, 8);
@@ -853,7 +878,7 @@ mod tests {
     fn scan_string_with_embedded_quote() {
         // "\"abc"
         let source = "\"\\\"abc\"";
-        let tokens = scan_optimistic(source);
+        let tokens = scan_optimistic(source, true);
         assert_eq!(tokens.len(), 2);
         check_string_token(tokens.get(0), "\"abc", 1, 1, 1, 7);
         check_token(tokens.get(1), Token::EndOfStatement, 1, 8, 1, 8);
@@ -864,7 +889,7 @@ mod tests {
         // "abc
         // "
         let source = "\"abc\n\"";
-        let tokens = scan_optimistic(source);
+        let tokens = scan_optimistic(source, true);
         assert_eq!(tokens.len(), 2);
         check_string_token(tokens.get(0), "abc\n", 1, 1, 2, 1);
         check_token(tokens.get(1), Token::EndOfStatement, 2, 2, 2, 2);
@@ -880,7 +905,7 @@ mod tests {
         //
         //   "
         let source = "\" a\nb\n\nc\n\n\n  \"";
-        let tokens = scan_optimistic(source);
+        let tokens = scan_optimistic(source, true);
         assert_eq!(tokens.len(), 2);
         check_string_token(tokens.get(0), " a\nb\n\nc\n\n\n  ", 1, 1, 7, 3);
         check_token(tokens.get(1), Token::EndOfStatement, 7, 4, 7, 4);
@@ -888,7 +913,7 @@ mod tests {
 
     #[test]
     fn scan_string_with_escaped_chars() {
-        let tokens = scan_optimistic("\"\\0\\a\\b\\n\\'\\\"\"");
+        let tokens = scan_optimistic("\"\\0\\a\\b\\n\\'\\\"\"", true);
         assert_eq!(tokens.len(), 2);
         // NOTE: We could put a backslash before the single quote in
         //       the expected string, but Rust seems to treat \' and '
@@ -899,7 +924,7 @@ mod tests {
 
     #[test]
     fn scan_string_with_escaped_regular_char() {
-        let tokens = scan_optimistic("\"ab\\c\"");
+        let tokens = scan_optimistic("\"ab\\c\"", true);
         assert_eq!(tokens.len(), 2);
         check_string_token(tokens.get(0), "ab\\c", 1, 1, 1, 6);
         check_token(tokens.get(1), Token::EndOfStatement, 1, 7, 1, 7);
@@ -908,7 +933,7 @@ mod tests {
     #[test]
     fn scan_string_unclosed() {
         let source = "\"abc";
-        match scan_text(source) {
+        match scan_text(source, true) {
             Err(err) => match err {
                 ScanError {
                     kind: ScanErrorKind::UnterminatedString(string),
@@ -917,7 +942,7 @@ mod tests {
                     assert_eq!(string, source.to_string());
                     assert_eq!(location, Location::new(1, 1));
                     let new_source = source.to_string() + "\"";
-                    match scan_text(new_source.as_str()) {
+                    match scan_text(new_source.as_str(), true) {
                         Ok(tokens) => {
                             assert_eq!(tokens.len(), 2);
                             check_string_token(tokens.get(0), "abc", 1, 1, 1, 5);
@@ -942,7 +967,7 @@ f (x) ->  # 1
 g (y) ->  # 6
     y     # 7\
 ";
-        let tokens = scan_optimistic(source);
+        let tokens = scan_optimistic(source, true);
         let mut tokens = tokens.iter();
 
         // f
@@ -979,7 +1004,7 @@ g (y) ->  # 6
     #[test]
     fn scan_unexpected_indent_on_first_line() {
         let source = "    abc = 1";
-        let result = scan_text(source);
+        let result = scan_text(source, true);
         assert!(result.is_err());
         match result.unwrap_err() {
             ScanError { kind: ScanErrorKind::UnexpectedIndent(1), location } => {
@@ -1002,7 +1027,7 @@ a = [
 
 b = 3
 ";
-        let tokens = scan_optimistic(source);
+        let tokens = scan_optimistic(source, true);
         let mut tokens = tokens.iter();
 
         check_token(tokens.next(), Token::Ident("a".to_string()), 3, 1, 3, 1);
@@ -1024,7 +1049,7 @@ b = 3
     #[test]
     fn scan_unknown() {
         let source = "{";
-        match scan_text(source) {
+        match scan_text(source, true) {
             Ok(tokens) => assert!(false),
             Err(err) => match err {
                 ScanError { kind: ScanErrorKind::UnexpectedCharacter(c), location } => {

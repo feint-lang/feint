@@ -7,6 +7,7 @@ use crate::util::Location;
 use super::TokenWithLocation;
 
 pub type ScanResult = Result<TokenWithLocation, ScanError>;
+pub type ScanTokensResult = Result<Vec<TokenWithLocation>, ScanError>;
 
 #[derive(Clone, Debug)]
 pub struct ScanError {

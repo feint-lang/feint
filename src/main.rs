@@ -41,6 +41,14 @@ fn main() {
                 .help("Disable REPL history?"),
         )
         .arg(
+            Arg::with_name("disassemble")
+                .short("D")
+                .long("dis")
+                .required(false)
+                .takes_value(false)
+                .help("Disassemble instructions?"),
+        )
+        .arg(
             Arg::with_name("debug")
                 .short("d")
                 .long("debug")
@@ -54,15 +62,16 @@ fn main() {
     let code = matches.value_of("code");
     let history_path = matches.value_of("history_path");
     let save_repl_history = !matches.is_present("no_history");
+    let disassemble = matches.is_present("disassemble");
     let debug = matches.is_present("debug");
 
     let result = if let Some(code) = code {
-        run::run_text(code, debug)
+        run::run_text(code, disassemble, debug)
     } else if let Some(file_name) = file_name {
         if file_name == "-" {
-            run::run_stdin(debug)
+            run::run_stdin(disassemble, debug)
         } else {
-            run::run_file(file_name, debug)
+            run::run_file(file_name, disassemble, debug)
         }
     } else {
         match save_repl_history {

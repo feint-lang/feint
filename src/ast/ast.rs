@@ -60,9 +60,8 @@ pub struct Statement {
 #[derive(PartialEq)]
 pub enum StatementKind {
     Print,
-    Label(u8),
-    Jump(u8),
-    JumpToLabel(String), // Converted to Jump
+    Jump(String, usize, usize),
+    Label(String, usize, usize),
     Expr(Expr),
 }
 
@@ -75,16 +74,12 @@ impl Statement {
         Self::new(StatementKind::Print)
     }
 
-    pub fn new_label(index: u8) -> Self {
-        Self::new(StatementKind::Label(index))
+    pub fn new_jump(name: String, scope: usize, count: usize) -> Self {
+        Self::new(StatementKind::Jump(name, scope, count))
     }
 
-    pub fn new_jump(index: u8) -> Self {
-        Self::new(StatementKind::Jump(index))
-    }
-
-    pub fn new_jump_to_label<S: Into<String>>(name: S) -> Self {
-        Self::new(StatementKind::JumpToLabel(name.into()))
+    pub fn new_label(name: String, scope: usize, count: usize) -> Self {
+        Self::new(StatementKind::Label(name, scope, count))
     }
 
     pub fn new_expr(expr: Expr) -> Self {
@@ -111,9 +106,12 @@ impl fmt::Debug for StatementKind {
         match self {
             Self::Expr(expr) => write!(f, "Expr({:?})", expr),
             Self::Print => write!(f, "Print"),
-            Self::Label(name) => write!(f, "Label: {}", name),
-            Self::JumpToLabel(name) => write!(f, "Jump: {}", name),
-            Self::Jump(index) => write!(f, "Jump: {}", index),
+            Self::Label(name, scope, count) => {
+                write!(f, "Label: {}/{}/{}", name, scope, count)
+            }
+            Self::Jump(name, scope, count) => {
+                write!(f, "Jump: {}/{}/{}", name, scope, count)
+            }
         }
     }
 }
@@ -179,7 +177,11 @@ impl fmt::Debug for ExprKind {
         match self {
             Self::UnaryOp(op, b) => write!(f, "({:?}{:?})", op, b),
             Self::BinaryOp(a, op, b) => write!(f, "({:?} {:?} {:?})", a, op, b),
-            Self::Block(block) => write!(f, "Block {}", block.statements.len()),
+            Self::Block(block) => {
+                let count = block.statements.len();
+                let ess = if count == 1 { "" } else { "s" };
+                write!(f, "Block with {} statement{}", count, ess)
+            }
             Self::Literal(literal) => write!(f, "{:?}", literal),
             Self::Ident(ident) => write!(f, "{:?}", ident),
             Self::Function(name, _) => write!(f, "{}()", name),

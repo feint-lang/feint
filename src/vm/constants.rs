@@ -15,8 +15,8 @@ impl Constants {
         index
     }
 
-    pub fn replace(&mut self, index: usize, object: ObjectRef) {
-        std::mem::replace(&mut self.storage[index], object);
+    pub fn replace(&mut self, index: usize, obj: ObjectRef) {
+        self.storage[index] = obj;
     }
 
     pub fn get(&self, index: usize) -> Option<&ObjectRef> {
