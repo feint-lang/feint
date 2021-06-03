@@ -116,7 +116,10 @@ impl<'a> Visitor<'a> {
 
     fn visit_statement(&mut self, node: ast::Statement) -> VisitResult {
         match node.kind {
-            ast::StatementKind::Print => self.push(Instruction::Print),
+            ast::StatementKind::Print => {
+                self.push(Instruction::Print);
+                self.push(Instruction::Push(0));
+            }
             ast::StatementKind::Jump(name) => {
                 // Insert placeholder jump instruction to be filled in
                 // with corresponding label address once labels have

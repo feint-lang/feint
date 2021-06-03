@@ -116,21 +116,29 @@ impl<'a> Repl<'a> {
 
         if let Ok(vm_state) = result {
             // Assign _ to value at top of stack
-            let var_name = "_";
+            let var = "_";
+            let mut instructions = vec![Instruction::AssignVar(var.to_owned())];
+            if let Some(&index) = self.vm.peek() {
+                // Don't print nil when the result of an expression is nil
+                if index != 0 {
+                    instructions.push(Instruction::Print);
+                }
+            }
             if let Err(err) = execute_instructions(
                 &mut self.vm,
-                vec![Instruction::AssignVar(var_name.to_owned()), Instruction::Print],
+                instructions,
                 self.disassemble,
                 self.debug,
             ) {
-                // If stack is empty assign _ to nil
+                // If stack is empty, assign _ to nil
                 if let RuntimeErrorKind::NotEnoughValuesOnStack(_) = err.kind {
+                    let instructions = vec![
+                        Instruction::Push(0),
+                        Instruction::AssignVar(var.to_owned()),
+                    ];
                     if let Err(err) = execute_instructions(
                         &mut self.vm,
-                        vec![
-                            Instruction::Push(0),
-                            Instruction::AssignVar(var_name.to_owned()),
-                        ],
+                        instructions,
                         self.disassemble,
                         self.debug,
                     ) {

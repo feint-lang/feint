@@ -292,7 +292,7 @@ impl VM {
         self.stack.pop()
     }
 
-    fn peek(&self) -> Option<&usize> {
+    pub fn peek(&self) -> Option<&usize> {
         self.stack.peek()
     }
 
