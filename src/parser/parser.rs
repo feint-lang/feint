@@ -218,7 +218,7 @@ impl<T: BufRead> Parser<T> {
                             }
                             _ => {
                                 return Err(
-                                    self.err(ParseErrorKind::ExpectedIdentifier(token))
+                                    self.err(ParseErrorKind::ExpectedIdent(token))
                                 )
                             }
                         }
@@ -248,6 +248,14 @@ impl<T: BufRead> Parser<T> {
         let mut expr = match token.token {
             Token::EndOfStatement => {
                 return Ok(None);
+            }
+            Token::LeftParen => {
+                //
+                let expr = self.expr()?;
+                if self.next_token_if(|t| t == &Token::RightParen)?.is_none() {
+                    return Err(self.err(ParseErrorKind::UnclosedExpr(token.start)));
+                }
+                expr.unwrap()
             }
             // First, try for a literal or identifier, since they're
             // leaf nodes.
@@ -291,7 +299,7 @@ impl<T: BufRead> Parser<T> {
                     let operator = token.token.as_str();
                     return Ok(Some(ast::Expr::new_unary_op(operator, rhs)));
                 } else {
-                    return Err(self.err(ParseErrorKind::ExpectedExpression(token.end)));
+                    return Err(self.err(ParseErrorKind::ExpectedExpr(token.end)));
                 }
             }
         };
@@ -312,9 +320,7 @@ impl<T: BufRead> Parser<T> {
                     let op = infix_token.token.as_str();
                     expr = ast::Expr::new_binary_op(expr, op, rhs);
                 } else {
-                    return Err(
-                        self.err(ParseErrorKind::ExpectedExpression(infix_token.end))
-                    );
+                    return Err(self.err(ParseErrorKind::ExpectedExpr(infix_token.end)));
                 }
             } else {
                 break;
@@ -330,10 +336,8 @@ impl<T: BufRead> Parser<T> {
                 if let Ok(Some(_)) = self.peek_token_if(|t| t == &Token::BlockStart) {
                     self.expr()
                 } else {
-                    Err(self.err(ParseErrorKind::SyntaxError(
-                        "Expected block".to_owned(),
-                        Location::new(end.line + 1, 1),
-                    )))
+                    let location = Location::new(end.line + 1, 1);
+                    Err(self.err(ParseErrorKind::ExpectedBlock(location)))
                 }
             } else {
                 Err(self.err(ParseErrorKind::SyntaxError(

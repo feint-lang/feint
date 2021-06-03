@@ -40,7 +40,7 @@ pub fn execute_stdin(vm: &mut VM, disassemble: bool, debug: bool) -> ExecutionRe
 }
 
 /// Execute parse result.
-fn execute_parse_result(
+pub fn execute_parse_result(
     vm: &mut VM,
     result: ParseResult,
     disassemble: bool,
@@ -53,19 +53,41 @@ fn execute_parse_result(
 }
 
 /// Create a new VM and execute AST program.
-fn execute_program(
+pub fn execute_program(
     vm: &mut VM,
     program: ast::Program,
     disassemble: bool,
     debug: bool,
 ) -> ExecutionResult {
-    let result = compile(vm, program, debug);
-    match result {
-        Ok(instructions) => match disassemble {
-            true => vm.disassemble(instructions),
-            false => vm.execute(instructions),
-        },
+    match compile(vm, program, debug) {
+        Ok(instructions) => execute_instructions(vm, instructions, disassemble, debug),
         Err(err) => Err(RuntimeError::new(RuntimeErrorKind::CompilationError(err))),
+    }
+}
+
+pub fn execute_instructions(
+    vm: &mut VM,
+    instructions: Instructions,
+    disassemble: bool,
+    debug: bool,
+) -> ExecutionResult {
+    match disassemble {
+        true => vm.disassemble(instructions),
+        false => {
+            let result = vm.execute(instructions);
+            if debug {
+                for index in vm.stack.iter() {
+                    let obj = vm.ctx.get_obj(*index);
+                    match obj {
+                        Some(obj) => {
+                            eprintln!("{} {}({})", index, obj.class().name(), obj)
+                        }
+                        None => eprintln!("{} [NOT AN OBJECT]", index),
+                    }
+                }
+            }
+            result
+        }
     }
 }
 

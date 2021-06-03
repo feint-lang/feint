@@ -1,5 +1,3 @@
-use std::fmt;
-
 use crate::util::{BinaryOperator, UnaryOperator};
 
 pub type Instructions = Vec<Instruction>;

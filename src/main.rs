@@ -80,9 +80,9 @@ fn main() {
                     Some(path) => PathBuf::from(path),
                     None => default_history_path(),
                 };
-                repl::run(Some(history_path.as_path()), debug)
+                repl::run(Some(history_path.as_path()), disassemble, debug)
             }
-            false => repl::run(None, debug),
+            false => repl::run(None, disassemble, debug),
         }
     };
 

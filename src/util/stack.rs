@@ -1,3 +1,8 @@
+use core::iter::Rev;
+use core::slice::Iter;
+use std::fmt;
+
+#[derive(Debug)]
 pub struct Stack<T> {
     storage: Vec<T>,
 }
@@ -29,6 +34,19 @@ impl<T> Stack<T> {
 
     pub fn clear(&mut self) {
         self.storage.clear()
+    }
+
+    pub fn iter(&self) -> Rev<Iter<T>> {
+        self.storage.iter().rev()
+    }
+}
+
+impl fmt::Display for Stack<usize> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for index in self.iter() {
+            write!(f, "{}", index);
+        }
+        write!(f, "")
     }
 }
 

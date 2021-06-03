@@ -367,6 +367,16 @@ impl<T: BufRead> Scanner<T> {
                 }
             },
             // Identifiers
+            // Special case for single underscore placeholder var
+            Some(('_', _, _)) => {
+                if self.consume_contiguous('_') > 1 {
+                    return Err(ScanError::new(
+                        ScanErrorKind::UnexpectedCharacter('_'),
+                        Location::new(start.line, start.col + 1),
+                    ));
+                }
+                Token::Ident("_".to_owned())
+            }
             Some((c @ 'a'..='z', _, _)) => {
                 let ident = self.read_ident(c);
                 let items = (&self.previous_token, self.source.peek());

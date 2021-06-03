@@ -86,7 +86,10 @@ impl<'a> Visitor<'a> {
             true
         });
         if let Some(name) = not_found {
-            return self.err(format!("Label not found for jump {}", name));
+            return self.err(format!(
+                "Label not found for jump {} (jump target must be *after* jump)",
+                name
+            ));
         }
         Ok(())
     }

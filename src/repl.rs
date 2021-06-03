@@ -9,11 +9,13 @@ use crate::parser::{ParseError, ParseErrorKind};
 use crate::result::ExitResult;
 use crate::scanner::ScanErrorKind;
 use crate::util::Location;
-use crate::vm::{execute_text, RuntimeErrorKind, VMState, VM};
+use crate::vm::{
+    execute_instructions, execute_text, Instruction, RuntimeErrorKind, VMState, VM,
+};
 
 /// Run FeInt REPL until user exits.
-pub fn run(history_path: Option<&Path>, debug: bool) -> ExitResult {
-    let mut repl = Repl::new(history_path, VM::default(), debug);
+pub fn run(history_path: Option<&Path>, disassemble: bool, debug: bool) -> ExitResult {
+    let mut repl = Repl::new(history_path, VM::default(), disassemble, debug);
     repl.run()
 }
 
@@ -21,12 +23,24 @@ struct Repl<'a> {
     reader: rustyline::Editor<()>,
     history_path: Option<&'a Path>,
     vm: VM,
+    disassemble: bool,
     debug: bool,
 }
 
 impl<'a> Repl<'a> {
-    fn new(history_path: Option<&'a Path>, vm: VM, debug: bool) -> Self {
-        Repl { reader: rustyline::Editor::<()>::new(), history_path, vm, debug }
+    fn new(
+        history_path: Option<&'a Path>,
+        vm: VM,
+        disassemble: bool,
+        debug: bool,
+    ) -> Self {
+        Repl {
+            reader: rustyline::Editor::<()>::new(),
+            history_path,
+            vm,
+            disassemble,
+            debug,
+        }
     }
 
     fn run(&mut self) -> ExitResult {
@@ -96,46 +110,69 @@ impl<'a> Repl<'a> {
                 //        printing the result. Ideally, it would be
                 //        stored in a temporary local var and that's
                 //        what would be printed.
-                if text == "print" || text.starts_with("print ") {
-                    execute_text(&mut self.vm, text, false, self.debug)
-                } else {
-                    execute_text(
-                        &mut self.vm,
-                        format!("print {}", text).as_str(),
-                        false,
-                        self.debug,
-                    )
-                }
+                execute_text(&mut self.vm, text, false, self.debug)
             }
         };
 
         if let Ok(vm_state) = result {
+            // Assign _ to value at top of stack
+            let var_name = "_";
+            if let Err(err) = execute_instructions(
+                &mut self.vm,
+                vec![Instruction::AssignVar(var_name.to_owned()), Instruction::Print],
+                self.disassemble,
+                self.debug,
+            ) {
+                // If stack is empty assign _ to nil
+                if let RuntimeErrorKind::NotEnoughValuesOnStack(_) = err.kind {
+                    if let Err(err) = execute_instructions(
+                        &mut self.vm,
+                        vec![
+                            Instruction::Push(0),
+                            Instruction::AssignVar(var_name.to_owned()),
+                        ],
+                        self.disassemble,
+                        self.debug,
+                    ) {
+                        eprintln!(
+                            "ERROR: Could not assign _ to top of stack or to nil:\n{}",
+                            err
+                        );
+                    }
+                }
+            }
             return self.vm_state_to_exit_result(vm_state);
         }
 
         let err = result.unwrap_err();
 
-        if let RuntimeErrorKind::ParseError(ParseError {
-            kind: ParseErrorKind::ScanError(scan_err),
-        }) = err.kind
-        {
-            if self.handle_scan_err(scan_err.kind, scan_err.location) {
+        if self.handle_execution_err(err.kind) {
+            // Keep adding input until 2 successive blank lines are
+            // entered.
+            let mut input = text.to_owned();
+            let mut blank_line_count = 0;
+            loop {
                 match self.read_line("+ ", false) {
-                    Ok(None) => {
-                        let input = format!("{}\n", text);
-                        self.eval(input.as_str())
+                    Ok(None) => unreachable!(),
+                    Ok(Some(new_input)) if new_input == "" => {
+                        input.push('\n');
+                        if blank_line_count > 0 {
+                            break self.eval(input.as_str());
+                        }
+                        blank_line_count += 1;
                     }
                     Ok(Some(new_input)) => {
-                        let input = format!("{}\n{}", text, new_input);
-                        self.eval(input.as_str())
+                        input.push('\n');
+                        input.push_str(new_input.as_str());
+                        if blank_line_count > 0 {
+                            break self.eval(input.as_str());
+                        }
+                        blank_line_count = 0;
                     }
-                    Err(err) => Some(Err((2, format!("{}", err)))),
+                    Err(err) => break Some(Err((2, format!("{}", err)))),
                 }
-            } else {
-                None
             }
         } else {
-            self.handle_execution_err(err.kind);
             None
         }
     }
@@ -154,7 +191,12 @@ impl<'a> Repl<'a> {
     }
 
     /// Handle VM execution errors.
-    fn handle_execution_err(&mut self, kind: RuntimeErrorKind) {
+    ///
+    /// A return value of true means eval should continue trying to add
+    /// text to the original input while false means eval should give up
+    /// on the input that caused the error. This applies to execution
+    /// errors and any nested error types.
+    fn handle_execution_err(&mut self, kind: RuntimeErrorKind) -> bool {
         let message = match kind {
             RuntimeErrorKind::ParseError(err) => {
                 return self.handle_parse_err(err.kind);
@@ -170,18 +212,20 @@ impl<'a> Repl<'a> {
             }
         };
         eprintln!("{}", message);
+        false
     }
 
     /// Handle compilation errors.
-    fn handle_compilation_err(&mut self, kind: CompilationErrorKind) {
+    fn handle_compilation_err(&mut self, kind: CompilationErrorKind) -> bool {
         let message = match kind {
             err => format!("Unhandled compilation error: {:?}", err),
         };
         eprintln!("{}", message);
+        false
     }
 
     /// Handle parse errors.
-    fn handle_parse_err(&mut self, kind: ParseErrorKind) {
+    fn handle_parse_err(&mut self, kind: ParseErrorKind) -> bool {
         match kind {
             ParseErrorKind::ScanError(err) => {
                 self.handle_scan_err(err.kind, err.location);
@@ -194,15 +238,17 @@ impl<'a> Repl<'a> {
                     location, token.token
                 );
             }
+            ParseErrorKind::ExpectedBlock(_) => {
+                return true;
+            }
             err => {
                 eprintln!("Unhandled parse error: {:?}", err);
             }
         }
+        false
     }
 
-    /// Handle scan errors. True means eval should continue trying to
-    /// add text to the original input while false means eval should
-    /// give up on the input that caused the error.
+    /// Handle scan errors.
     fn handle_scan_err(&mut self, kind: ScanErrorKind, location: Location) -> bool {
         match kind {
             ScanErrorKind::UnexpectedCharacter(c) => {
@@ -213,7 +259,8 @@ impl<'a> Repl<'a> {
                     col, c
                 );
             }
-            ScanErrorKind::UnterminatedString(_) => {
+            ScanErrorKind::UnmatchedOpeningBracket(_)
+            | ScanErrorKind::UnterminatedString(_) => {
                 return true;
             }
             ScanErrorKind::InvalidIndent(num_spaces) => {
@@ -301,7 +348,7 @@ mod tests {
 
     fn new<'a>() -> Repl<'a> {
         let vm = VM::default();
-        Repl::new(None, vm, false)
+        Repl::new(None, vm, false, false)
     }
 
     fn eval(input: &str) {
