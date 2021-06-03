@@ -9,7 +9,7 @@ pub struct ScopeTree {
 
 impl ScopeTree {
     pub fn new() -> Self {
-        Self { storage: vec![Scope::new(0, None)], pointer: 0 }
+        Self { storage: vec![Scope::new(ScopeKind::Global, 0, None)], pointer: 0 }
     }
 
     // Construction ----------------------------------------------------
@@ -31,9 +31,9 @@ impl ScopeTree {
 
     /// Add nested scope to current scope then make the new scope the
     /// current scope.
-    pub fn add(&mut self) -> usize {
+    pub fn add(&mut self, kind: ScopeKind) -> usize {
         let index = self.storage.len();
-        self.storage.push(Scope::new(index, Some(self.pointer)));
+        self.storage.push(Scope::new(kind, index, Some(self.pointer)));
         self.storage[self.pointer].children.push(index);
         self.pointer = index;
         index
@@ -110,6 +110,7 @@ impl ScopeTree {
 
 #[derive(Debug)]
 pub struct Scope {
+    kind: ScopeKind,
     index: usize,
     parent: Option<usize>,
     children: Vec<usize>,
@@ -119,9 +120,17 @@ pub struct Scope {
     jumps: HashMap<String, usize>,
 }
 
+#[derive(Debug)]
+pub enum ScopeKind {
+    Global,
+    Block,
+    Function,
+}
+
 impl Scope {
-    fn new(index: usize, parent: Option<usize>) -> Self {
+    fn new(kind: ScopeKind, index: usize, parent: Option<usize>) -> Self {
         Self {
+            kind,
             index,
             parent,
             children: vec![],
@@ -167,6 +176,11 @@ impl Scope {
             if label_addr > jump_addr {
                 return Some((*label_addr, tree.scope_depth(self.index)));
             }
+        }
+
+        // Disallow jump out of function
+        if let ScopeKind::Function = self.kind {
+            return None;
         }
 
         match self.parent {

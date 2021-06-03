@@ -44,7 +44,7 @@ impl<T> Stack<T> {
 impl fmt::Display for Stack<usize> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for index in self.iter() {
-            write!(f, "{}", index);
+            write!(f, "{}", index)?;
         }
         write!(f, "")
     }

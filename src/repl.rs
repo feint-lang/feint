@@ -5,7 +5,7 @@ use std::path::Path;
 use rustyline::error::ReadlineError;
 
 use crate::compiler::CompilationErrorKind;
-use crate::parser::{ParseError, ParseErrorKind};
+use crate::parser::ParseErrorKind;
 use crate::result::ExitResult;
 use crate::scanner::ScanErrorKind;
 use crate::util::Location;

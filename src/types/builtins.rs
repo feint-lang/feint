@@ -5,7 +5,7 @@ use num_bigint::BigInt;
 use num_traits::Num;
 
 use super::class::{Type, TypeRef};
-use super::object::{Object, ObjectExt, ObjectRef};
+use super::object::ObjectRef;
 use crate::vm::Instructions;
 
 pub struct Builtins {

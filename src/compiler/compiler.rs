@@ -1,13 +1,10 @@
-use std::collections::HashMap;
-
 use crate::ast;
-use crate::ast::LiteralKind::Int;
 use crate::types::ObjectRef;
 use crate::util::{BinaryOperator, UnaryOperator};
 use crate::vm::{Instruction, Instructions, RuntimeContext, VM};
 
 use super::result::{CompilationError, CompilationErrorKind, CompilationResult};
-use super::scope::{Scope, ScopeTree};
+use super::scope::{Scope, ScopeKind, ScopeTree};
 
 // Compiler ------------------------------------------------------------
 
@@ -54,8 +51,8 @@ impl<'a> Visitor<'a> {
 
     /// Add nested scope to current scope then make the new scope the
     /// current scope.
-    fn enter_scope(&mut self) {
-        self.scope_tree.add();
+    fn enter_scope(&mut self, kind: ScopeKind) {
+        self.scope_tree.add(kind);
     }
 
     /// Move up to the parent scope of the current scope.
@@ -65,8 +62,8 @@ impl<'a> Visitor<'a> {
 
     /// Update jump instructions with their target label addresses.
     fn fix_jumps(&mut self) -> VisitResult {
-        let mut instructions = &mut self.instructions;
-        let mut scope_tree = &self.scope_tree;
+        let instructions = &mut self.instructions;
+        let scope_tree = &self.scope_tree;
         let mut not_found: Option<String> = None;
         scope_tree.walk_up(&mut |scope: &Scope, jump_depth: usize| {
             for (name, jump_addr) in scope.jumps().iter() {
@@ -106,9 +103,9 @@ impl<'a> Visitor<'a> {
         Ok(())
     }
 
-    fn visit_block(&mut self, node: ast::Block) -> VisitResult {
+    fn visit_block(&mut self, node: ast::Block, scope_kind: ScopeKind) -> VisitResult {
         self.push(Instruction::BlockStart);
-        self.enter_scope();
+        self.enter_scope(scope_kind);
         for statement in node.statements {
             self.visit_statement(statement)?;
         }
@@ -144,7 +141,7 @@ impl<'a> Visitor<'a> {
 
     fn visit_expr(&mut self, node: ast::Expr) -> VisitResult {
         match node.kind {
-            ast::ExprKind::Block(block) => self.visit_block(block)?,
+            ast::ExprKind::Block(block) => self.visit_block(block, ScopeKind::Block)?,
             ast::ExprKind::UnaryOp(op, b) => self.visit_unary_op(op, *b)?,
             ast::ExprKind::BinaryOp(a, op, b) => self.visit_binary_op(*a, op, *b)?,
             ast::ExprKind::Ident(ident) => self.visit_ident(ident)?,

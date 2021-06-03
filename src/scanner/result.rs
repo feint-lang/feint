@@ -35,5 +35,4 @@ pub enum ScanErrorKind {
     ParseFloatError(ParseFloatError),
     CouldNotOpenSourceFile(String, String), // path, reason
     TooMuchWhitespace,
-    ExpectedNewline,
 }

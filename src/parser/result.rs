@@ -3,9 +3,7 @@ use crate::scanner::{ScanError, TokenWithLocation};
 use crate::util::Location;
 
 pub type ParseResult = Result<ast::Program, ParseError>;
-pub type StatementResult = Result<ast::Statement, ParseError>;
 pub type StatementsResult = Result<Vec<ast::Statement>, ParseError>;
-pub type ExprResult = Result<ast::Expr, ParseError>;
 pub type ExprOptionResult = Result<Option<ast::Expr>, ParseError>;
 pub type NextTokenResult = Result<Option<TokenWithLocation>, ParseError>;
 pub type NextInfixResult = Result<Option<(TokenWithLocation, u8)>, ParseError>;

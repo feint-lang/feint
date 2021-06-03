@@ -1,12 +1,10 @@
-use std::cell::RefCell;
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::VecDeque;
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Cursor};
 use std::iter::Peekable;
-use std::rc::Rc;
 
 use crate::ast;
-use crate::scanner::{ScanError, Scanner, Token, TokenWithLocation};
+use crate::scanner::{Scanner, Token, TokenWithLocation};
 use crate::util::Location;
 
 use super::precedence::{
@@ -14,11 +12,8 @@ use super::precedence::{
 };
 use super::result::{
     ExprOptionResult, NextTokenResult, ParseError, ParseErrorKind, ParseResult,
-    StatementResult,
 };
-use crate::parser::result::{
-    ExprResult, NextInfixResult, PeekTokenResult, StatementsResult,
-};
+use crate::parser::result::{NextInfixResult, PeekTokenResult, StatementsResult};
 
 /// Create a parser from the specified text, scan the text into tokens,
 /// parse the tokens, and return the resulting AST or error.
