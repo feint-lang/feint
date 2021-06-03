@@ -1,3 +1,5 @@
+//! The scope tree keeps track of nested scopes during compilation.
+//! Currently, it's only used resolve jump targets to labels.
 use std::collections::HashMap;
 
 pub struct ScopeTree {
@@ -27,7 +29,8 @@ impl ScopeTree {
         &mut self.storage[self.pointer]
     }
 
-    // Add child
+    /// Add nested scope to current scope then make the new scope the
+    /// current scope.
     pub fn add(&mut self) -> usize {
         let index = self.storage.len();
         self.storage.push(Scope::new(index, Some(self.pointer)));
@@ -80,19 +83,11 @@ impl ScopeTree {
         depth
     }
 
-    // Get jumps for the specified scope and all of its nested scopes.
-    pub fn all_jumps_for_scope(&self, index: usize) -> Vec<HashMap<String, usize>> {
-        let mut jumps = vec![];
-        let scope = self.get(index);
-        if scope.jumps.len() > 0 {
-            jumps.push(scope.jumps.clone());
-        }
-        for child_index in scope.children.iter() {
-            jumps.extend(self.all_jumps_for_scope(*child_index));
-        }
-        jumps
-    }
-
+    /// For each leaf scope, apply the specified visit function to the
+    /// leaf scope first and then to each of its parent scopes in turn.
+    /// Note that parent scopes will be processed multiple times when a
+    /// parent scope contains multiple nested scopes. The visit function
+    /// will be passed the current scope and its depth.
     pub fn walk_up(&self, mut visit: impl FnMut(&Scope, usize) -> bool) {
         for scope in self.storage.iter().filter(|n| n.is_leaf()) {
             let depth = self.scope_depth(scope.index);
@@ -118,7 +113,9 @@ pub struct Scope {
     index: usize,
     parent: Option<usize>,
     children: Vec<usize>,
+    /// label name => label instruction address
     labels: HashMap<String, usize>,
+    /// target label name => jump instruction address
     jumps: HashMap<String, usize>,
 }
 
@@ -137,6 +134,10 @@ impl Scope {
         self.index
     }
 
+    fn is_leaf(&self) -> bool {
+        self.children.len() == 0
+    }
+
     pub fn jumps(&self) -> &HashMap<String, usize> {
         &self.jumps
     }
@@ -145,7 +146,35 @@ impl Scope {
         &self.labels
     }
 
-    fn is_leaf(&self) -> bool {
-        self.children.len() == 0
+    /// Find label for jump target in this scope or its parent scopes.
+    /// When a target label is found, its instruction address and scope
+    /// depth are returned. Otherwise, None is returned.
+    pub fn find_label(
+        &self,
+        tree: &ScopeTree,
+        name: &str,
+        jump_addr: Option<&usize>,
+    ) -> Option<(usize, usize)> {
+        let jump_addr = match jump_addr {
+            Some(addr) => addr,
+            None => match self.jumps.get(name) {
+                Some(addr) => addr,
+                None => panic!("Jump does not exist in scope: {}", name),
+            },
+        };
+
+        if let Some(label_addr) = self.labels.get(name) {
+            if label_addr > jump_addr {
+                return Some((*label_addr, tree.scope_depth(self.index)));
+            }
+        }
+
+        match self.parent {
+            Some(parent_index) => {
+                let parent_scope = tree.get(parent_index);
+                parent_scope.find_label(tree, name, Some(jump_addr))
+            }
+            None => None,
+        }
     }
 }

@@ -52,15 +52,43 @@ impl<'a> Visitor<'a> {
         self.push_const(index);
     }
 
+    /// Add nested scope to current scope then make the new scope the
+    /// current scope.
     fn enter_scope(&mut self) {
-        // Add child scope to current scope, then make child the current
-        // scope.
         self.scope_tree.add();
     }
 
+    /// Move up to the parent scope of the current scope.
     fn exit_scope(&mut self) {
-        // Move up to the parent scope of the current scope.
         self.scope_tree.move_up();
+    }
+
+    /// Update jump instructions with their target label addresses.
+    fn fix_jumps(&mut self) -> VisitResult {
+        let mut instructions = &mut self.instructions;
+        let mut scope_tree = &self.scope_tree;
+        let mut not_found: Option<String> = None;
+        scope_tree.walk_up(&mut |scope: &Scope, jump_depth: usize| {
+            for (name, jump_addr) in scope.jumps().iter() {
+                let result = scope.find_label(scope_tree, name, None);
+                if let Some((label_addr, label_depth)) = result {
+                    let depth = jump_depth - label_depth;
+                    instructions[*jump_addr - 1] = match depth {
+                        0 => Instruction::NoOp,
+                        _ => Instruction::BlockEnd(depth),
+                    };
+                    instructions[*jump_addr] = Instruction::Jump(label_addr);
+                } else {
+                    not_found = Some(name.clone());
+                    return false;
+                }
+            }
+            true
+        });
+        if let Some(name) = not_found {
+            return self.err(format!("Label not found for jump {}", name));
+        }
+        Ok(())
     }
 
     // Visitors --------------------------------------------------------
@@ -72,58 +100,6 @@ impl<'a> Visitor<'a> {
         assert_eq!(self.scope_tree.pointer(), 0);
         self.fix_jumps()?;
         self.push(Instruction::Halt(0));
-        Ok(())
-    }
-
-    /// Update jump instructions with their corresponding label
-    /// addresses.
-    fn fix_jumps(&mut self) -> VisitResult {
-        let mut scope_tree = &self.scope_tree;
-        let mut updated: HashMap<usize, Instruction> = HashMap::new();
-
-        scope_tree.walk_up(&mut |scope: &Scope, depth: usize| {
-            let all_jumps = scope_tree.all_jumps_for_scope(scope.index());
-            for jumps in all_jumps.iter() {
-                for (name, jump_addr) in jumps.iter() {
-                    if updated.contains_key(jump_addr) {
-                        // The label for this jump was already found in
-                        // a nested scope.
-                        continue;
-                    }
-                    if let Some(label_addr) = scope.labels().get(name) {
-                        updated.insert(
-                            *jump_addr - 1,
-                            match depth {
-                                0 => Instruction::NoOp,
-                                _ => Instruction::BlockEnd(depth),
-                            },
-                        );
-                        updated.insert(*jump_addr, Instruction::Jump(*label_addr));
-                    }
-                }
-            }
-            true
-        });
-
-        let mut not_found: Option<(String, usize)> = None;
-        scope_tree.walk_up(&mut |scope: &Scope, depth: usize| {
-            for (name, jump_addr) in scope.jumps().iter() {
-                if !updated.contains_key(jump_addr) {
-                    not_found = Some((name.clone(), jump_addr.clone()));
-                    return false;
-                }
-            }
-            true
-        });
-
-        if let Some(item) = not_found {
-            return self.err(format!("Label not found for jump {}", item.0));
-        }
-
-        for (addr, inst) in updated {
-            self.instructions[addr] = inst;
-        }
-
         Ok(())
     }
 
@@ -144,17 +120,17 @@ impl<'a> Visitor<'a> {
             ast::StatementKind::Jump(name) => {
                 // Insert placeholder jump instruction to be filled in
                 // with corresponding label address once labels have
-                // been processed.
+                // been processed. We also take care to exit nested
+                // blocks/scopes before jumping out.
                 self.push(Instruction::BlockEnd(1));
                 self.push(Instruction::Jump(0));
-                self.scope_tree.add_jump(name.as_str(), self.instructions.len() - 1);
+                let addr = self.instructions.len() - 1;
+                self.scope_tree.add_jump(name.as_str(), addr);
             }
             ast::StatementKind::Label(name) => {
                 self.push(Instruction::NoOp);
-                let result = self
-                    .scope_tree
-                    .add_label(name.as_str(), self.instructions.len() - 1);
-                if result.is_some() {
+                let addr = self.instructions.len() - 1;
+                if self.scope_tree.add_label(name.as_str(), addr).is_some() {
                     self.err(format!("Duplicate label in scope: {}", name))?;
                 }
             }
