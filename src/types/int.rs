@@ -1,3 +1,4 @@
+//! Built in integer type
 use std::any::Any;
 use std::fmt;
 
@@ -11,8 +12,6 @@ use super::float::Float;
 use super::object::{Object, ObjectExt, ObjectRef};
 use super::util::eq_int_float;
 
-/// Built in integer type
-#[derive(Debug)]
 pub struct Int {
     class: TypeRef,
     value: BigInt,
@@ -143,5 +142,11 @@ impl Object for Int {
 impl fmt::Display for Int {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.value())
+    }
+}
+
+impl fmt::Debug for Int {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self)
     }
 }

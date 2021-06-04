@@ -7,7 +7,6 @@ use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeError};
 use super::class::TypeRef;
 use super::object::{Object, ObjectExt, ObjectRef};
 
-#[derive(Debug)]
 pub struct Bool {
     class: TypeRef,
     value: bool,
@@ -79,5 +78,11 @@ impl Object for Bool {
 impl fmt::Display for Bool {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.value)
+    }
+}
+
+impl fmt::Debug for Bool {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self)
     }
 }

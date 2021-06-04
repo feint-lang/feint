@@ -4,9 +4,7 @@ pub(crate) use result::VMState;
 pub(crate) use result::{
     ExecutionResult, RuntimeBoolResult, RuntimeError, RuntimeErrorKind, RuntimeResult,
 };
-pub(crate) use vm::{
-    execute_file, execute_instructions, execute_stdin, execute_text, VM,
-};
+pub(crate) use vm::{execute, execute_file, execute_stdin, execute_text, VM};
 
 mod constants;
 mod context;

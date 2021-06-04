@@ -9,9 +9,7 @@ use crate::parser::ParseErrorKind;
 use crate::result::ExitResult;
 use crate::scanner::ScanErrorKind;
 use crate::util::Location;
-use crate::vm::{
-    execute_instructions, execute_text, Instruction, RuntimeErrorKind, VMState, VM,
-};
+use crate::vm::{execute, execute_text, Instruction, RuntimeErrorKind, VMState, VM};
 
 /// Run FeInt REPL until user exits.
 pub fn run(history_path: Option<&Path>, disassemble: bool, debug: bool) -> ExitResult {
@@ -47,7 +45,7 @@ impl<'a> Repl<'a> {
         println!("Welcome to the FeInt REPL (read/eval/print loop)");
         println!("Type a line of code, then hit Enter to evaluate it");
         self.load_history();
-        println!("Type exit or quit to exit");
+        println!("Type .exit or .quit to exit");
 
         loop {
             match self.read_line("→ ", true) {
@@ -104,14 +102,22 @@ impl<'a> Repl<'a> {
         self.add_history_entry(text);
 
         let result = match text.trim() {
-            "exit" | "quit" => return Some(Ok(None)),
-            _ => {
-                // FIXME: This feels like a really hacky way to handle
-                //        printing the result. Ideally, it would be
-                //        stored in a temporary local var and that's
-                //        what would be printed.
-                execute_text(&mut self.vm, text, false, self.debug)
+            "?" => {
+                eprintln!("{:=>72}", "");
+                eprintln!("FeInt Help");
+                eprintln!("{:->72}", "");
+                eprintln!("?      -> show help");
+                eprintln!(".exit  -> exit");
+                eprintln!(".stack -> show VM stack (top first)");
+                eprintln!("{:=>72}", "");
+                return None;
             }
+            ".exit" | ".quit" => return Some(Ok(None)),
+            ".stack" => {
+                self.vm.display_stack();
+                return None;
+            }
+            _ => execute_text(&mut self.vm, text, self.disassemble, self.debug),
         };
 
         if let Ok(vm_state) = result {
@@ -124,24 +130,15 @@ impl<'a> Repl<'a> {
                     instructions.push(Instruction::Print);
                 }
             }
-            if let Err(err) = execute_instructions(
-                &mut self.vm,
-                instructions,
-                self.disassemble,
-                self.debug,
-            ) {
+            if let Err(err) = execute(&mut self.vm, instructions, false, false) {
                 // If stack is empty, assign _ to nil
                 if let RuntimeErrorKind::NotEnoughValuesOnStack(_) = err.kind {
                     let instructions = vec![
                         Instruction::Push(0),
                         Instruction::AssignVar(var.to_owned()),
                     ];
-                    if let Err(err) = execute_instructions(
-                        &mut self.vm,
-                        instructions,
-                        self.disassemble,
-                        self.debug,
-                    ) {
+                    if let Err(err) = execute(&mut self.vm, instructions, false, false)
+                    {
                         eprintln!(
                             "ERROR: Could not assign _ to top of stack or to nil:\n{}",
                             err
@@ -186,9 +183,6 @@ impl<'a> Repl<'a> {
     }
 
     fn vm_state_to_exit_result(&self, vm_state: VMState) -> Option<ExitResult> {
-        if self.debug {
-            eprintln!("VM STATE:\n{:?}", vm_state);
-        }
         match vm_state {
             VMState::Idle => None,
             VMState::Halted(0) => None,

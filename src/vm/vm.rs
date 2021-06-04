@@ -60,35 +60,25 @@ pub fn execute_program(
     debug: bool,
 ) -> ExecutionResult {
     match compile(vm, program, debug) {
-        Ok(instructions) => execute_instructions(vm, instructions, disassemble, debug),
+        Ok(instructions) => execute(vm, instructions, disassemble, debug),
         Err(err) => Err(RuntimeError::new(RuntimeErrorKind::CompilationError(err))),
     }
 }
 
-pub fn execute_instructions(
+pub fn execute(
     vm: &mut VM,
     instructions: Instructions,
     disassemble: bool,
     debug: bool,
 ) -> ExecutionResult {
-    match disassemble {
-        true => vm.disassemble(instructions),
-        false => {
-            let result = vm.execute(instructions);
-            if debug {
-                for index in vm.stack.iter() {
-                    let obj = vm.ctx.get_obj(*index);
-                    match obj {
-                        Some(obj) => {
-                            eprintln!("{} {}({})", index, obj.class().name(), obj)
-                        }
-                        None => eprintln!("{} [NOT AN OBJECT]", index),
-                    }
-                }
-            }
-            result
-        }
+    let result = vm.execute(instructions, disassemble);
+    if debug {
+        eprintln!("{:=<72}", "STACK ");
+        vm.display_stack();
+        eprintln!("{:=<72}", "VM STATE ");
+        eprintln!("{:?}", result);
     }
+    result
 }
 
 pub struct VM {
@@ -126,7 +116,11 @@ impl VM {
     /// When a HALT instruction is encountered, the VM's state will be
     /// cleared; it can be "restarted" by passing more instructions to
     /// execute.
-    fn execute(&mut self, instructions: Instructions) -> ExecutionResult {
+    fn execute(
+        &mut self,
+        instructions: Instructions,
+        disassemble: bool,
+    ) -> ExecutionResult {
         let mut ip: usize = 0;
 
         loop {
@@ -144,6 +138,9 @@ impl VM {
                     self.stack.pop();
                 }
                 Instruction::Jump(address) => {
+                    if disassemble {
+                        self.disassemble_instruction(ip, &instructions);
+                    }
                     ip = *address;
                     continue;
                 }
@@ -191,6 +188,9 @@ impl VM {
                                     _ => unreachable!(),
                                 };
                                 self.stack.push(if result { 1 } else { 2 });
+                                if disassemble {
+                                    self.disassemble_instruction(ip, &instructions);
+                                }
                                 ip += 1;
                                 continue;
                             }
@@ -230,6 +230,9 @@ impl VM {
                                 };
                                 self.stack.push(if result { 1 } else { 2 });
                                 ip += 1;
+                                if disassemble {
+                                    self.disassemble_instruction(ip, &instructions);
+                                }
                                 continue;
                             }
                         };
@@ -248,10 +251,15 @@ impl VM {
                         self.ctx.exit_scope();
                     }
                 }
-                Instruction::Print => match self.stack.pop() {
+                Instruction::Print => match self.stack.peek() {
                     Some(index) => {
-                        let value = self.ctx.constants.get(index).unwrap();
-                        println!("{}", value);
+                        let value = self.ctx.constants.get(*index).unwrap();
+                        if disassemble {
+                            self.disassemble_instruction(ip, &instructions);
+                        } else {
+                            println!("{}", value);
+                        }
+                        self.stack.pop();
                     }
                     None => {
                         self.err(RuntimeErrorKind::EmptyStack)?;
@@ -266,11 +274,22 @@ impl VM {
                 }
                 Instruction::Halt(code) => {
                     self.halt();
+                    if disassemble {
+                        self.disassemble_instruction(ip, &instructions);
+                    }
                     break Ok(VMState::Halted(*code));
                 }
                 instruction => {
                     let message = format!("{:?}", instruction);
                     self.err(RuntimeErrorKind::UnhandledInstruction(message))?;
+                }
+            }
+
+            if disassemble {
+                if let Instruction::Print = instructions[ip] {
+                    // do nothing
+                } else {
+                    self.disassemble_instruction(ip, &instructions);
                 }
             }
 
@@ -345,23 +364,40 @@ impl VM {
         Ok(())
     }
 
+    /// Show the contents of the stack (top first).
+    pub fn display_stack(&self) {
+        if self.stack.is_empty() {
+            return eprintln!("[EMPTY]");
+        }
+        for (i, index) in self.stack.iter().enumerate() {
+            let obj = self.ctx.get_obj(*index);
+            match obj {
+                Some(obj) => {
+                    eprintln!("{:0>4} ({}) -> {:?}", i, index, obj)
+                }
+                None => eprintln!("{:0>4} ({}) -> [NOT AN OBJECT]", i, index),
+            }
+        }
+    }
+
     // Disassembler ----------------------------------------------------
     //
     // This is done here because we need the VM context in order to show
     // more useful info like jump targets, values, etc.
 
-    fn disassemble(&mut self, instructions: Instructions) -> ExecutionResult {
-        let mut offset = 0;
-        for instruction in instructions.iter() {
-            eprintln!(
-                "{:0>offset_width$} {}",
-                offset,
-                self.format_instruction(&instructions, instruction),
-                offset_width = 4
-            );
-            offset += 1;
+    /// Disassemble a list of instructions.
+    pub fn disassemble(&mut self, instructions: &Instructions) -> ExecutionResult {
+        for (ip, _) in instructions.iter().enumerate() {
+            self.disassemble_instruction(ip, instructions);
         }
         Ok(VMState::Halted(0))
+    }
+
+    /// Disassemble a single instruction.
+    pub fn disassemble_instruction(&self, ip: usize, instructions: &Instructions) {
+        let instruction = &instructions[ip];
+        let formatted = self.format_instruction(instructions, instruction);
+        eprintln!("{:0>4} {}", ip, formatted);
     }
 
     fn format_instruction(
@@ -372,7 +408,10 @@ impl VM {
         use Instruction::*;
         match instruction {
             NoOp => format!("NOOP"),
-            Push(address) => self.format_aligned("PUSH", address),
+            Push(index) => {
+                let obj = self.ctx.get_obj(*index).unwrap();
+                self.format_aligned("PUSH", format!("{} ({:?})", index, obj))
+            }
             Pop => format!("POP"),
             Jump(address) => self.format_aligned(
                 "JUMP",
@@ -387,7 +426,7 @@ impl VM {
                     let obj = self.ctx.get_obj(*index).unwrap();
                     self.format_aligned(
                         "JUMP IF",
-                        format!("{} -> {} ({})", address, index, obj),
+                        format!("{} -> {} ({:?})", address, index, obj),
                     )
                 }
                 None => {
@@ -396,16 +435,21 @@ impl VM {
             },
             LoadConst(index) => {
                 let obj = self.ctx.get_obj(*index).unwrap();
-                self.format_aligned("LOAD_CONST", format!("{} ({})", index, obj))
+                self.format_aligned("LOAD_CONST", format!("{} ({:?})", index, obj))
+            }
+            AssignVar(name) => {
+                let index = self.peek().unwrap_or(&0);
+                let obj = self.ctx.get_obj(*index).unwrap();
+                self.format_aligned("ASSIGN", format!("{} ({:?})", name, obj))
             }
             UnaryOp(operator) => self.format_aligned("UNARY_OP", operator),
             BinaryOp(operator) => self.format_aligned("BINARY_OP", operator),
-            ScopeStart => format!("SCOPE START"),
-            ScopeEnd(count) => self.format_aligned("SCOPE END", count),
+            ScopeStart => format!("SCOPE_START"),
+            ScopeEnd(count) => self.format_aligned("SCOPE_END", count),
             Print => match self.peek() {
                 Some(index) => {
                     let obj = self.ctx.get_obj(*index).unwrap();
-                    self.format_aligned("PRINT", format!("{} ({})", index, obj))
+                    self.format_aligned("PRINT", format!("{} ({:?})", index, obj))
                 }
                 None => self.format_aligned("PRINT", "[EMPTY]"),
             },
@@ -440,7 +484,7 @@ mod tests {
             Instruction::Print,
             Instruction::Halt(0),
         ];
-        if let Ok(result) = vm.execute(instructions) {
+        if let Ok(result) = vm.execute(instructions, false) {
             assert_eq!(result, VMState::Halted(0));
         }
     }

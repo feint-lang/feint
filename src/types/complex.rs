@@ -62,22 +62,6 @@ impl Object for ComplexObject {
     }
 }
 
-// Display -------------------------------------------------------------
-
-impl fmt::Debug for ComplexObject {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Object {} @ {}", self, self.id())
-    }
-}
-
-impl fmt::Display for ComplexObject {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let names: Vec<String> =
-            self.attributes.iter().map(|(n, v)| format!("{}={}", n, v)).collect();
-        write!(f, "{}({})", self.class.name(), names.join(", "))
-    }
-}
-
 // Util ----------------------------------------------------------------
 
 /// Compare attributes for equality. The attribute maps are first
@@ -98,4 +82,20 @@ fn attributes_equal(
         }
     }
     Ok(true)
+}
+
+// Display -------------------------------------------------------------
+
+impl fmt::Display for ComplexObject {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let attrs: Vec<String> =
+            self.attributes.iter().map(|(n, v)| format!("{}={}", n, v)).collect();
+        write!(f, "{}({})", self.class.name(), attrs.join(", "))
+    }
+}
+
+impl fmt::Debug for ComplexObject {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Object {} @ {}", self, self.id())
+    }
 }

@@ -40,6 +40,7 @@ pub fn parse_stdin(debug: bool) -> ParseResult {
 fn handle_result(result: ParseResult, debug: bool) -> ParseResult {
     result.map(|program| {
         if debug {
+            eprintln!("{:=<72}", "AST ");
             eprintln!("{:?}", program);
         };
         program
@@ -335,7 +336,7 @@ impl<T: BufRead> Parser<T> {
                     // Function def or call
                     return Ok(Some(self.func(name)?));
                 }
-                self.ident(name)?
+                ast::Expr::new_ident(ast::Ident::new_ident(name))
             }
             Token::Block => {
                 // block ->
@@ -404,10 +405,6 @@ impl<T: BufRead> Parser<T> {
         self.expect_block()?;
         self.enter_scope();
         Ok(ast::Expr::new_block(self.expect_statements()?))
-    }
-
-    fn ident(&mut self, name: String) -> ExprResult {
-        Ok(ast::Expr::new_ident(ast::Ident::new_ident(name)))
     }
 
     fn func(&mut self, name: String) -> ExprResult {

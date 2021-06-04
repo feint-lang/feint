@@ -7,8 +7,6 @@ use crate::vm::{RuntimeBoolResult, RuntimeContext};
 use super::class::TypeRef;
 use super::object::{Object, ObjectExt};
 
-/// Built in nil type
-#[derive(Debug)]
 pub struct Nil {
     class: TypeRef,
 }
@@ -40,5 +38,11 @@ impl Object for Nil {
 impl fmt::Display for Nil {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "nil")
+    }
+}
+
+impl fmt::Debug for Nil {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self)
     }
 }

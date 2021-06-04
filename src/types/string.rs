@@ -11,7 +11,6 @@ use crate::types::object::{Object, ObjectExt, ObjectRef};
 
 type RustString = std::string::String;
 
-#[derive(Debug)]
 pub struct String {
     class: TypeRef,
     value: RustString,
@@ -120,5 +119,11 @@ impl Object for String {
 impl fmt::Display for String {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.value())
+    }
+}
+
+impl fmt::Debug for String {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "\"{}\"", self.value())
     }
 }

@@ -1,3 +1,4 @@
+//! Built in 64-bit float type
 use std::any::Any;
 use std::fmt;
 
@@ -10,8 +11,6 @@ use super::int::Int;
 use super::object::{Object, ObjectExt, ObjectRef};
 use super::util::eq_int_float;
 
-/// Built in 64-bit float type
-#[derive(Debug)]
 pub struct Float {
     class: TypeRef,
     value: f64,
@@ -110,5 +109,11 @@ impl fmt::Display for Float {
         } else {
             write!(f, "{}", self.value())
         }
+    }
+}
+
+impl fmt::Debug for Float {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self)
     }
 }

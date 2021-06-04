@@ -9,7 +9,6 @@ use crate::vm::{
 use super::class::TypeRef;
 use super::object::{Object, ObjectExt, ObjectRef};
 
-#[derive(Debug)]
 pub struct Function {
     class: TypeRef,
     name: String,
@@ -45,5 +44,11 @@ impl Object for Function {
 impl fmt::Display for Function {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}()", self.name)
+    }
+}
+
+impl fmt::Debug for Function {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self)
     }
 }

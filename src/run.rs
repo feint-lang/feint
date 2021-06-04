@@ -48,9 +48,6 @@ impl Runner {
 
     /// Convert VM state to exit result.
     fn vm_state_to_exit_result(&self, vm_state: VMState) -> ExitResult {
-        if self.debug {
-            eprintln!("VM STATE:\n{:?}", vm_state);
-        }
         match vm_state {
             VMState::Halted(0) => Ok(None),
             VMState::Halted(code) => {
