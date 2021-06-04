@@ -72,7 +72,7 @@ impl<'a> Visitor<'a> {
                     let depth = jump_depth - label_depth;
                     instructions[*jump_addr - 1] = match depth {
                         0 => Instruction::NoOp,
-                        _ => Instruction::BlockEnd(depth),
+                        _ => Instruction::ScopeEnd(depth),
                     };
                     instructions[*jump_addr] = Instruction::Jump(label_addr);
                 } else {
@@ -104,12 +104,12 @@ impl<'a> Visitor<'a> {
     }
 
     fn visit_block(&mut self, node: ast::Block, scope_kind: ScopeKind) -> VisitResult {
-        self.push(Instruction::BlockStart);
+        self.push(Instruction::ScopeStart);
         self.enter_scope(scope_kind);
         for statement in node.statements {
             self.visit_statement(statement)?;
         }
-        self.push(Instruction::BlockEnd(1));
+        self.push(Instruction::ScopeEnd(1));
         self.exit_scope();
         Ok(())
     }
@@ -125,7 +125,7 @@ impl<'a> Visitor<'a> {
                 // with corresponding label address once labels have
                 // been processed. We also take care to exit nested
                 // blocks/scopes before jumping out.
-                self.push(Instruction::BlockEnd(1));
+                self.push(Instruction::ScopeEnd(1));
                 self.push(Instruction::Jump(0));
                 let addr = self.instructions.len() - 1;
                 self.scope_tree.add_jump(name.as_str(), addr);

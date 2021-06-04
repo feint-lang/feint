@@ -190,7 +190,7 @@ impl<T: BufRead> Parser<T> {
                 break;
             };
             match token {
-                Token::BlockEnd => {
+                Token::ScopeEnd => {
                     self.next_token()?;
                     self.exit_scope();
                     break;
@@ -275,8 +275,8 @@ impl<T: BufRead> Parser<T> {
                 self.enter_scope();
                 return self.block(token.end);
             }
-            Token::BlockStart => {
-                // Start of any indented block of statements.
+            Token::ScopeStart => {
+                // Start of nested scope
                 if !self.expecting_block {
                     return Err(self.err(ParseErrorKind::UnexpectedBlock(token.end)));
                 }
@@ -328,7 +328,7 @@ impl<T: BufRead> Parser<T> {
     fn block(&mut self, end: Location) -> ExprOptionResult {
         if let Ok(Some(_)) = self.next_token_if(|t| t == &Token::FuncStart) {
             if let Ok(Some(_)) = self.next_token_if(|t| t == &Token::EndOfStatement) {
-                if let Ok(Some(_)) = self.peek_token_if(|t| t == &Token::BlockStart) {
+                if let Ok(Some(_)) = self.peek_token_if(|t| t == &Token::ScopeStart) {
                     self.expr()
                 } else {
                     let location = Location::new(end.line + 1, 1);

@@ -205,11 +205,11 @@ impl<T: BufRead> Scanner<T> {
         } else if indent_level == current_level + 1 {
             // Increased by one level
             self.indent_level = Some(indent_level);
-            self.add_token_to_queue(Token::BlockStart, location, Some(location));
+            self.add_token_to_queue(Token::ScopeStart, location, Some(location));
         } else if indent_level < current_level {
             // Decreased by one or more levels
             while current_level > indent_level {
-                self.add_token_to_queue(Token::BlockEnd, location, Some(location));
+                self.add_token_to_queue(Token::ScopeEnd, location, Some(location));
                 self.add_token_to_queue(
                     Token::EndOfStatement,
                     location,
@@ -383,7 +383,7 @@ impl<T: BufRead> Scanner<T> {
                 if let (Token::EndOfStatement, Some(&':')) = items {
                     self.next_char();
                     Token::Label(ident)
-                } else if let (Token::BlockStart, Some(&':')) = items {
+                } else if let (Token::ScopeStart, Some(&':')) = items {
                     self.next_char();
                     Token::Label(ident)
                 } else {
@@ -987,12 +987,12 @@ g (y) ->  # 6
         check_token(tokens.next(), Token::RightParen, 1, 5, 1, 5);
         check_token(tokens.next(), Token::FuncStart, 1, 7, 1, 8);
         check_token(tokens.next(), Token::EndOfStatement, 1, 14, 1, 14);
-        check_token(tokens.next(), Token::BlockStart, 2, 0, 2, 0);
+        check_token(tokens.next(), Token::ScopeStart, 2, 0, 2, 0);
         check_token(tokens.next(), Token::Ident("x".to_string()), 2, 5, 2, 5);
         check_token(tokens.next(), Token::EndOfStatement, 2, 14, 2, 14);
         check_token(tokens.next(), Token::Int(BigInt::from(1)), 3, 5, 3, 5);
         check_token(tokens.next(), Token::EndOfStatement, 3, 14, 3, 14);
-        check_token(tokens.next(), Token::BlockEnd, 6, 0, 6, 0);
+        check_token(tokens.next(), Token::ScopeEnd, 6, 0, 6, 0);
         check_token(tokens.next(), Token::EndOfStatement, 6, 0, 6, 0);
 
         // g
@@ -1002,10 +1002,10 @@ g (y) ->  # 6
         check_token(tokens.next(), Token::RightParen, 6, 5, 6, 5);
         check_token(tokens.next(), Token::FuncStart, 6, 7, 6, 8);
         check_token(tokens.next(), Token::EndOfStatement, 6, 14, 6, 14);
-        check_token(tokens.next(), Token::BlockStart, 7, 0, 7, 0);
+        check_token(tokens.next(), Token::ScopeStart, 7, 0, 7, 0);
         check_token(tokens.next(), Token::Ident("y".to_string()), 7, 5, 7, 5);
         check_token(tokens.next(), Token::EndOfStatement, 7, 14, 7, 14);
-        check_token(tokens.next(), Token::BlockEnd, 8, 0, 8, 0);
+        check_token(tokens.next(), Token::ScopeEnd, 8, 0, 8, 0);
         check_token(tokens.next(), Token::EndOfStatement, 8, 0, 8, 0);
 
         assert!(tokens.next().is_none());

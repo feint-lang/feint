@@ -9,7 +9,8 @@ pub struct ScopeTree {
 
 impl ScopeTree {
     pub fn new() -> Self {
-        Self { storage: vec![Scope::new(ScopeKind::Global, 0, None)], pointer: 0 }
+        let global_scope = Scope::new(ScopeKind::Global, 0, None);
+        Self { storage: vec![global_scope], pointer: 0 }
     }
 
     // Construction ----------------------------------------------------

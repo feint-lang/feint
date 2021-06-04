@@ -16,8 +16,8 @@ pub enum Instruction {
     DeclareVar(String),
     AssignVar(String),
     LoadVar(String),
-    BlockStart,
-    BlockEnd(usize),
+    ScopeStart,
+    ScopeEnd(usize),
     Print, // Print value at top of stack
     Return,
     Halt(i32),

@@ -240,10 +240,10 @@ impl VM {
                         self.err(RuntimeErrorKind::NotEnoughValuesOnStack(message))?;
                     };
                 }
-                Instruction::BlockStart => {
+                Instruction::ScopeStart => {
                     self.ctx.enter_scope();
                 }
-                Instruction::BlockEnd(count) => {
+                Instruction::ScopeEnd(count) => {
                     for _ in 0..*count {
                         self.ctx.exit_scope();
                     }
@@ -400,8 +400,8 @@ impl VM {
             }
             UnaryOp(operator) => self.format_aligned("UNARY_OP", operator),
             BinaryOp(operator) => self.format_aligned("BINARY_OP", operator),
-            BlockStart => format!("BLOCK START"),
-            BlockEnd(count) => self.format_aligned("BLOCK END", count),
+            ScopeStart => format!("SCOPE START"),
+            ScopeEnd(count) => self.format_aligned("SCOPE END", count),
             Print => match self.peek() {
                 Some(index) => {
                     let obj = self.ctx.get_obj(*index).unwrap();

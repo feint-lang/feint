@@ -57,11 +57,11 @@ pub enum Token {
     PlusEqual,  // +=
     MinusEqual, // -=
 
-    // Indicates start of function or block/scope
+    // Indicates start of function or block
     FuncStart, // ->
 
-    BlockStart, // Start of indented block
-    BlockEnd,   // End of indented block
+    ScopeStart, // Start of nested scope
+    ScopeEnd,   // End of nested scope
 
     // Keywords
     Nil,           // nil
