@@ -1,13 +1,13 @@
 use std::fmt;
 use std::fmt::Formatter;
 
-use crate::compiler::CompilationError;
-use crate::parser::ParseError;
+use crate::compiler::CompilationErr;
+use crate::parser::ParseErr;
 use crate::types::ObjectRef;
 
-pub type ExecutionResult = Result<VMState, RuntimeError>;
-pub type RuntimeResult = Result<ObjectRef, RuntimeError>;
-pub type RuntimeBoolResult = Result<bool, RuntimeError>;
+pub type ExeResult = Result<VMState, RuntimeErr>;
+pub type RuntimeResult = Result<ObjectRef, RuntimeErr>;
+pub type RuntimeBoolResult = Result<bool, RuntimeErr>;
 
 #[derive(Debug, PartialEq)]
 pub enum VMState {
@@ -18,32 +18,32 @@ pub enum VMState {
 // Runtime errors ------------------------------------------------------
 
 #[derive(Debug)]
-pub struct RuntimeError {
-    pub kind: RuntimeErrorKind,
+pub struct RuntimeErr {
+    pub kind: RuntimeErrKind,
 }
 
-impl RuntimeError {
-    pub fn new(kind: RuntimeErrorKind) -> Self {
+impl RuntimeErr {
+    pub fn new(kind: RuntimeErrKind) -> Self {
         Self { kind }
     }
 
     pub fn new_type_error<S: Into<String>>(message: S) -> Self {
-        Self::new(RuntimeErrorKind::TypeError(message.into()))
+        Self::new(RuntimeErrKind::TypeError(message.into()))
     }
 }
 
-impl fmt::Display for RuntimeError {
+impl fmt::Display for RuntimeErr {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self.kind)
     }
 }
 
 #[derive(Debug)]
-pub enum RuntimeErrorKind {
+pub enum RuntimeErrKind {
     EmptyStack,
     NotEnoughValuesOnStack(String),
-    ParseError(ParseError),
-    CompilationError(CompilationError),
+    ParseError(ParseErr),
+    CompilationError(CompilationErr),
     UnhandledInstruction(String),
     AttributeDoesNotExist(String),
     AttributeCannotBeSet(String),
@@ -51,7 +51,7 @@ pub enum RuntimeErrorKind {
     NameError(String),
 }
 
-impl fmt::Display for RuntimeErrorKind {
+impl fmt::Display for RuntimeErrKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self)
     }

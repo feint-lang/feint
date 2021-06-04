@@ -5,7 +5,7 @@ use std::fmt;
 use num_bigint::BigInt;
 use num_traits::{FromPrimitive, ToPrimitive};
 
-use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeError, RuntimeResult};
+use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeErr, RuntimeResult};
 
 use super::class::TypeRef;
 use super::float::Float;
@@ -27,14 +27,14 @@ impl Int {
     }
 
     // Cast both LHS and RHS to f64 and divide them
-    fn div_f64(&self, rhs: &ObjectRef) -> Result<f64, RuntimeError> {
+    fn div_f64(&self, rhs: &ObjectRef) -> Result<f64, RuntimeErr> {
         let lhs_val = self.value().to_f64().unwrap();
         let rhs_val = if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
             rhs.value().to_f64().unwrap()
         } else if let Some(rhs) = rhs.as_any().downcast_ref::<Float>() {
             *rhs.value()
         } else {
-            return Err(RuntimeError::new_type_error(format!(
+            return Err(RuntimeErr::new_type_error(format!(
                 "Could not divide {} into Int",
                 rhs.class().name()
             )));
@@ -57,7 +57,7 @@ macro_rules! make_op {
                 let value = ctx.builtins.new_float(value);
                 Ok(value)
             } else {
-                Err(RuntimeError::new_type_error(format!($message, rhs.class().name())))
+                Err(RuntimeErr::new_type_error(format!($message, rhs.class().name())))
             }
         }
     };
@@ -86,7 +86,7 @@ impl Object for Int {
         } else if let Some(rhs) = rhs.as_any().downcast_ref::<Float>() {
             Ok(eq_int_float(self, rhs))
         } else {
-            Err(RuntimeError::new_type_error(format!(
+            Err(RuntimeErr::new_type_error(format!(
                 "Could not compare Int to {} for equality",
                 rhs.class().name()
             )))
@@ -109,7 +109,7 @@ impl Object for Int {
             let value = ctx.builtins.new_float(value);
             Ok(value)
         } else {
-            Err(RuntimeError::new_type_error(format!(
+            Err(RuntimeErr::new_type_error(format!(
                 "Could not raise Int by {}",
                 rhs.class().name()
             )))

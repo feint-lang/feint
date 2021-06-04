@@ -5,7 +5,7 @@ use std::any::Any;
 use std::collections::HashMap;
 use std::fmt;
 
-use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeError, RuntimeErrorKind};
+use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeErr, RuntimeErrKind};
 
 use super::class::TypeRef;
 use super::object::{Object, ObjectExt, ObjectRef};
@@ -37,7 +37,7 @@ impl Object for ComplexObject {
             Ok(self.is(rhs)
                 || attributes_equal(&self.attributes, &rhs.attributes, ctx)?)
         } else {
-            Err(RuntimeError::new_type_error(format!(
+            Err(RuntimeErr::new_type_error(format!(
                 "Could not compare {} to {}",
                 self.class().name(),
                 rhs.class().name()
@@ -45,18 +45,18 @@ impl Object for ComplexObject {
         }
     }
 
-    fn get_attribute(&self, name: &str) -> Result<&ObjectRef, RuntimeError> {
+    fn get_attribute(&self, name: &str) -> Result<&ObjectRef, RuntimeErr> {
         if let Some(value) = self.attributes.get(name) {
             return Ok(value);
         }
-        Err(RuntimeError::new(RuntimeErrorKind::AttributeDoesNotExist(name.to_owned())))
+        Err(RuntimeErr::new(RuntimeErrKind::AttributeDoesNotExist(name.to_owned())))
     }
 
     fn set_attribute(
         &mut self,
         name: &str,
         value: ObjectRef,
-    ) -> Result<(), RuntimeError> {
+    ) -> Result<(), RuntimeErr> {
         self.attributes.insert(name.to_owned(), value.clone());
         Ok(())
     }

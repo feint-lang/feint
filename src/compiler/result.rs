@@ -1,19 +1,19 @@
-use crate::vm::Instructions;
+use crate::vm::Chunk;
 
-pub type CompilationResult = Result<Instructions, CompilationError>;
+pub type CompilationResult = Result<Chunk, CompilationErr>;
 
 #[derive(Clone, Debug)]
-pub struct CompilationError {
-    pub kind: CompilationErrorKind,
+pub struct CompilationErr {
+    pub kind: CompilationErrKind,
 }
 
-impl CompilationError {
-    pub fn new(kind: CompilationErrorKind) -> Self {
+impl CompilationErr {
+    pub fn new(kind: CompilationErrKind) -> Self {
         Self { kind }
     }
 }
 
 #[derive(Clone, Debug)]
-pub enum CompilationErrorKind {
+pub enum CompilationErrKind {
     VisitError(String),
 }

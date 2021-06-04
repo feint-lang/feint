@@ -2,9 +2,7 @@
 use std::any::Any;
 use std::fmt;
 
-use crate::vm::{
-    Instructions, RuntimeBoolResult, RuntimeContext, RuntimeError, RuntimeResult,
-};
+use crate::vm::{Chunk, RuntimeBoolResult, RuntimeContext, RuntimeErr, RuntimeResult};
 
 use super::class::TypeRef;
 use super::object::{Object, ObjectExt, ObjectRef};
@@ -13,7 +11,7 @@ pub struct Function {
     class: TypeRef,
     name: String,
     parameters: Vec<String>,
-    instructions: Instructions,
+    instructions: Chunk,
 }
 
 impl Function {
@@ -21,7 +19,7 @@ impl Function {
         class: TypeRef,
         name: S,
         parameters: Vec<String>,
-        instructions: Instructions,
+        instructions: Chunk,
     ) -> Self {
         Self { class, name: name.into(), parameters, instructions }
     }

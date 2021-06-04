@@ -1,9 +1,9 @@
 use crate::ast;
 use crate::types::ObjectRef;
 use crate::util::{BinaryOperator, UnaryOperator};
-use crate::vm::{Instruction, Instructions, RuntimeContext, VM};
+use crate::vm::{Chunk, Inst, RuntimeContext, VM};
 
-use super::result::{CompilationError, CompilationErrorKind, CompilationResult};
+use super::result::{CompilationErr, CompilationErrKind, CompilationResult};
 use super::scope::{Scope, ScopeKind, ScopeTree};
 
 // Compiler ------------------------------------------------------------
@@ -17,31 +17,31 @@ pub fn compile(vm: &mut VM, program: ast::Program, _debug: bool) -> CompilationR
 
 // Visitor -------------------------------------------------------------
 
-type VisitResult = Result<(), CompilationError>;
+type VisitResult = Result<(), CompilationErr>;
 
 struct Visitor<'a> {
     ctx: &'a mut RuntimeContext,
-    instructions: Instructions,
+    instructions: Chunk,
     scope_tree: ScopeTree,
 }
 
 impl<'a> Visitor<'a> {
     fn new(ctx: &'a mut RuntimeContext) -> Self {
-        Self { ctx, instructions: Instructions::new(), scope_tree: ScopeTree::new() }
+        Self { ctx, instructions: Chunk::new(), scope_tree: ScopeTree::new() }
     }
 
     // Utilities -------------------------------------------------------
 
     fn err(&self, message: String) -> VisitResult {
-        Err(CompilationError::new(CompilationErrorKind::VisitError(message)))
+        Err(CompilationErr::new(CompilationErrKind::VisitError(message)))
     }
 
-    fn push(&mut self, instruction: Instruction) {
-        self.instructions.push(instruction);
+    fn push(&mut self, inst: Inst) {
+        self.instructions.push(inst);
     }
 
     fn push_const(&mut self, index: usize) {
-        self.push(Instruction::LoadConst(index));
+        self.push(Inst::LoadConst(index));
     }
 
     fn add_const(&mut self, val: ObjectRef) {
@@ -71,10 +71,10 @@ impl<'a> Visitor<'a> {
                 if let Some((label_addr, label_depth)) = result {
                     let depth = jump_depth - label_depth;
                     instructions[*jump_addr - 1] = match depth {
-                        0 => Instruction::NoOp,
-                        _ => Instruction::ScopeEnd(depth),
+                        0 => Inst::NoOp,
+                        _ => Inst::ScopeEnd(depth),
                     };
-                    instructions[*jump_addr] = Instruction::Jump(label_addr);
+                    instructions[*jump_addr] = Inst::Jump(label_addr);
                 } else {
                     not_found = Some(name.clone());
                     return false;
@@ -99,17 +99,17 @@ impl<'a> Visitor<'a> {
         }
         assert_eq!(self.scope_tree.pointer(), 0);
         self.fix_jumps()?;
-        self.push(Instruction::Halt(0));
+        self.push(Inst::Halt(0));
         Ok(())
     }
 
     fn visit_block(&mut self, node: ast::Block, scope_kind: ScopeKind) -> VisitResult {
-        self.push(Instruction::ScopeStart);
+        self.push(Inst::ScopeStart);
         self.enter_scope(scope_kind);
         for statement in node.statements {
             self.visit_statement(statement)?;
         }
-        self.push(Instruction::ScopeEnd(1));
+        self.push(Inst::ScopeEnd(1));
         self.exit_scope();
         Ok(())
     }
@@ -117,21 +117,21 @@ impl<'a> Visitor<'a> {
     fn visit_statement(&mut self, node: ast::Statement) -> VisitResult {
         match node.kind {
             ast::StatementKind::Print => {
-                self.push(Instruction::Print);
-                self.push(Instruction::Push(0));
+                self.push(Inst::Print);
+                self.push(Inst::Push(0));
             }
             ast::StatementKind::Jump(name) => {
                 // Insert placeholder jump instruction to be filled in
                 // with corresponding label address once labels have
                 // been processed. We also take care to exit nested
                 // blocks/scopes before jumping out.
-                self.push(Instruction::ScopeEnd(1));
-                self.push(Instruction::Jump(0));
+                self.push(Inst::ScopeEnd(1));
+                self.push(Inst::Jump(0));
                 let addr = self.instructions.len() - 1;
                 self.scope_tree.add_jump(name.as_str(), addr);
             }
             ast::StatementKind::Label(name) => {
-                self.push(Instruction::NoOp);
+                self.push(Inst::NoOp);
                 let addr = self.instructions.len() - 1;
                 if self.scope_tree.add_label(name.as_str(), addr).is_some() {
                     self.err(format!("Duplicate label in scope: {}", name))?;
@@ -156,7 +156,7 @@ impl<'a> Visitor<'a> {
 
     fn visit_unary_op(&mut self, op: UnaryOperator, expr: ast::Expr) -> VisitResult {
         self.visit_expr(expr)?;
-        self.push(Instruction::UnaryOp(op));
+        self.push(Inst::UnaryOp(op));
         Ok(())
     }
 
@@ -171,7 +171,7 @@ impl<'a> Visitor<'a> {
         } else {
             self.visit_expr(expr_a)?;
             self.visit_expr(expr_b)?;
-            self.push(Instruction::BinaryOp(op));
+            self.push(Inst::BinaryOp(op));
             Ok(())
         }
     }
@@ -187,9 +187,9 @@ impl<'a> Visitor<'a> {
                     // NOTE: Currently, declaration and assignment are
                     //       the same thing, so declaration doesn't
                     //       do anything particularly useful ATM.
-                    self.push(Instruction::DeclareVar(name.clone()));
+                    self.push(Inst::DeclareVar(name.clone()));
                     self.visit_expr(value_expr)?;
-                    self.push(Instruction::AssignVar(name));
+                    self.push(Inst::AssignVar(name));
                 }
                 _ => return self.err("Expected identifier".to_owned()),
             },
@@ -202,8 +202,8 @@ impl<'a> Visitor<'a> {
     // assignment).
     fn visit_ident(&mut self, node: ast::Ident) -> VisitResult {
         match node.kind {
-            ast::IdentKind::Ident(name) => self.push(Instruction::LoadVar(name)),
-            ast::IdentKind::TypeIdent(name) => self.push(Instruction::LoadVar(name)),
+            ast::IdentKind::Ident(name) => self.push(Inst::LoadVar(name)),
+            ast::IdentKind::TypeIdent(name) => self.push(Inst::LoadVar(name)),
         }
         Ok(())
     }

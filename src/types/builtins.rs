@@ -6,7 +6,7 @@ use num_traits::Num;
 
 use super::class::{Type, TypeRef};
 use super::object::ObjectRef;
-use crate::vm::Instructions;
+use crate::vm::Chunk;
 
 pub struct Builtins {
     types: HashMap<&'static str, TypeRef>,
@@ -69,7 +69,7 @@ impl Builtins {
         &self,
         name: S,
         parameters: Vec<String>,
-        instructions: Instructions,
+        instructions: Chunk,
     ) -> ObjectRef {
         let class = self.get_type("Function").clone();
         Rc::new(super::function::Function::new(class, name, parameters, instructions))

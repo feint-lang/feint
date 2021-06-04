@@ -3,7 +3,7 @@ use std::any::Any;
 use std::fmt;
 
 use crate::vm::{
-    RuntimeBoolResult, RuntimeContext, RuntimeError, RuntimeErrorKind, RuntimeResult,
+    RuntimeBoolResult, RuntimeContext, RuntimeErr, RuntimeErrKind, RuntimeResult,
 };
 
 use crate::types::class::TypeRef;
@@ -30,7 +30,7 @@ impl String {
         self.is_format_string
     }
 
-    pub fn format(&self, ctx: &RuntimeContext) -> Result<Self, RuntimeError> {
+    pub fn format(&self, ctx: &RuntimeContext) -> Result<Self, RuntimeErr> {
         assert!(self.is_format_string, "String is not a format string: {}", self);
         let mut formatted = RustString::new();
         let mut chars = self.value().chars();
@@ -50,8 +50,8 @@ impl String {
                                 if let Some(obj) = ctx.get_obj_by_name(name.as_str()) {
                                     formatted.push_str(obj.to_string().as_str());
                                 } else {
-                                    return Err(RuntimeError::new(
-                                        RuntimeErrorKind::NameError(format!(
+                                    return Err(RuntimeErr::new(
+                                        RuntimeErrKind::NameError(format!(
                                             "Name not found: {}",
                                             name
                                         )),
@@ -89,7 +89,7 @@ impl Object for String {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
             Ok(self.is(rhs) || self.value() == rhs.value())
         } else {
-            Err(RuntimeError::new_type_error(format!(
+            Err(RuntimeErr::new_type_error(format!(
                 "Could not compare String to {} for equality",
                 rhs.class().name()
             )))
@@ -106,7 +106,7 @@ impl Object for String {
             let value = ctx.builtins.new_string(value, false);
             Ok(value)
         } else {
-            Err(RuntimeError::new_type_error(format!(
+            Err(RuntimeErr::new_type_error(format!(
                 "Could not concatenate String with {}",
                 rhs.class().name()
             )))

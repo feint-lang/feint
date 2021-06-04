@@ -6,23 +6,23 @@ use crate::util::Location;
 
 use super::TokenWithLocation;
 
-pub type ScanResult = Result<TokenWithLocation, ScanError>;
-pub type ScanTokensResult = Result<Vec<TokenWithLocation>, ScanError>;
+pub type ScanResult = Result<TokenWithLocation, ScanErr>;
+pub type ScanTokensResult = Result<Vec<TokenWithLocation>, ScanErr>;
 
 #[derive(Clone, Debug)]
-pub struct ScanError {
-    pub kind: ScanErrorKind,
+pub struct ScanErr {
+    pub kind: ScanErrKind,
     pub location: Location,
 }
 
-impl ScanError {
-    pub fn new(kind: ScanErrorKind, location: Location) -> Self {
+impl ScanErr {
+    pub fn new(kind: ScanErrKind, location: Location) -> Self {
         Self { kind, location }
     }
 }
 
 #[derive(Clone, Debug)]
-pub enum ScanErrorKind {
+pub enum ScanErrKind {
     InvalidIndent(u8), // Indent is not a multiple of 4 (number of spaces)
     UnexpectedIndent(u8), // Indent in unexpected place (indent level)
     WhitespaceAfterIndent, // Non-space whitespace after indent

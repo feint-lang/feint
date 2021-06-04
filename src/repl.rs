@@ -4,16 +4,16 @@ use std::path::Path;
 
 use rustyline::error::ReadlineError;
 
-use crate::compiler::CompilationErrorKind;
-use crate::parser::ParseErrorKind;
+use crate::compiler::CompilationErrKind;
+use crate::parser::ParseErrKind;
 use crate::result::ExitResult;
-use crate::scanner::ScanErrorKind;
+use crate::scanner::ScanErrKind;
 use crate::util::Location;
-use crate::vm::{execute, execute_text, Instruction, RuntimeErrorKind, VMState, VM};
+use crate::vm::{execute, execute_text, Inst, RuntimeErrKind, VMState, VM};
 
 /// Run FeInt REPL until user exits.
-pub fn run(history_path: Option<&Path>, disassemble: bool, debug: bool) -> ExitResult {
-    let mut repl = Repl::new(history_path, VM::default(), disassemble, debug);
+pub fn run(history_path: Option<&Path>, dis: bool, debug: bool) -> ExitResult {
+    let mut repl = Repl::new(history_path, VM::default(), dis, debug);
     repl.run()
 }
 
@@ -21,24 +21,13 @@ struct Repl<'a> {
     reader: rustyline::Editor<()>,
     history_path: Option<&'a Path>,
     vm: VM,
-    disassemble: bool,
+    dis: bool,
     debug: bool,
 }
 
 impl<'a> Repl<'a> {
-    fn new(
-        history_path: Option<&'a Path>,
-        vm: VM,
-        disassemble: bool,
-        debug: bool,
-    ) -> Self {
-        Repl {
-            reader: rustyline::Editor::<()>::new(),
-            history_path,
-            vm,
-            disassemble,
-            debug,
-        }
+    fn new(history_path: Option<&'a Path>, vm: VM, dis: bool, debug: bool) -> Self {
+        Repl { reader: rustyline::Editor::<()>::new(), history_path, vm, dis, debug }
     }
 
     fn run(&mut self) -> ExitResult {
@@ -117,26 +106,24 @@ impl<'a> Repl<'a> {
                 self.vm.display_stack();
                 return None;
             }
-            _ => execute_text(&mut self.vm, text, self.disassemble, self.debug),
+            _ => execute_text(&mut self.vm, text, self.dis, self.debug),
         };
 
         if let Ok(vm_state) = result {
             // Assign _ to value at top of stack
             let var = "_";
-            let mut instructions = vec![Instruction::AssignVar(var.to_owned())];
+            let mut instructions = vec![Inst::AssignVar(var.to_owned())];
             if let Some(&index) = self.vm.peek() {
                 // Don't print nil when the result of an expression is nil
                 if index != 0 {
-                    instructions.push(Instruction::Print);
+                    instructions.push(Inst::Print);
                 }
             }
             if let Err(err) = execute(&mut self.vm, instructions, false, false) {
                 // If stack is empty, assign _ to nil
-                if let RuntimeErrorKind::NotEnoughValuesOnStack(_) = err.kind {
-                    let instructions = vec![
-                        Instruction::Push(0),
-                        Instruction::AssignVar(var.to_owned()),
-                    ];
+                if let RuntimeErrKind::NotEnoughValuesOnStack(_) = err.kind {
+                    let instructions =
+                        vec![Inst::Push(0), Inst::AssignVar(var.to_owned())];
                     if let Err(err) = execute(&mut self.vm, instructions, false, false)
                     {
                         eprintln!(
@@ -198,15 +185,15 @@ impl<'a> Repl<'a> {
     /// text to the original input while false means eval should give up
     /// on the input that caused the error. This applies to execution
     /// errors and any nested error types.
-    fn handle_execution_err(&mut self, kind: RuntimeErrorKind) -> bool {
+    fn handle_execution_err(&mut self, kind: RuntimeErrKind) -> bool {
         let message = match kind {
-            RuntimeErrorKind::ParseError(err) => {
+            RuntimeErrKind::ParseError(err) => {
                 return self.handle_parse_err(err.kind);
             }
-            RuntimeErrorKind::CompilationError(err) => {
+            RuntimeErrKind::CompilationError(err) => {
                 return self.handle_compilation_err(err.kind);
             }
-            RuntimeErrorKind::TypeError(message) => {
+            RuntimeErrKind::TypeError(message) => {
                 format!("{}", message)
             }
             err => {
@@ -218,7 +205,7 @@ impl<'a> Repl<'a> {
     }
 
     /// Handle compilation errors.
-    fn handle_compilation_err(&mut self, kind: CompilationErrorKind) -> bool {
+    fn handle_compilation_err(&mut self, kind: CompilationErrKind) -> bool {
         let message = match kind {
             err => format!("Unhandled compilation error: {:?}", err),
         };
@@ -227,12 +214,12 @@ impl<'a> Repl<'a> {
     }
 
     /// Handle parse errors.
-    fn handle_parse_err(&mut self, kind: ParseErrorKind) -> bool {
+    fn handle_parse_err(&mut self, kind: ParseErrKind) -> bool {
         match kind {
-            ParseErrorKind::ScanError(err) => {
+            ParseErrKind::ScanError(err) => {
                 self.handle_scan_err(err.kind, err.location);
             }
-            ParseErrorKind::UnhandledToken(token) => {
+            ParseErrKind::UnhandledToken(token) => {
                 let location = token.start;
                 eprintln!("{: >width$}^", "", width = location.col + 1);
                 eprintln!(
@@ -240,7 +227,7 @@ impl<'a> Repl<'a> {
                     location, token.token
                 );
             }
-            ParseErrorKind::ExpectedBlock(_) => {
+            ParseErrKind::ExpectedBlock(_) => {
                 return true;
             }
             err => {
@@ -251,9 +238,9 @@ impl<'a> Repl<'a> {
     }
 
     /// Handle scan errors.
-    fn handle_scan_err(&mut self, kind: ScanErrorKind, location: Location) -> bool {
+    fn handle_scan_err(&mut self, kind: ScanErrKind, location: Location) -> bool {
         match kind {
-            ScanErrorKind::UnexpectedCharacter(c) => {
+            ScanErrKind::UnexpectedCharacter(c) => {
                 let col = location.col;
                 eprintln!("{: >width$}^", "", width = col + 1);
                 eprintln!(
@@ -261,22 +248,21 @@ impl<'a> Repl<'a> {
                     col, c
                 );
             }
-            ScanErrorKind::UnmatchedOpeningBracket(_)
-            | ScanErrorKind::UnterminatedString(_) => {
+            ScanErrKind::UnmatchedOpeningBracket(_)
+            | ScanErrKind::UnterminatedString(_) => {
                 return true;
             }
-            ScanErrorKind::InvalidIndent(num_spaces) => {
+            ScanErrKind::InvalidIndent(num_spaces) => {
                 let col = location.col;
                 eprintln!("{: >width$}^", "", width = col + 1);
                 eprintln!("Syntax error: invalid indent with {} spaces (should be a multiple of 4)", num_spaces);
             }
-            ScanErrorKind::UnexpectedIndent(_) => {
+            ScanErrKind::UnexpectedIndent(_) => {
                 let col = location.col;
                 eprintln!("{: >width$}^", "", width = col + 1);
                 eprintln!("Syntax error: unexpected indent");
             }
-            ScanErrorKind::WhitespaceAfterIndent
-            | ScanErrorKind::UnexpectedWhitespace => {
+            ScanErrKind::WhitespaceAfterIndent | ScanErrKind::UnexpectedWhitespace => {
                 let col = location.col;
                 eprintln!("{: >width$}^", "", width = col + 1);
                 eprintln!("Syntax error: unexpected whitespace");

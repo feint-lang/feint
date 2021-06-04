@@ -2,7 +2,7 @@
 use std::any::Any;
 use std::fmt;
 
-use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeError};
+use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeErr};
 
 use super::class::TypeRef;
 use super::object::{Object, ObjectExt, ObjectRef};
@@ -43,7 +43,7 @@ impl Object for Bool {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
             Ok(self.is(rhs) || self.value() == rhs.value())
         } else {
-            Err(RuntimeError::new_type_error(format!(
+            Err(RuntimeErr::new_type_error(format!(
                 "Could not compare Bool to {} for equality",
                 rhs.class().name()
             )))
@@ -54,7 +54,7 @@ impl Object for Bool {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
             Ok(*self.value() && *rhs.value())
         } else {
-            Err(RuntimeError::new_type_error(format!(
+            Err(RuntimeErr::new_type_error(format!(
                 "Bool && {} not implemented",
                 rhs.class().name()
             )))
@@ -65,7 +65,7 @@ impl Object for Bool {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
             Ok(*self.value() || *rhs.value())
         } else {
-            Err(RuntimeError::new_type_error(format!(
+            Err(RuntimeErr::new_type_error(format!(
                 "Bool || {} not implemented",
                 rhs.class().name()
             )))

@@ -8,7 +8,7 @@ use num_traits::Num;
 use crate::util::{Location, Source, Stack};
 
 use super::keywords::KEYWORDS;
-use super::result::{ScanError, ScanErrorKind, ScanResult, ScanTokensResult};
+use super::result::{ScanErr, ScanErrKind, ScanResult, ScanTokensResult};
 use super::token::{Token, TokenWithLocation};
 
 type NextOption<'a> = Option<(char, Option<&'a char>, Option<&'a char>)>;
@@ -29,8 +29,8 @@ pub fn scan_file(file_path: &str, debug: bool) -> ScanTokensResult {
     let scanner = match result {
         Ok(scanner) => scanner,
         Err(err) => {
-            return Err(ScanError::new(
-                ScanErrorKind::CouldNotOpenSourceFile(
+            return Err(ScanErr::new(
+                ScanErrKind::CouldNotOpenSourceFile(
                     file_path.to_string(),
                     err.to_string(),
                 ),
@@ -132,7 +132,7 @@ impl<T: BufRead> Scanner<T> {
         Ok(token)
     }
 
-    fn handle_indents(&mut self) -> Result<(), ScanError> {
+    fn handle_indents(&mut self) -> Result<(), ScanErr> {
         assert_eq!(
             self.source.current_char,
             Some('\n'),
@@ -159,16 +159,13 @@ impl<T: BufRead> Scanner<T> {
         // Now we have 0 or more spaces followed by some other char.
         // First, make sure it's a valid indent.
         if num_spaces % 4 != 0 {
-            return Err(ScanError::new(
-                ScanErrorKind::InvalidIndent(num_spaces),
-                start,
-            ));
+            return Err(ScanErr::new(ScanErrKind::InvalidIndent(num_spaces), start));
         }
 
         // Next, make sure the indent isn't followed by additional non-
         // space whitespace, because that would be confusing.
         if whitespace_count > 0 {
-            return Err(ScanError::new(ScanErrorKind::WhitespaceAfterIndent, start));
+            return Err(ScanErr::new(ScanErrKind::WhitespaceAfterIndent, start));
         }
 
         // Now we have something that *could* be a valid indent.
@@ -183,17 +180,14 @@ impl<T: BufRead> Scanner<T> {
         &mut self,
         indent_level: u8,
         start: Location,
-    ) -> Result<(), ScanError> {
+    ) -> Result<(), ScanErr> {
         if self.indent_level.is_none() {
             // Special case for first line of code
             return if indent_level == 0 {
                 self.indent_level = Some(0);
                 Ok(())
             } else {
-                Err(ScanError::new(
-                    ScanErrorKind::UnexpectedIndent(indent_level),
-                    start,
-                ))
+                Err(ScanErr::new(ScanErrKind::UnexpectedIndent(indent_level), start))
             };
         }
 
@@ -220,8 +214,8 @@ impl<T: BufRead> Scanner<T> {
             self.indent_level = Some(current_level);
         } else {
             // Increased by *more* than one level
-            return Err(ScanError::new(
-                ScanErrorKind::UnexpectedIndent(indent_level),
+            return Err(ScanErr::new(
+                ScanErrKind::UnexpectedIndent(indent_level),
                 start,
             ));
         }
@@ -229,15 +223,15 @@ impl<T: BufRead> Scanner<T> {
         Ok(())
     }
 
-    fn add_tokens_to_queue(&mut self) -> Result<(), ScanError> {
+    fn add_tokens_to_queue(&mut self) -> Result<(), ScanErr> {
         let start = self.source.location();
 
         let token = match self.next_char() {
             Some(('"', _, _)) => match self.read_string('"') {
                 (string, true) => Token::String(string),
                 (string, false) => {
-                    return Err(ScanError::new(
-                        ScanErrorKind::UnterminatedString(format!("\"{}", string)),
+                    return Err(ScanErr::new(
+                        ScanErrKind::UnterminatedString(format!("\"{}", string)),
                         start,
                     ));
                 }
@@ -247,8 +241,8 @@ impl<T: BufRead> Scanner<T> {
                 match self.read_string('"') {
                     (string, true) => Token::FormatString(string),
                     (string, false) => {
-                        return Err(ScanError::new(
-                            ScanErrorKind::UnterminatedString(format!("$\"{}", string)),
+                        return Err(ScanErr::new(
+                            ScanErrKind::UnterminatedString(format!("$\"{}", string)),
                             start,
                         ));
                     }
@@ -354,14 +348,14 @@ impl<T: BufRead> Scanner<T> {
             Some((c @ '0'..='9', _, _)) => match self.read_number(c) {
                 (string, _) if string.contains(".") || string.contains("E") => {
                     let value = string.parse::<f64>().map_err(|err| {
-                        ScanError::new(ScanErrorKind::ParseFloatError(err), start)
+                        ScanErr::new(ScanErrKind::ParseFloatError(err), start)
                     })?;
                     Token::Float(value)
                 }
                 (string, radix) => {
                     let value = BigInt::from_str_radix(string.as_str(), radix)
                         .map_err(|err| {
-                            ScanError::new(ScanErrorKind::ParseIntError(err), start)
+                            ScanErr::new(ScanErrKind::ParseIntError(err), start)
                         })?;
                     Token::Int(value)
                 }
@@ -370,8 +364,8 @@ impl<T: BufRead> Scanner<T> {
             // Special case for single underscore placeholder var
             Some(('_', _, _)) => {
                 if self.consume_contiguous('_') > 1 {
-                    return Err(ScanError::new(
-                        ScanErrorKind::UnexpectedCharacter('_'),
+                    return Err(ScanErr::new(
+                        ScanErrKind::UnexpectedCharacter('_'),
                         Location::new(start.line, start.col + 1),
                     ));
                 }
@@ -411,14 +405,11 @@ impl<T: BufRead> Scanner<T> {
                 return Ok(());
             }
             Some((c, _, _)) if c.is_whitespace() => {
-                return Err(ScanError::new(ScanErrorKind::UnexpectedWhitespace, start));
+                return Err(ScanErr::new(ScanErrKind::UnexpectedWhitespace, start));
             }
             // Unknown
             Some((c, _, _)) => {
-                return Err(ScanError::new(
-                    ScanErrorKind::UnexpectedCharacter(c),
-                    start,
-                ));
+                return Err(ScanErr::new(ScanErrKind::UnexpectedCharacter(c), start));
             }
             // End of input
             None => {
@@ -426,8 +417,8 @@ impl<T: BufRead> Scanner<T> {
                     self.maybe_add_end_of_statement_token(start);
                     self.set_indent_level(0, Location::new(start.line + 1, 1))?;
                 } else if let Some((c, location)) = self.bracket_stack.pop() {
-                    return Err(ScanError::new(
-                        ScanErrorKind::UnmatchedOpeningBracket(c),
+                    return Err(ScanErr::new(
+                        ScanErrKind::UnmatchedOpeningBracket(c),
                         location,
                     ));
                 }
@@ -489,7 +480,7 @@ impl<T: BufRead> Scanner<T> {
         closing_bracket: char,
         location: Location,
         token: Token,
-    ) -> Result<Token, ScanError> {
+    ) -> Result<Token, ScanErr> {
         match (self.bracket_stack.pop(), closing_bracket) {
             | (Some(('(', _)), ')')
             | (Some(('[', _)), ']')
@@ -497,8 +488,8 @@ impl<T: BufRead> Scanner<T> {
             => {
                 Ok(token)
             }
-            _ => Err(ScanError::new(
-                ScanErrorKind::UnmatchedClosingBracket(closing_bracket),
+            _ => Err(ScanErr::new(
+                ScanErrKind::UnmatchedClosingBracket(closing_bracket),
                 location,
             ))
         }
@@ -575,14 +566,14 @@ impl<T: BufRead> Scanner<T> {
 
     /// Consume contiguous whitespace up to the end of the line. Return
     /// the number of whitespace characters consumed.
-    fn consume_whitespace(&mut self) -> Result<u8, ScanError> {
+    fn consume_whitespace(&mut self) -> Result<u8, ScanErr> {
         let mut count = 0;
         loop {
             match self.next_char_if(|&c| c.is_whitespace() && c != '\n') {
                 Some(_) => {
                     if count == u8::MAX {
-                        return Err(ScanError::new(
-                            ScanErrorKind::TooMuchWhitespace,
+                        return Err(ScanErr::new(
+                            ScanErrKind::TooMuchWhitespace,
                             self.source.location(),
                         ));
                     }
@@ -610,14 +601,14 @@ impl<T: BufRead> Scanner<T> {
     /// Returns the number of contiguous space characters at the start
     /// of a line. An indent is defined as 4*N space characters followed
     /// by a non-whitespace character.
-    fn read_indent(&mut self) -> Result<u8, ScanError> {
+    fn read_indent(&mut self) -> Result<u8, ScanErr> {
         let mut count = 0;
         loop {
             match self.next_char_if(|&c| c == ' ') {
                 Some(_) => {
                     if count == u8::MAX {
-                        return Err(ScanError::new(
-                            ScanErrorKind::TooMuchWhitespace,
+                        return Err(ScanErr::new(
+                            ScanErrKind::TooMuchWhitespace,
                             self.source.location(),
                         ));
                     }
@@ -945,10 +936,7 @@ mod tests {
         let source = "\"abc";
         match scan_text(source, true) {
             Err(err) => match err {
-                ScanError {
-                    kind: ScanErrorKind::UnterminatedString(string),
-                    location,
-                } => {
+                ScanErr { kind: ScanErrKind::UnterminatedString(string), location } => {
                     assert_eq!(string, source.to_string());
                     assert_eq!(location, Location::new(1, 1));
                     let new_source = source.to_string() + "\"";
@@ -1017,7 +1005,7 @@ g (y) ->  # 6
         let result = scan_text(source, true);
         assert!(result.is_err());
         match result.unwrap_err() {
-            ScanError { kind: ScanErrorKind::UnexpectedIndent(1), location } => {
+            ScanErr { kind: ScanErrKind::UnexpectedIndent(1), location } => {
                 assert_eq!(location.line, 1);
                 assert_eq!(location.col, 1);
             }
@@ -1062,7 +1050,7 @@ b = 3
         match scan_text(source, true) {
             Ok(tokens) => assert!(false),
             Err(err) => match err {
-                ScanError { kind: ScanErrorKind::UnexpectedCharacter(c), location } => {
+                ScanErr { kind: ScanErrKind::UnexpectedCharacter(c), location } => {
                     assert_eq!(c, '{');
                     assert_eq!(location.line, 1);
                     assert_eq!(location.col, 1);

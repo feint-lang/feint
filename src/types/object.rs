@@ -3,7 +3,7 @@ use std::fmt;
 use std::rc::Rc;
 
 use crate::vm::{
-    RuntimeBoolResult, RuntimeContext, RuntimeError, RuntimeErrorKind, RuntimeResult,
+    RuntimeBoolResult, RuntimeContext, RuntimeErr, RuntimeErrKind, RuntimeResult,
 };
 
 use super::class::TypeRef;
@@ -14,7 +14,7 @@ type RustString = std::string::String;
 macro_rules! make_bin_op {
     ( $meth:ident, $op:literal, $result:ty ) => {
         fn $meth(&self, _rhs: ObjectRef, _ctx: &RuntimeContext) -> $result {
-            Err(RuntimeError::new_type_error(format!(
+            Err(RuntimeErr::new_type_error(format!(
                 "Binary operator {} ({}) not implemented for type {}",
                 $op,
                 stringify!($meth),
@@ -27,7 +27,7 @@ macro_rules! make_bin_op {
 macro_rules! make_unary_op {
     ( $meth:ident, $op:literal, $result:ty ) => {
         fn $meth(&self, _ctx: &RuntimeContext) -> $result {
-            Err(RuntimeError::new_type_error(format!(
+            Err(RuntimeErr::new_type_error(format!(
                 "Unary operator {} ({}) not implemented for type {}",
                 $op,
                 stringify!($meth),
@@ -84,16 +84,16 @@ pub trait Object {
 
     // Attributes ------------------------------------------------------
 
-    fn get_attribute(&self, name: &str) -> Result<&ObjectRef, RuntimeError> {
-        Err(RuntimeError::new(RuntimeErrorKind::AttributeDoesNotExist(name.to_owned())))
+    fn get_attribute(&self, name: &str) -> Result<&ObjectRef, RuntimeErr> {
+        Err(RuntimeErr::new(RuntimeErrKind::AttributeDoesNotExist(name.to_owned())))
     }
 
     fn set_attribute(
         &mut self,
         name: &str,
         _value: ObjectRef,
-    ) -> Result<(), RuntimeError> {
-        Err(RuntimeError::new(RuntimeErrorKind::AttributeCannotBeSet(name.to_owned())))
+    ) -> Result<(), RuntimeErr> {
+        Err(RuntimeErr::new(RuntimeErrKind::AttributeCannotBeSet(name.to_owned())))
     }
 }
 

@@ -1,29 +1,29 @@
 use crate::ast;
-use crate::scanner::{ScanError, Token, TokenWithLocation};
+use crate::scanner::{ScanErr, Token, TokenWithLocation};
 use crate::util::Location;
 
-pub type ParseResult = Result<ast::Program, ParseError>;
-pub type StatementsResult = Result<Vec<ast::Statement>, ParseError>;
-pub type ExprResult = Result<ast::Expr, ParseError>;
-pub type ExprOptionResult = Result<Option<ast::Expr>, ParseError>;
-pub type NextTokenResult = Result<Option<TokenWithLocation>, ParseError>;
-pub type NextInfixResult = Result<Option<(TokenWithLocation, u8)>, ParseError>;
-pub type PeekTokenResult<'a> = Result<Option<&'a TokenWithLocation>, ParseError>;
+pub type ParseResult = Result<ast::Program, ParseErr>;
+pub type StatementsResult = Result<Vec<ast::Statement>, ParseErr>;
+pub type ExprResult = Result<ast::Expr, ParseErr>;
+pub type ExprOptionResult = Result<Option<ast::Expr>, ParseErr>;
+pub type NextTokenResult = Result<Option<TokenWithLocation>, ParseErr>;
+pub type NextInfixResult = Result<Option<(TokenWithLocation, u8)>, ParseErr>;
+pub type PeekTokenResult<'a> = Result<Option<&'a TokenWithLocation>, ParseErr>;
 
 #[derive(Clone, Debug)]
-pub struct ParseError {
-    pub kind: ParseErrorKind,
+pub struct ParseErr {
+    pub kind: ParseErrKind,
 }
 
-impl ParseError {
-    pub fn new(kind: ParseErrorKind) -> Self {
+impl ParseErr {
+    pub fn new(kind: ParseErrKind) -> Self {
         Self { kind }
     }
 }
 
 #[derive(Clone, Debug)]
-pub enum ParseErrorKind {
-    ScanError(ScanError),
+pub enum ParseErrKind {
+    ScanError(ScanErr),
     CouldNotOpenSourceFile(String, String),
     UnhandledToken(TokenWithLocation),
     ExpectedExpr(Location),

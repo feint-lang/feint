@@ -1,31 +1,31 @@
 //! # FeInt
 
-use crate::compiler::CompilationErrorKind;
-use crate::parser::ParseErrorKind;
+use crate::compiler::CompilationErrKind;
+use crate::parser::ParseErrKind;
 use crate::result::ExitResult;
-use crate::scanner::ScanErrorKind;
+use crate::scanner::ScanErrKind;
 use crate::util::Location;
-use crate::vm::{self, ExecutionResult, RuntimeErrorKind, VMState, VM};
+use crate::vm::{self, ExeResult, RuntimeErrKind, VMState, VM};
 
 /// Run text source.
-pub fn run_text(text: &str, disassemble: bool, debug: bool) -> ExitResult {
+pub fn run_text(text: &str, dis: bool, debug: bool) -> ExitResult {
     let mut vm = VM::default();
     let mut runner = Runner::new(debug);
-    runner.exit(vm::execute_text(&mut vm, text, disassemble, debug))
+    runner.exit(vm::execute_text(&mut vm, text, dis, debug))
 }
 
 /// Run source from file.
-pub fn run_file(file_path: &str, disassemble: bool, debug: bool) -> ExitResult {
+pub fn run_file(file_path: &str, dis: bool, debug: bool) -> ExitResult {
     let mut vm = VM::default();
     let mut runner = Runner::new(debug);
-    runner.exit(vm::execute_file(&mut vm, file_path, disassemble, debug))
+    runner.exit(vm::execute_file(&mut vm, file_path, dis, debug))
 }
 
 /// Read and run source from stdin.
-pub fn run_stdin(disassemble: bool, debug: bool) -> ExitResult {
+pub fn run_stdin(dis: bool, debug: bool) -> ExitResult {
     let mut vm = VM::default();
     let mut runner = Runner::new(debug);
-    runner.exit(vm::execute_stdin(&mut vm, disassemble, debug))
+    runner.exit(vm::execute_stdin(&mut vm, dis, debug))
 }
 
 struct Runner {
@@ -39,7 +39,7 @@ impl Runner {
 
     /// Take result from VM execution and return an appropriate exit
     /// result.
-    fn exit(&mut self, result: ExecutionResult) -> ExitResult {
+    fn exit(&mut self, result: ExeResult) -> ExitResult {
         match result {
             Ok(vm_state) => self.vm_state_to_exit_result(vm_state),
             Err(err) => self.handle_execution_err(err.kind),
@@ -57,15 +57,15 @@ impl Runner {
         }
     }
 
-    fn handle_execution_err(&mut self, kind: RuntimeErrorKind) -> ExitResult {
+    fn handle_execution_err(&mut self, kind: RuntimeErrKind) -> ExitResult {
         let message = match kind {
-            RuntimeErrorKind::CompilationError(err) => {
+            RuntimeErrKind::CompilationError(err) => {
                 return self.handle_compilation_err(err.kind);
             }
-            RuntimeErrorKind::ParseError(err) => {
+            RuntimeErrKind::ParseError(err) => {
                 return self.handle_parse_err(err.kind);
             }
-            RuntimeErrorKind::TypeError(message) => {
+            RuntimeErrKind::TypeError(message) => {
                 return Err((5, message));
             }
             err => format!("Unhandled execution error: {:?}", err),
@@ -74,7 +74,7 @@ impl Runner {
     }
 
     /// Handle compilation errors.
-    fn handle_compilation_err(&mut self, kind: CompilationErrorKind) -> ExitResult {
+    fn handle_compilation_err(&mut self, kind: CompilationErrKind) -> ExitResult {
         let message = match kind {
             err => format!("Unhandled compilation error: {:?}", err),
         };
@@ -82,15 +82,15 @@ impl Runner {
     }
 
     /// Handle parsing errors.
-    fn handle_parse_err(&mut self, kind: ParseErrorKind) -> ExitResult {
+    fn handle_parse_err(&mut self, kind: ParseErrKind) -> ExitResult {
         let message = match kind {
-            ParseErrorKind::ScanError(err) => {
+            ParseErrKind::ScanError(err) => {
                 return self.handle_scan_err(err.kind, err.location);
             }
-            ParseErrorKind::CouldNotOpenSourceFile(path, message) => {
+            ParseErrKind::CouldNotOpenSourceFile(path, message) => {
                 format!("Could not open source file: {}\n{}", path, message)
             }
-            ParseErrorKind::UnhandledToken(token) => {
+            ParseErrKind::UnhandledToken(token) => {
                 let location = token.start;
                 let col = location.col;
                 let marker = if col == 0 { col } else { col - 1 };
@@ -111,16 +111,12 @@ impl Runner {
     }
 
     /// Handle scan errors.
-    fn handle_scan_err(
-        &mut self,
-        kind: ScanErrorKind,
-        location: Location,
-    ) -> ExitResult {
+    fn handle_scan_err(&mut self, kind: ScanErrKind, location: Location) -> ExitResult {
         let line = location.line;
         let col = location.col;
         let marker = col - 1;
         let message = match kind {
-            ScanErrorKind::UnexpectedCharacter(c) => {
+            ScanErrKind::UnexpectedCharacter(c) => {
                 format!(
                     "{:>width$}^\nSyntax error: unexpected character at column {}: '{}'",
                     "",
@@ -129,27 +125,26 @@ impl Runner {
                     width = marker
                 )
             }
-            ScanErrorKind::UnterminatedString(_) => {
+            ScanErrKind::UnterminatedString(_) => {
                 format!(
                     "{:>width$}^\nSyntax error: unterminated string literal at line {line}, col {col}",
                     "", line = line, col = col, width = marker
                 )
             }
-            ScanErrorKind::InvalidIndent(num_spaces) => {
+            ScanErrKind::InvalidIndent(num_spaces) => {
                 format!(
                     "{:>width$}^\nSyntax error: invalid indent with {} spaces (should be a multiple of 4)",
                     "", num_spaces, width = marker
                 )
             }
-            ScanErrorKind::UnexpectedIndent(_) => {
+            ScanErrKind::UnexpectedIndent(_) => {
                 format!(
                     "{:>width$}^\nSyntax error: unexpected indent",
                     "",
                     width = marker
                 )
             }
-            ScanErrorKind::WhitespaceAfterIndent
-            | ScanErrorKind::UnexpectedWhitespace => {
+            ScanErrKind::WhitespaceAfterIndent | ScanErrKind::UnexpectedWhitespace => {
                 format!(
                     "{:>width$}^\nSyntax error: unexpected whitespace",
                     "",

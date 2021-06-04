@@ -1,9 +1,9 @@
 use crate::util::{BinaryOperator, UnaryOperator};
 
-pub type Instructions = Vec<Instruction>;
+pub type Chunk = Vec<Inst>;
 
-#[derive(Debug)]
-pub enum Instruction {
+#[derive(Debug, PartialEq)]
+pub enum Inst {
     NoOp,
     Push(usize),
     Pop,

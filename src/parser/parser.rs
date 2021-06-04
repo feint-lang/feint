@@ -11,8 +11,7 @@ use super::precedence::{
     get_binary_precedence, get_unary_precedence, is_right_associative,
 };
 use super::result::{
-    ExprOptionResult, ExprResult, NextTokenResult, ParseError, ParseErrorKind,
-    ParseResult,
+    ExprOptionResult, ExprResult, NextTokenResult, ParseErr, ParseErrKind, ParseResult,
 };
 use crate::parser::result::{NextInfixResult, PeekTokenResult, StatementsResult};
 
@@ -72,12 +71,12 @@ impl<T: BufRead> Parser<T> {
         Parser::new(scanner)
     }
 
-    pub fn from_file(file_path: &str) -> Result<Parser<BufReader<File>>, ParseError> {
+    pub fn from_file(file_path: &str) -> Result<Parser<BufReader<File>>, ParseErr> {
         let result = Scanner::<BufReader<File>>::from_file(file_path);
         let scanner = match result {
             Ok(scanner) => scanner,
             Err(err) => {
-                return Err(ParseError::new(ParseErrorKind::CouldNotOpenSourceFile(
+                return Err(ParseErr::new(ParseErrKind::CouldNotOpenSourceFile(
                     file_path.to_string(),
                     err.to_string(),
                 )));
@@ -130,7 +129,7 @@ impl<T: BufRead> Parser<T> {
                     self.current_token = Some(token_with_location.clone());
                     Ok(Some(token_with_location))
                 }
-                Err(err) => Err(ParseError::new(ParseErrorKind::ScanError(err))),
+                Err(err) => Err(ParseErr::new(ParseErrKind::ScanError(err))),
             };
         }
         Ok(None)
@@ -150,7 +149,7 @@ impl<T: BufRead> Parser<T> {
     /// Consume next token and return true if next token is equal to
     /// specified token. Otherwise, leave the token in the stream and
     /// return false.
-    fn next_token_is(&mut self, token: Token) -> Result<bool, ParseError> {
+    fn next_token_is(&mut self, token: Token) -> Result<bool, ParseErr> {
         if let Some(_) = self.next_token_if(|next| next == &token)? {
             return Ok(true);
         }
@@ -180,9 +179,7 @@ impl<T: BufRead> Parser<T> {
             return result
                 .as_ref()
                 .map(|token_with_location| Some(token_with_location))
-                .map_err(|err| {
-                    ParseError::new(ParseErrorKind::ScanError(err.clone()))
-                });
+                .map_err(|err| ParseErr::new(ParseErrKind::ScanError(err.clone())));
         }
         Ok(None)
     }
@@ -198,7 +195,7 @@ impl<T: BufRead> Parser<T> {
 
     /// Look at the next token and return true if it's equal to the
     /// specified token. Otherwise, return false.
-    fn peek_token_is(&mut self, token: Token) -> Result<bool, ParseError> {
+    fn peek_token_is(&mut self, token: Token) -> Result<bool, ParseErr> {
         if let Some(_) = self.peek_token_if(|next| next == &token)? {
             return Ok(true);
         }
@@ -208,14 +205,14 @@ impl<T: BufRead> Parser<T> {
     // Utilities -------------------------------------------------------
 
     /// Create a new ParseError of the specified kind.
-    fn err(&self, kind: ParseErrorKind) -> ParseError {
-        ParseError::new(kind)
+    fn err(&self, kind: ParseErrKind) -> ParseErr {
+        ParseErr::new(kind)
     }
 
     fn collect_until(
         &mut self,
         token: Token,
-    ) -> Result<(bool, Vec<TokenWithLocation>), ParseError> {
+    ) -> Result<(bool, Vec<TokenWithLocation>), ParseErr> {
         let mut collector = vec![];
         while let Some(t) = self.next_token()? {
             if t.token == token {
@@ -226,10 +223,10 @@ impl<T: BufRead> Parser<T> {
         Ok((false, collector))
     }
 
-    fn expect_block(&mut self) -> Result<(), ParseError> {
+    fn expect_block(&mut self) -> Result<(), ParseErr> {
         let end_of_statement = self.next_token_is(Token::EndOfStatement)?;
         if !(end_of_statement && self.next_token_is(Token::ScopeStart)?) {
-            return Err(self.err(ParseErrorKind::ExpectedBlock(self.loc())));
+            return Err(self.err(ParseErrKind::ExpectedBlock(self.loc())));
         }
         Ok(())
     }
@@ -237,7 +234,7 @@ impl<T: BufRead> Parser<T> {
     fn expect_statements(&mut self) -> StatementsResult {
         let statements = self.statements()?;
         if statements.is_empty() {
-            return Err(self.err(ParseErrorKind::ExpectedBlock(self.loc())));
+            return Err(self.err(ParseErrKind::ExpectedBlock(self.loc())));
         }
         Ok(statements)
     }
@@ -276,9 +273,7 @@ impl<T: BufRead> Parser<T> {
                                 statements.push(ast::Statement::new_jump(name));
                             }
                             _ => {
-                                return Err(
-                                    self.err(ParseErrorKind::ExpectedIdent(token))
-                                )
+                                return Err(self.err(ParseErrKind::ExpectedIdent(token)))
                             }
                         }
                     };
@@ -312,7 +307,7 @@ impl<T: BufRead> Parser<T> {
                 //
                 let expr = self.expr()?;
                 if !self.next_token_is(Token::RightParen)? {
-                    return Err(self.err(ParseErrorKind::UnclosedExpr(token.start)));
+                    return Err(self.err(ParseErrKind::UnclosedExpr(token.start)));
                 }
                 expr.unwrap()
             }
@@ -346,25 +341,25 @@ impl<T: BufRead> Parser<T> {
             Token::FuncStart => {
                 // XXX: This should only happened when an otherwise
                 //      unhandled func start token is encountered.
-                return Err(self.err(ParseErrorKind::UnexpectedToken(token)));
+                return Err(self.err(ParseErrKind::UnexpectedToken(token)));
             }
             Token::ScopeStart => {
                 // XXX: This should only happened when an otherwise
                 //      unhandled scope start token is encountered.
-                return Err(self.err(ParseErrorKind::UnexpectedBlock(token.end)));
+                return Err(self.err(ParseErrKind::UnexpectedBlock(token.end)));
             }
             // The token isn't a leaf node, so it *must* be some other
             // kind of prefix token--a unary operation like -1 or !true.
             _ => {
                 let precedence = get_unary_precedence(&token.token);
                 if precedence == 0 {
-                    return Err(self.err(ParseErrorKind::UnhandledToken(token.clone())));
+                    return Err(self.err(ParseErrKind::UnhandledToken(token.clone())));
                 }
                 if let Some(rhs) = self.expr()? {
                     let operator = token.token.as_str();
                     return Ok(Some(ast::Expr::new_unary_op(operator, rhs)));
                 } else {
-                    return Err(self.err(ParseErrorKind::ExpectedExpr(token.end)));
+                    return Err(self.err(ParseErrKind::ExpectedExpr(token.end)));
                 }
             }
         };
@@ -385,7 +380,7 @@ impl<T: BufRead> Parser<T> {
                     let op = infix_token.token.as_str();
                     expr = ast::Expr::new_binary_op(expr, op, rhs);
                 } else {
-                    return Err(self.err(ParseErrorKind::ExpectedExpr(infix_token.end)));
+                    return Err(self.err(ParseErrKind::ExpectedExpr(infix_token.end)));
                 }
             } else {
                 break;
@@ -397,10 +392,8 @@ impl<T: BufRead> Parser<T> {
 
     fn block(&mut self) -> ExprResult {
         if !self.next_token_is(Token::FuncStart)? {
-            return Err(self.err(ParseErrorKind::SyntaxError(
-                "Expected ->".to_owned(),
-                self.loc(),
-            )));
+            return Err(self
+                .err(ParseErrKind::SyntaxError("Expected ->".to_owned(), self.loc())));
         }
         self.expect_block()?;
         self.enter_scope();
@@ -412,7 +405,7 @@ impl<T: BufRead> Parser<T> {
         let (found, tokens) = self.collect_until(Token::RightParen)?;
         if !found {
             self.lookahead_queue.extend(tokens);
-            return Err(self.err(ParseErrorKind::ExpectedToken(loc, Token::RightParen)));
+            return Err(self.err(ParseErrKind::ExpectedToken(loc, Token::RightParen)));
         }
         if self.next_token_is(Token::FuncStart)? {
             // Function def -- tokens are parameters

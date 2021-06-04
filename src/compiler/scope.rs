@@ -115,9 +115,9 @@ pub struct Scope {
     index: usize,
     parent: Option<usize>,
     children: Vec<usize>,
-    /// label name => label instruction address
+    /// label name => label inst address
     labels: HashMap<String, usize>,
-    /// target label name => jump instruction address
+    /// target label name => jump inst address
     jumps: HashMap<String, usize>,
 }
 
