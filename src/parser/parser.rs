@@ -11,7 +11,8 @@ use super::precedence::{
     get_binary_precedence, get_unary_precedence, is_right_associative,
 };
 use super::result::{
-    ExprOptionResult, NextTokenResult, ParseError, ParseErrorKind, ParseResult,
+    ExprOptionResult, ExprResult, NextTokenResult, ParseError, ParseErrorKind,
+    ParseResult,
 };
 use crate::parser::result::{NextInfixResult, PeekTokenResult, StatementsResult};
 
@@ -46,23 +47,20 @@ fn handle_result(result: ParseResult, debug: bool) -> ParseResult {
 }
 
 struct Parser<T: BufRead> {
+    current_token: Option<TokenWithLocation>,
     token_stream: Peekable<Scanner<T>>,
-
-    /// Keep track of tokens until a valid statement is encountered.
-    /// TODO: ???
-    token_queue: VecDeque<TokenWithLocation>,
-
+    lookahead_queue: VecDeque<TokenWithLocation>,
     /// Current operator precedence
     precedence: u8,
-
     expecting_block: bool,
 }
 
 impl<T: BufRead> Parser<T> {
     fn new(scanner: Scanner<T>) -> Self {
         Self {
+            current_token: None,
             token_stream: scanner.peekable(),
-            token_queue: VecDeque::new(),
+            lookahead_queue: VecDeque::new(),
             precedence: 0,
             expecting_block: false,
         }
@@ -114,17 +112,31 @@ impl<T: BufRead> Parser<T> {
 
     // Tokens ----------------------------------------------------------
 
+    fn loc(&self) -> Location {
+        match &self.current_token {
+            Some(token) => token.start,
+            None => Location::new(0, 0),
+        }
+    }
+
     fn next_token(&mut self) -> NextTokenResult {
-        if let Some(result) = self.token_stream.next() {
-            return result
-                .map(|token_with_location| Some(token_with_location))
-                .map_err(|err| {
-                    ParseError::new(ParseErrorKind::ScanError(err.clone()))
-                });
+        if let Some(token_with_location) = self.lookahead_queue.pop_front() {
+            self.current_token = Some(token_with_location.clone());
+            return Ok(Some(token_with_location));
+        } else if let Some(result) = self.token_stream.next() {
+            return match result {
+                Ok(token_with_location) => {
+                    self.current_token = Some(token_with_location.clone());
+                    Ok(Some(token_with_location))
+                }
+                Err(err) => Err(ParseError::new(ParseErrorKind::ScanError(err))),
+            };
         }
         Ok(None)
     }
 
+    /// Consume the next token and return it if the specified condition
+    /// is true. Otherwise, return None.
     fn next_token_if(&mut self, func: impl FnOnce(&Token) -> bool) -> NextTokenResult {
         if let Some(t) = self.peek_token()? {
             if func(&t.token) {
@@ -132,6 +144,16 @@ impl<T: BufRead> Parser<T> {
             }
         }
         Ok(None)
+    }
+
+    /// Consume next token and return true if next token is equal to
+    /// specified token. Otherwise, leave the token in the stream and
+    /// return false.
+    fn next_token_is(&mut self, token: Token) -> Result<bool, ParseError> {
+        if let Some(_) = self.next_token_if(|next| next == &token)? {
+            return Ok(true);
+        }
+        Ok(false)
     }
 
     /// Return the next token along with its precedence *if* it's both
@@ -150,8 +172,10 @@ impl<T: BufRead> Parser<T> {
     }
 
     fn peek_token(&mut self) -> PeekTokenResult {
-        // peek() returns Option<ScanResult>
-        if let Some(result) = self.token_stream.peek() {
+        if let Some(token_with_location) = self.lookahead_queue.front() {
+            return Ok(Some(token_with_location));
+        } else if let Some(result) = self.token_stream.peek() {
+            // token_stream.peek() returns Option<ScanResult>
             return result
                 .as_ref()
                 .map(|token_with_location| Some(token_with_location))
@@ -171,11 +195,50 @@ impl<T: BufRead> Parser<T> {
         Ok(None)
     }
 
-    // Error utilities -------------------------------------------------
+    /// Look at the next token and return true if it's equal to the
+    /// specified token. Otherwise, return false.
+    fn peek_token_is(&mut self, token: Token) -> Result<bool, ParseError> {
+        if let Some(_) = self.peek_token_if(|next| next == &token)? {
+            return Ok(true);
+        }
+        Ok(false)
+    }
+
+    // Utilities -------------------------------------------------------
 
     /// Create a new ParseError of the specified kind.
     fn err(&self, kind: ParseErrorKind) -> ParseError {
         ParseError::new(kind)
+    }
+
+    fn collect_until(
+        &mut self,
+        token: Token,
+    ) -> Result<(bool, Vec<TokenWithLocation>), ParseError> {
+        let mut collector = vec![];
+        while let Some(t) = self.next_token()? {
+            if t.token == token {
+                return Ok((true, collector));
+            }
+            collector.push(t);
+        }
+        Ok((false, collector))
+    }
+
+    fn expect_block(&mut self) -> Result<(), ParseError> {
+        let end_of_statement = self.next_token_is(Token::EndOfStatement)?;
+        if !(end_of_statement && self.next_token_is(Token::ScopeStart)?) {
+            return Err(self.err(ParseErrorKind::ExpectedBlock(self.loc())));
+        }
+        Ok(())
+    }
+
+    fn expect_statements(&mut self) -> StatementsResult {
+        let statements = self.statements()?;
+        if statements.is_empty() {
+            return Err(self.err(ParseErrorKind::ExpectedBlock(self.loc())));
+        }
+        Ok(statements)
     }
 
     // Grammar ---------------------------------------------------------
@@ -247,7 +310,7 @@ impl<T: BufRead> Parser<T> {
             Token::LeftParen => {
                 //
                 let expr = self.expr()?;
-                if self.next_token_if(|t| t == &Token::RightParen)?.is_none() {
+                if !self.next_token_is(Token::RightParen)? {
                     return Err(self.err(ParseErrorKind::UnclosedExpr(token.start)));
                 }
                 expr.unwrap()
@@ -267,21 +330,27 @@ impl<T: BufRead> Parser<T> {
             Token::FormatString(value) => {
                 ast::Expr::new_literal(ast::Literal::new_format_string(value))
             }
-            Token::Ident(name) => ast::Expr::new_ident(ast::Ident::new_ident(name)),
+            Token::Ident(name) => {
+                if self.next_token_is(Token::LeftParen)? {
+                    // Function def or call
+                    return Ok(Some(self.func(name)?));
+                }
+                self.ident(name)?
+            }
             Token::Block => {
-                // block keyword:
-                //     block ->
-                //         ...
-                self.enter_scope();
-                return self.block(token.end);
+                // block ->
+                //     ...
+                return Ok(Some(self.block()?));
+            }
+            Token::FuncStart => {
+                // XXX: This should only happened when an otherwise
+                //      unhandled func start token is encountered.
+                return Err(self.err(ParseErrorKind::UnexpectedToken(token)));
             }
             Token::ScopeStart => {
-                // Start of nested scope
-                if !self.expecting_block {
-                    return Err(self.err(ParseErrorKind::UnexpectedBlock(token.end)));
-                }
-                let statements = self.statements()?;
-                ast::Expr::new_block(statements)
+                // XXX: This should only happened when an otherwise
+                //      unhandled scope start token is encountered.
+                return Err(self.err(ParseErrorKind::UnexpectedBlock(token.end)));
             }
             // The token isn't a leaf node, so it *must* be some other
             // kind of prefix token--a unary operation like -1 or !true.
@@ -325,167 +394,39 @@ impl<T: BufRead> Parser<T> {
         Ok(Some(expr))
     }
 
-    fn block(&mut self, end: Location) -> ExprOptionResult {
-        if let Ok(Some(_)) = self.next_token_if(|t| t == &Token::FuncStart) {
-            if let Ok(Some(_)) = self.next_token_if(|t| t == &Token::EndOfStatement) {
-                if let Ok(Some(_)) = self.peek_token_if(|t| t == &Token::ScopeStart) {
-                    self.expr()
-                } else {
-                    let location = Location::new(end.line + 1, 1);
-                    Err(self.err(ParseErrorKind::ExpectedBlock(location)))
-                }
-            } else {
-                Err(self.err(ParseErrorKind::SyntaxError(
-                    "Expected end of line after ->".to_owned(),
-                    Location::new(end.line, end.col + 4),
-                )))
-            }
-        } else {
-            Err(self.err(ParseErrorKind::SyntaxError(
+    fn block(&mut self) -> ExprResult {
+        if !self.next_token_is(Token::FuncStart)? {
+            return Err(self.err(ParseErrorKind::SyntaxError(
                 "Expected ->".to_owned(),
-                Location::new(end.line, end.col + 2),
-            )))
+                self.loc(),
+            )));
         }
+        self.expect_block()?;
+        self.enter_scope();
+        Ok(ast::Expr::new_block(self.expect_statements()?))
     }
-}
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::util::BinaryOperator;
-    use num_bigint::BigInt;
+    fn ident(&mut self, name: String) -> ExprResult {
+        Ok(ast::Expr::new_ident(ast::Ident::new_ident(name)))
+    }
 
-    #[test]
-    fn parse_empty() {
-        let result = parse_text("", true);
-        if let Ok(program) = result {
-            assert_eq!(program.statements.len(), 0);
-        } else {
-            assert!(false, "Program failed to parse: {:?}", result);
+    fn func(&mut self, name: String) -> ExprResult {
+        let loc = self.loc();
+        let (found, tokens) = self.collect_until(Token::RightParen)?;
+        if !found {
+            self.lookahead_queue.extend(tokens);
+            return Err(self.err(ParseErrorKind::ExpectedToken(loc, Token::RightParen)));
         }
-    }
-
-    #[test]
-    #[rustfmt::skip]
-    fn parse_int() {
-        let result = parse_text("1", true);
-        assert!(result.is_ok());
-        let program = result.unwrap();
-        let statements = program.statements;
-        assert_eq!(statements.len(), 1);
-        let statement = statements.first().unwrap();
-        assert_eq!(
-            *statement,
-            ast::Statement {
-                kind: ast::StatementKind::Expr(
-                    ast::Expr {
-                        kind: ast::ExprKind::Literal(
-                            ast::Literal {
-                                kind: ast::LiteralKind::Int(
-                                    BigInt::from(1)
-                                )
-                            }
-                        )
-                    }
-                )
-            }
-        );
-    }
-
-    #[test]
-    fn parse_simple_assignment() {
-        //      R
-        //      |
-        //      n=
-        //      |
-        //      1
-        let result = parse_text("n = 1", true);
-        if let Ok(program) = result {
-            assert_eq!(program.statements.len(), 1);
-            // TODO: More checks
+        if self.next_token_is(Token::FuncStart)? {
+            // Function def -- tokens are parameters
+            self.expect_block()?;
+            self.enter_scope();
+            let statements = self.expect_statements()?;
+            Ok(ast::Expr::new_func(name.clone(), statements))
         } else {
-            assert!(false, "Program failed to parse: {:?}", result);
-        }
-    }
-
-    #[test]
-    #[rustfmt::skip]
-    fn parse_add() {
-        //      R
-        //      |
-        //      +
-        //     / \
-        //    1   2
-        let result = parse_text("1 + 2", true);
-        assert!(result.is_ok());
-        let program = result.unwrap();
-        let statements = program.statements;
-        assert_eq!(statements.len(), 1);
-        let statement = statements.first().unwrap();
-
-        assert_eq!(
-            *statement,
-            ast::Statement {
-                kind: ast::StatementKind::Expr(
-                    // 1 + 2
-                    ast::Expr {
-                        kind: ast::ExprKind::BinaryOp(
-                            Box::new(
-                                // 1
-                                ast::Expr {
-                                    kind: ast::ExprKind::Literal(
-                                        ast::Literal {
-                                            kind: ast::LiteralKind::Int(BigInt::from(1))
-                                        }
-                                    )
-                                }
-                            ),
-                            // +
-                            BinaryOperator::Add,
-                            Box::new(
-                                // 2
-                                ast::Expr {
-                                    kind: ast::ExprKind::Literal(
-                                        ast::Literal {
-                                            kind: ast::LiteralKind::Int(BigInt::from(2))
-                                        }
-                                    )
-                                }
-                            ),
-                        )
-                    }
-                )
-            }
-        );
-    }
-
-    #[test]
-    fn parse_assign_to_addition() {
-        let result = parse_text("n = 1 + 2", true);
-        if let Ok(program) = result {
-            assert_eq!(program.statements.len(), 1);
-            eprintln!("{:?}", program);
-            // TODO: More checks
-        } else {
-            assert!(false, "Program failed to parse: {:?}", result);
-        }
-    }
-
-    #[test]
-    fn parse_simple_program() {
-        //      ROOT
-        //     /    \
-        //    a=    b=
-        //    |     |
-        //    1     +
-        //         / \
-        //        a   1
-        let result = parse_text("a = 1\nb = a + 2\n", true);
-        if let Ok(program) = result {
-            assert_eq!(program.statements.len(), 2);
-            // TODO: More checks
-        } else {
-            assert!(false, "Program failed to parse");
+            // Function call -- tokens are args
+            // FIXME: Temporary
+            Ok(ast::Expr::new_func(name.clone(), vec![]))
         }
     }
 }

@@ -51,6 +51,30 @@ impl fmt::Debug for Block {
     }
 }
 
+/// Function
+#[derive(PartialEq)]
+pub struct Func {
+    pub name: String,
+    pub statements: Vec<Statement>,
+}
+
+impl Func {
+    pub fn new(name: String, statements: Vec<Statement>) -> Self {
+        Self { name, statements }
+    }
+}
+
+impl fmt::Debug for Func {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let items: Vec<String> = self
+            .statements
+            .iter()
+            .map(|statement| format!("{:?}", statement))
+            .collect();
+        write!(f, "Function() ->\n{}", items.join("\n    "))
+    }
+}
+
 /// Statement - a logical chunk of code.
 #[derive(PartialEq)]
 pub struct Statement {
@@ -123,7 +147,7 @@ pub enum ExprKind {
     UnaryOp(UnaryOperator, Box<Expr>),
     BinaryOp(Box<Expr>, BinaryOperator, Box<Expr>),
     Block(Block),
-    Function(String, Block),
+    Func(Func),
     Literal(Literal),
     Ident(Ident),
 }
@@ -135,6 +159,10 @@ impl Expr {
 
     pub fn new_block(statements: Vec<Statement>) -> Self {
         Self::new(ExprKind::Block(Block::new(statements)))
+    }
+
+    pub fn new_func(name: String, statements: Vec<Statement>) -> Self {
+        Self::new(ExprKind::Func(Func::new(name, statements)))
     }
 
     pub fn new_unary_op(operator: &str, a: Expr) -> Self {
@@ -171,16 +199,20 @@ impl fmt::Debug for Expr {
 impl fmt::Debug for ExprKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Literal(literal) => write!(f, "{:?}", literal),
             Self::UnaryOp(op, b) => write!(f, "({:?}{:?})", op, b),
             Self::BinaryOp(a, op, b) => write!(f, "({:?} {:?} {:?})", a, op, b),
+            Self::Ident(ident) => write!(f, "{:?}", ident),
             Self::Block(block) => {
                 let count = block.statements.len();
                 let ess = if count == 1 { "" } else { "s" };
                 write!(f, "Block with {} statement{}", count, ess)
             }
-            Self::Literal(literal) => write!(f, "{:?}", literal),
-            Self::Ident(ident) => write!(f, "{:?}", ident),
-            Self::Function(name, _) => write!(f, "{}()", name),
+            Self::Func(func) => {
+                let count = func.statements.len();
+                let ess = if count == 1 { "" } else { "s" };
+                write!(f, "{}() -> with {} statement{}", func.name, count, ess)
+            }
         }
     }
 }
