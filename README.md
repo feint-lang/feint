@@ -26,60 +26,69 @@ MIT. See the LICENSE file.
 ## Builtin Types
 
 - Nil
-- Bool (true and false keywords, not ints)
+- Bool (`true` and `false` keywords, not ints)
 - Float (64-bit)
 - Int (BigInt)
 - String
-- Format String (like f"" in Python)
+- Format String (like `f""` in Python)
 - Option
 - Function
-- Range (0..10 and 1...10)
+- Range (`0..10` and `1...10`)
 
 ## Types
 
-Upper camel case only
+- Upper camel case names only
 
-    <Name> ([args])
+```
+<Name> ([args])
 
-        # @ indicates class method
-        @new (value) ->
-            this.value = value
+    # @ indicates class method
+    @new (value) ->
+        this.value = value
 
-    > Name.new(value)
+> <Name>.new(value)
+```
 
 ## Blocks
 
 Blocks create a new scope and return the value of the last expression.
 
-    # Expression value is 4
-    block ->
-        x = 2
-        y = 2
-        x + y
+```
+# Expression value is 4
+block ->
+    x = 2
+    y = 2
+    x + y
+```
 
 ## Functions
 
-Lower snake case only. Value of last evaluated expression is returned.
+- Lower snake case names only
+- Value of last evaluated expression is returned
 
-    <name> ([parameters]) ->
-        <body>
+```
+<name> ([parameters]) ->
+    <body>
 
-    <name> = ([parameters]) -> <expression>
+<name> = ([parameters]) -> <expression>
 
-    <name> = ([parameters]) ->
-        <body>
+<name> = ([parameters]) ->
+    <body>
     
-    (([parameters]) -> <expression>)([arguments])
+(([parameters]) -> <expression>)([arguments])
+```
 
 ## Loops
 
-    # Loop from 0 up to, but not including, 10
-    # Expression value is 9 (last value of i)
-    i <- 0..10
-        print(i)
-
-    <- true
-        break
+```
+# Loop from 0 up to, but not including, 10
+# Expression value is 9 (last value of i)
+i <- 0..10
+    print(i)
+        
+<- true
+    break
+```
 
 ## Jumps
 
@@ -87,11 +96,12 @@ Lower snake case only. Value of last evaluated expression is returned.
 - Backward jumps are disallowed (so no looping via goto)
 - Labels can't be redefined in a scope
 
-
-    my_func () ->
-        ...
-        if true
-            jump exit
-        ...
-        exit:
-        # clean up and return
+```
+my_func () ->
+    ...
+    if true
+        jump exit
+    ...
+    exit:
+    # clean up and return
+```
