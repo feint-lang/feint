@@ -4,6 +4,7 @@ use crate::util::Location;
 
 pub type ParseResult = Result<ast::Program, ParseErr>;
 pub type StatementsResult = Result<Vec<ast::Statement>, ParseErr>;
+pub type StatementsOptionResult = Result<Option<Vec<ast::Statement>>, ParseErr>;
 pub type ExprResult = Result<ast::Expr, ParseErr>;
 pub type ExprOptionResult = Result<Option<ast::Expr>, ParseErr>;
 pub type NextTokenResult = Result<Option<TokenWithLocation>, ParseErr>;
@@ -32,6 +33,7 @@ pub enum ParseErrKind {
     ExpectedIdent(TokenWithLocation),
     SyntaxError(String, Location),
     ExpectedBlock(Location),
+    ExpectedEndOfBlock(Location),
     UnexpectedBlock(Location),
     ExpectedToken(Location, Token),
     UnexpectedToken(TokenWithLocation),

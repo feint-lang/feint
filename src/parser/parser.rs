@@ -11,9 +11,10 @@ use super::precedence::{
     get_binary_precedence, get_unary_precedence, is_right_associative,
 };
 use super::result::{
-    ExprOptionResult, ExprResult, NextTokenResult, ParseErr, ParseErrKind, ParseResult,
+    ExprOptionResult, ExprResult, NextInfixResult, NextTokenResult, ParseErr,
+    ParseErrKind, ParseResult, PeekTokenResult, StatementsOptionResult,
+    StatementsResult,
 };
-use crate::parser::result::{NextInfixResult, PeekTokenResult, StatementsResult};
 
 /// Create a parser from the specified text, scan the text into tokens,
 /// parse the tokens, and return the resulting AST or error.
@@ -204,7 +205,7 @@ impl<T: BufRead> Parser<T> {
         Ok((false, collector))
     }
 
-    fn expect_block(&mut self) -> Result<(), ParseErr> {
+    fn expect_scope(&mut self) -> Result<(), ParseErr> {
         let end_of_statement = self.next_token_is(Token::EndOfStatement)?;
         if !(end_of_statement && self.next_token_is(Token::ScopeStart)?) {
             return Err(ParseErr::new(ParseErrKind::ExpectedBlock(self.loc())));
@@ -212,10 +213,13 @@ impl<T: BufRead> Parser<T> {
         Ok(())
     }
 
-    fn expect_statements(&mut self) -> StatementsResult {
+    fn expect_statement_block(&mut self) -> StatementsResult {
         let statements = self.statements()?;
         if statements.is_empty() {
             return Err(ParseErr::new(ParseErrKind::ExpectedBlock(self.loc())));
+        }
+        if !self.next_token_is(Token::ScopeEnd)? {
+            return Err(ParseErr::new(ParseErrKind::ExpectedEndOfBlock(self.loc())));
         }
         Ok(statements)
     }
@@ -225,64 +229,70 @@ impl<T: BufRead> Parser<T> {
     fn statements(&mut self) -> StatementsResult {
         let mut statements = vec![];
         loop {
-            let token = match self.peek_token()? {
-                Some(token) => token.token.clone(),
+            match self.peek_token()? {
                 None => break,
-            };
-            match token {
-                Token::ScopeEnd => {
-                    self.next_token()?;
-                    break;
-                }
-                Token::Print => {
-                    self.next_token()?;
-                    let statement = match self.expr(0)? {
-                        Some(expr) => ast::Statement::new_expr(expr),
-                        None => ast::Statement::new_string(""),
-                    };
-                    statements.push(statement);
-                    statements.push(ast::Statement::new_print());
-                }
-                Token::Jump => {
-                    self.next_token()?;
-                    if let Some(token) = self.next_token()? {
-                        match token.token {
-                            Token::Ident(name) => {
-                                statements.push(ast::Statement::new_jump(name));
-                            }
-                            _ => {
-                                return Err(ParseErr::new(
-                                    ParseErrKind::ExpectedIdent(token),
-                                ));
-                            }
-                        }
-                    };
-                }
-                Token::Label(name) => {
-                    self.next_token()?;
-                    statements.push(ast::Statement::new_label(name));
-                }
-                _ => {
-                    if let Some(expr) = self.expr(0)? {
-                        let statement = ast::Statement::new_expr(expr);
-                        statements.push(statement);
+                Some(t) => {
+                    if let Token::ScopeEnd = t.token {
+                        break;
                     }
                 }
+            }
+            if let Some(maybe_statement) = self.maybe_statement()? {
+                statements.extend(maybe_statement);
+            } else if let Some(expr) = self.expr(0)? {
+                let statement = ast::Statement::new_expr(expr);
+                statements.push(statement);
             }
         }
         Ok(statements)
     }
 
-    fn expr(&mut self, prec: u8) -> ExprOptionResult {
-        let token = match self.next_token()? {
-            Some(token) => token,
+    fn maybe_statement(&mut self) -> StatementsOptionResult {
+        let mut statements = vec![];
+        let token_with_location = match self.next_token()? {
+            Some(t) => t,
             None => return Ok(None),
         };
-
-        let expr = match token.token {
-            Token::EndOfStatement => {
+        match token_with_location.token {
+            Token::EndOfStatement => {}
+            Token::Print => {
+                let statement = match self.expr(0)? {
+                    Some(expr) => ast::Statement::new_expr(expr),
+                    None => ast::Statement::new_string(""),
+                };
+                statements.push(statement);
+                statements.push(ast::Statement::new_print());
+            }
+            Token::Jump => {
+                if let Some(ident_token) = self.next_token()? {
+                    if let Token::Ident(name) = ident_token.token {
+                        statements.push(ast::Statement::new_jump(name));
+                    } else {
+                        let kind = ParseErrKind::UnexpectedToken(ident_token);
+                        return Err(ParseErr::new(kind));
+                    }
+                } else {
+                    let kind = ParseErrKind::ExpectedIdent(token_with_location);
+                    return Err(ParseErr::new(kind));
+                }
+            }
+            Token::Label(name) => {
+                statements.push(ast::Statement::new_label(name));
+            }
+            _ => {
+                self.lookahead_queue.push_back(token_with_location);
                 return Ok(None);
             }
+        }
+        Ok(Some(statements))
+    }
+
+    fn expr(&mut self, prec: u8) -> ExprOptionResult {
+        let token = match self.next_token()? {
+            Some(t) => t,
+            None => return Ok(None),
+        };
+        let expr = match token.token {
             Token::LeftParen => self.nested_expr()?,
             Token::RightParen => {
                 // XXX: The scanner detects mismatched brackets and
@@ -314,16 +324,9 @@ impl<T: BufRead> Parser<T> {
             Token::Block => {
                 return Ok(Some(self.block()?));
             }
-            Token::FuncStart | Token::ScopeStart => {
-                // XXX: This should only happened when an otherwise
-                //      unhandled start token is encountered.
-                return Err(ParseErr::new(ParseErrKind::UnexpectedBlock(token.end)));
-            }
             _ => self.expect_unary_expr(&token)?,
         };
-
         let expr = self.maybe_binary_expr(prec, expr)?;
-
         Ok(Some(expr))
     }
 
@@ -332,7 +335,7 @@ impl<T: BufRead> Parser<T> {
     fn expect_unary_expr(&mut self, token: &TokenWithLocation) -> ExprResult {
         let prec = get_unary_precedence(&token.token);
         if prec == 0 {
-            Err(ParseErr::new(ParseErrKind::UnhandledToken(token.clone())))
+            Err(ParseErr::new(ParseErrKind::UnexpectedToken(token.clone())))
         } else if let Some(rhs) = self.expr(prec)? {
             let operator = token.token.as_str();
             Ok(ast::Expr::new_unary_op(operator, rhs))
@@ -386,8 +389,8 @@ impl<T: BufRead> Parser<T> {
                 self.loc(),
             )));
         }
-        self.expect_block()?;
-        Ok(ast::Expr::new_block(self.expect_statements()?))
+        self.expect_scope()?;
+        Ok(ast::Expr::new_block(self.expect_statement_block()?))
     }
 
     fn func(&mut self, name: String) -> ExprResult {
@@ -402,8 +405,10 @@ impl<T: BufRead> Parser<T> {
         }
         if self.next_token_is(Token::FuncStart)? {
             // Function def -- tokens are parameters
-            self.expect_block()?;
-            let statements = self.expect_statements()?;
+            self.expect_scope()?;
+            println!("getting statements for func...");
+            let statements = self.expect_statement_block()?;
+            println!("{:?}", statements);
             Ok(ast::Expr::new_func(name.clone(), statements))
         } else {
             // Function call -- tokens are args
