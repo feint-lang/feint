@@ -1,3 +1,4 @@
+//! Parse a stream of tokens into an AST.
 use std::collections::VecDeque;
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Cursor};
@@ -88,11 +89,8 @@ impl<T: BufRead> Parser<T> {
 
     // Parse entry point -----------------------------------------------
 
-    /// Scan source -> tokens
-    /// Parse tokens -> AST
-    /// Walk AST -> instructions
+    /// A program is a list of statements.
     fn parse(&mut self) -> ParseResult {
-        // A program is a list of statements.
         let statements = self.statements()?;
         let program = ast::Program::new(statements);
         Ok(program)
@@ -100,22 +98,25 @@ impl<T: BufRead> Parser<T> {
 
     // Tokens ----------------------------------------------------------
 
+    /// Get the location of the current token.
     fn loc(&self) -> Location {
         match &self.current_token {
-            Some(token) => token.start,
+            Some(t) => t.start,
             None => Location::new(0, 0),
         }
     }
 
+    /// Consume and return the next token unconditionally. If no tokens
+    /// are left, return `None`.
     fn next_token(&mut self) -> NextTokenResult {
-        if let Some(token_with_location) = self.lookahead_queue.pop_front() {
-            self.current_token = Some(token_with_location.clone());
-            return Ok(Some(token_with_location));
+        if let Some(t) = self.lookahead_queue.pop_front() {
+            self.current_token = Some(t.clone());
+            return Ok(Some(t));
         } else if let Some(result) = self.token_stream.next() {
             return match result {
-                Ok(token_with_location) => {
-                    self.current_token = Some(token_with_location.clone());
-                    Ok(Some(token_with_location))
+                Ok(t) => {
+                    self.current_token = Some(t.clone());
+                    Ok(Some(t))
                 }
                 Err(err) => Err(ParseErr::new(ParseErrKind::ScanError(err))),
             };
@@ -124,7 +125,7 @@ impl<T: BufRead> Parser<T> {
     }
 
     /// Consume the next token and return it if the specified condition
-    /// is true. Otherwise, return None.
+    /// is true. Otherwise, return `None`.
     fn next_token_if(&mut self, func: impl FnOnce(&Token) -> bool) -> NextTokenResult {
         if let Some(t) = self.peek_token()? {
             if func(&t.token) {
@@ -134,11 +135,11 @@ impl<T: BufRead> Parser<T> {
         Ok(None)
     }
 
-    /// Consume next token and return true if next token is equal to
-    /// specified token. Otherwise, leave the token in the stream and
+    /// Consume next token and return true *if* the next token is equal
+    /// to specified token. Otherwise, leave the token in the stream and
     /// return false.
     fn next_token_is(&mut self, token: Token) -> Result<bool, ParseErr> {
-        if let Some(_) = self.next_token_if(|next| next == &token)? {
+        if let Some(_) = self.next_token_if(|t| t == &token)? {
             return Ok(true);
         }
         Ok(false)
@@ -158,19 +159,23 @@ impl<T: BufRead> Parser<T> {
         Ok(None)
     }
 
+    /// Return the next token without consuming it. If no tokens are
+    /// left, return `None`.
     fn peek_token(&mut self) -> PeekTokenResult {
-        if let Some(token_with_location) = self.lookahead_queue.front() {
-            return Ok(Some(token_with_location));
+        if let Some(t) = self.lookahead_queue.front() {
+            return Ok(Some(t));
         } else if let Some(result) = self.token_stream.peek() {
             // token_stream.peek() returns Option<ScanResult>
             return result
                 .as_ref()
-                .map(|token_with_location| Some(token_with_location))
+                .map(|t| Some(t))
                 .map_err(|err| ParseErr::new(ParseErrKind::ScanError(err.clone())));
         }
         Ok(None)
     }
 
+    /// Look at the next token and return it if it's equal to the
+    /// specified token. Otherwise, return `None`.
     fn peek_token_if(&mut self, func: impl FnOnce(&Token) -> bool) -> PeekTokenResult {
         if let Some(t) = self.peek_token()? {
             if func(&t.token) {
@@ -183,7 +188,7 @@ impl<T: BufRead> Parser<T> {
     /// Look at the next token and return true if it's equal to the
     /// specified token. Otherwise, return false.
     fn peek_token_is(&mut self, token: Token) -> Result<bool, ParseErr> {
-        if let Some(_) = self.peek_token_if(|next| next == &token)? {
+        if let Some(_) = self.peek_token_if(|t| t == &token)? {
             return Ok(true);
         }
         Ok(false)
@@ -191,6 +196,11 @@ impl<T: BufRead> Parser<T> {
 
     // Utilities -------------------------------------------------------
 
+    /// Collect tokens until the specified token is reached. This is
+    /// used for lookahead. For example, the is used to find the
+    /// parameters/args for a function def/call since the number of
+    /// args is unknown up front and we can't use single-peek token
+    /// inspection techniques.
     fn collect_until(
         &mut self,
         token: Token,
@@ -205,6 +215,8 @@ impl<T: BufRead> Parser<T> {
         Ok((false, collector))
     }
 
+    /// Expect the start of a scope. This is really just a check to
+    /// make sure the token stream is valid.
     fn expect_scope(&mut self) -> Result<(), ParseErr> {
         let end_of_statement = self.next_token_is(Token::EndOfStatement)?;
         if !(end_of_statement && self.next_token_is(Token::ScopeStart)?) {
@@ -213,6 +225,8 @@ impl<T: BufRead> Parser<T> {
         Ok(())
     }
 
+    /// Expect and collect a block of statements. There must be at least
+    /// one statement.
     fn expect_statement_block(&mut self) -> StatementsResult {
         let statements = self.statements()?;
         if statements.is_empty() {
@@ -226,6 +240,8 @@ impl<T: BufRead> Parser<T> {
 
     // Grammar ---------------------------------------------------------
 
+    /// Get a list of statements. Collect statements until there's
+    /// either no more input or the end of a scope is reached.
     fn statements(&mut self) -> StatementsResult {
         let mut statements = vec![];
         loop {
@@ -247,6 +263,9 @@ impl<T: BufRead> Parser<T> {
         Ok(statements)
     }
 
+    /// See if the next statement is a non-expression statement. If so,
+    /// return a list of statements. If not, return `None`. This makes
+    /// the main `statements` method a little tidier.
     fn maybe_statement(&mut self) -> StatementsOptionResult {
         let mut statements = vec![];
         let token_with_location = match self.next_token()? {
@@ -287,6 +306,8 @@ impl<T: BufRead> Parser<T> {
         Ok(Some(statements))
     }
 
+    /// Get the next expression, possibly recurring to handle nested
+    /// expressions, unary & binary expressions, blocks, functions, etc.
     fn expr(&mut self, prec: u8) -> ExprOptionResult {
         let token = match self.next_token()? {
             Some(t) => t,
@@ -330,8 +351,8 @@ impl<T: BufRead> Parser<T> {
         Ok(Some(expr))
     }
 
-    // The current token should represent a unary operator and should be
-    // followed by an expression.
+    /// The current token should represent a unary operator and should
+    /// be followed by an expression.
     fn expect_unary_expr(&mut self, token: &TokenWithLocation) -> ExprResult {
         let prec = get_unary_precedence(&token.token);
         if prec == 0 {
@@ -344,9 +365,9 @@ impl<T: BufRead> Parser<T> {
         }
     }
 
-    // See if the expr is followed by an infix operator. If so, get the
-    // RHS expr and return a binary expression. If not, just return the
-    // original expr.
+    /// See if the expr is followed by an infix operator. If so, get the
+    /// RHS expression and return a binary expression. If not, just
+    /// return the original expr.
     fn maybe_binary_expr(&mut self, prec: u8, mut expr: ast::Expr) -> ExprResult {
         loop {
             let next = self.next_infix_token(prec)?;
@@ -370,6 +391,7 @@ impl<T: BufRead> Parser<T> {
         }
     }
 
+    /// Handle nested expressions (inside parens).
     fn nested_expr(&mut self) -> ExprResult {
         return match self.expr(0)? {
             Some(mut expr) => {
@@ -382,6 +404,7 @@ impl<T: BufRead> Parser<T> {
         };
     }
 
+    /// Handle `block ->`.
     fn block(&mut self) -> ExprResult {
         if !self.next_token_is(Token::FuncStart)? {
             return Err(ParseErr::new(ParseErrKind::SyntaxError(
@@ -393,6 +416,7 @@ impl<T: BufRead> Parser<T> {
         Ok(ast::Expr::new_block(self.expect_statement_block()?))
     }
 
+    /// Handle `func () -> ...` (definition) and `func()` (call).
     fn func(&mut self, name: String) -> ExprResult {
         let loc = self.loc();
         let (found, tokens) = self.collect_until(Token::RightParen)?;
@@ -404,7 +428,7 @@ impl<T: BufRead> Parser<T> {
             )));
         }
         if self.next_token_is(Token::FuncStart)? {
-            // Function def -- tokens are parameters
+            // Function def - tokens are parameters
             self.expect_scope()?;
             println!("getting statements for func...");
             let statements = self.expect_statement_block()?;
