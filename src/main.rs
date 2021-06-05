@@ -42,7 +42,7 @@ fn main() {
         )
         .arg(
             Arg::with_name("dis")
-                .short("D")
+                .short("i")
                 .long("dis")
                 .required(false)
                 .takes_value(false)

@@ -61,12 +61,21 @@ pub fn execute_program(
 
 pub fn execute(vm: &mut VM, instructions: Chunk, dis: bool, debug: bool) -> ExeResult {
     let result = if cfg!(debug_assertions) {
+        if dis {
+            eprintln!("{:=<72}", "INSTRUCTIONS ");
+        } else if debug {
+            eprintln!("{:=<72}", "OUTPUT ");
+        }
         vm.execute(instructions, dis)
     } else if dis {
+        eprintln!("{:=<72}", "INSTRUCTIONS ");
         let result = vm.dis_list(&instructions);
         eprintln!("NOTE: Full disassembly is only available in debug builds");
         result
     } else {
+        if debug {
+            eprintln!("{:=<72}", "OUTPUT ");
+        }
         vm.execute(instructions, false)
     };
     if debug {
@@ -417,10 +426,16 @@ impl VM {
                 let obj = self.ctx.get_obj(*index).unwrap();
                 self.format_aligned("LOAD_CONST", format!("{} ({:?})", index, obj))
             }
+            DeclareVar(name) => self.format_aligned("DECLARE_VAR", name),
             AssignVar(name) => {
                 let index = self.peek().unwrap_or(&0);
                 let obj = self.ctx.get_obj(*index).unwrap();
-                self.format_aligned("ASSIGN", format!("{} ({:?})", name, obj))
+                self.format_aligned("ASSIGN_VAR", format!("{} ({:?})", name, obj))
+            }
+            LoadVar(name) => {
+                let index = self.peek().unwrap_or(&0);
+                let obj = self.ctx.get_obj(*index).unwrap();
+                self.format_aligned("LOAD_VAR", format!("{} ({:?})", name, obj))
             }
             UnaryOp(operator) => self.format_aligned("UNARY_OP", operator),
             BinaryOp(operator) => self.format_aligned("BINARY_OP", operator),

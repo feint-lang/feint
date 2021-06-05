@@ -139,6 +139,16 @@ fn parse_simple_program() {
 }
 
 #[test]
+fn parse_precedence() {
+    let result = parse_text("1 + 2 + 3", true);
+    if let Ok(program) = result {
+        assert_eq!(program.statements.len(), 1);
+    } else {
+        assert!(false, "Program failed to parse");
+    }
+}
+
+#[test]
 fn parse_func_def() {
     let source = "\
 func (x, y) -> 
