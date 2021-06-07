@@ -1,3 +1,4 @@
+# block.fi
 print "start =========================================================="
 
 jump y
@@ -7,6 +8,10 @@ y: block ->
     jump x
 
 x: print "found"
+print true && false
+print true || false
+print 1 / 2
+print 1 // 2
 
 block ->
     block ->

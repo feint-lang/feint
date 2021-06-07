@@ -46,7 +46,7 @@ impl<'a> Repl<'a> {
                     // Evaluate the input. If eval returns a result of
                     // any kind (ok or err), exit the loop and shut down
                     // the REPL.
-                    match self.eval(input.as_str()) {
+                    match self.eval(input.as_str(), false) {
                         Some(result) => {
                             self.vm.halt();
                             break result;
@@ -87,15 +87,15 @@ impl<'a> Repl<'a> {
     /// Evaluate text. Returns None to indicate to the main loop to
     /// continue reading and evaluating input. Returns some result to
     /// indicate to the main loop to exit.
-    fn eval(&mut self, text: &str) -> Option<ExitResult> {
+    fn eval(&mut self, text: &str, bail: bool) -> Option<ExitResult> {
         self.add_history_entry(text);
 
         let result = match text.trim() {
-            "?" => {
+            "?" | ".help" => {
                 eprintln!("{:=>72}", "");
                 eprintln!("FeInt Help");
                 eprintln!("{:->72}", "");
-                eprintln!("?      -> show help");
+                eprintln!(".help  -> show help");
                 eprintln!(".exit  -> exit");
                 eprintln!(".stack -> show VM stack (top first)");
                 eprintln!("{:=>72}", "");
@@ -138,7 +138,7 @@ impl<'a> Repl<'a> {
 
         let err = result.unwrap_err();
 
-        if self.handle_execution_err(err.kind) {
+        if self.handle_execution_err(err.kind, bail) {
             // Keep adding input until 2 successive blank lines are
             // entered.
             let mut input = text.to_owned();
@@ -149,7 +149,7 @@ impl<'a> Repl<'a> {
                     Ok(Some(new_input)) if new_input == "" => {
                         input.push('\n');
                         if blank_line_count > 0 {
-                            break self.eval(input.as_str());
+                            break self.eval(input.as_str(), true);
                         }
                         blank_line_count += 1;
                     }
@@ -157,7 +157,7 @@ impl<'a> Repl<'a> {
                         input.push('\n');
                         input.push_str(new_input.as_str());
                         if blank_line_count > 0 {
-                            break self.eval(input.as_str());
+                            break self.eval(input.as_str(), true);
                         }
                         blank_line_count = 0;
                     }
@@ -185,13 +185,13 @@ impl<'a> Repl<'a> {
     /// text to the original input while false means eval should give up
     /// on the input that caused the error. This applies to execution
     /// errors and any nested error types.
-    fn handle_execution_err(&mut self, kind: RuntimeErrKind) -> bool {
+    fn handle_execution_err(&mut self, kind: RuntimeErrKind, bail: bool) -> bool {
         let message = match kind {
-            RuntimeErrKind::ParseError(err) => {
-                return self.handle_parse_err(err.kind);
-            }
             RuntimeErrKind::CompilationError(err) => {
-                return self.handle_compilation_err(err.kind);
+                return self.handle_compilation_err(err.kind, bail);
+            }
+            RuntimeErrKind::ParseError(err) => {
+                return self.handle_parse_err(err.kind, bail);
             }
             RuntimeErrKind::TypeError(message) => {
                 format!("{}", message)
@@ -205,7 +205,7 @@ impl<'a> Repl<'a> {
     }
 
     /// Handle compilation errors.
-    fn handle_compilation_err(&mut self, kind: CompilationErrKind) -> bool {
+    fn handle_compilation_err(&mut self, kind: CompilationErrKind, bail: bool) -> bool {
         let message = match kind {
             err => format!("Unhandled compilation error: {:?}", err),
         };
@@ -214,21 +214,23 @@ impl<'a> Repl<'a> {
     }
 
     /// Handle parse errors.
-    fn handle_parse_err(&mut self, kind: ParseErrKind) -> bool {
+    fn handle_parse_err(&mut self, kind: ParseErrKind, bail: bool) -> bool {
         match kind {
             ParseErrKind::ScanError(err) => {
-                self.handle_scan_err(err.kind, err.location);
+                return self.handle_scan_err(err.kind, err.location, bail);
             }
             ParseErrKind::UnhandledToken(token) => {
-                let location = token.start;
-                eprintln!("{: >width$}^", "", width = location.col + 1);
-                eprintln!(
-                    "Parse error: unhandled token at {}: {:?}",
-                    location, token.token
-                );
+                let loc = token.start;
+                eprintln!("{: >width$}^", "", width = loc.col + 1);
+                eprintln!("Parse error: unhandled token at {}: {:?}", loc, token.token);
             }
-            ParseErrKind::ExpectedBlock(_) => {
-                return true;
+            ParseErrKind::ExpectedBlock(loc) => {
+                if bail {
+                    eprintln!("{: >width$}^", "", width = loc.col + 1);
+                    eprintln!("Parse error: expected indented block at {}", loc);
+                } else {
+                    return true;
+                }
             }
             err => {
                 eprintln!("Unhandled parse error: {:?}", err);
@@ -238,10 +240,15 @@ impl<'a> Repl<'a> {
     }
 
     /// Handle scan errors.
-    fn handle_scan_err(&mut self, kind: ScanErrKind, location: Location) -> bool {
+    fn handle_scan_err(
+        &mut self,
+        kind: ScanErrKind,
+        loc: Location,
+        bail: bool,
+    ) -> bool {
         match kind {
             ScanErrKind::UnexpectedCharacter(c) => {
-                let col = location.col;
+                let col = loc.col;
                 eprintln!("{: >width$}^", "", width = col + 1);
                 eprintln!(
                     "Syntax error: unexpected character at column {}: '{}'",
@@ -253,22 +260,22 @@ impl<'a> Repl<'a> {
                 return true;
             }
             ScanErrKind::InvalidIndent(num_spaces) => {
-                let col = location.col;
+                let col = loc.col;
                 eprintln!("{: >width$}^", "", width = col + 1);
                 eprintln!("Syntax error: invalid indent with {} spaces (should be a multiple of 4)", num_spaces);
             }
             ScanErrKind::UnexpectedIndent(_) => {
-                let col = location.col;
+                let col = loc.col;
                 eprintln!("{: >width$}^", "", width = col + 1);
                 eprintln!("Syntax error: unexpected indent");
             }
             ScanErrKind::WhitespaceAfterIndent | ScanErrKind::UnexpectedWhitespace => {
-                let col = location.col;
+                let col = loc.col;
                 eprintln!("{: >width$}^", "", width = col + 1);
                 eprintln!("Syntax error: unexpected whitespace");
             }
             err => {
-                eprintln!("Unhandled scan error at {}: {:?}", location, err);
+                eprintln!("Unhandled scan error at {}: {:?}", loc, err);
             }
         }
         false
@@ -329,7 +336,7 @@ mod tests {
     //       newline to stdin.
     // #[test]
     // fn eval_unterminated_string() {
-    //     eval("x = \"abc");
+    //     eval("x = \"abc", true);
     // }
 
     // Utilities -----------------------------------------------------------
@@ -341,7 +348,7 @@ mod tests {
 
     fn eval(input: &str) {
         let mut runner = new();
-        match runner.eval(input) {
+        match runner.eval(input, true) {
             Some(Ok(string)) => assert!(false),
             Some(Err((code, string))) => assert!(false),
             None => assert!(true), // eval returns None on valid input
