@@ -149,16 +149,15 @@ fn parse_precedence() {
 }
 
 #[test]
-fn parse_func_def() {
+fn parse_func() {
     let source = "\
 func (x, y) -> 
-    print x
-    print y
     x + y
+
+func(1, 2)
 ";
     let result = parse_text(source, true);
     if let Ok(program) = result {
-        eprintln!("{:?}", program);
     } else {
         assert!(false, "Function def failed to parse: {:?}", result.unwrap_err());
     }

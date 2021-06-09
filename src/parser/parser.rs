@@ -2,10 +2,10 @@
 use std::collections::VecDeque;
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Cursor};
-use std::iter::Peekable;
+use std::iter::{Iterator, Peekable};
 
 use crate::ast;
-use crate::scanner::{Scanner, Token, TokenWithLocation};
+use crate::scanner::{ScanResult, Scanner, Token, TokenWithLocation};
 use crate::util::Location;
 
 use super::precedence::{
@@ -16,25 +16,47 @@ use super::result::{
     ParseErrKind, ParseResult, PeekTokenResult, StatementsOptionResult,
     StatementsResult,
 };
+use crate::ast::ExprKind;
+use crate::ast::StatementKind::Expr;
 
-/// Create a parser from the specified text, scan the text into tokens,
-/// parse the tokens, and return the resulting AST or error.
+/// Scan the text into tokens, parse the tokens, and return the
+/// resulting AST or error.
 pub fn parse_text(text: &str, debug: bool) -> ParseResult {
-    let mut parser = Parser::<Cursor<&str>>::from_text(text);
+    let scanner = Scanner::<Cursor<&str>>::from_text(text);
+    let mut parser = Parser::new(scanner.into_iter());
     handle_result(parser.parse(), debug)
 }
 
-/// Create a parser from the specified file, scan its text into tokens,
-/// parse the tokens, and return the resulting AST or error.
+/// Scan the file into tokens, parse the tokens, and return the
+/// resulting AST or error.
 pub fn parse_file(file_path: &str, debug: bool) -> ParseResult {
-    let mut parser = Parser::<BufReader<File>>::from_file(file_path)?;
+    let result = Scanner::<BufReader<File>>::from_file(file_path);
+    let scanner = match result {
+        Ok(scanner) => scanner,
+        Err(err) => {
+            return Err(ParseErr::new(ParseErrKind::CouldNotOpenSourceFile(
+                file_path.to_string(),
+                err.to_string(),
+            )));
+        }
+    };
+    let mut parser = Parser::new(scanner.into_iter());
     handle_result(parser.parse(), debug)
 }
 
-/// Create a parser from stdin, scan the text into tokens, parse the
-/// tokens, and return the resulting AST or error.
+/// Scan text from stdin into tokens, parse the tokens, and return the
+/// resulting AST or error.
 pub fn parse_stdin(debug: bool) -> ParseResult {
-    let mut parser = Parser::<BufReader<io::Stdin>>::from_stdin();
+    let scanner = Scanner::<BufReader<io::Stdin>>::from_stdin();
+    let mut parser = Parser::new(scanner.into_iter());
+    handle_result(parser.parse(), debug)
+}
+
+/// Parse tokens and return the resulting AST or error.
+pub fn parse_tokens(tokens: Vec<TokenWithLocation>, debug: bool) -> ParseResult {
+    let scanner: Vec<ScanResult> = vec![];
+    let mut parser = Parser::new(scanner.into_iter());
+    parser.lookahead_queue.extend(tokens);
     handle_result(parser.parse(), debug)
 }
 
@@ -48,43 +70,19 @@ fn handle_result(result: ParseResult, debug: bool) -> ParseResult {
     })
 }
 
-struct Parser<T: BufRead> {
+struct Parser<I: Iterator<Item = ScanResult>> {
     current_token: Option<TokenWithLocation>,
-    token_stream: Peekable<Scanner<T>>,
+    token_stream: Peekable<I>,
     lookahead_queue: VecDeque<TokenWithLocation>,
 }
 
-impl<T: BufRead> Parser<T> {
-    fn new(scanner: Scanner<T>) -> Self {
+impl<I: Iterator<Item = ScanResult>> Parser<I> {
+    fn new(token_iter: I) -> Self {
         Self {
             current_token: None,
-            token_stream: scanner.peekable(),
+            token_stream: token_iter.peekable(),
             lookahead_queue: VecDeque::new(),
         }
-    }
-
-    pub fn from_text(text: &str) -> Parser<Cursor<&str>> {
-        let scanner = Scanner::<Cursor<&str>>::from_text(text);
-        Parser::new(scanner)
-    }
-
-    pub fn from_file(file_path: &str) -> Result<Parser<BufReader<File>>, ParseErr> {
-        let result = Scanner::<BufReader<File>>::from_file(file_path);
-        let scanner = match result {
-            Ok(scanner) => scanner,
-            Err(err) => {
-                return Err(ParseErr::new(ParseErrKind::CouldNotOpenSourceFile(
-                    file_path.to_string(),
-                    err.to_string(),
-                )));
-            }
-        };
-        Ok(Parser::new(scanner))
-    }
-
-    pub fn from_stdin() -> Parser<BufReader<io::Stdin>> {
-        let scanner = Scanner::<BufReader<io::Stdin>>::from_stdin();
-        Parser::new(scanner)
     }
 
     // Parse entry point -----------------------------------------------
@@ -113,13 +111,9 @@ impl<T: BufRead> Parser<T> {
             self.current_token = Some(t.clone());
             return Ok(Some(t));
         } else if let Some(result) = self.token_stream.next() {
-            return match result {
-                Ok(t) => {
-                    self.current_token = Some(t.clone());
-                    Ok(Some(t))
-                }
-                Err(err) => Err(ParseErr::new(ParseErrKind::ScanError(err))),
-            };
+            return result
+                .map(|t| Some(t))
+                .map_err(|err| ParseErr::new(ParseErrKind::ScanError(err.clone())));
         }
         Ok(None)
     }
@@ -165,7 +159,6 @@ impl<T: BufRead> Parser<T> {
         if let Some(t) = self.lookahead_queue.front() {
             return Ok(Some(t));
         } else if let Some(result) = self.token_stream.peek() {
-            // token_stream.peek() returns Option<ScanResult>
             return result
                 .as_ref()
                 .map(|t| Some(t))
@@ -206,9 +199,13 @@ impl<T: BufRead> Parser<T> {
         token: Token,
     ) -> Result<(bool, Vec<TokenWithLocation>), ParseErr> {
         let mut collector = vec![];
+        let mut nesting_level = 0;
         while let Some(t) = self.next_token()? {
-            if t.token == token {
+            if t.token == token && nesting_level == 0 {
                 return Ok((true, collector));
+            }
+            if token == Token::RightParen && t.token == Token::LeftParen {
+                nesting_level += 1;
             }
             collector.push(t);
         }
@@ -429,15 +426,40 @@ impl<T: BufRead> Parser<T> {
         }
         if self.next_token_is(Token::FuncStart)? {
             // Function def - tokens are parameters
+            let params = self.parse_params(tokens)?;
             self.expect_scope()?;
-            println!("getting statements for func...");
             let statements = self.expect_statement_block()?;
-            println!("{:?}", statements);
-            Ok(ast::Expr::new_func(name.clone(), statements))
+            Ok(ast::Expr::new_func(name.clone(), params, statements))
         } else {
             // Function call -- tokens are args
-            // FIXME: Temporary
-            Ok(ast::Expr::new_func(name.clone(), vec![]))
+            let args = parse_tokens(tokens, false)?;
+            let args = args.statements;
+            let args = vec![];
+            Ok(ast::Expr::new_call(name.clone(), args))
         }
+    }
+
+    fn parse_params(
+        &self,
+        tokens: Vec<TokenWithLocation>,
+    ) -> Result<Vec<String>, ParseErr> {
+        let mut params = vec![];
+        let program = parse_tokens(tokens, false)?;
+        for statement in program.statements {
+            let kind = statement.kind;
+            if let ast::StatementKind::Expr(ast::Expr {
+                kind:
+                    ast::ExprKind::Ident(ast::Ident { kind: ast::IdentKind::Ident(name) }),
+            }) = kind
+            {
+                params.push(name);
+            } else {
+                return Err(ParseErr::new(ParseErrKind::SyntaxError(
+                    "Expected identifier".to_owned(),
+                    self.loc(),
+                )));
+            }
+        }
+        Ok(params)
     }
 }

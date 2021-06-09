@@ -7,3 +7,6 @@ mod keywords;
 mod result;
 mod scanner;
 mod token;
+
+#[cfg(test)]
+mod tests;
