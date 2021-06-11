@@ -12,9 +12,8 @@ use super::precedence::{
     get_binary_precedence, get_unary_precedence, is_right_associative,
 };
 use super::result::{
-    ExprOptionResult, ExprResult, NextInfixResult, NextTokenResult, ParseErr,
-    ParseErrKind, ParseResult, PeekTokenResult, StatementsOptionResult,
-    StatementsResult,
+    BoolResult, ExprResult, NextInfixResult, NextTokenResult, ParseErr, ParseErrKind,
+    ParseResult, PeekTokenResult, StatementResult, StatementsResult,
 };
 use crate::ast::ExprKind;
 use crate::ast::StatementKind::Expr;
@@ -104,18 +103,58 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
         }
     }
 
+    /// Get location after current token.
+    fn next_loc(&self) -> Location {
+        if let Some(t) = &self.current_token {
+            match t.token {
+                Token::EndOfStatement => Location::new(t.end.line + 1, 1),
+                _ => Location::new(t.end.line, t.end.col + 1),
+            }
+        } else {
+            Location::new(0, 0)
+        }
+    }
+
+    /// Are there any tokens left in the stream?
+    fn has_tokens(&mut self) -> BoolResult {
+        Ok(self.peek_token()?.is_some())
+    }
+
     /// Consume and return the next token unconditionally. If no tokens
     /// are left, return `None`.
     fn next_token(&mut self) -> NextTokenResult {
         if let Some(t) = self.lookahead_queue.pop_front() {
             self.current_token = Some(t.clone());
             return Ok(Some(t));
-        } else if let Some(result) = self.token_stream.next() {
-            return result
-                .map(|t| Some(t))
-                .map_err(|err| ParseErr::new(ParseErrKind::ScanError(err.clone())));
         }
-        Ok(None)
+        match self.token_stream.next() {
+            Some(Ok(t)) => {
+                self.current_token = Some(t.clone());
+                Ok(Some(t))
+            }
+            Some(Err(err)) => Err(ParseErr::new(ParseErrKind::ScanError(err.clone()))),
+            None => Ok(None),
+        }
+    }
+
+    /// Get the next token. If there isn't a next token, panic! This is
+    /// used where there *should* be a next token and if there isn't
+    /// that indicates an internal logic/processing error.
+    fn expect_next_token(&mut self) -> Result<TokenWithLocation, ParseErr> {
+        Ok(self.next_token()?.expect("Expected token"))
+    }
+
+    /// Expect the next token to be the specified token. If it is,
+    /// consume the token and return nothing. If it's not, return an
+    /// error.
+    fn expect_token(&mut self, token: &Token) -> Result<(), ParseErr> {
+        if !self.next_token_is(token)? {
+            return Err(ParseErr::new(ParseErrKind::SyntaxError(
+                format!("Expected {}", token),
+                self.next_loc(),
+            )));
+        }
+        Ok(())
     }
 
     /// Consume the next token and return it if the specified condition
@@ -132,8 +171,8 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
     /// Consume next token and return true *if* the next token is equal
     /// to specified token. Otherwise, leave the token in the stream and
     /// return false.
-    fn next_token_is(&mut self, token: Token) -> Result<bool, ParseErr> {
-        if let Some(_) = self.next_token_if(|t| t == &token)? {
+    fn next_token_is(&mut self, token: &Token) -> BoolResult {
+        if let Some(_) = self.next_token_if(|t| t == token)? {
             return Ok(true);
         }
         Ok(false)
@@ -180,8 +219,8 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
 
     /// Look at the next token and return true if it's equal to the
     /// specified token. Otherwise, return false.
-    fn peek_token_is(&mut self, token: Token) -> Result<bool, ParseErr> {
-        if let Some(_) = self.peek_token_if(|t| t == &token)? {
+    fn peek_token_is(&mut self, token: &Token) -> BoolResult {
+        if let Some(_) = self.peek_token_if(|t| t == token)? {
             return Ok(true);
         }
         Ok(false)
@@ -215,10 +254,8 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
     /// Expect the start of a scope. This is really just a check to
     /// make sure the token stream is valid.
     fn expect_scope(&mut self) -> Result<(), ParseErr> {
-        let end_of_statement = self.next_token_is(Token::EndOfStatement)?;
-        if !(end_of_statement && self.next_token_is(Token::ScopeStart)?) {
-            return Err(ParseErr::new(ParseErrKind::ExpectedBlock(self.loc())));
-        }
+        self.expect_token(&Token::EndOfStatement)?;
+        self.expect_token(&Token::ScopeStart)?;
         Ok(())
     }
 
@@ -227,11 +264,9 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
     fn expect_statement_block(&mut self) -> StatementsResult {
         let statements = self.statements()?;
         if statements.is_empty() {
-            return Err(ParseErr::new(ParseErrKind::ExpectedBlock(self.loc())));
+            return Err(ParseErr::new(ParseErrKind::ExpectedBlock(self.next_loc())));
         }
-        if !self.next_token_is(Token::ScopeEnd)? {
-            return Err(ParseErr::new(ParseErrKind::ExpectedEndOfBlock(self.loc())));
-        }
+        self.expect_token(&Token::ScopeEnd)?;
         Ok(statements)
     }
 
@@ -242,75 +277,69 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
     fn statements(&mut self) -> StatementsResult {
         let mut statements = vec![];
         loop {
-            match self.peek_token()? {
-                None => break,
-                Some(t) => {
-                    if let Token::ScopeEnd = t.token {
-                        break;
-                    }
-                }
+            if !self.has_tokens()? || self.peek_token_is(&Token::ScopeEnd)? {
+                break;
             }
-            if let Some(maybe_statement) = self.maybe_statement()? {
-                statements.extend(maybe_statement);
-            } else if let Some(expr) = self.expr(0)? {
-                let statement = ast::Statement::new_expr(expr);
-                statements.push(statement);
-            }
+            let statement = self.statement()?;
+            statements.push(statement);
         }
         Ok(statements)
     }
 
-    /// See if the next statement is a non-expression statement. If so,
-    /// return a list of statements. If not, return `None`. This makes
-    /// the main `statements` method a little tidier.
-    fn maybe_statement(&mut self) -> StatementsOptionResult {
-        let mut statements = vec![];
-        let token_with_location = match self.next_token()? {
-            Some(t) => t,
-            None => return Ok(None),
-        };
-        match token_with_location.token {
-            Token::EndOfStatement => {}
+    /// Get the next statement (which might be an expression).
+    fn statement(&mut self) -> StatementResult {
+        let token = self.expect_next_token()?;
+        let statement = match token.token {
+            /// XXX: The print statement is temporary until functions
+            ///      are implemented. The shenanigans below are so that
+            ///      print statements have similar syntax to the
+            ///      eventual built in print function.
             Token::Print => {
-                let statement = match self.expr(0)? {
-                    Some(expr) => ast::Statement::new_expr(expr),
-                    None => ast::Statement::new_string(""),
+                self.expect_token(&Token::LeftParen)?;
+                let expr = if self.peek_token_is(&Token::RightParen)? {
+                    ast::Expr::new_string("")
+                } else if self.has_tokens()? {
+                    self.expr(0)?
+                } else {
+                    return Err(ParseErr::new(ParseErrKind::ExpectedExpr(
+                        self.next_loc(),
+                    )));
                 };
-                statements.push(statement);
-                statements.push(ast::Statement::new_print());
+                self.expect_token(&Token::RightParen)?;
+                self.expect_token(&Token::EndOfStatement)?;
+                ast::Statement::new_print(expr)
             }
             Token::Jump => {
                 if let Some(ident_token) = self.next_token()? {
                     if let Token::Ident(name) = ident_token.token {
-                        statements.push(ast::Statement::new_jump(name));
+                        self.expect_token(&Token::EndOfStatement)?;
+                        ast::Statement::new_jump(name)
                     } else {
                         let kind = ParseErrKind::UnexpectedToken(ident_token);
                         return Err(ParseErr::new(kind));
                     }
                 } else {
-                    let kind = ParseErrKind::ExpectedIdent(token_with_location);
+                    let kind = ParseErrKind::ExpectedIdent(token);
                     return Err(ParseErr::new(kind));
                 }
             }
-            Token::Label(name) => {
-                statements.push(ast::Statement::new_label(name));
-            }
+            Token::Label(name) => ast::Statement::new_label(name),
             _ => {
-                self.lookahead_queue.push_back(token_with_location);
-                return Ok(None);
+                self.lookahead_queue.push_back(token);
+                let expr = self.expr(0)?;
+                ast::Statement::new_expr(expr)
             }
-        }
-        Ok(Some(statements))
+        };
+        // Consume optional EOS
+        self.next_token_is(&Token::EndOfStatement)?;
+        Ok(statement)
     }
 
     /// Get the next expression, possibly recurring to handle nested
     /// expressions, unary & binary expressions, blocks, functions, etc.
-    fn expr(&mut self, prec: u8) -> ExprOptionResult {
-        let token = match self.next_token()? {
-            Some(t) => t,
-            None => return Ok(None),
-        };
-        let expr = match token.token {
+    fn expr(&mut self, prec: u8) -> ExprResult {
+        let token = self.expect_next_token()?;
+        let mut expr = match token.token {
             Token::LeftParen => self.nested_expr()?,
             Token::RightParen => {
                 // XXX: The scanner detects mismatched brackets and
@@ -333,33 +362,49 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
                 ast::Expr::new_literal(ast::Literal::new_format_string(value))
             }
             Token::Ident(name) => {
-                if self.next_token_is(Token::LeftParen)? {
+                if self.next_token_is(&Token::LeftParen)? {
                     // Function def or call
-                    return Ok(Some(self.func(name)?));
+                    return Ok(self.func(name)?);
                 }
                 ast::Expr::new_ident(ast::Ident::new_ident(name))
             }
             Token::Block => {
-                return Ok(Some(self.block()?));
+                return Ok(self.block()?);
             }
             _ => self.expect_unary_expr(&token)?,
         };
-        let expr = self.maybe_binary_expr(prec, expr)?;
-        Ok(Some(expr))
+        expr = self.maybe_binary_expr(prec, expr)?;
+        // if self.next_token_is(&Token::Comma) {
+        //     expr = self.tuple(expr)?;
+        // }
+        Ok(expr)
     }
+
+    // fn tuple(&mut self, first_expr: ast::Expr) -> ExprResult {
+    //     let mut items = vec![first_expr];
+    //     loop {
+    //         if self.is_eos()? {
+    //             break;
+    //         }
+    //         let expr = self.expr(0)?;
+    //         items.push(expr);
+    //     }
+    //     Ok(ast::Expr::new_tuple(items))
+    // }
 
     /// The current token should represent a unary operator and should
     /// be followed by an expression.
-    fn expect_unary_expr(&mut self, token: &TokenWithLocation) -> ExprResult {
-        let prec = get_unary_precedence(&token.token);
+    fn expect_unary_expr(&mut self, op_token: &TokenWithLocation) -> ExprResult {
+        let prec = get_unary_precedence(&op_token.token);
         if prec == 0 {
-            Err(ParseErr::new(ParseErrKind::UnexpectedToken(token.clone())))
-        } else if let Some(rhs) = self.expr(prec)? {
-            let operator = token.token.as_str();
-            Ok(ast::Expr::new_unary_op(operator, rhs))
-        } else {
-            Err(ParseErr::new(ParseErrKind::ExpectedOperand(token.end)))
+            return Err(ParseErr::new(ParseErrKind::UnexpectedToken(op_token.clone())));
         }
+        if !self.has_tokens()? {
+            return Err(ParseErr::new(ParseErrKind::ExpectedOperand(op_token.end)));
+        }
+        let rhs = self.expr(prec)?;
+        let op = op_token.as_str();
+        Ok(ast::Expr::new_unary_op(op, rhs))
     }
 
     /// See if the expr is followed by an infix operator. If so, get the
@@ -369,19 +414,19 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
         loop {
             let next = self.next_infix_token(prec)?;
             if let Some((infix_token, mut infix_prec)) = next {
+                if !self.has_tokens()? {
+                    return Err(ParseErr::new(ParseErrKind::ExpectedOperand(
+                        infix_token.end,
+                    )));
+                }
                 // Lower precedence of right-associative operator when
                 // fetching its RHS expr.
                 if is_right_associative(&infix_token.token) {
                     infix_prec -= 1;
                 }
-                if let Some(rhs) = self.expr(infix_prec)? {
-                    let op = infix_token.token.as_str();
-                    expr = ast::Expr::new_binary_op(expr, op, rhs);
-                } else {
-                    return Err(ParseErr::new(ParseErrKind::ExpectedOperand(
-                        infix_token.end,
-                    )));
-                }
+                let rhs = self.expr(infix_prec)?;
+                let op = infix_token.as_str();
+                expr = ast::Expr::new_binary_op(expr, op, rhs);
             } else {
                 break Ok(expr);
             }
@@ -390,41 +435,35 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
 
     /// Handle nested expressions (inside parens).
     fn nested_expr(&mut self) -> ExprResult {
-        return match self.expr(0)? {
-            Some(mut expr) => {
-                if self.next_token_is(Token::RightParen)? {
-                    return Ok(expr);
-                }
-                self.nested_expr()
-            }
-            None => Err(ParseErr::new(ParseErrKind::ExpectedExpr(self.loc()))),
-        };
+        if !self.has_tokens()? {
+            return Err(ParseErr::new(ParseErrKind::ExpectedExpr(self.next_loc())));
+        }
+        let expr = self.expr(0)?;
+        if self.next_token_is(&Token::RightParen)? {
+            return Ok(expr);
+        }
+        self.nested_expr()
     }
 
     /// Handle `block ->`.
     fn block(&mut self) -> ExprResult {
-        if !self.next_token_is(Token::FuncStart)? {
-            return Err(ParseErr::new(ParseErrKind::SyntaxError(
-                "Expected ->".to_owned(),
-                self.loc(),
-            )));
-        }
+        self.expect_token(&Token::FuncStart)?;
         self.expect_scope()?;
-        Ok(ast::Expr::new_block(self.expect_statement_block()?))
+        let statements = self.expect_statement_block()?;
+        Ok(ast::Expr::new_block(statements))
     }
 
     /// Handle `func () -> ...` (definition) and `func()` (call).
     fn func(&mut self, name: String) -> ExprResult {
-        let loc = self.loc();
         let (found, tokens) = self.collect_until(Token::RightParen)?;
         if !found {
             self.lookahead_queue.extend(tokens);
             return Err(ParseErr::new(ParseErrKind::ExpectedToken(
-                loc,
+                self.next_loc(),
                 Token::RightParen,
             )));
         }
-        if self.next_token_is(Token::FuncStart)? {
+        if self.next_token_is(&Token::FuncStart)? {
             // Function def - tokens are parameters
             let params = self.parse_params(tokens)?;
             self.expect_scope()?;
@@ -456,7 +495,7 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
             } else {
                 return Err(ParseErr::new(ParseErrKind::SyntaxError(
                     "Expected identifier".to_owned(),
-                    self.loc(),
+                    self.next_loc(),
                 )));
             }
         }

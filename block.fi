@@ -1,85 +1,85 @@
 # block.fi
-print "start =========================================================="
+print("start ==========================================================")
 
 jump y
 
 y: block ->
-    print "in block y"
+    print("    in block y")
     jump x
 
-x: print "found"
-print true && false
-print true || false
-print 1 / 2
-print 1 // 2
+x: print("found")
+print(true && false)
+print(true || false)
+print(1 / 2)
+print(1 // 2)
 
 block ->
     block ->
         jump z
     block ->
-        print "no"
+        print("        no")
         jump z
-        print "no"
-    z: print "z"
+        print("        no")
+    z: print("    z")
 
 a = "a1"
 b = "b1"
 
-print "before block"
-print a
-print b
+print("before block")
+print(a)
+print(b)
 
 a = block ->
-    print "    in block"
-    print $"    ${a}"
+    print("    in block")
+    print($"    ${a}")
     a = "a2"
-    print $"    ${a}"
-    print $"    ${b}"
+    print($"    ${a}")
+    print($"    ${b}")
     block ->
-        print "        in inner block"
+        print("        in inner block")
         c = "c3"
-        print $"        ${a}"
-        print $"        ${b}"
-        print $"        ${c}"
-    print "    after inner block"
+        print($"        ${a}")
+        print($"        ${b}")
+        print($"        ${c}")
+    print("    after inner block")
 
-print "after block"
-print a
-print b
+print("after block")
+print(a)
+print(b)
 
-print "before jump"
+print("before jump")
 jump a
 
-print "this should be skipped"
+print("this should be skipped")
 
 block ->
-    print "this should be skipped too"
+    print("    this should be skipped too")
     jump a
     a: block ->
-        print "skipped"
+        print("        skipped")
 
-a: print "label: a"
+a: print("label: a")
 
 block ->
     jump b
-    print "skipped"
-    b: print "leave block"
+    print("    skipped")
+    b: print("    leave block")
 
-print "before label: b"
+print("before label: b")
 b:
-print "after label: b"
+print("after label: b")
 
 block ->
-    print "in last block"
+    print("    in last block")
     x = "x"
-    print $"    x = ${x}"
+    print($"    x = ${x}")
     jump out
     y = "y"
-    print "skipped y"
+    print("    skipped y")
 
 out:
-print $"    jumped out"
+print($"jumped out")
 
 yyy: # do-nothing label
 
-print "end ============================================================"
+print("end ============================================================")

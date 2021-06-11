@@ -58,55 +58,50 @@ fn parse_simple_assignment() {
 }
 
 #[test]
-    #[rustfmt::skip]
-    fn parse_add() {
-        //      R
-        //      |
-        //      +
-        //     / \
-        //    1   2
-        let result = parse_text("1 + 2", true);
-        assert!(result.is_ok());
-        let program = result.unwrap();
-        let statements = program.statements;
-        assert_eq!(statements.len(), 1);
-        let statement = statements.first().unwrap();
+fn parse_add() {
+    //      R
+    //      |
+    //      +
+    //     / \
+    //    1   2
+    let result = parse_text("1 + 2", true);
+    assert!(result.is_ok(), "{:?}", result);
+    let program = result.unwrap();
+    let statements = program.statements;
+    assert_eq!(statements.len(), 1);
+    let statement = statements.first().unwrap();
 
-        assert_eq!(
-            *statement,
-            ast::Statement {
-                kind: ast::StatementKind::Expr(
-                    // 1 + 2
-                    ast::Expr {
-                        kind: ast::ExprKind::BinaryOp(
-                            Box::new(
-                                // 1
-                                ast::Expr {
-                                    kind: ast::ExprKind::Literal(
-                                        ast::Literal {
-                                            kind: ast::LiteralKind::Int(BigInt::from(1))
-                                        }
-                                    )
-                                }
-                            ),
-                            // +
-                            BinaryOperator::Add,
-                            Box::new(
-                                // 2
-                                ast::Expr {
-                                    kind: ast::ExprKind::Literal(
-                                        ast::Literal {
-                                            kind: ast::LiteralKind::Int(BigInt::from(2))
-                                        }
-                                    )
-                                }
-                            ),
-                        )
-                    }
-                )
-            }
-        );
-    }
+    assert_eq!(
+        *statement,
+        ast::Statement {
+            kind: ast::StatementKind::Expr(
+                // 1 + 2
+                ast::Expr {
+                    kind: ast::ExprKind::BinaryOp(
+                        Box::new(
+                            // 1
+                            ast::Expr {
+                                kind: ast::ExprKind::Literal(ast::Literal {
+                                    kind: ast::LiteralKind::Int(BigInt::from(1))
+                                })
+                            }
+                        ),
+                        // +
+                        BinaryOperator::Add,
+                        Box::new(
+                            // 2
+                            ast::Expr {
+                                kind: ast::ExprKind::Literal(ast::Literal {
+                                    kind: ast::LiteralKind::Int(BigInt::from(2))
+                                })
+                            }
+                        ),
+                    )
+                }
+            )
+        }
+    );
+}
 
 #[test]
 fn parse_assign_to_addition() {

@@ -116,7 +116,8 @@ impl<'a> Visitor<'a> {
 
     fn visit_statement(&mut self, node: ast::Statement) -> VisitResult {
         match node.kind {
-            ast::StatementKind::Print => {
+            ast::StatementKind::Print(expr) => {
+                self.visit_expr(expr)?;
                 self.push(Inst::Print);
                 self.push(Inst::Push(0));
             }

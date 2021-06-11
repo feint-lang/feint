@@ -2,11 +2,11 @@ use crate::ast;
 use crate::scanner::{ScanErr, Token, TokenWithLocation};
 use crate::util::Location;
 
+pub type BoolResult = Result<bool, ParseErr>;
 pub type ParseResult = Result<ast::Program, ParseErr>;
+pub type StatementResult = Result<ast::Statement, ParseErr>;
 pub type StatementsResult = Result<Vec<ast::Statement>, ParseErr>;
-pub type StatementsOptionResult = Result<Option<Vec<ast::Statement>>, ParseErr>;
 pub type ExprResult = Result<ast::Expr, ParseErr>;
-pub type ExprOptionResult = Result<Option<ast::Expr>, ParseErr>;
 pub type NextTokenResult = Result<Option<TokenWithLocation>, ParseErr>;
 pub type NextInfixResult = Result<Option<(TokenWithLocation, u8)>, ParseErr>;
 pub type PeekTokenResult<'a> = Result<Option<&'a TokenWithLocation>, ParseErr>;
@@ -37,4 +37,5 @@ pub enum ParseErrKind {
     UnexpectedBlock(Location),
     ExpectedToken(Location, Token),
     UnexpectedToken(TokenWithLocation),
+    ExpectedEOS(Location),
 }

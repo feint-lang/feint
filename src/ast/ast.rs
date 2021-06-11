@@ -36,7 +36,7 @@ pub struct Statement {
 
 #[derive(PartialEq)]
 pub enum StatementKind {
-    Print,
+    Print(Expr),
     Jump(String),
     Label(String),
     Expr(Expr),
@@ -47,8 +47,8 @@ impl Statement {
         Self { kind }
     }
 
-    pub fn new_print() -> Self {
-        Self::new(StatementKind::Print)
+    pub fn new_print(expr: Expr) -> Self {
+        Self::new(StatementKind::Print(expr))
     }
 
     pub fn new_jump(name: String) -> Self {
@@ -66,10 +66,6 @@ impl Statement {
     pub fn new_nil() -> Self {
         Self::new_expr(Expr::new_literal(Literal::new_nil()))
     }
-
-    pub fn new_string(value: &str) -> Self {
-        Self::new_expr(Expr::new_literal(Literal::new_string(value)))
-    }
 }
 
 impl fmt::Debug for Statement {
@@ -82,7 +78,7 @@ impl fmt::Debug for StatementKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Expr(expr) => write!(f, "Expr({:?})", expr),
-            Self::Print => write!(f, "Print"),
+            Self::Print(_expr) => write!(f, "Print"),
             Self::Label(label_index) => write!(f, "Label: {}", label_index),
             Self::Jump(label_index) => write!(f, "Jump: {}", label_index),
         }
@@ -104,6 +100,7 @@ pub enum ExprKind {
     Call(Call),
     Literal(Literal),
     Ident(Ident),
+    Tuple(Vec<Expr>),
 }
 
 impl Expr {
@@ -150,6 +147,14 @@ impl Expr {
     pub fn new_literal(literal: Literal) -> Self {
         Self::new(ExprKind::Literal(literal))
     }
+
+    pub fn new_string(value: &str) -> Self {
+        Self::new_literal(Literal::new_string(value))
+    }
+
+    pub fn new_tuple(items: Vec<Expr>) -> Self {
+        Self::new(ExprKind::Tuple(items))
+    }
 }
 
 impl fmt::Debug for Expr {
@@ -168,6 +173,7 @@ impl fmt::Debug for ExprKind {
             Self::Block(block) => write!(f, "{:?}", block),
             Self::Func(func) => write!(f, "{:?}", func),
             Self::Call(func) => write!(f, "{:?}", func),
+            Self::Tuple(items) => write!(f, "{:?}", items),
         }
     }
 }

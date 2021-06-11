@@ -23,17 +23,17 @@ pub enum Token {
     FormatString(String), // $"words {name_in_scope} words"
 
     // Single-character operators
-    Equal,     // =
+    Caret,     // ^
     Star,      // *
     Slash,     // /
+    Percent,   // %
     Plus,      // +
     Minus,     // -
     Bang,      // !
     Dot,       // .
-    Percent,   // %
-    Caret,     // ^
     Ampersand, // &
     Pipe,      // |
+    Equal,     // =
 
     // Multi-character operators
     EqualEqual,         // ==
@@ -99,35 +99,56 @@ pub enum Token {
 impl Token {
     pub fn as_str(&self) -> &str {
         match self {
+            Self::LeftParen => "(",
+            Self::RightParen => ")",
+
+            Self::Colon => ":",
+            Self::Comma => ",",
+
             Self::Caret => "^",
             Self::Star => "*",
             Self::Slash => "/",
-            Self::DoubleSlash => "//",
             Self::Percent => "%",
             Self::Plus => "+",
             Self::Minus => "-",
             Self::Bang => "!",
+            Self::Dot => ".",
+            Self::Equal => "=",
+
+            Self::DoubleSlash => "//",
             Self::BangBang => "!!",
             Self::EqualEqual => "==",
+            Self::EqualEqualEqual => "===",
             Self::NotEqual => "!=",
             Self::And => "&&",
             Self::Or => "||",
-            Self::Equal => "=",
+
+            Self::FuncStart => "->",
+            Self::ScopeStart => "start of block",
+            Self::ScopeEnd => "end of block",
+
+            // Keywords
+            Self::Block => "block",
             Self::Jump => "jump",
-            Self::Label(name) => "label",
+            Self::Label(_name) => "label",
+
+            // Identifiers
             Self::Ident(s)
             | Self::TypeIdent(s)
             | Self::TypeMethodIdent(s)
             | Self::SpecialMethodIdent(s) => s.as_str(),
+
+            Self::EndOfStatement => "end of statement",
             Self::EndOfInput => "EOI",
-            _ => panic!("{:?} (need to implement Token.as_str() for {})", self, self),
+
+            _ => unimplemented!("{:?}.as_str()", self),
         }
     }
 }
 
 impl fmt::Display for Token {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{}", self.as_str())
     }
 }
 
@@ -143,10 +164,14 @@ impl TokenWithLocation {
     pub fn new(token: Token, start: Location, end: Location) -> Self {
         Self { token, start, end }
     }
+
+    pub fn as_str(&self) -> &str {
+        self.token.as_str()
+    }
 }
 
 impl fmt::Display for TokenWithLocation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}: {} -> {}", self.token, self.start, self.end)
+        write!(f, "{}: {} -> {}", self.as_str(), self.start, self.end)
     }
 }
