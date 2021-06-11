@@ -6,12 +6,10 @@ use crate::util::Location;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Token {
-    LeftParen,          // (
-    RightParen,         // )
-    LeftSquareBracket,  // [
-    RightSquareBracket, // ]
-    LeftAngleBracket,   // <
-    RightAngleBracket,  // >
+    LParen,   // (
+    RParen,   // )
+    LBracket, // [
+    RBracket, // ]
 
     Colon, // :
     Comma, // ,
@@ -23,17 +21,19 @@ pub enum Token {
     FormatString(String), // $"words {name_in_scope} words"
 
     // Single-character operators
-    Caret,     // ^
-    Star,      // *
-    Slash,     // /
-    Percent,   // %
-    Plus,      // +
-    Minus,     // -
-    Bang,      // !
-    Dot,       // .
-    Ampersand, // &
-    Pipe,      // |
-    Equal,     // =
+    Caret,       // ^
+    Star,        // *
+    Slash,       // /
+    Percent,     // %
+    Plus,        // +
+    Minus,       // -
+    Bang,        // !
+    Dot,         // .
+    Ampersand,   // &
+    Pipe,        // |
+    LessThan,    // <
+    GreaterThan, // >
+    Equal,       // =
 
     // Multi-character operators
     EqualEqual,         // ==
@@ -99,8 +99,10 @@ pub enum Token {
 impl Token {
     pub fn as_str(&self) -> &str {
         match self {
-            Self::LeftParen => "(",
-            Self::RightParen => ")",
+            Self::LParen => "(",
+            Self::RParen => ")",
+            Self::LBracket => "[",
+            Self::RBracket => "]",
 
             Self::Colon => ":",
             Self::Comma => ",",

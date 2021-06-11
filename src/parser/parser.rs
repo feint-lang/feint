@@ -235,16 +235,30 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
     /// inspection techniques.
     fn collect_until(
         &mut self,
-        token: Token,
+        token: &Token,
     ) -> Result<(bool, Vec<TokenWithLocation>), ParseErr> {
         let mut collector = vec![];
-        let mut nesting_level = 0;
+        let mut nesting_stack = vec![];
         while let Some(t) = self.next_token()? {
-            if t.token == token && nesting_level == 0 {
+            if &t.token == token && nesting_stack.is_empty() {
                 return Ok((true, collector));
             }
-            if token == Token::RightParen && t.token == Token::LeftParen {
-                nesting_level += 1;
+            match t.token {
+                Token::LParen => nesting_stack.push('('),
+                Token::LBracket => nesting_stack.push('['),
+                Token::RParen => {
+                    if nesting_stack.pop() != Some('(') {
+                        let kind = ParseErrKind::MismatchedBracket(self.loc());
+                        return Err(ParseErr::new(kind));
+                    }
+                }
+                Token::RBracket => {
+                    if nesting_stack.pop() != Some('[') {
+                        let kind = ParseErrKind::MismatchedBracket(self.loc());
+                        return Err(ParseErr::new(kind));
+                    }
+                }
+                _ => (),
             }
             collector.push(t);
         }
@@ -295,8 +309,8 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
             ///      print statements have similar syntax to the
             ///      eventual built in print function.
             Token::Print => {
-                self.expect_token(&Token::LeftParen)?;
-                let expr = if self.peek_token_is(&Token::RightParen)? {
+                self.expect_token(&Token::LParen)?;
+                let expr = if self.peek_token_is(&Token::RParen)? {
                     ast::Expr::new_string("")
                 } else if self.has_tokens()? {
                     self.expr(0)?
@@ -305,7 +319,7 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
                         self.next_loc(),
                     )));
                 };
-                self.expect_token(&Token::RightParen)?;
+                self.expect_token(&Token::RParen)?;
                 self.expect_token(&Token::EndOfStatement)?;
                 ast::Statement::new_print(expr)
             }
@@ -340,8 +354,8 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
     fn expr(&mut self, prec: u8) -> ExprResult {
         let token = self.expect_next_token()?;
         let mut expr = match token.token {
-            Token::LeftParen => self.nested_expr()?,
-            Token::RightParen => {
+            Token::LParen => self.nested_expr()?,
+            Token::RParen => {
                 // XXX: The scanner detects mismatched brackets and
                 //      self.nested_expr() handles right parens, so this
                 //      will only happen when an empty group is
@@ -362,7 +376,7 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
                 ast::Expr::new_literal(ast::Literal::new_format_string(value))
             }
             Token::Ident(name) => {
-                if self.next_token_is(&Token::LeftParen)? {
+                if self.next_token_is(&Token::LParen)? {
                     // Function def or call
                     return Ok(self.func(name)?);
                 }
@@ -439,7 +453,7 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
             return Err(ParseErr::new(ParseErrKind::ExpectedExpr(self.next_loc())));
         }
         let expr = self.expr(0)?;
-        if self.next_token_is(&Token::RightParen)? {
+        if self.next_token_is(&Token::RParen)? {
             return Ok(expr);
         }
         self.nested_expr()
@@ -455,12 +469,12 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
 
     /// Handle `func () -> ...` (definition) and `func()` (call).
     fn func(&mut self, name: String) -> ExprResult {
-        let (found, tokens) = self.collect_until(Token::RightParen)?;
+        let (found, tokens) = self.collect_until(&Token::RParen)?;
         if !found {
             self.lookahead_queue.extend(tokens);
             return Err(ParseErr::new(ParseErrKind::ExpectedToken(
+                Token::RParen,
                 self.next_loc(),
-                Token::RightParen,
             )));
         }
         if self.next_token_is(&Token::FuncStart)? {

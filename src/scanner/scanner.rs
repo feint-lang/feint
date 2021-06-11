@@ -256,17 +256,17 @@ impl<T: BufRead> Scanner<T> {
             Some((',', _, _)) => Token::Comma,
             Some(('(', _, _)) => {
                 self.bracket_stack.push(('(', start));
-                Token::LeftParen
+                Token::LParen
             }
             Some((c @ ')', _, _)) => {
-                self.pop_bracket_and_return_token(c, start, Token::RightParen)?
+                self.pop_bracket_and_return_token(c, start, Token::RParen)?
             }
             Some(('[', _, _)) => {
                 self.bracket_stack.push(('[', start));
-                Token::LeftSquareBracket
+                Token::LBracket
             }
             Some((c @ ']', _, _)) => {
-                self.pop_bracket_and_return_token(c, start, Token::RightSquareBracket)?
+                self.pop_bracket_and_return_token(c, start, Token::RBracket)?
             }
             Some(('<', Some('='), _)) => {
                 self.consume_char_and_return_token(Token::LessThanOrEqual)
@@ -276,13 +276,13 @@ impl<T: BufRead> Scanner<T> {
             }
             Some(('<', _, _)) => {
                 self.bracket_stack.push(('<', start));
-                Token::LeftAngleBracket
+                Token::LessThan
             }
             Some(('>', Some('='), _)) => {
                 self.consume_char_and_return_token(Token::GreaterThanOrEqual)
             }
             Some((c @ '>', _, _)) => {
-                self.pop_bracket_and_return_token(c, start, Token::RightAngleBracket)?
+                self.pop_bracket_and_return_token(c, start, Token::GreaterThan)?
             }
             Some(('=', Some('='), _)) => {
                 self.consume_char_and_return_token(Token::EqualEqual)

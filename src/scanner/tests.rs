@@ -149,9 +149,9 @@ g (y) ->  # 6
 
     // f
     check_token(tokens.next(), Token::Ident("f".to_string()), 1, 1, 1, 1);
-    check_token(tokens.next(), Token::LeftParen, 1, 3, 1, 3);
+    check_token(tokens.next(), Token::LParen, 1, 3, 1, 3);
     check_token(tokens.next(), Token::Ident("x".to_string()), 1, 4, 1, 4);
-    check_token(tokens.next(), Token::RightParen, 1, 5, 1, 5);
+    check_token(tokens.next(), Token::RParen, 1, 5, 1, 5);
     check_token(tokens.next(), Token::FuncStart, 1, 7, 1, 8);
     check_token(tokens.next(), Token::EndOfStatement, 1, 14, 1, 14);
     check_token(tokens.next(), Token::ScopeStart, 2, 0, 2, 0);
@@ -164,9 +164,9 @@ g (y) ->  # 6
 
     // g
     check_token(tokens.next(), Token::Ident("g".to_string()), 6, 1, 6, 1);
-    check_token(tokens.next(), Token::LeftParen, 6, 3, 6, 3);
+    check_token(tokens.next(), Token::LParen, 6, 3, 6, 3);
     check_token(tokens.next(), Token::Ident("y".to_string()), 6, 4, 6, 4);
-    check_token(tokens.next(), Token::RightParen, 6, 5, 6, 5);
+    check_token(tokens.next(), Token::RParen, 6, 5, 6, 5);
     check_token(tokens.next(), Token::FuncStart, 6, 7, 6, 8);
     check_token(tokens.next(), Token::EndOfStatement, 6, 14, 6, 14);
     check_token(tokens.next(), Token::ScopeStart, 7, 0, 7, 0);
@@ -209,12 +209,12 @@ b = 3
 
     check_token(tokens.next(), Token::Ident("a".to_string()), 3, 1, 3, 1);
     check_token(tokens.next(), Token::Equal, 3, 3, 3, 3);
-    check_token(tokens.next(), Token::LeftSquareBracket, 3, 5, 3, 5);
+    check_token(tokens.next(), Token::LBracket, 3, 5, 3, 5);
     check_token(tokens.next(), Token::Int(BigInt::from(1)), 4, 4, 4, 4);
     check_token(tokens.next(), Token::Comma, 4, 5, 4, 5);
     check_token(tokens.next(), Token::Int(BigInt::from(2)), 6, 3, 6, 3);
     check_token(tokens.next(), Token::Comma, 6, 4, 6, 4);
-    check_token(tokens.next(), Token::RightSquareBracket, 7, 1, 7, 1);
+    check_token(tokens.next(), Token::RBracket, 7, 1, 7, 1);
     check_token(tokens.next(), Token::EndOfStatement, 7, 21, 7, 21);
     check_token(tokens.next(), Token::Ident("b".to_string()), 9, 1, 9, 1);
     check_token(tokens.next(), Token::Equal, 9, 3, 9, 3);

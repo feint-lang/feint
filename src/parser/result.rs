@@ -35,7 +35,8 @@ pub enum ParseErrKind {
     ExpectedBlock(Location),
     ExpectedEndOfBlock(Location),
     UnexpectedBlock(Location),
-    ExpectedToken(Location, Token),
+    ExpectedToken(Token, Location),
     UnexpectedToken(TokenWithLocation),
     ExpectedEOS(Location),
+    MismatchedBracket(Location),
 }
