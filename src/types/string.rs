@@ -124,6 +124,7 @@ impl fmt::Display for String {
 
 impl fmt::Debug for String {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "\"{}\"", self.value())
+        let prefix = if self.is_format_string { "$" } else { "" };
+        write!(f, "{}\"{}\"", prefix, self.value())
     }
 }

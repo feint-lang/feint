@@ -119,6 +119,14 @@ macro_rules! write_instance {
     )+ };
 }
 
+macro_rules! debug_instance {
+    ( $f:ident, $a:ident, $($A:ty),+ ) => { $(
+        if let Some(a) = $a.as_any().downcast_ref::<$A>() {
+            return write!($f, "{:?}", a);
+        }
+    )+ };
+}
+
 impl fmt::Display for dyn Object {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write_instance!(
@@ -129,6 +137,7 @@ impl fmt::Display for dyn Object {
             super::float::Float,
             super::int::Int,
             super::string::String,
+            super::tuple::Tuple,
             super::complex::ComplexObject
         );
         // Fallback
@@ -138,6 +147,18 @@ impl fmt::Display for dyn Object {
 
 impl fmt::Debug for dyn Object {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        debug_instance!(
+            f,
+            self,
+            super::nil::Nil,
+            super::bool::Bool,
+            super::float::Float,
+            super::int::Int,
+            super::string::String,
+            super::tuple::Tuple,
+            super::complex::ComplexObject
+        );
+        // Fallback
         write!(f, "{} object @ {:?} -> {}", self.class(), self.id(), self)
     }
 }

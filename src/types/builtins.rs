@@ -13,6 +13,7 @@ pub struct Builtins {
     pub nil_obj: Rc<super::nil::Nil>,
     pub true_obj: Rc<super::bool::Bool>,
     pub false_obj: Rc<super::bool::Bool>,
+    pub empty_tuple: Rc<super::tuple::Tuple>,
 }
 
 impl Builtins {
@@ -22,11 +23,13 @@ impl Builtins {
         // Singleton types
         let nil_type = Self::create_type("Nil");
         let bool_type = Self::create_type("Bool");
+        let tuple_type = Self::create_type("Tuple");
 
         // Singletons
         let nil_obj = Rc::new(super::nil::Nil::new(nil_type.clone()));
         let true_obj = Rc::new(super::bool::Bool::new(bool_type.clone(), true));
         let false_obj = Rc::new(super::bool::Bool::new(bool_type.clone(), false));
+        let empty_tuple = Rc::new(super::tuple::Tuple::new(tuple_type.clone(), vec![]));
 
         // All the builtin types
         types.insert("Nil", nil_type);
@@ -35,8 +38,9 @@ impl Builtins {
         types.insert("Function", Self::create_type("Function"));
         types.insert("Int", Self::create_type("Int"));
         types.insert("String", Self::create_type("String"));
+        types.insert("Tuple", tuple_type);
 
-        Self { types, nil_obj, true_obj, false_obj }
+        Self { types, nil_obj, true_obj, false_obj, empty_tuple }
     }
 
     fn create_type(name: &'static str) -> TypeRef {
@@ -91,5 +95,13 @@ impl Builtins {
         let class = self.get_type("String").clone();
         let value = value.into();
         Rc::new(super::string::String::new(class, value, format))
+    }
+
+    pub fn new_tuple(&self, items: Vec<ObjectRef>) -> ObjectRef {
+        if items.is_empty() {
+            return self.empty_tuple.clone();
+        }
+        let class = self.get_type("Tuple").clone();
+        Rc::new(super::tuple::Tuple::new(class, items))
     }
 }

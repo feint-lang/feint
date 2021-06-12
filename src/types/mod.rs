@@ -13,6 +13,7 @@ mod int;
 mod nil;
 mod object;
 mod string;
+mod tuple;
 mod util;
 
 #[cfg(test)]

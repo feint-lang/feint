@@ -146,10 +146,10 @@ fn parse_precedence() {
 #[test]
 fn parse_func() {
     let source = "\
-func (x, y) -> 
-    x + y
+add (x, y, z) -> 
+    x + y + z
 
-func(1, 2)
+add(1, 2, 3)
 ";
     let result = parse_text(source, true);
     if let Ok(program) = result {

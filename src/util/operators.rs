@@ -62,6 +62,7 @@ pub enum BinaryOperator {
     And,
     Or,
     Assign,
+    Comma,
 }
 
 impl str::FromStr for BinaryOperator {
@@ -81,6 +82,7 @@ impl str::FromStr for BinaryOperator {
             "&&" => Self::And,
             "||" => Self::Or,
             "=" => Self::Assign,
+            "," => Self::Comma,
             _ => {
                 return Err(format!("Unknown binary operator: {}", op));
             }
@@ -104,6 +106,7 @@ impl fmt::Display for BinaryOperator {
             Self::And => "&&",
             Self::Or => "||",
             Self::Assign => "=",
+            Self::Comma => ",",
         };
         write!(f, "{}", string)
     }
@@ -111,6 +114,6 @@ impl fmt::Display for BinaryOperator {
 
 impl fmt::Debug for BinaryOperator {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.to_string())
+        write!(f, "{}", self)
     }
 }

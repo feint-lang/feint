@@ -125,7 +125,7 @@ pub struct Scope {
 pub enum ScopeKind {
     Global,
     Block,
-    Function,
+    Func,
 }
 
 impl Scope {
@@ -180,7 +180,7 @@ impl Scope {
         }
 
         // Disallow jump out of function
-        if let ScopeKind::Function = self.kind {
+        if let ScopeKind::Func = self.kind {
             return None;
         }
 

@@ -24,19 +24,20 @@ impl ParseErr {
 
 #[derive(Clone, Debug)]
 pub enum ParseErrKind {
-    ScanErr(ScanErr),
     CouldNotOpenSourceFile(String, String),
-    UnhandledToken(TokenWithLocation),
-    ExpectedExpr(Location),
-    ExpectedOperand(Location),
-    UnclosedExpr(Location),
-    ExpectedIdent(TokenWithLocation),
-    SyntaxError(String, Location),
-    ExpectedBlock(Location),
-    ExpectedEndOfBlock(Location),
-    UnexpectedBlock(Location),
-    ExpectedToken(Token, Location),
-    UnexpectedToken(TokenWithLocation),
-    ExpectedEOS(Location),
+    ScanErr(ScanErr),
+
     MismatchedBracket(Location),
+
+    /// Generic syntax error
+    SyntaxErr(Location),
+
+    ExpectedBlock(Location),
+    ExpectedExpr(Location),
+    ExpectedIdent(Location),
+    ExpectedOperand(Location),
+    ExpectedToken(Token, Location),
+
+    UnexpectedBlock(Location),
+    UnexpectedToken(TokenWithLocation),
 }

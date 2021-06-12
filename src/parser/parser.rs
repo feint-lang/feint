@@ -1,7 +1,7 @@
 //! Parse a stream of tokens into an AST.
 use std::collections::VecDeque;
 use std::fs::File;
-use std::io::{self, BufRead, BufReader, Cursor};
+use std::io::{self, BufReader, Cursor};
 use std::iter::{Iterator, Peekable};
 
 use crate::ast;
@@ -148,10 +148,9 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
     /// error.
     fn expect_token(&mut self, token: &Token) -> Result<(), ParseErr> {
         if !self.next_token_is(token)? {
-            return Err(self.err(ParseErrKind::SyntaxError(
-                format!("Expected {}", token),
-                self.next_loc(),
-            )));
+            return Err(
+                self.err(ParseErrKind::ExpectedToken(token.clone(), self.next_loc()))
+            );
         }
         Ok(())
     }
@@ -343,12 +342,12 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
                         );
                     }
                 } else {
-                    return Err(self.err(ParseErrKind::ExpectedIdent(token)));
+                    return Err(self.err(ParseErrKind::ExpectedIdent(self.next_loc())));
                 }
             }
             Token::Label(name) => ast::Statement::new_label(name),
             _ => {
-                self.lookahead_queue.push_back(token);
+                self.lookahead_queue.push_front(token);
                 let expr = self.expr(0)?;
                 ast::Statement::new_expr(expr)
             }
@@ -363,14 +362,10 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
     fn expr(&mut self, prec: u8) -> ExprResult {
         let token = self.expect_next_token()?;
         let mut expr = match token.token {
-            Token::LParen => self.nested_expr()?,
-            Token::RParen => {
-                // XXX: The scanner detects mismatched brackets and
-                //      self.nested_expr() handles right parens, so this
-                //      will only happen when an empty group is
-                //      encountered.
-                return Err(self.err(ParseErrKind::ExpectedExpr(token.start)));
-            }
+            Token::LParen => match self.next_token_is(&Token::RParen)? {
+                true => ast::Expr::new_tuple(vec![]),
+                false => self.nested_expr()?,
+            },
             Token::Nil => ast::Expr::new_literal(ast::Literal::new_nil()),
             Token::True => ast::Expr::new_literal(ast::Literal::new_bool(true)),
             Token::False => ast::Expr::new_literal(ast::Literal::new_bool(false)),
@@ -392,28 +387,41 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
                 ast::Expr::new_ident(ast::Ident::new_ident(name))
             }
             Token::Block => {
-                return Ok(self.block()?);
+                return self.block();
             }
             _ => self.expect_unary_expr(&token)?,
         };
-        expr = self.maybe_binary_expr(prec, expr)?;
-        // if self.next_token_is(&Token::Comma) {
-        //     expr = self.tuple(expr)?;
-        // }
+        expr = if self.next_token_is(&Token::Comma)? {
+            self.tuple(expr)?
+        } else {
+            self.maybe_binary_expr(prec, expr)?
+        };
         Ok(expr)
     }
 
-    // fn tuple(&mut self, first_expr: ast::Expr) -> ExprResult {
-    //     let mut items = vec![first_expr];
-    //     loop {
-    //         if self.is_eos()? {
-    //             break;
-    //         }
-    //         let expr = self.expr(0)?;
-    //         items.push(expr);
-    //     }
-    //     Ok(ast::Expr::new_tuple(items))
-    // }
+    fn tuple(&mut self, first_expr: ast::Expr) -> ExprResult {
+        let mut items = vec![first_expr];
+        loop {
+            if !self.has_tokens()?
+                || self.peek_token_is(&Token::RParen)?
+                || self.next_token_is(&Token::EndOfStatement)?
+            {
+                break;
+            }
+            if self.next_token_is(&Token::LParen)? {
+                let expr = self.nested_expr()?;
+                items.push(expr);
+            } else {
+                let expr = self.expr(0)?;
+                if let ast::Expr { kind: ast::ExprKind::Tuple(new_items) } = expr {
+                    items.extend(new_items);
+                } else {
+                    items.push(expr);
+                }
+            };
+        }
+        Ok(ast::Expr::new_tuple(items))
+    }
 
     /// The current token should represent a unary operator and should
     /// be followed by an expression.
@@ -478,13 +486,23 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
 
     /// Handle `func () -> ...` (definition) and `func()` (call).
     fn func(&mut self, name: String) -> ExprResult {
-        let (found, tokens) = self.collect_until(&Token::RParen)?;
+        let (found, mut tokens) = self.collect_until(&Token::RParen)?;
+
         if !found {
             self.lookahead_queue.extend(tokens);
             return Err(
                 self.err(ParseErrKind::ExpectedToken(Token::RParen, self.next_loc()))
             );
         }
+
+        // Add a trailing comma for consistency
+        if let Some(t) = tokens.last() {
+            if t.token != Token::Comma {
+                let start = Location::new(t.start.line, t.start.col + 1);
+                tokens.push(TokenWithLocation::new(Token::Comma, start, start));
+            }
+        }
+
         if self.next_token_is(&Token::FuncStart)? {
             // Function def - tokens are parameters
             let params = self.parse_params(tokens)?;
@@ -502,25 +520,36 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
 
     fn parse_params(
         &self,
-        tokens: Vec<TokenWithLocation>,
+        mut tokens: Vec<TokenWithLocation>,
     ) -> Result<Vec<String>, ParseErr> {
         let mut params = vec![];
-        let program = parse_tokens(tokens, false)?;
-        for statement in program.statements {
-            let kind = statement.kind;
-            if let ast::StatementKind::Expr(ast::Expr {
-                kind:
-                    ast::ExprKind::Ident(ast::Ident { kind: ast::IdentKind::Ident(name) }),
-            }) = kind
-            {
-                params.push(name);
-            } else {
-                return Err(self.err(ParseErrKind::SyntaxError(
-                    "Expected identifier".to_owned(),
-                    self.next_loc(),
-                )));
-            }
+
+        if tokens.is_empty() {
+            return Ok(params);
         }
+
+        let start = tokens[0].start.clone();
+        let program = parse_tokens(tokens, false)?;
+        let statements = program.statements;
+
+        if statements.is_empty() || statements.len() > 1 {
+            return Err(self.err(ParseErrKind::SyntaxErr(start)));
+        }
+
+        let statement = statements.last().unwrap();
+
+        if let Some(items) = statement.tuple_items() {
+            for expr in items.iter() {
+                if let Some(name) = expr.ident_name() {
+                    params.push(name.clone());
+                } else {
+                    return Err(self.err(ParseErrKind::SyntaxErr(start)));
+                }
+            }
+        } else {
+            return Err(self.err(ParseErrKind::SyntaxErr(start)));
+        }
+
         Ok(params)
     }
 }

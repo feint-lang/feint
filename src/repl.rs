@@ -219,7 +219,7 @@ impl<'a> Repl<'a> {
             ParseErrKind::ScanErr(err) => {
                 return self.handle_scan_err(err.kind, err.location, bail);
             }
-            ParseErrKind::UnhandledToken(token) => {
+            ParseErrKind::UnexpectedToken(token) => {
                 let loc = token.start;
                 eprintln!("{: >width$}^", "", width = loc.col + 1);
                 eprintln!("Parse error: unhandled token at {}: {:?}", loc, token.token);

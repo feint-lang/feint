@@ -90,7 +90,7 @@ impl Runner {
             ParseErrKind::CouldNotOpenSourceFile(path, message) => {
                 format!("Could not open source file: {}\n{}", path, message)
             }
-            ParseErrKind::UnhandledToken(token) => {
+            ParseErrKind::UnexpectedToken(token) => {
                 let location = token.start;
                 let col = location.col;
                 let marker = if col == 0 { col } else { col - 1 };

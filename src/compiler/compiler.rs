@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use crate::ast;
 use crate::types::ObjectRef;
 use crate::util::{BinaryOperator, UnaryOperator};
@@ -114,6 +116,18 @@ impl<'a> Visitor<'a> {
         Ok(())
     }
 
+    fn visit_func(&mut self, node: ast::Func) -> VisitResult {
+        eprintln!("IMPLEMENT visit_func()!!!");
+        eprintln!("{}({})", node.name, node.params.join(", "));
+        Ok(())
+    }
+
+    fn visit_call(&mut self, node: ast::Call) -> VisitResult {
+        eprintln!("IMPLEMENT visit_call()!!!");
+        eprintln!("{}()", node.name);
+        Ok(())
+    }
+
     fn visit_statement(&mut self, node: ast::Statement) -> VisitResult {
         match node.kind {
             ast::StatementKind::Print(expr) => {
@@ -144,12 +158,15 @@ impl<'a> Visitor<'a> {
     }
 
     fn visit_expr(&mut self, node: ast::Expr) -> VisitResult {
+        type Kind = ast::ExprKind;
         match node.kind {
-            ast::ExprKind::Block(block) => self.visit_block(block, ScopeKind::Block)?,
-            ast::ExprKind::UnaryOp(op, b) => self.visit_unary_op(op, *b)?,
-            ast::ExprKind::BinaryOp(a, op, b) => self.visit_binary_op(*a, op, *b)?,
-            ast::ExprKind::Ident(ident) => self.visit_ident(ident)?,
-            ast::ExprKind::Literal(literal) => self.visit_literal(literal)?,
+            Kind::Block(block) => self.visit_block(block, ScopeKind::Block)?,
+            Kind::Func(func) => self.visit_func(func)?,
+            Kind::UnaryOp(op, b) => self.visit_unary_op(op, *b)?,
+            Kind::BinaryOp(a, op, b) => self.visit_binary_op(*a, op, *b)?,
+            Kind::Ident(ident) => self.visit_ident(ident)?,
+            Kind::Literal(literal) => self.visit_literal(literal)?,
+            Kind::Tuple(items) => self.visit_tuple(items)?,
             _ => self.err(format!("Unhandled expression: {:?}", node))?,
         }
         Ok(())
@@ -202,31 +219,60 @@ impl<'a> Visitor<'a> {
     // Visit identifier as expression (i.e., not as part of an
     // assignment).
     fn visit_ident(&mut self, node: ast::Ident) -> VisitResult {
+        type Kind = ast::IdentKind;
         match node.kind {
-            ast::IdentKind::Ident(name) => self.push(Inst::LoadVar(name)),
-            ast::IdentKind::TypeIdent(name) => self.push(Inst::LoadVar(name)),
+            Kind::Ident(name) => self.push(Inst::LoadVar(name)),
+            Kind::TypeIdent(name) => self.push(Inst::LoadVar(name)),
         }
         Ok(())
     }
 
     fn visit_literal(&mut self, node: ast::Literal) -> VisitResult {
+        type Kind = ast::LiteralKind;
+        let builtins = &self.ctx.builtins;
         match node.kind {
-            ast::LiteralKind::Nil => self.push_const(0),
-            ast::LiteralKind::Bool(true) => self.push_const(1),
-            ast::LiteralKind::Bool(false) => self.push_const(2),
-            ast::LiteralKind::Float(value) => {
-                self.add_const(self.ctx.builtins.new_float(value))
-            }
-            ast::LiteralKind::Int(value) => {
-                self.add_const(self.ctx.builtins.new_int(value))
-            }
-            ast::LiteralKind::String(value) => {
-                self.add_const(self.ctx.builtins.new_string(value, false))
-            }
-            ast::LiteralKind::FormatString(value) => {
-                self.add_const(self.ctx.builtins.new_string(value, true))
+            Kind::Nil => self.push_const(0),
+            Kind::Bool(true) => self.push_const(1),
+            Kind::Bool(false) => self.push_const(2),
+            Kind::Float(value) => self.add_const(builtins.new_float(value)),
+            Kind::Int(value) => self.add_const(builtins.new_int(value)),
+            Kind::String(value) => self.add_const(builtins.new_string(value, false)),
+            Kind::FormatString(value) => {
+                self.add_const(builtins.new_string(value, true))
             }
         }
         Ok(())
+    }
+
+    fn visit_tuple(&mut self, exprs: Vec<ast::Expr>) -> VisitResult {
+        let items = self.convert_tuple_items(exprs);
+        self.add_const(self.ctx.builtins.new_tuple(items));
+        Ok(())
+    }
+
+    fn convert_tuple_items(&self, exprs: Vec<ast::Expr>) -> Vec<ObjectRef> {
+        type Kind = ast::LiteralKind;
+        let builtins = &self.ctx.builtins;
+        let mut items: Vec<ObjectRef> = vec![];
+        for expr in exprs {
+            let obj: ObjectRef = match expr.kind {
+                ast::ExprKind::Literal(literal) => match literal.kind {
+                    Kind::Nil => builtins.nil_obj.clone(),
+                    Kind::Bool(true) => builtins.true_obj.clone(),
+                    Kind::Bool(false) => builtins.false_obj.clone(),
+                    Kind::Float(value) => builtins.new_float(value),
+                    Kind::Int(value) => builtins.new_int(value),
+                    Kind::String(value) => builtins.new_string(value, false),
+                    Kind::FormatString(value) => builtins.new_string(value, true),
+                },
+                ast::ExprKind::Tuple(exprs) => {
+                    let items = self.convert_tuple_items(exprs);
+                    builtins.new_tuple(items)
+                }
+                _ => unimplemented!("Unhandled tuple expression: {:?}", expr),
+            };
+            items.push(obj);
+        }
+        items
     }
 }

@@ -31,6 +31,7 @@ pub fn is_right_associative(token: &Token) -> bool {
 ///       more complicated than this.
 pub fn get_operator_precedence(token: &Token) -> (u8, u8) {
     match token {
+        Token::Comma                    // a, b
         | Token::Equal       => (0, 1), // a = b
         
         | Token::If          => (0, 2), // if ...
