@@ -216,7 +216,7 @@ impl<'a> Repl<'a> {
     /// Handle parse errors.
     fn handle_parse_err(&mut self, kind: ParseErrKind, bail: bool) -> bool {
         match kind {
-            ParseErrKind::ScanError(err) => {
+            ParseErrKind::ScanErr(err) => {
                 return self.handle_scan_err(err.kind, err.location, bail);
             }
             ParseErrKind::UnhandledToken(token) => {

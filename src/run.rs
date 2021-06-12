@@ -84,7 +84,7 @@ impl Runner {
     /// Handle parsing errors.
     fn handle_parse_err(&mut self, kind: ParseErrKind) -> ExitResult {
         let message = match kind {
-            ParseErrKind::ScanError(err) => {
+            ParseErrKind::ScanErr(err) => {
                 return self.handle_scan_err(err.kind, err.location);
             }
             ParseErrKind::CouldNotOpenSourceFile(path, message) => {

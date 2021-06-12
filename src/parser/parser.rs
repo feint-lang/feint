@@ -5,7 +5,7 @@ use std::io::{self, BufRead, BufReader, Cursor};
 use std::iter::{Iterator, Peekable};
 
 use crate::ast;
-use crate::scanner::{ScanResult, Scanner, Token, TokenWithLocation};
+use crate::scanner::{ScanErr, ScanResult, Scanner, Token, TokenWithLocation};
 use crate::util::Location;
 
 use super::precedence::{
@@ -15,8 +15,6 @@ use super::result::{
     BoolResult, ExprResult, NextInfixResult, NextTokenResult, ParseErr, ParseErrKind,
     ParseResult, PeekTokenResult, StatementResult, StatementsResult,
 };
-use crate::ast::ExprKind;
-use crate::ast::StatementKind::Expr;
 
 /// Scan the text into tokens, parse the tokens, and return the
 /// resulting AST or error.
@@ -127,14 +125,15 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
             self.current_token = Some(t.clone());
             return Ok(Some(t));
         }
-        match self.token_stream.next() {
-            Some(Ok(t)) => {
-                self.current_token = Some(t.clone());
-                Ok(Some(t))
-            }
-            Some(Err(err)) => Err(ParseErr::new(ParseErrKind::ScanError(err.clone()))),
-            None => Ok(None),
+        if let Some(result) = self.token_stream.next() {
+            return result
+                .map(|t| {
+                    self.current_token = Some(t.clone());
+                    Some(t)
+                })
+                .map_err(|err| self.scan_err(err.clone()));
         }
+        Ok(None)
     }
 
     /// Get the next token. If there isn't a next token, panic! This is
@@ -149,7 +148,7 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
     /// error.
     fn expect_token(&mut self, token: &Token) -> Result<(), ParseErr> {
         if !self.next_token_is(token)? {
-            return Err(ParseErr::new(ParseErrKind::SyntaxError(
+            return Err(self.err(ParseErrKind::SyntaxError(
                 format!("Expected {}", token),
                 self.next_loc(),
             )));
@@ -197,11 +196,12 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
     fn peek_token(&mut self) -> PeekTokenResult {
         if let Some(t) = self.lookahead_queue.front() {
             return Ok(Some(t));
-        } else if let Some(result) = self.token_stream.peek() {
+        }
+        if let Some(result) = self.token_stream.peek() {
             return result
                 .as_ref()
                 .map(|t| Some(t))
-                .map_err(|err| ParseErr::new(ParseErrKind::ScanError(err.clone())));
+                .map_err(|err| ParseErr::new(ParseErrKind::ScanErr(err.clone())));
         }
         Ok(None)
     }
@@ -228,6 +228,15 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
 
     // Utilities -------------------------------------------------------
 
+    /// Make creating errors a little less tedious.
+    fn err(&self, kind: ParseErrKind) -> ParseErr {
+        ParseErr::new(kind)
+    }
+
+    fn scan_err(&self, err: ScanErr) -> ParseErr {
+        self.err(ParseErrKind::ScanErr(err))
+    }
+
     /// Collect tokens until the specified token is reached. This is
     /// used for lookahead. For example, the is used to find the
     /// parameters/args for a function def/call since the number of
@@ -248,14 +257,16 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
                 Token::LBracket => nesting_stack.push('['),
                 Token::RParen => {
                     if nesting_stack.pop() != Some('(') {
-                        let kind = ParseErrKind::MismatchedBracket(self.loc());
-                        return Err(ParseErr::new(kind));
+                        return Err(
+                            self.err(ParseErrKind::MismatchedBracket(self.loc()))
+                        );
                     }
                 }
                 Token::RBracket => {
                     if nesting_stack.pop() != Some('[') {
-                        let kind = ParseErrKind::MismatchedBracket(self.loc());
-                        return Err(ParseErr::new(kind));
+                        return Err(
+                            self.err(ParseErrKind::MismatchedBracket(self.loc()))
+                        );
                     }
                 }
                 _ => (),
@@ -278,7 +289,7 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
     fn expect_statement_block(&mut self) -> StatementsResult {
         let statements = self.statements()?;
         if statements.is_empty() {
-            return Err(ParseErr::new(ParseErrKind::ExpectedBlock(self.next_loc())));
+            return Err(self.err(ParseErrKind::ExpectedBlock(self.next_loc())));
         }
         self.expect_token(&Token::ScopeEnd)?;
         Ok(statements)
@@ -315,9 +326,7 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
                 } else if self.has_tokens()? {
                     self.expr(0)?
                 } else {
-                    return Err(ParseErr::new(ParseErrKind::ExpectedExpr(
-                        self.next_loc(),
-                    )));
+                    return Err(self.err(ParseErrKind::ExpectedExpr(self.next_loc())));
                 };
                 self.expect_token(&Token::RParen)?;
                 self.expect_token(&Token::EndOfStatement)?;
@@ -329,12 +338,12 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
                         self.expect_token(&Token::EndOfStatement)?;
                         ast::Statement::new_jump(name)
                     } else {
-                        let kind = ParseErrKind::UnexpectedToken(ident_token);
-                        return Err(ParseErr::new(kind));
+                        return Err(
+                            self.err(ParseErrKind::UnexpectedToken(ident_token))
+                        );
                     }
                 } else {
-                    let kind = ParseErrKind::ExpectedIdent(token);
-                    return Err(ParseErr::new(kind));
+                    return Err(self.err(ParseErrKind::ExpectedIdent(token)));
                 }
             }
             Token::Label(name) => ast::Statement::new_label(name),
@@ -360,7 +369,7 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
                 //      self.nested_expr() handles right parens, so this
                 //      will only happen when an empty group is
                 //      encountered.
-                return Err(ParseErr::new(ParseErrKind::ExpectedExpr(token.start)));
+                return Err(self.err(ParseErrKind::ExpectedExpr(token.start)));
             }
             Token::Nil => ast::Expr::new_literal(ast::Literal::new_nil()),
             Token::True => ast::Expr::new_literal(ast::Literal::new_bool(true)),
@@ -411,10 +420,10 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
     fn expect_unary_expr(&mut self, op_token: &TokenWithLocation) -> ExprResult {
         let prec = get_unary_precedence(&op_token.token);
         if prec == 0 {
-            return Err(ParseErr::new(ParseErrKind::UnexpectedToken(op_token.clone())));
+            return Err(self.err(ParseErrKind::UnexpectedToken(op_token.clone())));
         }
         if !self.has_tokens()? {
-            return Err(ParseErr::new(ParseErrKind::ExpectedOperand(op_token.end)));
+            return Err(self.err(ParseErrKind::ExpectedOperand(op_token.end)));
         }
         let rhs = self.expr(prec)?;
         let op = op_token.as_str();
@@ -429,9 +438,9 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
             let next = self.next_infix_token(prec)?;
             if let Some((infix_token, mut infix_prec)) = next {
                 if !self.has_tokens()? {
-                    return Err(ParseErr::new(ParseErrKind::ExpectedOperand(
-                        infix_token.end,
-                    )));
+                    return Err(
+                        self.err(ParseErrKind::ExpectedOperand(infix_token.end))
+                    );
                 }
                 // Lower precedence of right-associative operator when
                 // fetching its RHS expr.
@@ -450,7 +459,7 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
     /// Handle nested expressions (inside parens).
     fn nested_expr(&mut self) -> ExprResult {
         if !self.has_tokens()? {
-            return Err(ParseErr::new(ParseErrKind::ExpectedExpr(self.next_loc())));
+            return Err(self.err(ParseErrKind::ExpectedExpr(self.next_loc())));
         }
         let expr = self.expr(0)?;
         if self.next_token_is(&Token::RParen)? {
@@ -472,10 +481,9 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
         let (found, tokens) = self.collect_until(&Token::RParen)?;
         if !found {
             self.lookahead_queue.extend(tokens);
-            return Err(ParseErr::new(ParseErrKind::ExpectedToken(
-                Token::RParen,
-                self.next_loc(),
-            )));
+            return Err(
+                self.err(ParseErrKind::ExpectedToken(Token::RParen, self.next_loc()))
+            );
         }
         if self.next_token_is(&Token::FuncStart)? {
             // Function def - tokens are parameters
@@ -507,7 +515,7 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
             {
                 params.push(name);
             } else {
-                return Err(ParseErr::new(ParseErrKind::SyntaxError(
+                return Err(self.err(ParseErrKind::SyntaxError(
                     "Expected identifier".to_owned(),
                     self.next_loc(),
                 )));
