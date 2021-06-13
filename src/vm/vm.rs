@@ -14,7 +14,7 @@ use super::context::RuntimeContext;
 use super::frame::Frame;
 use super::inst::{Chunk, Inst};
 use super::result::{ExeResult, RuntimeErr, RuntimeErrKind, VMState};
-use crate::types::String;
+use crate::types::{String, Tuple};
 
 type RustString = std::string::String;
 
@@ -349,6 +349,9 @@ impl VM {
                     let formatted = Rc::new(formatted);
                     self.ctx.constants.replace(const_index, formatted);
                 }
+            }
+            if let Some(string) = obj.as_any().downcast_ref::<Tuple>() {
+                todo!();
             }
         }
         Ok(())

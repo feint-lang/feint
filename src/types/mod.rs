@@ -2,6 +2,7 @@ pub(crate) use builtins::Builtins;
 pub(crate) use object::ObjectRef;
 // FIXME: Shouldn't need to export?
 pub(crate) use string::String;
+pub(crate) use tuple::Tuple;
 
 mod bool;
 mod builtins;
