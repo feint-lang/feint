@@ -297,7 +297,7 @@ impl VM {
         self.stack.push(item);
     }
 
-    fn pop(&mut self) -> Option<usize> {
+    pub fn pop(&mut self) -> Option<usize> {
         self.stack.pop()
     }
 
@@ -340,12 +340,12 @@ impl VM {
         Err(RuntimeErr::new(kind))
     }
 
-    /// Format String with vars from current context.
+    /// Format a $ string
     fn format_string(&mut self, const_index: usize) -> Result<(), RuntimeErr> {
         if let Some(obj) = self.ctx.get_obj(const_index) {
             if let Some(string) = obj.as_any().downcast_ref::<String>() {
                 if string.is_format_string() {
-                    let formatted = string.format(&self.ctx)?;
+                    let formatted = string.format(self)?;
                     let formatted = Rc::new(formatted);
                     self.ctx.constants.replace(const_index, formatted);
                 }

@@ -3,7 +3,8 @@ use std::any::Any;
 use std::fmt;
 
 use crate::vm::{
-    RuntimeBoolResult, RuntimeContext, RuntimeErr, RuntimeErrKind, RuntimeResult,
+    execute_text, ExeResult, RuntimeBoolResult, RuntimeContext, RuntimeErr,
+    RuntimeErrKind, RuntimeResult, VM,
 };
 
 use crate::types::class::TypeRef;
@@ -30,7 +31,8 @@ impl String {
         self.is_format_string
     }
 
-    pub fn format(&self, ctx: &RuntimeContext) -> Result<Self, RuntimeErr> {
+    // TODO: Handle nested ${}
+    pub fn format(&self, vm: &mut VM) -> Result<Self, RuntimeErr> {
         assert!(self.is_format_string, "String is not a format string: {}", self);
         let mut formatted = RustString::new();
         let mut chars = self.value().chars();
@@ -42,24 +44,32 @@ impl String {
                 if let ('$', Some('{')) = (c, d) {
                     chars.next();
                     peek_chars.next();
-                    let mut name = RustString::new();
+                    let mut expr = RustString::new();
                     loop {
                         if let Some(c) = chars.next() {
                             peek_chars.next();
                             if c == '}' {
-                                if let Some(obj) = ctx.get_obj_by_name(name.as_str()) {
-                                    formatted.push_str(obj.to_string().as_str());
+                                // Execute expression then pop result
+                                // from stack.
+                                // XXX: This feels a little wonky?
+                                match execute_text(vm, expr.as_str(), false, false) {
+                                    Ok(_) => (),
+                                    Err(err) => return Err(err),
+                                }
+                                if let Some(i) = vm.pop() {
+                                    if let Some(obj) = vm.ctx.get_obj(i) {
+                                        formatted.push_str(obj.to_string().as_str());
+                                    } else {
+                                        let err = RuntimeErrKind::ObjectNotFound(i);
+                                        return Err(RuntimeErr::new(err));
+                                    }
                                 } else {
-                                    return Err(RuntimeErr::new(
-                                        RuntimeErrKind::NameError(format!(
-                                            "Name not found: {}",
-                                            name
-                                        )),
-                                    ));
+                                    let err = RuntimeErrKind::EmptyStack;
+                                    return Err(RuntimeErr::new(err));
                                 }
                                 break;
                             } else {
-                                name.push(c);
+                                expr.push(c);
                             }
                         } else {
                             break;
