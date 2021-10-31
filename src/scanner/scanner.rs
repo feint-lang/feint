@@ -725,9 +725,9 @@ impl<T: BufRead> Scanner<T> {
                     // below.
                     '\n' => (),
 
-                    'a' => string.push('\x07'),
-                    'b' => string.push('\x08'),
-                    'f' => string.push('\x0c'),
+                    'a' => string.push('\x07'), // bell
+                    'b' => string.push('\x08'), // backspace
+                    'f' => string.push('\x0c'), // form feed
 
                     // These next few lines might seem pointless,
                     // but they're replacing the escape sequence in
