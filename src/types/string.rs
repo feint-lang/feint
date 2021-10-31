@@ -52,7 +52,7 @@ impl String {
                                 // Execute expression then pop result
                                 // from stack.
                                 // XXX: This feels a little wonky?
-                                match execute_text(vm, expr.as_str(), false, false) {
+                                match execute_text(vm, expr.trim(), false, false) {
                                     Ok(_) => (),
                                     Err(err) => return Err(err),
                                 }
