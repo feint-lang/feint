@@ -41,6 +41,13 @@ impl String {
         loop {
             if let Some(c) = chars.next() {
                 let d = peek_chars.next();
+
+                if let ('\\', Some('$')) = (c, d) {
+                    chars.next();
+                    peek_chars.next();
+                    continue;
+                }
+
                 if let ('$', Some('{')) = (c, d) {
                     chars.next();
                     peek_chars.next();
