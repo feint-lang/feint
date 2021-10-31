@@ -227,22 +227,22 @@ impl<T: BufRead> Scanner<T> {
         let start = self.source.location();
 
         let token = match self.next_char() {
-            Some(('"', _, _)) => match self.read_string('"') {
-                (string, true) => Token::String(string),
-                (string, false) => {
+            Some((c @ '"' | c @ '\'', _, _)) => match self.read_string(c) {
+                (s, true) => Token::String(s),
+                (s, false) => {
                     return Err(ScanErr::new(
-                        ScanErrKind::UnterminatedString(format!("\"{}", string)),
+                        ScanErrKind::UnterminatedString(format!("{}{}", c, s)),
                         start,
                     ));
                 }
             },
-            Some(('$', Some('"'), _)) => {
-                self.next_char();
-                match self.read_string('"') {
-                    (string, true) => Token::FormatString(string),
-                    (string, false) => {
+            Some(('$', Some('"' | '\''), _)) => {
+                let (d, ..) = self.next_char().unwrap();
+                match self.read_string(d) {
+                    (s, true) => Token::FormatString(s),
+                    (s, false) => {
                         return Err(ScanErr::new(
-                            ScanErrKind::UnterminatedString(format!("$\"{}", string)),
+                            ScanErrKind::UnterminatedString(format!("${}{}", d, s)),
                             start,
                         ));
                     }
@@ -742,11 +742,8 @@ impl<T: BufRead> Scanner<T> {
 
                     '\\' => string.push('\\'),
 
-                    // Unescape single quote. I'm not entirely sure
-                    // what the point of this is, since only double
-                    // quotes are used to quote strings, but it
-                    // seems to be a standard (Python and Rust both
-                    // do it).
+                    // Unescape escaped single quote. Seems to be
+                    // standard (Python and Rust both do it).
                     '\'' => string.push('\''),
 
                     // This also seems to be a standard.
