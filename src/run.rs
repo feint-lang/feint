@@ -96,7 +96,7 @@ impl Runner {
                 let marker = if col == 0 { col } else { col - 1 };
                 let token = token.token;
                 format!(
-                    "{:>width$}^\nParse error: unhandled token at {}: {:?}",
+                    "{:>width$}^\nParse error: Unhandled token at {}: {:?}",
                     "",
                     location,
                     token,
@@ -118,7 +118,7 @@ impl Runner {
         let message = match kind {
             ScanErrKind::UnexpectedCharacter(c) => {
                 format!(
-                    "{:>width$}^\nSyntax error: unexpected character at column {}: '{}'",
+                    "{:>width$}^\nSyntax error: Unexpected character at column {}: '{}'",
                     "",
                     col,
                     c,
@@ -127,26 +127,26 @@ impl Runner {
             }
             ScanErrKind::UnterminatedString(_) => {
                 format!(
-                    "{:>width$}^\nSyntax error: unterminated string literal at line {line}, col {col}",
+                    "{:>width$}^\nSyntax error: Unterminated string literal at line {line}, col {col}",
                     "", line = line, col = col, width = marker
                 )
             }
             ScanErrKind::InvalidIndent(num_spaces) => {
                 format!(
-                    "{:>width$}^\nSyntax error: invalid indent with {} spaces (should be a multiple of 4)",
+                    "{:>width$}^\nSyntax error: Invalid indent with {} spaces (should be a multiple of 4)",
                     "", num_spaces, width = marker
                 )
             }
             ScanErrKind::UnexpectedIndent(_) => {
                 format!(
-                    "{:>width$}^\nSyntax error: unexpected indent",
+                    "{:>width$}^\nSyntax error: Unexpected indent",
                     "",
                     width = marker
                 )
             }
             ScanErrKind::WhitespaceAfterIndent | ScanErrKind::UnexpectedWhitespace => {
                 format!(
-                    "{:>width$}^\nSyntax error: unexpected whitespace",
+                    "{:>width$}^\nSyntax error: Unexpected whitespace",
                     "",
                     width = marker
                 )
