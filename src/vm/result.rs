@@ -50,6 +50,7 @@ pub enum RuntimeErrKind {
     AttributeCannotBeSet(String),
     TypeError(String),
     NameError(String),
+    SyntaxError(String),
 }
 
 impl fmt::Display for RuntimeErrKind {

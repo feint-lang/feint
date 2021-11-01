@@ -32,15 +32,20 @@ impl String {
     }
 
     // TODO: Handle nested ${}
+    // XXX: Not sure this belongs here. Move to its own module?
     pub fn format(&self, vm: &mut VM) -> Result<Self, RuntimeErr> {
         assert!(self.is_format_string, "String is not a format string: {}", self);
 
+        let value = self.value();
         let mut formatted = RustString::new();
-        let mut chars = self.value().chars();
+        let mut chars = value.chars();
         let mut peek_chars = self.value.chars();
 
         // Current group expression
         let mut expr = RustString::with_capacity(32);
+
+        let mut pos = 0;
+        let mut stack: Vec<usize> = Vec::new();
 
         peek_chars.next();
 
@@ -53,11 +58,29 @@ impl String {
             } else if (c, d) == ('$', Some('{')) {
                 chars.next();
                 peek_chars.next();
+                stack.push(pos);
+                pos += 1;
 
                 while let Some(c) = chars.next() {
                     peek_chars.next();
+                    pos += 1;
 
                     if c == '}' {
+                        if let Some(start) = stack.pop() {
+                            expr.push_str(&value[start + 2..pos]);
+                            println!("EXPR: `{}` @ {}:{}", expr, start, pos);
+                        }
+
+                        let trimmed_expr = expr.trim();
+                        if trimmed_expr.len() == 0 {
+                            return Err(RuntimeErr::new(RuntimeErrKind::SyntaxError(
+                                format!(
+                                    "Empty expression in $ string at position {}",
+                                    pos,
+                                ),
+                            )));
+                        }
+
                         let result = execute_text(vm, expr.trim(), false, false);
 
                         expr.clear();
@@ -79,13 +102,13 @@ impl String {
                         }
 
                         break;
-                    } else {
-                        expr.push(c);
                     }
                 }
             } else {
                 formatted.push(c);
             }
+
+            pos += 1;
         }
 
         Ok(Self::new(self.class().clone(), formatted, false))

@@ -65,6 +65,9 @@ impl Runner {
             RuntimeErrKind::ParseError(err) => {
                 return self.handle_parse_err(err.kind);
             }
+            RuntimeErrKind::SyntaxError(message) => {
+                return Err((5, format!("Syntax error: {}", message)));
+            }
             RuntimeErrKind::TypeError(message) => {
                 return Err((5, message));
             }
