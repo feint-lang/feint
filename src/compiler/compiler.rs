@@ -244,6 +244,10 @@ impl<'a> Visitor<'a> {
         Ok(())
     }
 
+    /// XXX: The way this works currently, tuples can only contain
+    ///      literal values because there's no way to store a name
+    ///      reference as an object. Python uses a different approach--
+    ///      a BUILD_TUPLE instruction that would probably fix this.
     fn visit_tuple(&mut self, exprs: Vec<ast::Expr>) -> VisitResult {
         let items = self.convert_tuple_items(exprs);
         self.add_const(self.ctx.builtins.new_tuple(items));
@@ -268,6 +272,12 @@ impl<'a> Visitor<'a> {
                 ast::ExprKind::Tuple(exprs) => {
                     let items = self.convert_tuple_items(exprs);
                     builtins.new_tuple(items)
+                }
+                ast::ExprKind::Ident(ident) => {
+                    unimplemented!("Unhandled identifier in tuple: {:?}", ident)
+                }
+                ast::ExprKind::Func(func) => {
+                    unimplemented!("Unhandled function in tuple: {:?}", func)
                 }
                 _ => unimplemented!("Unhandled tuple expression: {:?}", expr),
             };
