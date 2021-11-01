@@ -34,61 +34,60 @@ impl String {
     // TODO: Handle nested ${}
     pub fn format(&self, vm: &mut VM) -> Result<Self, RuntimeErr> {
         assert!(self.is_format_string, "String is not a format string: {}", self);
+
         let mut formatted = RustString::new();
         let mut chars = self.value().chars();
         let mut peek_chars = self.value.chars();
+
+        // Current group expression
+        let mut expr = RustString::with_capacity(32);
+
         peek_chars.next();
-        loop {
-            if let Some(c) = chars.next() {
-                let d = peek_chars.next();
 
-                if let ('\\', Some('$')) = (c, d) {
-                    chars.next();
-                    peek_chars.next();
-                    continue;
-                }
+        while let Some(c) = chars.next() {
+            let d = peek_chars.next();
 
-                if let ('$', Some('{')) = (c, d) {
-                    chars.next();
+            if (c, d) == ('\\', Some('$')) {
+                chars.next();
+                peek_chars.next();
+            } else if (c, d) == ('$', Some('{')) {
+                chars.next();
+                peek_chars.next();
+
+                while let Some(c) = chars.next() {
                     peek_chars.next();
-                    let mut expr = RustString::new();
-                    loop {
-                        if let Some(c) = chars.next() {
-                            peek_chars.next();
-                            if c == '}' {
-                                // Execute expression then pop result
-                                // from stack.
-                                // XXX: This feels a little wonky?
-                                match execute_text(vm, expr.trim(), false, false) {
-                                    Ok(_) => (),
-                                    Err(err) => return Err(err),
-                                }
-                                if let Some(i) = vm.pop() {
-                                    if let Some(obj) = vm.ctx.get_obj(i) {
-                                        formatted.push_str(obj.to_string().as_str());
-                                    } else {
-                                        let err = RuntimeErrKind::ObjectNotFound(i);
-                                        return Err(RuntimeErr::new(err));
-                                    }
-                                } else {
-                                    let err = RuntimeErrKind::EmptyStack;
-                                    return Err(RuntimeErr::new(err));
-                                }
-                                break;
+
+                    if c == '}' {
+                        let result = execute_text(vm, expr.trim(), false, false);
+
+                        expr.clear();
+
+                        if result.is_err() {
+                            return Err(result.unwrap_err());
+                        }
+
+                        if let Some(i) = vm.pop() {
+                            if let Some(obj) = vm.ctx.get_obj(i) {
+                                formatted.push_str(obj.to_string().as_str());
                             } else {
-                                expr.push(c);
+                                return Err(RuntimeErr::new(
+                                    RuntimeErrKind::ObjectNotFound(i),
+                                ));
                             }
                         } else {
-                            break;
+                            return Err(RuntimeErr::new(RuntimeErrKind::EmptyStack));
                         }
+
+                        break;
+                    } else {
+                        expr.push(c);
                     }
-                } else {
-                    formatted.push(c);
                 }
             } else {
-                break;
+                formatted.push(c);
             }
         }
+
         Ok(Self::new(self.class().clone(), formatted, false))
     }
 }
