@@ -14,7 +14,7 @@ use super::context::RuntimeContext;
 use super::frame::Frame;
 use super::inst::{Chunk, Inst};
 use super::result::{ExeResult, RuntimeErr, RuntimeErrKind, VMState};
-use crate::types::{String, Tuple};
+use crate::types::{ObjectRef, String, Tuple};
 
 type RustString = std::string::String;
 
@@ -138,7 +138,7 @@ impl VM {
                     continue;
                 }
                 Inst::LoadConst(index) => {
-                    self.format_string(*index)?;
+                    self.format_strings(*index)?;
                     self.stack.push(*index);
                 }
                 Inst::DeclareVar(name) => {
@@ -158,7 +158,7 @@ impl VM {
                 }
                 Inst::LoadVar(name) => {
                     if let Some(&index) = self.ctx.get_obj_index(name) {
-                        self.format_string(index)?;
+                        self.format_strings(index)?;
                         self.stack.push(index);
                     } else {
                         self.err(RuntimeErrKind::NameError(format!(
@@ -340,8 +340,18 @@ impl VM {
         Err(RuntimeErr::new(kind))
     }
 
-    /// Format a $ string
-    fn format_string(&mut self, const_index: usize) -> Result<(), RuntimeErr> {
+    /// Format strings.
+    ///
+    /// This is called whenever an object is loaded (constant or var).
+    /// If the object isn't a $ string or a tuple, this does nothing.
+    ///
+    /// If the object a $ string, it will be formatted and the formatted
+    /// value will *replace* the original constant value.
+    ///
+    /// If the object a tuple, any $ string items will be formatted. If
+    /// any $ strings are present, the original tuple will be *replaced*
+    /// with a new tuple containing the formatted values.
+    fn format_strings(&mut self, const_index: usize) -> Result<(), RuntimeErr> {
         if let Some(obj) = self.ctx.get_obj(const_index) {
             if let Some(string) = obj.as_any().downcast_ref::<String>() {
                 if string.is_format_string() {
@@ -350,8 +360,26 @@ impl VM {
                     self.ctx.constants.replace(const_index, formatted);
                 }
             }
-            if let Some(string) = obj.as_any().downcast_ref::<Tuple>() {
-                todo!();
+            if let Some(tuple) = obj.as_any().downcast_ref::<Tuple>() {
+                let mut new_items: Vec<ObjectRef> = Vec::new();
+                let mut num_formatted = 0;
+                for item in tuple.items() {
+                    if let Some(string) = item.as_any().downcast_ref::<String>() {
+                        if string.is_format_string() {
+                            let formatted = string.format(self)?;
+                            new_items.push(Rc::new(formatted));
+                            num_formatted += 1;
+                        } else {
+                            new_items.push(item.clone());
+                        }
+                    } else {
+                        new_items.push(item.clone());
+                    }
+                }
+                if num_formatted > 0 {
+                    let new_tuple = self.ctx.builtins.new_tuple(new_items);
+                    self.ctx.constants.replace(const_index, new_tuple);
+                }
             }
         }
         Ok(())
