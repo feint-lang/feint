@@ -244,14 +244,25 @@ impl VM {
                 }
                 Inst::Print => match self.stack.peek() {
                     Some(index) => {
-                        let value = self.ctx.constants.get(*index).unwrap();
+                        let val = self.ctx.constants.get(*index).unwrap();
+                        let mut print;
                         if cfg!(debug_assertions) {
                             self.dis(dis, ip, &instructions);
-                            if !dis {
-                                println!("{}", value);
-                            }
+                            print = !dis;
                         } else {
-                            println!("{}", value);
+                            print = true;
+                        }
+                        if print {
+                            if let Some(tuple) = val.as_any().downcast_ref::<Tuple>() {
+                                let items: Vec<RustString> = tuple
+                                    .items()
+                                    .into_iter()
+                                    .map(|i| format!("{}", i))
+                                    .collect();
+                                println!("{}", items.join(" "));
+                            } else {
+                                println!("{}", val);
+                            }
                         }
                         self.stack.pop();
                     }
