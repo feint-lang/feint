@@ -2,6 +2,8 @@
 use std::any::Any;
 use std::fmt;
 
+use crate::format::{scan, Token as FStringToken};
+
 use crate::vm::{
     execute_text, ExeResult, RuntimeBoolResult, RuntimeContext, RuntimeErr,
     RuntimeErrKind, RuntimeResult, VM,
@@ -33,82 +35,40 @@ impl String {
 
     // TODO: Handle nested ${}
     // XXX: Not sure this belongs here. Move to its own module?
+    // XXX: Maybe all the scanning/parsing should happen in the main
+    //      scanner? In addition to catching syntax errors early, I
+    //      think this would make it easier to handle nested groups.
     pub fn format(&self, vm: &mut VM) -> Result<Self, RuntimeErr> {
         assert!(self.is_format_string, "String is not a format string: {}", self);
 
         let value = self.value();
-        let mut formatted = RustString::new();
-        let mut chars = value.chars();
-        let mut peek_chars = self.value.chars();
+        let result = scan(value);
+        let tokens = result.expect("Scanning of format string failed");
+        let mut formatted = RustString::with_capacity(64);
 
-        // Current group expression
-        let mut expr = RustString::with_capacity(32);
-
-        let mut pos = 0;
-        let mut stack: Vec<usize> = Vec::new();
-
-        peek_chars.next();
-
-        while let Some(c) = chars.next() {
-            let d = peek_chars.next();
-
-            if (c, d) == ('\\', Some('$')) {
-                chars.next();
-                peek_chars.next();
-            } else if (c, d) == ('$', Some('{')) {
-                chars.next();
-                peek_chars.next();
-                stack.push(pos);
-                pos += 1;
-
-                while let Some(c) = chars.next() {
-                    peek_chars.next();
-                    pos += 1;
-
-                    if c == '}' {
-                        if let Some(start) = stack.pop() {
-                            expr.push_str(&value[start + 2..pos]);
-                            println!("EXPR: `{}` @ {}:{}", expr, start, pos);
-                        }
-
-                        let trimmed_expr = expr.trim();
-                        if trimmed_expr.len() == 0 {
-                            return Err(RuntimeErr::new(RuntimeErrKind::SyntaxError(
-                                format!(
-                                    "Empty expression in $ string at position {}",
-                                    pos,
-                                ),
-                            )));
-                        }
-
-                        let result = execute_text(vm, expr.trim(), false, false);
-
-                        expr.clear();
-
-                        if result.is_err() {
-                            return Err(result.unwrap_err());
-                        }
-
-                        if let Some(i) = vm.pop() {
-                            if let Some(obj) = vm.ctx.get_obj(i) {
-                                formatted.push_str(obj.to_string().as_str());
-                            } else {
-                                return Err(RuntimeErr::new(
-                                    RuntimeErrKind::ObjectNotFound(i),
-                                ));
-                            }
+        for token in tokens {
+            match token {
+                FStringToken::String(part, _) => {
+                    formatted.push_str(part.as_str());
+                }
+                FStringToken::Group(expr, _) => {
+                    let result = execute_text(vm, expr.as_str(), false, false);
+                    if result.is_err() {
+                        return Err(result.unwrap_err());
+                    }
+                    if let Some(i) = vm.pop() {
+                        if let Some(obj) = vm.ctx.get_obj(i) {
+                            formatted.push_str(obj.to_string().as_str());
                         } else {
-                            return Err(RuntimeErr::new(RuntimeErrKind::EmptyStack));
+                            return Err(RuntimeErr::new(
+                                RuntimeErrKind::ObjectNotFound(i),
+                            ));
                         }
-
-                        break;
+                    } else {
+                        return Err(RuntimeErr::new(RuntimeErrKind::EmptyStack));
                     }
                 }
-            } else {
-                formatted.push(c);
             }
-
-            pos += 1;
         }
 
         Ok(Self::new(self.class().clone(), formatted, false))

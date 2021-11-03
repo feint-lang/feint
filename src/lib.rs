@@ -7,6 +7,7 @@ pub mod run;
 
 mod ast;
 mod compiler;
+mod format;
 mod parser;
 mod result;
 mod scanner;
