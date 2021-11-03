@@ -179,8 +179,3 @@ impl fmt::Display for Location {
         write!(f, "{}:{}", self.line, self.col)
     }
 }
-
-mod tests {
-    #[test]
-    fn source_from_text() {}
-}
