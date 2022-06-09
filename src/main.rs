@@ -1,25 +1,25 @@
 use std::path::PathBuf;
 use std::process;
 
-use clap::{App, Arg};
+use clap::{Arg, Command};
 
 use feint::repl;
 use feint::run;
 
 /// Interpret a file if one is specified. Otherwise, run the REPL.
 fn main() {
-    let app = App::new("FeInt")
+    let app = Command::new("FeInt")
         .version("0.0.0")
         .arg(
-            Arg::with_name("FILE_NAME")
+            Arg::new("FILE_NAME")
                 .index(1)
                 .required(false)
                 .conflicts_with("code")
                 .help("Script file to run (use - to read from stdin)"),
         )
         .arg(
-            Arg::with_name("code")
-                .short("c")
+            Arg::new("code")
+                .short('c')
                 .long("code")
                 .required(false)
                 .conflicts_with("FILE_NAME")
@@ -27,30 +27,30 @@ fn main() {
                 .help("Code to run"),
         )
         .arg(
-            Arg::with_name("history_path")
+            Arg::new("history_path")
                 .long("history-path")
                 .required(false)
                 .takes_value(true)
                 .help("Disable REPL history?"),
         )
         .arg(
-            Arg::with_name("no_history")
+            Arg::new("no_history")
                 .long("no-history")
                 .required(false)
                 .takes_value(false)
                 .help("Disable REPL history?"),
         )
         .arg(
-            Arg::with_name("dis")
-                .short("i")
+            Arg::new("dis")
+                .short('i')
                 .long("dis")
                 .required(false)
                 .takes_value(false)
                 .help("Disassemble instructions?"),
         )
         .arg(
-            Arg::with_name("debug")
-                .short("d")
+            Arg::new("debug")
+                .short('d')
                 .long("debug")
                 .required(false)
                 .takes_value(false)
