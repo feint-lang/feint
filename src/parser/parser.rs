@@ -5,6 +5,7 @@ use std::io::{self, BufReader, Cursor};
 use std::iter::{Iterator, Peekable};
 
 use crate::ast;
+use crate::ast::Statement;
 use crate::scanner::{ScanErr, ScanResult, Scanner, Token, TokenWithLocation};
 use crate::util::Location;
 
@@ -237,7 +238,7 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
     }
 
     /// Collect tokens until the specified token is reached. This is
-    /// used for lookahead. For example, the is used to find the
+    /// used for lookahead. For example, it's used to find the
     /// parameters/args for a function def/call since the number of
     /// args is unknown up front and we can't use single-peek token
     /// inspection techniques.
@@ -387,7 +388,13 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
                 ast::Expr::new_ident(ast::Ident::new_ident(name))
             }
             Token::Block => {
-                return self.block();
+                let statements = self.block()?;
+                ast::Expr::new_block(statements)
+            }
+            Token::If => {
+                let if_expr = self.expr(0)?;
+                let if_block = self.block()?;
+                ast::Expr::new_conditional(if_expr, if_block)
             }
             _ => self.expect_unary_expr(&token)?,
         };
@@ -476,12 +483,11 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
         self.nested_expr()
     }
 
-    /// Handle `block ->`.
-    fn block(&mut self) -> ExprResult {
+    /// Handle `block ->`, `if <expr> ->`, etc.
+    fn block(&mut self) -> StatementsResult {
         self.expect_token(&Token::FuncStart)?;
         self.expect_scope()?;
-        let statements = self.expect_statement_block()?;
-        Ok(ast::Expr::new_block(statements))
+        self.expect_statement_block()
     }
 
     /// Handle `func () -> ...` (definition) and `func()` (call).

@@ -110,6 +110,8 @@ pub enum ExprKind {
     UnaryOp(UnaryOperator, Box<Expr>),
     BinaryOp(Box<Expr>, BinaryOperator, Box<Expr>),
     Block(Block),
+    // if expr, if block
+    Conditional(Box<Expr>, Block),
     Func(Func),
     Call(Call),
     Literal(Literal),
@@ -124,6 +126,10 @@ impl Expr {
 
     pub fn new_block(statements: Vec<Statement>) -> Self {
         Self::new(ExprKind::Block(Block::new(statements)))
+    }
+
+    pub fn new_conditional(if_expr: Expr, if_statements: Vec<Statement>) -> Self {
+        Self::new(ExprKind::Conditional(Box::new(if_expr), Block::new(if_statements)))
     }
 
     pub fn new_func(
@@ -199,6 +205,7 @@ impl fmt::Debug for ExprKind {
             Self::BinaryOp(a, op, b) => write!(f, "({:?} {:?} {:?})", a, op, b),
             Self::Ident(ident) => write!(f, "{:?}", ident),
             Self::Block(block) => write!(f, "{:?}", block),
+            Self::Conditional(if_expr, _) => write!(f, "{:?}", if_expr),
             Self::Func(func) => write!(f, "{:?}", func),
             Self::Call(func) => write!(f, "{:?}", func),
             Self::Tuple(items) => write!(f, "{:?}", items),
@@ -226,6 +233,25 @@ impl fmt::Debug for Block {
             .map(|statement| format!("{:?}", statement))
             .collect();
         write!(f, "Block ->\n{}", items.join("\n    "))
+    }
+}
+
+/// Conditional
+#[derive(PartialEq)]
+pub struct Conditional {
+    pub if_expr: Expr,
+    pub if_statements: Vec<Statement>,
+}
+
+impl Conditional {
+    pub fn new(if_expr: Expr, if_statements: Vec<Statement>) -> Self {
+        Self { if_expr, if_statements }
+    }
+}
+
+impl fmt::Debug for Conditional {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Conditional")
     }
 }
 

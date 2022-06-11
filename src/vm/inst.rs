@@ -7,9 +7,14 @@ pub enum Inst {
     NoOp,
     Push(usize),
     Pop,
-    Jump(usize),        // Jump unconditionally
-    JumpIfTrue(usize),  // Jump if top of stack is true
-    JumpIfFalse(usize), // Jump if top of stack is false
+
+    // Jump unconditionally
+    Jump(usize),
+
+    // If top of stack is true, jump to first address
+    // Otherwise, jump to second address
+    JumpIfElse(usize, usize),
+
     UnaryOp(UnaryOperator),
     BinaryOp(BinaryOperator),
     LoadConst(usize),

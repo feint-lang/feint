@@ -116,6 +116,22 @@ impl<'a> Visitor<'a> {
         Ok(())
     }
 
+    fn visit_conditional(
+        &mut self,
+        if_expr: ast::Expr,
+        if_block: ast::Block,
+        scope_kind: ScopeKind,
+    ) -> VisitResult {
+        self.visit_expr(if_expr)?;
+        let jump_index = self.instructions.len();
+        let if_addr = jump_index + 1; // start of if block
+        self.push(Inst::NoOp); // jump placeholder
+        self.visit_block(if_block, scope_kind)?;
+        let else_addr = self.instructions.len() + 1; // after if block
+        self.instructions[jump_index] = Inst::JumpIfElse(if_addr, else_addr);
+        Ok(())
+    }
+
     fn visit_func(&mut self, node: ast::Func) -> VisitResult {
         eprintln!("IMPLEMENT visit_func()!!!");
         eprintln!("{}({})", node.name, node.params.join(", "));
@@ -161,6 +177,9 @@ impl<'a> Visitor<'a> {
         type Kind = ast::ExprKind;
         match node.kind {
             Kind::Block(block) => self.visit_block(block, ScopeKind::Block)?,
+            Kind::Conditional(if_expr, if_block) => {
+                self.visit_conditional(*if_expr, if_block, ScopeKind::Block)?
+            }
             Kind::Func(func) => self.visit_func(func)?,
             Kind::UnaryOp(op, b) => self.visit_unary_op(op, *b)?,
             Kind::BinaryOp(a, op, b) => self.visit_binary_op(*a, op, *b)?,

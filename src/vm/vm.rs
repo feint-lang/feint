@@ -137,6 +137,19 @@ impl VM {
                     ip = *address;
                     continue;
                 }
+                Inst::JumpIfElse(if_addr, else_addr) => {
+                    if let Some(i) = self.pop() {
+                        let obj = self.ctx.constants.get(i).unwrap();
+                        if obj.as_bool(&self.ctx)? {
+                            ip = *if_addr;
+                        } else {
+                            ip = *else_addr;
+                        }
+                    } else {
+                        self.err(RuntimeErrKind::EmptyStack)?;
+                    };
+                    continue;
+                }
                 Inst::LoadConst(index) => {
                     self.format_strings(*index)?;
                     self.push(*index);
@@ -452,17 +465,18 @@ impl VM {
                     self.format_instruction(instructions, &instructions[*address])
                 ),
             ),
-            JumpIfTrue(address) => match self.peek() {
+            JumpIfElse(if_addr, else_addr) => match self.peek() {
                 Some(index) => {
                     let obj = self.ctx.get_obj(*index).unwrap();
                     self.format_aligned(
-                        "JUMP IF",
-                        format!("{} -> {} ({:?})", address, index, obj),
+                        "JUMP_IF_ELSE",
+                        format!("{} ({}) ? {} : {:?}", obj, index, if_addr, else_addr),
                     )
                 }
-                None => {
-                    self.format_aligned("JUMP IF", format!("{} -> [EMPTY]", address))
-                }
+                None => self.format_aligned(
+                    "JUMP_IF_ELSE",
+                    format!("[EMPTY] ? {} : {}", if_addr, else_addr),
+                ),
             },
             LoadConst(index) => {
                 let obj = self.ctx.get_obj(*index).unwrap();
