@@ -123,13 +123,13 @@ impl VM {
                     // do nothing
                 }
                 Inst::Push(value) => {
-                    self.stack.push(*value);
+                    self.push(*value);
                 }
                 Inst::Pop => {
                     if self.stack.is_empty() {
                         self.err(RuntimeErrKind::EmptyStack)?;
                     }
-                    self.stack.pop();
+                    self.pop();
                 }
                 Inst::Jump(address) => {
                     #[cfg(debug_assertions)]
@@ -139,7 +139,7 @@ impl VM {
                 }
                 Inst::LoadConst(index) => {
                     self.format_strings(*index)?;
-                    self.stack.push(*index);
+                    self.push(*index);
                 }
                 Inst::DeclareVar(name) => {
                     // NOTE: Currently, declaration and assignment are
@@ -150,7 +150,7 @@ impl VM {
                 Inst::AssignVar(name) => {
                     if let Some(i) = self.pop() {
                         self.ctx.assign_var(name, i);
-                        self.stack.push(i);
+                        self.push(i);
                     } else {
                         let message = format!("Assignment");
                         self.err(RuntimeErrKind::NotEnoughValuesOnStack(message))?;
@@ -159,7 +159,7 @@ impl VM {
                 Inst::LoadVar(name) => {
                     if let Some(&index) = self.ctx.get_obj_index(name) {
                         self.format_strings(index)?;
-                        self.stack.push(index);
+                        self.push(index);
                     } else {
                         self.err(RuntimeErrKind::NameError(format!(
                             "Name not found: {}",
@@ -180,7 +180,7 @@ impl VM {
                                     UnaryOperator::Not => a.not(&self.ctx)?,
                                     _ => unreachable!(),
                                 };
-                                self.stack.push(if result { 1 } else { 2 });
+                                self.push(if result { 1 } else { 2 });
                                 #[cfg(debug_assertions)]
                                 self.dis(dis, ip, &instructions);
                                 ip += 1;
@@ -188,7 +188,7 @@ impl VM {
                             }
                         };
                         let index = self.ctx.constants.add(value);
-                        self.stack.push(index);
+                        self.push(index);
                     } else {
                         let message = format!("Unary op: {}", op);
                         self.err(RuntimeErrKind::NotEnoughValuesOnStack(message))?;
@@ -220,7 +220,7 @@ impl VM {
                                     BinaryOperator::Or => a.or(b, &self.ctx)?,
                                     _ => unreachable!(),
                                 };
-                                self.stack.push(if result { 1 } else { 2 });
+                                self.push(if result { 1 } else { 2 });
                                 ip += 1;
                                 #[cfg(debug_assertions)]
                                 self.dis(dis, ip, &instructions);
@@ -228,7 +228,7 @@ impl VM {
                             }
                         };
                         let index = self.ctx.constants.add(value);
-                        self.stack.push(index);
+                        self.push(index);
                     } else {
                         let message = format!("Binary op: {}", op);
                         self.err(RuntimeErrKind::NotEnoughValuesOnStack(message))?;
@@ -264,7 +264,7 @@ impl VM {
                                 println!("{}", val);
                             }
                         }
-                        self.stack.pop();
+                        self.pop();
                     }
                     None => {
                         self.err(RuntimeErrKind::EmptyStack)?;
@@ -272,7 +272,7 @@ impl VM {
                 },
                 Inst::Return => {
                     // TODO: Implement actual return
-                    match self.stack.pop() {
+                    match self.pop() {
                         Some(v) => println!("{}", v),
                         None => eprintln!("Stack is empty!"),
                     }
