@@ -18,3 +18,20 @@ else ->
         3
 
 print($"z: z = ${z}")
+
+if 0 ->
+    nil
+else ->
+    print("start else")
+    if 0 ->
+        print("inner if (this should NOT be printed)")
+    else ->
+        print("inner else (SHOULD be printed)")
+    print("end else")
+
+# This just demonstrates that if/else suite at the end of the file
+# doesn't cause an error.
+if false ->
+    nil
+else ->
+    nil

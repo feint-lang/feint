@@ -110,8 +110,8 @@ pub enum ExprKind {
     UnaryOp(UnaryOperator, Box<Expr>),
     BinaryOp(Box<Expr>, BinaryOperator, Box<Expr>),
     Block(Block),
-    // if expr, if block
-    Conditional(Box<Expr>, Block),
+    // if expr, if block, else block
+    Conditional(Box<Expr>, Block, Option<Block>),
     Func(Func),
     Call(Call),
     Literal(Literal),
@@ -128,8 +128,20 @@ impl Expr {
         Self::new(ExprKind::Block(Block::new(statements)))
     }
 
-    pub fn new_conditional(if_expr: Expr, if_statements: Vec<Statement>) -> Self {
-        Self::new(ExprKind::Conditional(Box::new(if_expr), Block::new(if_statements)))
+    pub fn new_conditional(
+        if_expr: Expr,
+        if_statements: Vec<Statement>,
+        else_statements: Option<Vec<Statement>>,
+    ) -> Self {
+        let else_block = match else_statements {
+            Some(statements) => Some(Block::new(statements)),
+            None => None,
+        };
+        Self::new(ExprKind::Conditional(
+            Box::new(if_expr),
+            Block::new(if_statements),
+            else_block,
+        ))
     }
 
     pub fn new_func(
@@ -205,7 +217,9 @@ impl fmt::Debug for ExprKind {
             Self::BinaryOp(a, op, b) => write!(f, "({:?} {:?} {:?})", a, op, b),
             Self::Ident(ident) => write!(f, "{:?}", ident),
             Self::Block(block) => write!(f, "{:?}", block),
-            Self::Conditional(if_expr, _) => write!(f, "{:?}", if_expr),
+            Self::Conditional(if_expr, if_block, else_block) => {
+                write!(f, "{:?} ? {:?} : {:?}", if_expr, if_block, else_block)
+            }
             Self::Func(func) => write!(f, "{:?}", func),
             Self::Call(func) => write!(f, "{:?}", func),
             Self::Tuple(items) => write!(f, "{:?}", items),

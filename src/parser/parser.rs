@@ -5,7 +5,6 @@ use std::io::{self, BufReader, Cursor};
 use std::iter::{Iterator, Peekable};
 
 use crate::ast;
-use crate::ast::Statement;
 use crate::scanner::{ScanErr, ScanResult, Scanner, Token, TokenWithLocation};
 use crate::util::Location;
 
@@ -284,14 +283,23 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
         Ok(())
     }
 
+    /// Expect the end of a scope.
+    fn expect_scope_end(&mut self) -> Result<(), ParseErr> {
+        self.expect_token(&Token::ScopeEnd)?;
+        self.expect_token(&Token::EndOfStatement)?;
+        Ok(())
+    }
+
     /// Expect and collect a block of statements. There must be at least
     /// one statement.
     fn expect_statement_block(&mut self) -> StatementsResult {
+        self.expect_token(&Token::FuncStart)?;
+        self.expect_scope()?;
         let statements = self.statements()?;
         if statements.is_empty() {
             return Err(self.err(ParseErrKind::ExpectedBlock(self.next_loc())));
         }
-        self.expect_token(&Token::ScopeEnd)?;
+        self.expect_scope_end()?;
         Ok(statements)
     }
 
@@ -394,7 +402,12 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
             Token::If => {
                 let if_expr = self.expr(0)?;
                 let if_block = self.block()?;
-                ast::Expr::new_conditional(if_expr, if_block)
+                let else_block = if self.next_token_is(&Token::Else)? {
+                    Some(self.block()?)
+                } else {
+                    None
+                };
+                ast::Expr::new_conditional(if_expr, if_block, else_block)
             }
             _ => self.expect_unary_expr(&token)?,
         };
@@ -485,8 +498,6 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
 
     /// Handle `block ->`, `if <expr> ->`, etc.
     fn block(&mut self) -> StatementsResult {
-        self.expect_token(&Token::FuncStart)?;
-        self.expect_scope()?;
         self.expect_statement_block()
     }
 
@@ -509,10 +520,9 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
             }
         }
 
-        if self.next_token_is(&Token::FuncStart)? {
+        if self.peek_token_is(&Token::FuncStart)? {
             // Function def - tokens are parameters
             let params = self.parse_params(tokens)?;
-            self.expect_scope()?;
             let statements = self.expect_statement_block()?;
             Ok(ast::Expr::new_func(name.clone(), params, statements))
         } else {

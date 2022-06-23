@@ -120,15 +120,45 @@ impl<'a> Visitor<'a> {
         &mut self,
         if_expr: ast::Expr,
         if_block: ast::Block,
+        else_block: Option<ast::Block>,
         scope_kind: ScopeKind,
     ) -> VisitResult {
+        // Addresses of if and elif Jump out instructions (added to the
+        // end of each block). The target address for these isn't known
+        // until all the if, elif, and else blocks are compiled.
+        let mut jump_out_addrs: Vec<usize> = vec![];
+
+        // Evaluate if expression and leave result on top of stack
         self.visit_expr(if_expr)?;
-        let jump_index = self.instructions.len();
-        let if_addr = jump_index + 1; // start of if block
-        self.push(Inst::NoOp); // jump placeholder
-        self.visit_block(if_block, scope_kind)?;
-        let else_addr = self.instructions.len() + 1; // after if block
-        self.instructions[jump_index] = Inst::JumpIfElse(if_addr, else_addr);
+
+        // Placeholder to jump to if or else depending on if expr
+        let jump_if_else_index = self.instructions.len();
+        self.push(Inst::InternalError("JumpIfElse not set".to_owned()));
+
+        // If block
+        let if_addr = jump_if_else_index + 1;
+        self.visit_block(if_block, scope_kind.clone())?;
+
+        // Placeholder to jump out of if
+        jump_out_addrs.push(self.instructions.len());
+        self.push(Inst::InternalError("Jump for if not set".to_owned()));
+
+        // Else block (if present)
+        let else_addr = self.instructions.len();
+        if let Some(else_block) = else_block {
+            self.visit_block(else_block, scope_kind.clone())?;
+        }
+
+        // Address of the next instruction after the conditional suite
+        let after_addr = self.instructions.len();
+
+        // Insert jump instructions now that addresses are known
+        self.instructions[jump_if_else_index] = Inst::JumpIfElse(if_addr, else_addr);
+
+        for addr in jump_out_addrs {
+            self.instructions[addr] = Inst::Jump(after_addr);
+        }
+
         Ok(())
     }
 
@@ -177,9 +207,8 @@ impl<'a> Visitor<'a> {
         type Kind = ast::ExprKind;
         match node.kind {
             Kind::Block(block) => self.visit_block(block, ScopeKind::Block)?,
-            Kind::Conditional(if_expr, if_block) => {
-                self.visit_conditional(*if_expr, if_block, ScopeKind::Block)?
-            }
+            Kind::Conditional(if_expr, if_block, else_block) => self
+                .visit_conditional(*if_expr, if_block, else_block, ScopeKind::Block)?,
             Kind::Func(func) => self.visit_func(func)?,
             Kind::UnaryOp(op, b) => self.visit_unary_op(op, *b)?,
             Kind::BinaryOp(a, op, b) => self.visit_binary_op(*a, op, *b)?,

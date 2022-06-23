@@ -121,7 +121,7 @@ pub struct Scope {
     jumps: HashMap<String, usize>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum ScopeKind {
     Global,
     Block,

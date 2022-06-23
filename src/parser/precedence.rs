@@ -34,7 +34,10 @@ pub fn get_operator_precedence(token: &Token) -> (u8, u8) {
         Token::Comma                    // a, b
         | Token::Equal       => (0, 1), // a = b
         
-        | Token::If          => (0, 2), // if ...
+        // TODO: This was added for use in ternary expressions, but
+        //       it doesn't work with if/else blocks. Maybe just use
+        //       `cond ? yes : no`?
+        // | Token::If          => (0, 2), // if ...
         
         | Token::Or          => (0, 3), // a || b
         | Token::And         => (0, 4), // a && b

@@ -131,6 +131,9 @@ impl Token {
 
             // Keywords
             Self::Block => "block",
+            Self::If => "if",
+            Self::Else => "else",
+            Self::ElseIf => "elif",
             Self::Jump => "jump",
             Self::Label(_name) => "label",
 
