@@ -26,4 +26,6 @@ pub enum Inst {
     Print, // Print value at top of stack
     Return,
     Halt(i32),
+
+    InternalError(String),
 }

@@ -296,6 +296,11 @@ impl VM {
                     self.dis(dis, ip, &instructions);
                     break Ok(VMState::Halted(*code));
                 }
+                Inst::InternalError(message) => {
+                    self.halt();
+                    eprintln!("INTERNAL ERROR: {}", message);
+                    break Ok(VMState::Halted(-1));
+                }
                 inst => {
                     let message = format!("{:?}", inst);
                     self.err(RuntimeErrKind::UnhandledInstruction(message))?;
