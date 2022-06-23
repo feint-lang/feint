@@ -1,0 +1,20 @@
+x = true
+
+if x ->
+    print($"x: x = ${x}")
+
+y = if true ->
+    print("y: yes, true is true")
+    1
+
+print($"y: y = ${y}")
+
+z = if false ->
+    print("z: if block should NOT be printed")
+    2
+else ->
+    print("z: else block SHOULD be printed")
+    block ->
+        3
+
+print($"z: z = ${z}")
