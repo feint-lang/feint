@@ -26,16 +26,17 @@ x != y
 x == y
 list = [1, 2, 3]
 
-1.  # Syntax error
-1.times_do((n) ->
-    print(n)
-)
+.3  # Syntax error (leading 0 required)
+3.  # Syntax error (decimal part required)
+
+# Print `n` three times
+3.times_do((n) -> print(n))
 
 # Anonymous block (new scope)
 block ->
     x = 2
 
-Type ()
+Type () ->
     @new () ->
         print("Create new instance Type")
 
@@ -50,21 +51,26 @@ hello () ->
 func_with_return_type (): String ->
     "abc"
 
-loop () ->
+loops () ->
     i = 0
 
-    <- true
+    loop ->
         print(i)
         i += 1
-        break if i == 10
+        if i == 10 -> break
 
     j = 0
     go = true
-    <- go
+    loop go ->
         print(i)
         j += 1
-        go = false if j == 10
+        go = j == 10
 
 loop_over_range () ->
-    i <- 0..10
+    # Prints 0, 1, 2, 3, 4
+    loop i <- 0..5 ->
+        print(i)
+
+    # Prints 1, 2, 3, 4, 5
+    loop i <- 1...5 ->
         print(i)
