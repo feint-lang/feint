@@ -31,8 +31,7 @@ pub enum ScanErrKind {
     UnexpectedCharacter(char), // Char not recognized as token or start of token
     UnmatchedOpeningBracket(char), // Closing bracket with no matching opening bracket
     UnmatchedClosingBracket(char), // Opening bracket with no matching closing bracket
-    ParseIntError(ParseBigIntError),
-    ParseFloatError(ParseFloatError),
-    CouldNotOpenSourceFile(String, String), // path, reason
+    ParseIntErr(ParseBigIntError),
+    ParseFloatErr(ParseFloatError),
     TooMuchWhitespace,
 }

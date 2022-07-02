@@ -1,33 +1,35 @@
 //! # FeInt REPL
-
+use rustyline::config::Configurer;
 use std::path::Path;
 
 use rustyline::error::ReadlineError;
 
-use crate::compiler::CompilationErrKind;
+use crate::exe::Executor;
 use crate::parser::ParseErrKind;
-use crate::result::ExitResult;
+use crate::result::{ExeErr, ExeErrKind, ExitResult};
 use crate::scanner::ScanErrKind;
-use crate::util::Location;
-use crate::vm::{execute, execute_text, Inst, RuntimeErrKind, VMState, VM};
+use crate::vm::{Inst, RuntimeErrKind, VMState, VM};
 
 /// Run FeInt REPL until user exits.
 pub fn run(history_path: Option<&Path>, dis: bool, debug: bool) -> ExitResult {
-    let mut repl = Repl::new(history_path, VM::default(), dis, debug);
+    let mut vm = VM::default();
+    let executor = Executor::new(&mut vm, true, dis, debug);
+    let mut repl = Repl::new(history_path, executor);
     repl.run()
 }
 
 struct Repl<'a> {
     reader: rustyline::Editor<()>,
     history_path: Option<&'a Path>,
-    vm: VM,
-    dis: bool,
-    debug: bool,
+    executor: Executor<'a>,
 }
 
 impl<'a> Repl<'a> {
-    fn new(history_path: Option<&'a Path>, vm: VM, dis: bool, debug: bool) -> Self {
-        Repl { reader: rustyline::Editor::<()>::new(), history_path, vm, dis, debug }
+    fn new(history_path: Option<&'a Path>, executor: Executor<'a>) -> Self {
+        let mut reader = rustyline::Editor::<()>::new();
+        reader.set_indent_size(4);
+        reader.set_tab_stop(4);
+        Repl { reader, history_path, executor }
     }
 
     fn run(&mut self) -> ExitResult {
@@ -48,7 +50,7 @@ impl<'a> Repl<'a> {
                     // the REPL.
                     match self.eval(input.as_str(), false) {
                         Some(result) => {
-                            self.vm.halt();
+                            self.executor.vm.halt();
                             break result;
                         }
                         None => (),
@@ -56,14 +58,14 @@ impl<'a> Repl<'a> {
                 }
                 // User hit Ctrl-C or Ctrl-D.
                 Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => {
-                    self.vm.halt();
+                    self.executor.vm.halt();
                     break Ok(None);
                 }
                 // Unexpected error encountered while attempting to read
                 // a line.
                 Err(err) => {
-                    self.vm.halt();
-                    break Err((1, format!("Could not read line: {}", err)));
+                    self.executor.vm.halt();
+                    break Err((1, Some(format!("Could not read line: {}", err))));
                 }
             }
         }
@@ -87,7 +89,7 @@ impl<'a> Repl<'a> {
     /// Evaluate text. Returns None to indicate to the main loop to
     /// continue reading and evaluating input. Returns some result to
     /// indicate to the main loop to exit.
-    fn eval(&mut self, text: &str, bail: bool) -> Option<ExitResult> {
+    fn eval(&mut self, text: &str, no_continue: bool) -> Option<ExitResult> {
         self.add_history_entry(text);
 
         let result = match text.trim() {
@@ -98,34 +100,47 @@ impl<'a> Repl<'a> {
                 eprintln!(".help  -> show help");
                 eprintln!(".exit  -> exit");
                 eprintln!(".stack -> show VM stack (top first)");
+                eprintln!(".emacs -> switch to emacs-style input (default)");
+                eprintln!(".vi    -> switch to vi-style input");
                 eprintln!("{:=>72}", "");
+                return None;
+            }
+            "\t" => {
+                eprintln!("got tab");
                 return None;
             }
             ".exit" | ".quit" => return Some(Ok(None)),
             ".stack" => {
-                self.vm.display_stack();
+                self.executor.vm.display_stack();
                 return None;
             }
-            _ => execute_text(&mut self.vm, text, self.dis, self.debug),
+            ".emacs" => {
+                self.reader.set_edit_mode(rustyline::config::EditMode::Emacs);
+                return None;
+            }
+            ".vi" | ".vim" => {
+                self.reader.set_edit_mode(rustyline::config::EditMode::Vi);
+                return None;
+            }
+            _ => self.executor.execute_text(text),
         };
 
         if let Ok(vm_state) = result {
             // Assign _ to value at top of stack
             let var = "_";
             let mut instructions = vec![Inst::AssignVar(var.to_owned())];
-            if let Some(&index) = self.vm.peek() {
+            if let Some(&index) = self.executor.vm.peek() {
                 // Don't print nil when the result of an expression is nil
                 if index != 0 {
                     instructions.push(Inst::Print);
                 }
             }
-            if let Err(err) = execute(&mut self.vm, instructions, false, false) {
+            if let Err(err) = self.executor.vm.execute(instructions, false) {
                 // If stack is empty, assign _ to nil
                 if let RuntimeErrKind::NotEnoughValuesOnStack(_) = err.kind {
                     let instructions =
                         vec![Inst::Push(0), Inst::AssignVar(var.to_owned())];
-                    if let Err(err) = execute(&mut self.vm, instructions, false, false)
-                    {
+                    if let Err(err) = self.executor.vm.execute(instructions, false) {
                         eprintln!(
                             "ERROR: Could not assign _ to top of stack or to nil:\n{}",
                             err
@@ -138,7 +153,9 @@ impl<'a> Repl<'a> {
 
         let err = result.unwrap_err();
 
-        if self.handle_execution_err(err.kind, bail) {
+        if no_continue {
+            None
+        } else if self.continue_on_err(err) {
             // Keep adding input until 2 successive blank lines are
             // entered.
             let mut input = text.to_owned();
@@ -161,7 +178,7 @@ impl<'a> Repl<'a> {
                         }
                         blank_line_count = 0;
                     }
-                    Err(err) => break Some(Err((2, format!("{}", err)))),
+                    Err(err) => break Some(Err((2, Some(format!("{}", err))))),
                 }
             }
         } else {
@@ -174,111 +191,25 @@ impl<'a> Repl<'a> {
             VMState::Idle => None,
             VMState::Halted(0) => None,
             VMState::Halted(code) => {
-                Some(Err((code, format!("Halted abnormally: {}", code))))
+                Some(Err((code, Some(format!("Halted abnormally: {}", code)))))
             }
         }
     }
 
-    /// Handle VM execution errors.
-    ///
-    /// A return value of true means eval should continue trying to add
-    /// text to the original input while false means eval should give up
-    /// on the input that caused the error. This applies to execution
-    /// errors and any nested error types.
-    fn handle_execution_err(&mut self, kind: RuntimeErrKind, bail: bool) -> bool {
-        let message = match kind {
-            RuntimeErrKind::CompilationError(err) => {
-                return self.handle_compilation_err(err.kind, bail);
-            }
-            RuntimeErrKind::ParseError(err) => {
-                return self.handle_parse_err(err.kind, bail);
-            }
-            RuntimeErrKind::TypeError(message) => {
-                format!("{}", message)
-            }
-            err => {
-                format!("Unhandled execution error: {:?}", err)
-            }
-        };
-        eprintln!("{}", message);
-        false
-    }
-
-    /// Handle compilation errors.
-    fn handle_compilation_err(&mut self, kind: CompilationErrKind, bail: bool) -> bool {
-        let message = match kind {
-            err => format!("Unhandled compilation error: {:?}", err),
-        };
-        eprintln!("{}", message);
-        false
-    }
-
-    /// Handle parse errors.
-    fn handle_parse_err(&mut self, kind: ParseErrKind, bail: bool) -> bool {
-        match kind {
-            ParseErrKind::ScanErr(err) => {
-                return self.handle_scan_err(err.kind, err.location, bail);
-            }
-            ParseErrKind::UnexpectedToken(token) => {
-                let loc = token.start;
-                eprintln!("{: >width$}^", "", width = loc.col + 1);
-                eprintln!("Parse error: unhandled token at {}: {:?}", loc, token.token);
-            }
-            ParseErrKind::ExpectedBlock(loc) => {
-                if bail {
-                    eprintln!("{: >width$}^", "", width = loc.col + 1);
-                    eprintln!("Parse error: expected indented block at {}", loc);
-                } else {
-                    return true;
-                }
-            }
-            err => {
-                eprintln!("Unhandled parse error: {:?}", err);
-            }
+    fn continue_on_err(&self, err: ExeErr) -> bool {
+        use ParseErrKind::*;
+        use ScanErrKind::*;
+        match err.kind {
+            ExeErrKind::ScanErr(scan_err_kind) => match scan_err_kind {
+                UnmatchedOpeningBracket(_) | UnterminatedString(_) => true,
+                _ => false,
+            },
+            ExeErrKind::ParseErr(parse_err_kind) => match parse_err_kind {
+                ExpectedBlock(_) => true,
+                _ => false,
+            },
+            _ => false,
         }
-        false
-    }
-
-    /// Handle scan errors.
-    fn handle_scan_err(
-        &mut self,
-        kind: ScanErrKind,
-        loc: Location,
-        bail: bool,
-    ) -> bool {
-        match kind {
-            ScanErrKind::UnexpectedCharacter(c) => {
-                let col = loc.col;
-                eprintln!("{: >width$}^", "", width = col + 1);
-                eprintln!(
-                    "Syntax error: unexpected character at column {}: '{}'",
-                    col, c
-                );
-            }
-            ScanErrKind::UnmatchedOpeningBracket(_)
-            | ScanErrKind::UnterminatedString(_) => {
-                return true;
-            }
-            ScanErrKind::InvalidIndent(num_spaces) => {
-                let col = loc.col;
-                eprintln!("{: >width$}^", "", width = col + 1);
-                eprintln!("Syntax error: invalid indent with {} spaces (should be a multiple of 4)", num_spaces);
-            }
-            ScanErrKind::UnexpectedIndent(_) => {
-                let col = loc.col;
-                eprintln!("{: >width$}^", "", width = col + 1);
-                eprintln!("Syntax error: unexpected indent");
-            }
-            ScanErrKind::WhitespaceAfterIndent | ScanErrKind::UnexpectedWhitespace => {
-                let col = loc.col;
-                eprintln!("{: >width$}^", "", width = col + 1);
-                eprintln!("Syntax error: unexpected whitespace");
-            }
-            err => {
-                eprintln!("Unhandled scan error at {}: {:?}", loc, err);
-            }
-        }
-        false
     }
 
     fn load_history(&mut self) {
@@ -334,21 +265,22 @@ mod tests {
 
     // TODO: Figure out how to automatically send closing quote and
     //       newline to stdin.
-    // #[test]
-    // fn eval_unterminated_string() {
-    //     eval("x = \"abc", true);
-    // }
-
-    // Utilities -----------------------------------------------------------
-
-    fn new<'a>() -> Repl<'a> {
-        let vm = VM::default();
-        Repl::new(None, vm, false, false)
+    #[test]
+    fn eval_unterminated_string() {
+        eval("x = \"abc");
     }
 
+    #[test]
+    fn eval_if_with_no_block() {
+        eval("if true ->");
+    }
+
+    // Utilities -----------------------------------------------------------
     fn eval(input: &str) {
-        let mut runner = new();
-        match runner.eval(input, true) {
+        let mut vm = VM::default();
+        let mut executor = Executor::new(&mut vm, false, false, false);
+        let mut repl = Repl::new(None, executor);
+        match repl.eval(input, true) {
             Some(Ok(string)) => assert!(false),
             Some(Err((code, string))) => assert!(false),
             None => assert!(true), // eval returns None on valid input

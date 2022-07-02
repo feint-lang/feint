@@ -91,10 +91,10 @@ impl Builtins {
         self.new_int(value)
     }
 
-    pub fn new_string<S: Into<String>>(&self, value: S, format: bool) -> ObjectRef {
+    pub fn new_string<S: Into<String>>(&self, value: S) -> ObjectRef {
         let class = self.get_type("String").clone();
         let value = value.into();
-        Rc::new(super::string::String::new(class, value, format))
+        Rc::new(super::string::String::new(class, value))
     }
 
     pub fn new_tuple(&self, items: Vec<ObjectRef>) -> ObjectRef {

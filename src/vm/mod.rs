@@ -1,10 +1,8 @@
 pub(crate) use context::RuntimeContext;
 pub(crate) use inst::{Chunk, Inst};
 pub(crate) use result::VMState;
-pub(crate) use result::{
-    ExeResult, RuntimeBoolResult, RuntimeErr, RuntimeErrKind, RuntimeResult,
-};
-pub(crate) use vm::{execute, execute_file, execute_stdin, execute_text, VM};
+pub(crate) use result::{RuntimeBoolResult, RuntimeErr, RuntimeErrKind, RuntimeResult};
+pub(crate) use vm::VM;
 
 mod constants;
 mod context;

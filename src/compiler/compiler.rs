@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use crate::ast;
 use crate::types::ObjectRef;
 use crate::util::{BinaryOperator, UnaryOperator};
@@ -11,7 +9,7 @@ use super::scope::{Scope, ScopeKind, ScopeTree};
 // Compiler ------------------------------------------------------------
 
 /// Compile AST to VM instructions.
-pub fn compile(vm: &mut VM, program: ast::Program, _debug: bool) -> CompilationResult {
+pub fn compile(vm: &mut VM, program: ast::Program) -> CompilationResult {
     let mut visitor = Visitor::new(&mut vm.ctx);
     visitor.visit_program(program)?;
     Ok(visitor.instructions)
@@ -35,7 +33,7 @@ impl<'a> Visitor<'a> {
     // Utilities -------------------------------------------------------
 
     fn err(&self, message: String) -> VisitResult {
-        Err(CompilationErr::new(CompilationErrKind::VisitError(message)))
+        Err(CompilationErr::new(CompilationErrKind::VisitErr(message)))
     }
 
     fn push(&mut self, inst: Inst) {
@@ -123,9 +121,10 @@ impl<'a> Visitor<'a> {
         else_block: Option<ast::Block>,
         scope_kind: ScopeKind,
     ) -> VisitResult {
-        // Addresses of if and elif Jump out instructions (added to the
-        // end of each block). The target address for these isn't known
-        // until all the if, elif, and else blocks are compiled.
+        // Addresses of if and else if Jump out instructions (added to
+        // the end of each block). The target address for these isn't
+        // known until all the if, else if, and else blocks are
+        // compiled.
         let mut jump_out_addrs: Vec<usize> = vec![];
 
         // Evaluate if expression and leave result on top of stack
@@ -133,7 +132,7 @@ impl<'a> Visitor<'a> {
 
         // Placeholder to jump to if or else depending on if expr
         let jump_if_else_index = self.instructions.len();
-        self.push(Inst::InternalError("JumpIfElse not set".to_owned()));
+        self.push(Inst::InternalErr("JumpIfElse not set".to_owned()));
 
         // If block
         let if_addr = jump_if_else_index + 1;
@@ -141,7 +140,7 @@ impl<'a> Visitor<'a> {
 
         // Placeholder to jump out of if
         jump_out_addrs.push(self.instructions.len());
-        self.push(Inst::InternalError("Jump for if not set".to_owned()));
+        self.push(Inst::InternalErr("Jump for if not set".to_owned()));
 
         // Else block (if present)
         let else_addr = self.instructions.len();
@@ -284,10 +283,8 @@ impl<'a> Visitor<'a> {
             Kind::Bool(false) => self.push_const(2),
             Kind::Float(value) => self.add_const(builtins.new_float(value)),
             Kind::Int(value) => self.add_const(builtins.new_int(value)),
-            Kind::String(value) => self.add_const(builtins.new_string(value, false)),
-            Kind::FormatString(value) => {
-                self.add_const(builtins.new_string(value, true))
-            }
+            Kind::String(value) => self.add_const(builtins.new_string(value)),
+            Kind::FormatString(value) => self.add_const(builtins.new_string(value)),
         }
         Ok(())
     }
@@ -314,8 +311,8 @@ impl<'a> Visitor<'a> {
                     Kind::Bool(false) => builtins.false_obj.clone(),
                     Kind::Float(value) => builtins.new_float(value),
                     Kind::Int(value) => builtins.new_int(value),
-                    Kind::String(value) => builtins.new_string(value, false),
-                    Kind::FormatString(value) => builtins.new_string(value, true),
+                    Kind::String(value) => builtins.new_string(value),
+                    Kind::FormatString(value) => builtins.new_string(value),
                 },
                 ast::ExprKind::Tuple(exprs) => {
                     let items = self.convert_tuple_items(exprs);

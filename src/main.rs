@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use std::process;
+use std::process::ExitCode;
 
 use clap::{Arg, Command};
 
@@ -7,7 +7,7 @@ use feint::repl;
 use feint::run;
 
 /// Interpret a file if one is specified. Otherwise, run the REPL.
-fn main() {
+fn main() -> ExitCode {
     let app = Command::new("FeInt")
         .version("0.0.0")
         .arg(
@@ -86,11 +86,20 @@ fn main() {
         }
     };
 
-    match result {
-        Ok(Some(message)) => exit(Some(message)),
-        Ok(None) => exit(None),
-        Err((code, message)) => error_exit(code, message),
-    }
+    let return_code = match result {
+        Ok(Some(message)) => {
+            println!("{}", message);
+            0
+        }
+        Ok(None) => 0,
+        Err((code, Some(message))) => {
+            eprintln!("{}", message);
+            code
+        }
+        Err((code, None)) => code,
+    };
+
+    ExitCode::from(return_code)
 }
 
 /// Get the default history path, which is either ~/.feint_history or,
@@ -100,18 +109,4 @@ fn default_history_path() -> PathBuf {
     let base_path = home.unwrap_or_default();
     let history_path_buf = base_path.join(".feint_history");
     history_path_buf
-}
-
-/// Exit 0 with optional message.
-fn exit(message: Option<String>) {
-    if message.is_some() {
-        println!("{}", message.unwrap());
-    }
-    process::exit(0);
-}
-
-/// Exit with non-zero and error message.
-fn error_exit(code: i32, message: String) {
-    eprintln!("{}", message);
-    process::exit(code);
 }

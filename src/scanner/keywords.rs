@@ -11,6 +11,7 @@ lazy_static! {
         ("true", True),
         ("false", False),
         ("import", Import),
+        ("export", Export),
         ("from", From),
         ("package", Package),
         ("as", As),
@@ -18,7 +19,6 @@ lazy_static! {
         ("let", Let),         // ???
         ("block", Block),
         ("if", If),
-        ("elif", ElseIf),
         ("else", Else),
         ("loop", Loop),       // ???
         ("for", For),         // ???

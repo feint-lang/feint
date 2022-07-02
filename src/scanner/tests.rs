@@ -1,20 +1,39 @@
+use std::io::Cursor;
+
 use num_bigint::BigInt;
 
-use crate::util::Location;
+use crate::util::{source_from_text, Location};
 
 use super::result::*;
 use super::scanner::*;
 use super::token::*;
 
+/// Create a scanner from the specified text, scan the text, and return
+/// the resulting tokens or error.
+pub fn scan_text(text: &str) -> ScanTokensResult {
+    let mut source = source_from_text(text);
+    let scanner = Scanner::new(&mut source);
+    scanner.collect()
+}
+
+/// Scan text and assume success, returning tokens in unwrapped form.
+/// Panic on error. Mainly useful for testing.
+pub fn scan_optimistic(text: &str) -> Vec<TokenWithLocation> {
+    match scan_text(text) {
+        Ok(tokens) => tokens,
+        Err(err) => panic!("Scan failed unexpectedly: {:?}", err),
+    }
+}
+
 #[test]
 fn scan_empty() {
-    let tokens = scan_optimistic("", true);
+    let tokens = scan_optimistic("");
     assert_eq!(tokens.len(), 0);
 }
 
 #[test]
 fn scan_int() {
-    let tokens = scan_optimistic("123", true);
+    let tokens = scan_optimistic("123");
     assert_eq!(tokens.len(), 2);
     check_token(tokens.get(0), Token::Int(BigInt::from(123)), 1, 1, 1, 3);
     check_token(tokens.get(1), Token::EndOfStatement, 1, 4, 1, 4);
@@ -22,7 +41,7 @@ fn scan_int() {
 
 #[test]
 fn scan_binary_number() {
-    let tokens = scan_optimistic("0b11", true); // = 3
+    let tokens = scan_optimistic("0b11"); // = 3
     assert_eq!(tokens.len(), 2);
     check_token(tokens.get(0), Token::Int(BigInt::from(3)), 1, 1, 1, 4);
     check_token(tokens.get(1), Token::EndOfStatement, 1, 5, 1, 5);
@@ -30,7 +49,7 @@ fn scan_binary_number() {
 
 #[test]
 fn scan_float() {
-    let tokens = scan_optimistic("123.1", true);
+    let tokens = scan_optimistic("123.1");
     assert_eq!(tokens.len(), 2);
     check_token(tokens.get(0), Token::Float(123.1 as f64), 1, 1, 1, 5);
     check_token(tokens.get(1), Token::EndOfStatement, 1, 6, 1, 6);
@@ -38,7 +57,7 @@ fn scan_float() {
 
 #[test]
 fn scan_float_with_e_and_no_sign() {
-    let tokens = scan_optimistic("123.1e1", true);
+    let tokens = scan_optimistic("123.1e1");
     assert_eq!(tokens.len(), 2);
     let expected = Token::Float(123.1E+1);
     check_token(tokens.get(0), expected, 1, 1, 1, 7);
@@ -47,7 +66,7 @@ fn scan_float_with_e_and_no_sign() {
 
 #[test]
 fn scan_float_with_e_and_sign() {
-    let tokens = scan_optimistic("123.1e+1", true);
+    let tokens = scan_optimistic("123.1e+1");
     assert_eq!(tokens.len(), 2);
     let expected = Token::Float(123.1E+1);
     check_token(tokens.get(0), expected, 1, 1, 1, 8);
@@ -58,7 +77,7 @@ fn scan_float_with_e_and_sign() {
 fn scan_string_with_embedded_quote() {
     // "\"abc"
     let source = "\"\\\"abc\"";
-    let tokens = scan_optimistic(source, true);
+    let tokens = scan_optimistic(source);
     assert_eq!(tokens.len(), 2);
     check_string_token(tokens.get(0), "\"abc", 1, 1, 1, 7);
     check_token(tokens.get(1), Token::EndOfStatement, 1, 8, 1, 8);
@@ -69,7 +88,7 @@ fn scan_string_with_newline() {
     // "abc
     // "
     let source = "\"abc\n\"";
-    let tokens = scan_optimistic(source, true);
+    let tokens = scan_optimistic(source);
     assert_eq!(tokens.len(), 2);
     check_string_token(tokens.get(0), "abc\n", 1, 1, 2, 1);
     check_token(tokens.get(1), Token::EndOfStatement, 2, 2, 2, 2);
@@ -85,7 +104,7 @@ fn scan_string_with_many_newlines() {
     //
     //   "
     let source = "\" a\nb\n\nc\n\n\n  \"";
-    let tokens = scan_optimistic(source, true);
+    let tokens = scan_optimistic(source);
     assert_eq!(tokens.len(), 2);
     check_string_token(tokens.get(0), " a\nb\n\nc\n\n\n  ", 1, 1, 7, 3);
     check_token(tokens.get(1), Token::EndOfStatement, 7, 4, 7, 4);
@@ -93,7 +112,7 @@ fn scan_string_with_many_newlines() {
 
 #[test]
 fn scan_string_with_escaped_chars() {
-    let tokens = scan_optimistic("\"\\0\\a\\b\\n\\'\\\"\"", true);
+    let tokens = scan_optimistic("\"\\0\\a\\b\\n\\'\\\"\"");
     assert_eq!(tokens.len(), 2);
     // NOTE: We could put a backslash before the single quote in
     //       the expected string, but Rust seems to treat \' and '
@@ -104,7 +123,7 @@ fn scan_string_with_escaped_chars() {
 
 #[test]
 fn scan_string_with_escaped_regular_char() {
-    let tokens = scan_optimistic("\"ab\\c\"", true);
+    let tokens = scan_optimistic("\"ab\\c\"");
     assert_eq!(tokens.len(), 2);
     check_string_token(tokens.get(0), "ab\\c", 1, 1, 1, 6);
     check_token(tokens.get(1), Token::EndOfStatement, 1, 7, 1, 7);
@@ -113,13 +132,13 @@ fn scan_string_with_escaped_regular_char() {
 #[test]
 fn scan_string_unclosed() {
     let source = "\"abc";
-    match scan_text(source, true) {
+    match scan_text(source) {
         Err(err) => match err {
             ScanErr { kind: ScanErrKind::UnterminatedString(string), location } => {
                 assert_eq!(string, source.to_string());
                 assert_eq!(location, Location::new(1, 1));
                 let new_source = source.to_string() + "\"";
-                match scan_text(new_source.as_str(), true) {
+                match scan_text(new_source.as_str()) {
                     Ok(tokens) => {
                         assert_eq!(tokens.len(), 2);
                         check_string_token(tokens.get(0), "abc", 1, 1, 1, 5);
@@ -144,7 +163,7 @@ f (x) ->  # 1
 g (y) ->  # 6
     y     # 7\
 ";
-    let tokens = scan_optimistic(source, true);
+    let tokens = scan_optimistic(source);
     let mut tokens = tokens.iter();
 
     // f
@@ -152,9 +171,7 @@ g (y) ->  # 6
     check_token(tokens.next(), Token::LParen, 1, 3, 1, 3);
     check_token(tokens.next(), Token::Ident("x".to_string()), 1, 4, 1, 4);
     check_token(tokens.next(), Token::RParen, 1, 5, 1, 5);
-    check_token(tokens.next(), Token::FuncStart, 1, 7, 1, 8);
-    check_token(tokens.next(), Token::EndOfStatement, 1, 14, 1, 14);
-    check_token(tokens.next(), Token::ScopeStart, 2, 0, 2, 0);
+    check_token(tokens.next(), Token::ScopeStart, 1, 7, 1, 8);
     check_token(tokens.next(), Token::Ident("x".to_string()), 2, 5, 2, 5);
     check_token(tokens.next(), Token::EndOfStatement, 2, 14, 2, 14);
     check_token(tokens.next(), Token::Int(BigInt::from(1)), 3, 5, 3, 5);
@@ -167,9 +184,7 @@ g (y) ->  # 6
     check_token(tokens.next(), Token::LParen, 6, 3, 6, 3);
     check_token(tokens.next(), Token::Ident("y".to_string()), 6, 4, 6, 4);
     check_token(tokens.next(), Token::RParen, 6, 5, 6, 5);
-    check_token(tokens.next(), Token::FuncStart, 6, 7, 6, 8);
-    check_token(tokens.next(), Token::EndOfStatement, 6, 14, 6, 14);
-    check_token(tokens.next(), Token::ScopeStart, 7, 0, 7, 0);
+    check_token(tokens.next(), Token::ScopeStart, 6, 7, 6, 8);
     check_token(tokens.next(), Token::Ident("y".to_string()), 7, 5, 7, 5);
     check_token(tokens.next(), Token::EndOfStatement, 7, 14, 7, 14);
     check_token(tokens.next(), Token::ScopeEnd, 8, 0, 8, 0);
@@ -181,7 +196,7 @@ g (y) ->  # 6
 #[test]
 fn scan_unexpected_indent_on_first_line() {
     let source = "    abc = 1";
-    let result = scan_text(source, true);
+    let result = scan_text(source);
     assert!(result.is_err());
     match result.unwrap_err() {
         ScanErr { kind: ScanErrKind::UnexpectedIndent(1), location } => {
@@ -204,7 +219,7 @@ a = [
 
 b = 3
 ";
-    let tokens = scan_optimistic(source, true);
+    let tokens = scan_optimistic(source);
     let mut tokens = tokens.iter();
 
     check_token(tokens.next(), Token::Ident("a".to_string()), 3, 1, 3, 1);
@@ -226,8 +241,8 @@ b = 3
 #[test]
 fn scan_unknown() {
     let source = "{";
-    match scan_text(source, true) {
-        Ok(tokens) => assert!(false),
+    match scan_text(source) {
+        Ok(_tokens) => assert!(false),
         Err(err) => match err {
             ScanErr { kind: ScanErrKind::UnexpectedCharacter(c), location } => {
                 assert_eq!(c, '{');

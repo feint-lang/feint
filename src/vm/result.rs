@@ -12,12 +12,12 @@ pub type RuntimeBoolResult = Result<bool, RuntimeErr>;
 #[derive(Debug, PartialEq)]
 pub enum VMState {
     Idle,
-    Halted(i32),
+    Halted(u8),
 }
 
 // Runtime errors ------------------------------------------------------
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct RuntimeErr {
     pub kind: RuntimeErrKind,
 }
@@ -28,7 +28,7 @@ impl RuntimeErr {
     }
 
     pub fn new_type_error<S: Into<String>>(message: S) -> Self {
-        Self::new(RuntimeErrKind::TypeError(message.into()))
+        Self::new(RuntimeErrKind::TypeErr(message.into()))
     }
 }
 
@@ -38,7 +38,7 @@ impl fmt::Display for RuntimeErr {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum RuntimeErrKind {
     EmptyStack,
     ObjectNotFound(usize),
@@ -48,9 +48,9 @@ pub enum RuntimeErrKind {
     UnhandledInstruction(String),
     AttributeDoesNotExist(String),
     AttributeCannotBeSet(String),
-    TypeError(String),
-    NameError(String),
-    SyntaxError(String),
+    TypeErr(String),
+    NameErr(String),
+    StringFormatErr(String),
 }
 
 impl fmt::Display for RuntimeErrKind {

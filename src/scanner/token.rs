@@ -57,11 +57,8 @@ pub enum Token {
     PlusEqual,  // +=
     MinusEqual, // -=
 
-    // Indicates start of function or block
-    FuncStart, // ->
-
-    ScopeStart, // Start of nested scope
-    ScopeEnd,   // End of nested scope
+    ScopeStart, // -> (start of scope: function, block, etc)
+    ScopeEnd,   // end of scope (implicit, no symbol)
 
     // Keywords
     Nil,           // nil
@@ -70,12 +67,12 @@ pub enum Token {
     Import,        // import <module>
     From,          // import from <module>: x, y, z
     Package,       // import from package.<module>: x, y, z
+    Export,        // export <object>
     As,            // import <module> as <name>
     Is,            // Identity (use === instead?)
     Let,           // let (???)
     Block,         // block
     If,            // if
-    ElseIf,        // elif
     Else,          // else
     Loop,          // ??? (while true, like Rust)
     For,           // ??? or use <-
@@ -125,15 +122,13 @@ impl Token {
             Self::And => "&&",
             Self::Or => "||",
 
-            Self::FuncStart => "->",
-            Self::ScopeStart => "start of block",
-            Self::ScopeEnd => "end of block",
+            Self::ScopeStart => "->",
+            Self::ScopeEnd => "<scope end>",
 
             // Keywords
             Self::Block => "block",
             Self::If => "if",
             Self::Else => "else",
-            Self::ElseIf => "elif",
             Self::Jump => "jump",
             Self::Label(_name) => "label",
 

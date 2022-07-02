@@ -1,6 +1,5 @@
 use std::collections::VecDeque;
-use std::fs::File;
-use std::io::{self, BufRead, BufReader, Cursor};
+use std::io::BufRead;
 
 use num_bigint::BigInt;
 use num_traits::Num;
@@ -8,78 +7,27 @@ use num_traits::Num;
 use crate::util::{Location, Source, Stack};
 
 use super::keywords::KEYWORDS;
-use super::result::{ScanErr, ScanErrKind, ScanResult, ScanTokensResult};
+use super::result::{ScanErr, ScanErrKind, ScanResult};
 use super::token::{Token, TokenWithLocation};
 
 type NextOption<'a> = Option<(char, Option<&'a char>, Option<&'a char>)>;
 type NextTwoOption<'a> = Option<(char, char, Option<&'a char>)>;
 type NextThreeOption = Option<(char, char, char)>;
 
-/// Create a scanner from the specified text, scan the text, and return
-/// the resulting tokens or error.
-pub fn scan_text(text: &str, debug: bool) -> ScanTokensResult {
-    let scanner = Scanner::<Cursor<&str>>::from_text(text);
-    handle_result(scanner.collect(), debug)
-}
-
-/// Create a scanner from the specified file, scan its text, and return
-/// the resulting tokens or error.
-pub fn scan_file(file_path: &str, debug: bool) -> ScanTokensResult {
-    let result = Scanner::<BufReader<File>>::from_file(file_path);
-    let scanner = match result {
-        Ok(scanner) => scanner,
-        Err(err) => {
-            return Err(ScanErr::new(
-                ScanErrKind::CouldNotOpenSourceFile(
-                    file_path.to_string(),
-                    err.to_string(),
-                ),
-                Location::new(0, 0),
-            ));
-        }
-    };
-    handle_result(scanner.collect(), debug)
-}
-
-/// Create a scanner from stdin, scan the text into tokens, and return
-/// the resulting tokens or error.
-pub fn scan_stdin(debug: bool) -> ScanTokensResult {
-    let scanner = Scanner::<BufReader<io::Stdin>>::from_stdin();
-    handle_result(scanner.collect(), debug)
-}
-
-/// Scan text and assume success, returning tokens in unwrapped form.
-/// Panic on error. Mainly useful for testing.
-pub fn scan_optimistic(text: &str, debug: bool) -> Vec<TokenWithLocation> {
-    match scan_text(text, debug) {
-        Ok(tokens) => tokens,
-        Err(err) => panic!("Scan failed unexpectedly: {:?}", err),
-    }
-}
-
-fn handle_result(result: ScanTokensResult, debug: bool) -> ScanTokensResult {
-    result.map(|tokens| {
-        if debug {
-            for token in tokens.iter() {
-                eprintln!("{:?}", token);
-            }
-        }
-        tokens
-    })
-}
-
-pub struct Scanner<T: BufRead> {
+pub struct Scanner<'a, T: BufRead> {
     /// This is the source code that's being scanned. T can be anything
     /// that implements the BufRead trait (e.g., a Cursor wrapping some
     /// text or a BufReader wrapping an open file).
-    source: Source<T>,
+    source: &'a mut Source<T>,
     /// Temporary storage for tokens. This is mainly needed to handle
     /// the complexity of indents, because there are cases where
     /// multiple tokens will need to be emitted.
     queue: VecDeque<TokenWithLocation>,
+    /// Keep track of scope level.
+    scope_level: u16,
     /// Keep track of whether we're at the start of a line so indents
     /// can be handled specially.
-    indent_level: Option<u8>,
+    indent_level: u8,
     /// Opening brackets are pushed and later popped when the closing
     /// bracket is encountered. This gives us a way to verify brackets
     /// are matched and also lets us know when we're inside a group
@@ -89,38 +37,16 @@ pub struct Scanner<T: BufRead> {
     previous_token: Token,
 }
 
-impl<T: BufRead> Scanner<T> {
-    fn new(reader: T) -> Self {
+impl<'a, T: BufRead> Scanner<'a, T> {
+    pub fn new(source: &'a mut Source<T>) -> Self {
         Scanner {
-            source: Source::new(reader),
+            source,
             queue: VecDeque::new(),
-            indent_level: None,
+            scope_level: 0,
+            indent_level: 0,
             bracket_stack: Stack::new(),
             previous_token: Token::EndOfStatement,
         }
-    }
-
-    /// Create a scanner from the specified text.
-    pub fn from_text(text: &str) -> Scanner<Cursor<&str>> {
-        let cursor = Cursor::new(text);
-        let scanner = Scanner::new(cursor);
-        scanner
-    }
-
-    /// Create a scanner from the specified file.
-    pub fn from_file(file_path: &str) -> Result<Scanner<BufReader<File>>, io::Error> {
-        let file = File::open(file_path)?;
-        let reader = BufReader::new(file);
-        let scanner = Scanner::new(reader);
-        Ok(scanner)
-    }
-
-    /// Create a scanner from stdin
-    pub fn from_stdin() -> Scanner<BufReader<io::Stdin>> {
-        let stdin = io::stdin();
-        let reader = BufReader::new(stdin);
-        let scanner = Scanner::new(reader);
-        scanner
     }
 
     fn next_token_from_queue(&mut self) -> ScanResult {
@@ -130,6 +56,18 @@ impl<T: BufRead> Scanner<T> {
         let token = self.queue.pop_front().unwrap();
         self.previous_token = token.token.clone();
         Ok(token)
+    }
+
+    fn scope_enter(&mut self, start: Location) {
+        let end = Location::new(start.line, start.col + 1);
+        self.scope_level += 1;
+        self.add_token_to_queue(Token::ScopeStart, start, Some(end));
+    }
+
+    fn scope_exit(&mut self, loc: Location) {
+        self.scope_level -= 1;
+        self.add_token_to_queue(Token::ScopeEnd, loc, Some(loc));
+        self.add_token_to_queue(Token::EndOfStatement, loc, Some(loc));
     }
 
     fn handle_indents(&mut self) -> Result<(), ScanErr> {
@@ -174,44 +112,39 @@ impl<T: BufRead> Scanner<T> {
 
     /// Maybe update the current indent level. If the new indent level
     /// is the same as the current indent level, do nothing. If it has
-    /// increased, that signals the start of a block. If it has
-    /// decreased, that signals the end of one or more blocks.
+    /// increased, that signals the start of a block (scopes). If it has
+    /// decreased, that signals the end of one or more blocks (scopes).
     fn set_indent_level(
         &mut self,
         indent_level: u8,
         start: Location,
     ) -> Result<(), ScanErr> {
-        if self.indent_level.is_none() {
-            // Special case for first line of code
-            return if indent_level == 0 {
-                self.indent_level = Some(0);
-                Ok(())
-            } else {
-                Err(ScanErr::new(ScanErrKind::UnexpectedIndent(indent_level), start))
-            };
-        }
-
-        let mut current_level = self.indent_level.unwrap();
-        let location = Location::new(start.line, 0);
+        let mut current_level = self.indent_level;
 
         if indent_level == current_level {
             // Stayed the same; nothing to do
         } else if indent_level == current_level + 1 {
             // Increased by one level
-            self.indent_level = Some(indent_level);
-            self.add_token_to_queue(Token::ScopeStart, location, Some(location));
+
+            // Ensure this indent is preceded by a scope start token.
+            match self.previous_token {
+                Token::ScopeStart => (),
+                _ => {
+                    return Err(ScanErr::new(
+                        ScanErrKind::UnexpectedIndent(indent_level),
+                        start,
+                    ));
+                }
+            }
+
+            self.indent_level = indent_level;
         } else if indent_level < current_level {
             // Decreased by one or more levels
             while current_level > indent_level {
-                self.add_token_to_queue(Token::ScopeEnd, location, Some(location));
-                self.add_token_to_queue(
-                    Token::EndOfStatement,
-                    location,
-                    Some(location),
-                );
+                self.scope_exit(Location::new(start.line, 0));
                 current_level -= 1;
             }
-            self.indent_level = Some(current_level);
+            self.indent_level = current_level;
         } else {
             // Increased by *more* than one level
             return Err(ScanErr::new(
@@ -319,7 +252,10 @@ impl<T: BufRead> Scanner<T> {
                 self.consume_char_and_return_token(Token::MinusEqual)
             }
             Some(('-', Some('>'), _)) => {
-                self.consume_char_and_return_token(Token::FuncStart)
+                self.next();
+                self.scope_enter(start);
+                self.consume_whitespace()?;
+                return Ok(());
             }
             Some(('-', _, _)) => Token::Minus,
             Some(('!', Some('='), _)) => {
@@ -348,14 +284,14 @@ impl<T: BufRead> Scanner<T> {
             Some((c @ '0'..='9', _, _)) => match self.read_number(c) {
                 (string, _) if string.contains(".") || string.contains("E") => {
                     let value = string.parse::<f64>().map_err(|err| {
-                        ScanErr::new(ScanErrKind::ParseFloatError(err), start)
+                        ScanErr::new(ScanErrKind::ParseFloatErr(err), start)
                     })?;
                     Token::Float(value)
                 }
                 (string, radix) => {
                     let value = BigInt::from_str_radix(string.as_str(), radix)
                         .map_err(|err| {
-                            ScanErr::new(ScanErrKind::ParseIntError(err), start)
+                            ScanErr::new(ScanErrKind::ParseIntErr(err), start)
                         })?;
                     Token::Int(value)
                 }
@@ -431,15 +367,13 @@ impl<T: BufRead> Scanner<T> {
         Ok(())
     }
 
-    fn maybe_add_end_of_statement_token(&mut self, location: Location) -> bool {
-        if self.previous_token == Token::EndOfStatement {
-            return false;
-        }
-        if self.bracket_stack.size() > 0 {
-            return false;
-        }
-        self.add_token_to_queue(Token::EndOfStatement, location, Some(location));
-        true
+    fn maybe_add_end_of_statement_token(&mut self, loc: Location) {
+        match self.previous_token {
+            Token::EndOfStatement | Token::ScopeStart => (),
+            _ => {
+                self.add_token_to_queue(Token::EndOfStatement, loc, Some(loc));
+            }
+        };
     }
 
     fn add_token_to_queue(
@@ -451,7 +385,7 @@ impl<T: BufRead> Scanner<T> {
         let end = match end_option {
             Some(end) => end,
             None => Location::new(
-                self.source.line,
+                self.source.line_no,
                 if self.source.col == 0 { 0 } else { self.source.col - 1 },
             ),
         };
@@ -808,7 +742,7 @@ impl<T: BufRead> Scanner<T> {
     }
 }
 
-impl<T: BufRead> Iterator for Scanner<T> {
+impl<'a, T: BufRead> Iterator for Scanner<'a, T> {
     type Item = ScanResult;
 
     fn next(&mut self) -> Option<Self::Item> {

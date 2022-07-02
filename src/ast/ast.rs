@@ -63,10 +63,6 @@ impl Statement {
         Self::new(StatementKind::Expr(expr))
     }
 
-    pub fn new_nil() -> Self {
-        Self::new_expr(Expr::new_literal(Literal::new_nil()))
-    }
-
     pub fn tuple_items(&self) -> Option<&Vec<Expr>> {
         if let StatementKind::Expr(expr) = &self.kind {
             return expr.tuple_items();

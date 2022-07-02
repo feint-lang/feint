@@ -25,7 +25,7 @@ pub enum Inst {
     ScopeEnd(usize),
     Print, // Print value at top of stack
     Return,
-    Halt(i32),
+    Halt(u8),
 
-    InternalError(String),
+    InternalErr(String),
 }

@@ -1,6 +1,7 @@
 use std::collections::VecDeque;
-use std::fmt;
-use std::io::{BufRead, Take};
+use std::fs::File;
+use std::io::{BufRead, BufReader, Cursor, Take};
+use std::{fmt, io};
 
 /// This is used to set the initial capacity for the source's char
 /// queue up front to avoid allocations. It assumes reasonable line
@@ -20,6 +21,29 @@ const INITIAL_CAPACITY: usize = 255; // 2^8 - 1
 const MAX_LINE_LENGTH: u64 = 4096; // 2^12
 const MAX_LINE_LENGTH_USIZE: usize = MAX_LINE_LENGTH as usize;
 
+/// Create source from the specified file.
+pub fn source_from_file(file_path: &str) -> Result<Source<BufReader<File>>, io::Error> {
+    let file = File::open(file_path)?;
+    let reader = BufReader::new(file);
+    let source = Source::new(reader);
+    Ok(source)
+}
+
+/// Create source from the specified text.
+pub fn source_from_text(text: &str) -> Source<Cursor<&str>> {
+    let cursor = Cursor::new(text);
+    let source = Source::new(cursor);
+    source
+}
+
+/// Create source from stdin.
+pub fn source_from_stdin() -> Source<BufReader<io::Stdin>> {
+    let stdin = io::stdin();
+    let reader = BufReader::new(stdin);
+    let source = Source::new(reader);
+    source
+}
+
 /// A wrapper around some source, typically either some text or a file.
 /// The source is read line by line and the characters from each line
 /// are yielded (so to speak) in turn. Other features:
@@ -31,37 +55,41 @@ const MAX_LINE_LENGTH_USIZE: usize = MAX_LINE_LENGTH as usize;
 /// - Tracks current line and column.
 /// - Tracks previous and current characters.
 /// - Panics when lines are too long.
-pub struct Source<T>
-where
-    T: BufRead,
-{
+pub struct Source<T: BufRead> {
     stream: Take<T>,
     /// String buffer the source reader reads into.
     buffer: String,
     /// The queue of characters for the current line.
     queue: VecDeque<char>,
-    pub line: usize,
+    pub line_no: usize,
     pub col: usize,
     pub previous_char: Option<char>,
     pub current_char: Option<char>,
+    pub current_line: Option<String>,
 }
 
-impl<T> Source<T>
-where
-    T: BufRead,
-{
+impl<T: BufRead> Source<T> {
     pub fn new(source: T) -> Self {
         let mut source = Source {
             stream: source.take(MAX_LINE_LENGTH + 1),
             buffer: String::with_capacity(INITIAL_CAPACITY),
             queue: VecDeque::with_capacity(INITIAL_CAPACITY),
-            line: 0,
+            line_no: 0,
             col: 0,
             previous_char: None,
             current_char: None,
+            current_line: None,
         };
         source.queue.push_back('\n');
         source
+    }
+
+    pub fn get_current_line(&self) -> Option<&str> {
+        if let Some(line) = &self.current_line {
+            Some(line.as_str())
+        } else {
+            None
+        }
     }
 
     fn check_queue(&mut self) -> bool {
@@ -77,8 +105,9 @@ where
                     if n > MAX_LINE_LENGTH_USIZE {
                         panic!("Line is too long (> {})", MAX_LINE_LENGTH);
                     }
-                    self.line += 1;
+                    self.line_no += 1;
                     self.col = 1;
+                    self.current_line = Some(self.buffer.clone());
                     self.queue.extend(self.buffer.chars());
                 }
                 Err(err) => {
@@ -146,14 +175,11 @@ where
     }
 
     pub fn location(&self) -> Location {
-        Location::new(self.line, self.col)
+        Location::new(self.line_no, self.col)
     }
 }
 
-impl<T> Iterator for Source<T>
-where
-    T: BufRead,
-{
+impl<T: BufRead> Iterator for Source<T> {
     type Item = char;
 
     fn next(&mut self) -> Option<Self::Item> {

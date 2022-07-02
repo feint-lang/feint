@@ -1,11 +1,9 @@
 //! Parse a stream of tokens into an AST.
 use std::collections::VecDeque;
-use std::fs::File;
-use std::io::{self, BufReader, Cursor};
 use std::iter::{Iterator, Peekable};
 
 use crate::ast;
-use crate::scanner::{ScanErr, ScanResult, Scanner, Token, TokenWithLocation};
+use crate::scanner::{ScanErr, ScanResult, Token, TokenWithLocation};
 use crate::util::Location;
 
 use super::precedence::{
@@ -16,65 +14,22 @@ use super::result::{
     ParseResult, PeekTokenResult, StatementResult, StatementsResult,
 };
 
-/// Scan the text into tokens, parse the tokens, and return the
-/// resulting AST or error.
-pub fn parse_text(text: &str, debug: bool) -> ParseResult {
-    let scanner = Scanner::<Cursor<&str>>::from_text(text);
-    let mut parser = Parser::new(scanner.into_iter());
-    handle_result(parser.parse(), debug)
-}
-
-/// Scan the file into tokens, parse the tokens, and return the
-/// resulting AST or error.
-pub fn parse_file(file_path: &str, debug: bool) -> ParseResult {
-    let result = Scanner::<BufReader<File>>::from_file(file_path);
-    let scanner = match result {
-        Ok(scanner) => scanner,
-        Err(err) => {
-            return Err(ParseErr::new(ParseErrKind::CouldNotOpenSourceFile(
-                file_path.to_string(),
-                err.to_string(),
-            )));
-        }
-    };
-    let mut parser = Parser::new(scanner.into_iter());
-    handle_result(parser.parse(), debug)
-}
-
-/// Scan text from stdin into tokens, parse the tokens, and return the
-/// resulting AST or error.
-pub fn parse_stdin(debug: bool) -> ParseResult {
-    let scanner = Scanner::<BufReader<io::Stdin>>::from_stdin();
-    let mut parser = Parser::new(scanner.into_iter());
-    handle_result(parser.parse(), debug)
-}
-
 /// Parse tokens and return the resulting AST or error.
-pub fn parse_tokens(tokens: Vec<TokenWithLocation>, debug: bool) -> ParseResult {
+pub fn parse_tokens(tokens: Vec<TokenWithLocation>) -> ParseResult {
     let scanner: Vec<ScanResult> = vec![];
     let mut parser = Parser::new(scanner.into_iter());
     parser.lookahead_queue.extend(tokens);
-    handle_result(parser.parse(), debug)
+    parser.parse()
 }
 
-fn handle_result(result: ParseResult, debug: bool) -> ParseResult {
-    result.map(|program| {
-        if debug {
-            eprintln!("{:=<72}", "AST ");
-            eprintln!("{:?}", program);
-        };
-        program
-    })
-}
-
-struct Parser<I: Iterator<Item = ScanResult>> {
+pub struct Parser<I: Iterator<Item = ScanResult>> {
     current_token: Option<TokenWithLocation>,
     token_stream: Peekable<I>,
     lookahead_queue: VecDeque<TokenWithLocation>,
 }
 
 impl<I: Iterator<Item = ScanResult>> Parser<I> {
-    fn new(token_iter: I) -> Self {
+    pub fn new(token_iter: I) -> Self {
         Self {
             current_token: None,
             token_stream: token_iter.peekable(),
@@ -85,7 +40,7 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
     // Parse entry point -----------------------------------------------
 
     /// A program is a list of statements.
-    fn parse(&mut self) -> ParseResult {
+    pub fn parse(&mut self) -> ParseResult {
         let statements = self.statements()?;
         let program = ast::Program::new(statements);
         Ok(program)
@@ -149,7 +104,7 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
     fn expect_token(&mut self, token: &Token) -> Result<(), ParseErr> {
         if !self.next_token_is(token)? {
             return Err(
-                self.err(ParseErrKind::ExpectedToken(token.clone(), self.next_loc()))
+                self.err(ParseErrKind::ExpectedToken(self.next_loc(), token.clone()))
             );
         }
         Ok(())
@@ -278,7 +233,6 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
     /// Expect the start of a scope. This is really just a check to
     /// make sure the token stream is valid.
     fn expect_scope(&mut self) -> Result<(), ParseErr> {
-        self.expect_token(&Token::EndOfStatement)?;
         self.expect_token(&Token::ScopeStart)?;
         Ok(())
     }
@@ -293,7 +247,6 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
     /// Expect and collect a block of statements. There must be at least
     /// one statement.
     fn expect_statement_block(&mut self) -> StatementsResult {
-        self.expect_token(&Token::FuncStart)?;
         self.expect_scope()?;
         let statements = self.statements()?;
         if statements.is_empty() {
@@ -323,10 +276,10 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
     fn statement(&mut self) -> StatementResult {
         let token = self.expect_next_token()?;
         let statement = match token.token {
-            /// XXX: The print statement is temporary until functions
-            ///      are implemented. The shenanigans below are so that
-            ///      print statements have similar syntax to the
-            ///      eventual built in print function.
+            // XXX: The print statement is temporary until functions
+            //      are implemented. The shenanigans below are so that
+            //      print statements have similar syntax to the eventual
+            //      built in print function.
             Token::Print => {
                 self.expect_token(&Token::LParen)?;
                 let expr = if self.peek_token_is(&Token::RParen)? {
@@ -508,7 +461,7 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
         if !found {
             self.lookahead_queue.extend(tokens);
             return Err(
-                self.err(ParseErrKind::ExpectedToken(Token::RParen, self.next_loc()))
+                self.err(ParseErrKind::ExpectedToken(self.next_loc(), Token::RParen))
             );
         }
 
@@ -520,14 +473,14 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
             }
         }
 
-        if self.peek_token_is(&Token::FuncStart)? {
+        if self.peek_token_is(&Token::ScopeStart)? {
             // Function def - tokens are parameters
             let params = self.parse_params(tokens)?;
             let statements = self.expect_statement_block()?;
             Ok(ast::Expr::new_func(name.clone(), params, statements))
         } else {
             // Function call -- tokens are args
-            let args = parse_tokens(tokens, false)?;
+            let args = parse_tokens(tokens)?;
             let args = args.statements;
             let args = vec![];
             Ok(ast::Expr::new_call(name.clone(), args))
@@ -536,7 +489,7 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
 
     fn parse_params(
         &self,
-        mut tokens: Vec<TokenWithLocation>,
+        tokens: Vec<TokenWithLocation>,
     ) -> Result<Vec<String>, ParseErr> {
         let mut params = vec![];
 
@@ -545,7 +498,7 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
         }
 
         let start = tokens[0].start.clone();
-        let program = parse_tokens(tokens, false)?;
+        let program = parse_tokens(tokens)?;
         let statements = program.statements;
 
         if statements.is_empty() || statements.len() > 1 {

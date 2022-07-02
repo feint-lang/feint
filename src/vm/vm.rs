@@ -3,89 +3,17 @@
 //! execute. After instructions are executed, it goes back into idle
 //! mode.
 use std::fmt;
-use std::rc::Rc;
 
-use crate::ast;
 use crate::compiler::compile;
-use crate::parser::{self, ParseResult};
+use crate::types::Tuple;
 use crate::util::{BinaryOperator, Stack, UnaryOperator};
 
 use super::context::RuntimeContext;
 use super::frame::Frame;
 use super::inst::{Chunk, Inst};
 use super::result::{ExeResult, RuntimeErr, RuntimeErrKind, VMState};
-use crate::types::{ObjectRef, String, Tuple};
 
 type RustString = std::string::String;
-
-/// Execute source text.
-pub fn execute_text(vm: &mut VM, text: &str, dis: bool, debug: bool) -> ExeResult {
-    execute_parse_result(vm, parser::parse_text(text, debug), dis, debug)
-}
-
-/// Execute source from file.
-pub fn execute_file(vm: &mut VM, path: &str, dis: bool, debug: bool) -> ExeResult {
-    execute_parse_result(vm, parser::parse_file(path, debug), dis, debug)
-}
-
-/// Execute source from stdin.
-pub fn execute_stdin(vm: &mut VM, dis: bool, debug: bool) -> ExeResult {
-    execute_parse_result(vm, parser::parse_stdin(debug), dis, debug)
-}
-
-/// Execute parse result.
-pub fn execute_parse_result(
-    vm: &mut VM,
-    result: ParseResult,
-    dis: bool,
-    debug: bool,
-) -> ExeResult {
-    match result {
-        Ok(program) => execute_program(vm, program, dis, debug),
-        Err(err) => Err(RuntimeErr::new(RuntimeErrKind::ParseError(err))),
-    }
-}
-
-/// Create a new VM and execute AST program.
-pub fn execute_program(
-    vm: &mut VM,
-    program: ast::Program,
-    dis: bool,
-    debug: bool,
-) -> ExeResult {
-    match compile(vm, program, debug) {
-        Ok(instructions) => execute(vm, instructions, dis, debug),
-        Err(err) => Err(RuntimeErr::new(RuntimeErrKind::CompilationError(err))),
-    }
-}
-
-pub fn execute(vm: &mut VM, instructions: Chunk, dis: bool, debug: bool) -> ExeResult {
-    let result = if cfg!(debug_assertions) {
-        if dis {
-            eprintln!("{:=<72}", "INSTRUCTIONS ");
-        } else if debug {
-            eprintln!("{:=<72}", "OUTPUT ");
-        }
-        vm.execute(instructions, dis)
-    } else if dis {
-        eprintln!("{:=<72}", "INSTRUCTIONS ");
-        let result = vm.dis_list(&instructions);
-        eprintln!("NOTE: Full disassembly is only available in debug builds");
-        result
-    } else {
-        if debug {
-            eprintln!("{:=<72}", "OUTPUT ");
-        }
-        vm.execute(instructions, false)
-    };
-    if debug {
-        eprintln!("{:=<72}", "STACK ");
-        vm.display_stack();
-        eprintln!("{:=<72}", "VM STATE ");
-        eprintln!("{:?}", result);
-    }
-    result
-}
 
 pub struct VM {
     pub ctx: RuntimeContext,
@@ -114,7 +42,7 @@ impl VM {
     /// When a HALT instruction is encountered, the VM's state will be
     /// cleared; it can be "restarted" by passing more instructions to
     /// execute.
-    fn execute(&mut self, instructions: Chunk, dis: bool) -> ExeResult {
+    pub fn execute(&mut self, instructions: Chunk, dis: bool) -> ExeResult {
         let mut ip: usize = 0;
 
         loop {
@@ -151,7 +79,7 @@ impl VM {
                     continue;
                 }
                 Inst::LoadConst(index) => {
-                    self.format_strings(*index)?;
+                    // self.format_strings(*index)?;
                     self.push(*index);
                 }
                 Inst::DeclareVar(name) => {
@@ -171,11 +99,10 @@ impl VM {
                 }
                 Inst::LoadVar(name) => {
                     if let Some(&index) = self.ctx.get_obj_index(name) {
-                        self.format_strings(index)?;
                         self.push(index);
                     } else {
-                        self.err(RuntimeErrKind::NameError(format!(
-                            "Name not found: {}",
+                        self.err(RuntimeErrKind::NameErr(format!(
+                            "Name not defined in current scope: {}",
                             name
                         )))?;
                     }
@@ -258,7 +185,7 @@ impl VM {
                 Inst::Print => match self.stack.peek() {
                     Some(index) => {
                         let val = self.ctx.constants.get(*index).unwrap();
-                        let mut print;
+                        let print;
                         if cfg!(debug_assertions) {
                             self.dis(dis, ip, &instructions);
                             print = !dis;
@@ -296,14 +223,10 @@ impl VM {
                     self.dis(dis, ip, &instructions);
                     break Ok(VMState::Halted(*code));
                 }
-                Inst::InternalError(message) => {
+                Inst::InternalErr(message) => {
                     self.halt();
                     eprintln!("INTERNAL ERROR: {}", message);
-                    break Ok(VMState::Halted(-1));
-                }
-                inst => {
-                    let message = format!("{:?}", inst);
-                    self.err(RuntimeErrKind::UnhandledInstruction(message))?;
+                    break Ok(VMState::Halted(255));
                 }
             }
 
@@ -380,39 +303,39 @@ impl VM {
     /// If the object a tuple, any $ string items will be formatted. If
     /// any $ strings are present, the original tuple will be *replaced*
     /// with a new tuple containing the formatted values.
-    fn format_strings(&mut self, const_index: usize) -> Result<(), RuntimeErr> {
-        if let Some(obj) = self.ctx.get_obj(const_index) {
-            if let Some(string) = obj.as_any().downcast_ref::<String>() {
-                if string.is_format_string() {
-                    let formatted = string.format(self)?;
-                    let formatted = Rc::new(formatted);
-                    self.ctx.constants.replace(const_index, formatted);
-                }
-            }
-            if let Some(tuple) = obj.as_any().downcast_ref::<Tuple>() {
-                let mut new_items: Vec<ObjectRef> = Vec::new();
-                let mut num_formatted = 0;
-                for item in tuple.items() {
-                    if let Some(string) = item.as_any().downcast_ref::<String>() {
-                        if string.is_format_string() {
-                            let formatted = string.format(self)?;
-                            new_items.push(Rc::new(formatted));
-                            num_formatted += 1;
-                        } else {
-                            new_items.push(item.clone());
-                        }
-                    } else {
-                        new_items.push(item.clone());
-                    }
-                }
-                if num_formatted > 0 {
-                    let new_tuple = self.ctx.builtins.new_tuple(new_items);
-                    self.ctx.constants.replace(const_index, new_tuple);
-                }
-            }
-        }
-        Ok(())
-    }
+    // fn format_strings(&mut self, const_index: usize) -> Result<(), RuntimeErr> {
+    //     if let Some(obj) = self.ctx.get_obj(const_index) {
+    //         if let Some(string) = obj.as_any().downcast_ref::<String>() {
+    //             if string.is_format_string() {
+    //                 let formatted = string.format(self)?;
+    //                 let formatted = Rc::new(formatted);
+    //                 self.ctx.constants.replace(const_index, formatted);
+    //             }
+    //         }
+    //         if let Some(tuple) = obj.as_any().downcast_ref::<Tuple>() {
+    //             let mut new_items: Vec<ObjectRef> = Vec::new();
+    //             let mut num_formatted = 0;
+    //             for item in tuple.items() {
+    //                 if let Some(string) = item.as_any().downcast_ref::<String>() {
+    //                     if string.is_format_string() {
+    //                         let formatted = string.format(self)?;
+    //                         new_items.push(Rc::new(formatted));
+    //                         num_formatted += 1;
+    //                     } else {
+    //                         new_items.push(item.clone());
+    //                     }
+    //                 } else {
+    //                     new_items.push(item.clone());
+    //                 }
+    //             }
+    //             if num_formatted > 0 {
+    //                 let new_tuple = self.ctx.builtins.new_tuple(new_items);
+    //                 self.ctx.constants.replace(const_index, new_tuple);
+    //             }
+    //         }
+    //     }
+    //     Ok(())
+    // }
 
     /// Show the contents of the stack (top first).
     pub fn display_stack(&self) {
@@ -529,7 +452,6 @@ mod tests {
 
     #[test]
     fn execute_simple_program() {
-        let builtins = Builtins::new();
         let mut vm = VM::default();
         let i = vm.ctx.constants.add(vm.ctx.builtins.new_int(1));
         let j = vm.ctx.constants.add(vm.ctx.builtins.new_int(2));

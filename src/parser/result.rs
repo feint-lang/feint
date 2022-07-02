@@ -24,7 +24,6 @@ impl ParseErr {
 
 #[derive(Clone, Debug)]
 pub enum ParseErrKind {
-    CouldNotOpenSourceFile(String, String),
     ScanErr(ScanErr),
 
     MismatchedBracket(Location),
@@ -36,7 +35,7 @@ pub enum ParseErrKind {
     ExpectedExpr(Location),
     ExpectedIdent(Location),
     ExpectedOperand(Location),
-    ExpectedToken(Token, Location),
+    ExpectedToken(Location, Token),
 
     UnexpectedBlock(Location),
     UnexpectedToken(TokenWithLocation),
