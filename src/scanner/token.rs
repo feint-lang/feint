@@ -74,6 +74,7 @@ pub enum Token {
     Block,         // block
     If,            // if
     Else,          // else
+    Match,         // match
     Loop,          // ??? (while true, like Rust)
     For,           // ??? or use <-
     While,         // ??? or use <-
@@ -129,6 +130,7 @@ impl Token {
             Self::Block => "block",
             Self::If => "if",
             Self::Else => "else",
+            Self::Match => "match",
             Self::Jump => "jump",
             Self::Label(_name) => "label",
 

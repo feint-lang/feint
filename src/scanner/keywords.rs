@@ -20,6 +20,7 @@ lazy_static! {
         ("block", Block),
         ("if", If),
         ("else", Else),
+        ("match", Match),
         ("loop", Loop),       // ???
         ("for", For),         // ???
         ("while", While),     // ???
