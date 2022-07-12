@@ -10,8 +10,8 @@ use super::precedence::{
     get_binary_precedence, get_unary_precedence, is_right_associative,
 };
 use super::result::{
-    BoolResult, ExprResult, NextInfixResult, NextTokenResult, ParseErr, ParseErrKind,
-    ParseResult, PeekTokenResult, StatementResult, StatementsResult,
+    BlockResult, BoolResult, ExprResult, NextInfixResult, NextTokenResult, ParseErr,
+    ParseErrKind, ParseResult, PeekTokenResult, StatementResult, StatementsResult,
 };
 
 /// Parse tokens and return the resulting AST or error.
@@ -131,6 +131,28 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
         Ok(false)
     }
 
+    /// Consume next N tokens and return true *if* the next N tokens are
+    /// equal to specified tokens. Otherwise, leave the tokens in the
+    /// stream and return false.
+    fn next_tokens_are(&mut self, tokens: Vec<&Token>) -> BoolResult {
+        assert!(tokens.len() > 1, "At least two tokens are required");
+        let mut temp_queue: VecDeque<TokenWithLocation> = VecDeque::new();
+        for token in tokens {
+            match self.next_token_if(|t| t == token)? {
+                Some(token) => {
+                    temp_queue.push_front(token);
+                }
+                None => {
+                    for twl in temp_queue {
+                        self.lookahead_queue.push_front(twl);
+                    }
+                    return Ok(false);
+                }
+            }
+        }
+        Ok(true)
+    }
+
     /// Return the next token along with its precedence *if* it's both
     /// an infix operator *and* its precedence is greater than the
     /// current precedence level.
@@ -244,18 +266,6 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
         Ok(())
     }
 
-    /// Expect and collect a block of statements. There must be at least
-    /// one statement.
-    fn expect_statement_block(&mut self) -> StatementsResult {
-        self.expect_scope()?;
-        let statements = self.statements()?;
-        if statements.is_empty() {
-            return Err(self.err(ParseErrKind::ExpectedBlock(self.next_loc())));
-        }
-        self.expect_scope_end()?;
-        Ok(statements)
-    }
-
     // Grammar ---------------------------------------------------------
 
     /// Get a list of statements. Collect statements until there's
@@ -349,18 +359,23 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
                 ast::Expr::new_ident(ast::Ident::new_ident(name))
             }
             Token::Block => {
-                let statements = self.block()?;
-                ast::Expr::new_block(statements)
+                let block = self.block()?;
+                ast::Expr::new_block(block)
             }
             Token::If => {
-                let if_expr = self.expr(0)?;
-                let if_block = self.block()?;
-                let else_block = if self.next_token_is(&Token::Else)? {
-                    Some(self.block()?)
-                } else {
-                    None
+                let mut branches = vec![];
+                branches.push((self.expr(0)?, self.block()?));
+                loop {
+                    match self.next_tokens_are(vec![&Token::Else, &Token::If])? {
+                        true => branches.push((self.expr(0)?, self.block()?)),
+                        false => break,
+                    }
+                }
+                let default = match self.next_token_is(&Token::Else)? {
+                    true => Some(self.block()?),
+                    false => None,
                 };
-                ast::Expr::new_conditional(if_expr, if_block, else_block)
+                ast::Expr::new_conditional(branches, default)
             }
             _ => self.expect_unary_expr(&token)?,
         };
@@ -450,8 +465,14 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
     }
 
     /// Handle `block ->`, `if <expr> ->`, etc.
-    fn block(&mut self) -> StatementsResult {
-        self.expect_statement_block()
+    fn block(&mut self) -> BlockResult {
+        self.expect_scope()?;
+        let statements = self.statements()?;
+        if statements.is_empty() {
+            return Err(self.err(ParseErrKind::ExpectedBlock(self.next_loc())));
+        }
+        self.expect_scope_end()?;
+        Ok(ast::Block::new(statements))
     }
 
     /// Handle `func () -> ...` (definition) and `func()` (call).
@@ -476,8 +497,8 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
         if self.peek_token_is(&Token::ScopeStart)? {
             // Function def - tokens are parameters
             let params = self.parse_params(tokens)?;
-            let statements = self.expect_statement_block()?;
-            Ok(ast::Expr::new_func(name.clone(), params, statements))
+            let block = self.block()?;
+            Ok(ast::Expr::new_func(name.clone(), params, block))
         } else {
             // Function call -- tokens are args
             let args = parse_tokens(tokens)?;

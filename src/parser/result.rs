@@ -6,6 +6,7 @@ pub type BoolResult = Result<bool, ParseErr>;
 pub type ParseResult = Result<ast::Program, ParseErr>;
 pub type StatementResult = Result<ast::Statement, ParseErr>;
 pub type StatementsResult = Result<Vec<ast::Statement>, ParseErr>;
+pub type BlockResult = Result<ast::Block, ParseErr>;
 pub type ExprResult = Result<ast::Expr, ParseErr>;
 pub type NextTokenResult = Result<Option<TokenWithLocation>, ParseErr>;
 pub type NextInfixResult = Result<Option<(TokenWithLocation, u8)>, ParseErr>;

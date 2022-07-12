@@ -29,6 +29,15 @@ else ->
         print("inner else (SHOULD be printed)")
     print("end else")
 
+if false ->
+    nil
+else if 1 + 1 == 5 ->
+    print("else if branch 1 (should NOT be printed)")
+else if true ->
+    print("else if branch 2")
+else ->
+    nil
+
 # This just demonstrates that if/else suite at the end of the file
 # doesn't cause an error.
 if false ->

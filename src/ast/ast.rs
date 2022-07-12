@@ -106,8 +106,7 @@ pub enum ExprKind {
     UnaryOp(UnaryOperator, Box<Expr>),
     BinaryOp(Box<Expr>, BinaryOperator, Box<Expr>),
     Block(Block),
-    // if expr, if block, else block
-    Conditional(Box<Expr>, Block, Option<Block>),
+    Conditional(Vec<(Expr, Block)>, Option<Block>),
     Func(Func),
     Call(Call),
     Literal(Literal),
@@ -120,32 +119,19 @@ impl Expr {
         Self { kind }
     }
 
-    pub fn new_block(statements: Vec<Statement>) -> Self {
-        Self::new(ExprKind::Block(Block::new(statements)))
+    pub fn new_block(block: Block) -> Self {
+        Self::new(ExprKind::Block(block))
     }
 
     pub fn new_conditional(
-        if_expr: Expr,
-        if_statements: Vec<Statement>,
-        else_statements: Option<Vec<Statement>>,
+        branches: Vec<(Expr, Block)>,
+        default: Option<Block>,
     ) -> Self {
-        let else_block = match else_statements {
-            Some(statements) => Some(Block::new(statements)),
-            None => None,
-        };
-        Self::new(ExprKind::Conditional(
-            Box::new(if_expr),
-            Block::new(if_statements),
-            else_block,
-        ))
+        Self::new(ExprKind::Conditional(branches, default))
     }
 
-    pub fn new_func(
-        name: String,
-        params: Vec<String>,
-        statements: Vec<Statement>,
-    ) -> Self {
-        Self::new(ExprKind::Func(Func::new(name, params, statements)))
+    pub fn new_func(name: String, params: Vec<String>, block: Block) -> Self {
+        Self::new(ExprKind::Func(Func::new(name, params, block)))
     }
 
     pub fn new_call(name: String, args: Vec<Expr>) -> Self {
@@ -213,8 +199,8 @@ impl fmt::Debug for ExprKind {
             Self::BinaryOp(a, op, b) => write!(f, "({:?} {:?} {:?})", a, op, b),
             Self::Ident(ident) => write!(f, "{:?}", ident),
             Self::Block(block) => write!(f, "{:?}", block),
-            Self::Conditional(if_expr, if_block, else_block) => {
-                write!(f, "{:?} ? {:?} : {:?}", if_expr, if_block, else_block)
+            Self::Conditional(branches, default) => {
+                write!(f, "{branches:?} {default:?}")
             }
             Self::Func(func) => write!(f, "{:?}", func),
             Self::Call(func) => write!(f, "{:?}", func),
@@ -270,18 +256,19 @@ impl fmt::Debug for Conditional {
 pub struct Func {
     pub name: String,
     pub params: Vec<String>,
-    pub statements: Vec<Statement>,
+    pub block: Block,
 }
 
 impl Func {
-    pub fn new(name: String, params: Vec<String>, statements: Vec<Statement>) -> Self {
-        Self { name, params, statements }
+    pub fn new(name: String, params: Vec<String>, block: Block) -> Self {
+        Self { name, params, block }
     }
 }
 
 impl fmt::Debug for Func {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let items: Vec<String> = self
+            .block
             .statements
             .iter()
             .map(|statement| format!("{:?}", statement))

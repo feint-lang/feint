@@ -116,44 +116,50 @@ impl<'a> Visitor<'a> {
 
     fn visit_conditional(
         &mut self,
-        if_expr: ast::Expr,
-        if_block: ast::Block,
-        else_block: Option<ast::Block>,
+        branches: Vec<(ast::Expr, ast::Block)>,
+        default: Option<ast::Block>,
         scope_kind: ScopeKind,
     ) -> VisitResult {
-        // Addresses of if and else if Jump out instructions (added to
-        // the end of each block). The target address for these isn't
-        // known until all the if, else if, and else blocks are
-        // compiled.
+        assert!(branches.len() > 0, "At least one branch required for conditional");
+
+        // Addresses of branch jump-out instructions (added after each
+        // branch's block). The target address for these isn't known
+        // until the whole conditional suite is compiled.
         let mut jump_out_addrs: Vec<usize> = vec![];
 
-        // Evaluate if expression and leave result on top of stack
-        self.visit_expr(if_expr)?;
+        for (expr, block) in branches {
+            // Evaluate branch expression.
+            self.visit_expr(expr)?;
 
-        // Placeholder to jump to if or else depending on if expr
-        let jump_if_else_index = self.instructions.len();
-        self.push(Inst::InternalErr("JumpIfElse not set".to_owned()));
+            // Placeholder for jump depending on result of branch expr.
+            let jump_index = self.instructions.len();
+            self.push(Inst::InternalErr("JumpIfElse not set".to_owned()));
 
-        // If block
-        let if_addr = jump_if_else_index + 1;
-        self.visit_block(if_block, scope_kind.clone())?;
+            // Start of branch block (jump target if branch condition is
+            // true).
+            let block_addr = jump_index + 1;
+            self.visit_block(block, scope_kind)?;
 
-        // Placeholder to jump out of if
-        jump_out_addrs.push(self.instructions.len());
-        self.push(Inst::InternalErr("Jump for if not set".to_owned()));
+            // Placeholder for jump out of conditional suite if this
+            // branch is selected.
+            jump_out_addrs.push(self.instructions.len());
+            self.push(Inst::InternalErr("Jump for if not set".to_owned()));
 
-        // Else block (if present)
-        let else_addr = self.instructions.len();
-        if let Some(else_block) = else_block {
-            self.visit_block(else_block, scope_kind.clone())?;
+            // Jump target if branch condition is false.
+            let next_addr = self.instructions.len();
+
+            self.instructions[jump_index] = Inst::JumpIfElse(block_addr, next_addr);
         }
 
-        // Address of the next instruction after the conditional suite
+        // Default block (if present).
+        if let Some(default_block) = default {
+            self.visit_block(default_block, scope_kind)?;
+        }
+
+        // Address of instruction after conditional suite.
         let after_addr = self.instructions.len();
 
-        // Insert jump instructions now that addresses are known
-        self.instructions[jump_if_else_index] = Inst::JumpIfElse(if_addr, else_addr);
-
+        // Replace jump-out placeholders with actual jumps.
         for addr in jump_out_addrs {
             self.instructions[addr] = Inst::Jump(after_addr);
         }
@@ -206,8 +212,9 @@ impl<'a> Visitor<'a> {
         type Kind = ast::ExprKind;
         match node.kind {
             Kind::Block(block) => self.visit_block(block, ScopeKind::Block)?,
-            Kind::Conditional(if_expr, if_block, else_block) => self
-                .visit_conditional(*if_expr, if_block, else_block, ScopeKind::Block)?,
+            Kind::Conditional(branches, default) => {
+                self.visit_conditional(branches, default, ScopeKind::Block)?
+            }
             Kind::Func(func) => self.visit_func(func)?,
             Kind::UnaryOp(op, b) => self.visit_unary_op(op, *b)?,
             Kind::BinaryOp(a, op, b) => self.visit_binary_op(*a, op, *b)?,
