@@ -122,7 +122,7 @@ impl<'a> Repl<'a> {
                 self.reader.set_edit_mode(rustyline::config::EditMode::Vi);
                 return None;
             }
-            _ => self.executor.execute_text(text),
+            _ => self.executor.execute_text(text, Some("<repl>")),
         };
 
         if let Ok(vm_state) = result {

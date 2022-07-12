@@ -23,7 +23,7 @@ pub fn run_stdin(dis: bool, debug: bool) -> ExitResult {
 pub fn run_text(text: &str, dis: bool, debug: bool) -> ExitResult {
     let mut vm = VM::default();
     let mut executor = Executor::new(&mut vm, false, dis, debug);
-    let result = executor.execute_text(text);
+    let result = executor.execute_text(text, None);
     exit(result)
 }
 

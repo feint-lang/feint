@@ -44,8 +44,12 @@ impl<'a> Executor<'a> {
     }
 
     /// Execute text.
-    pub fn execute_text(&mut self, text: &str) -> ExeResult {
-        self.current_file_name = "<text>";
+    pub fn execute_text(
+        &mut self,
+        text: &str,
+        file_name: Option<&'a str>,
+    ) -> ExeResult {
+        self.current_file_name = file_name.unwrap_or("<text>");
         let mut source = source_from_text(text);
         self.execute_source(&mut source)
     }
@@ -134,9 +138,7 @@ impl<'a> Executor<'a> {
     fn print_err_line(&self, line_no: usize, line: &str) {
         let file_name = self.current_file_name;
         let line = line.trim_end();
-        eprintln!(
-            "\n  Error in file {file_name} on line {line_no}:\n\n    |\n    |{line}"
-        );
+        eprintln!("\n  Error in {file_name} on line {line_no}:\n\n    |\n    |{line}");
     }
 
     fn print_err_message(&self, message: String, loc: Location) {
