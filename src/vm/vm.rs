@@ -59,15 +59,37 @@ impl VM {
                     }
                     self.pop();
                 }
-                Inst::Jump(address) => {
+                Inst::Jump(addr) => {
                     #[cfg(debug_assertions)]
                     self.dis(dis, ip, &instructions);
-                    ip = *address;
+                    ip = *addr;
                     continue;
+                }
+                Inst::JumpIf(addr) => {
+                    if let Some(i) = self.pop() {
+                        let obj = self.ctx.get_obj(i).unwrap();
+                        if obj.as_bool(&self.ctx)? {
+                            ip = *addr;
+                            continue;
+                        }
+                    } else {
+                        self.err(RuntimeErrKind::EmptyStack)?;
+                    };
+                }
+                Inst::JumpIfNot(addr) => {
+                    if let Some(i) = self.pop() {
+                        let obj = self.ctx.get_obj(i).unwrap();
+                        if !obj.as_bool(&self.ctx)? {
+                            ip = *addr;
+                            continue;
+                        }
+                    } else {
+                        self.err(RuntimeErrKind::EmptyStack)?;
+                    };
                 }
                 Inst::JumpIfElse(if_addr, else_addr) => {
                     if let Some(i) = self.pop() {
-                        let obj = self.ctx.constants.get(i).unwrap();
+                        let obj = self.ctx.get_obj(i).unwrap();
                         if obj.as_bool(&self.ctx)? {
                             ip = *if_addr;
                         } else {
@@ -109,7 +131,7 @@ impl VM {
                 }
                 Inst::UnaryOp(op) => {
                     if let Some(i) = self.pop() {
-                        let a = self.ctx.constants.get(i).unwrap();
+                        let a = self.ctx.get_obj(i).unwrap();
                         let value = match op {
                             UnaryOperator::Plus => a.clone(), // no-op
                             UnaryOperator::Negate => a.negate(&self.ctx)?,
@@ -127,7 +149,7 @@ impl VM {
                                 continue;
                             }
                         };
-                        let index = self.ctx.constants.add(value);
+                        let index = self.ctx.add_obj(value);
                         self.push(index);
                     } else {
                         let message = format!("Unary op: {}", op);
@@ -135,44 +157,69 @@ impl VM {
                     };
                 }
                 Inst::BinaryOp(op) => {
-                    if let Some((i, j)) = self.pop_top_two() {
-                        let a = self.ctx.constants.get(i).unwrap();
-                        let b = self.ctx.constants.get(j).unwrap();
-                        let b = b.clone();
-                        let value = match op {
-                            BinaryOperator::Pow => a.pow(b, &self.ctx)?,
-                            BinaryOperator::Mul => a.mul(b, &self.ctx)?,
-                            BinaryOperator::Div => a.div(b, &self.ctx)?,
-                            BinaryOperator::FloorDiv => a.floor_div(b, &self.ctx)?,
-                            BinaryOperator::Mod => a.modulo(b, &self.ctx)?,
-                            BinaryOperator::Add => a.add(b, &self.ctx)?,
-                            BinaryOperator::Sub => a.sub(b, &self.ctx)?,
-                            op => {
-                                // Operators that return bool
-                                let result = match op {
-                                    BinaryOperator::IsEqual => {
-                                        a.is_equal(b, &self.ctx)?
-                                    }
-                                    BinaryOperator::NotEqual => {
-                                        a.not_equal(b, &self.ctx)?
-                                    }
-                                    BinaryOperator::And => a.and(b, &self.ctx)?,
-                                    BinaryOperator::Or => a.or(b, &self.ctx)?,
-                                    _ => unreachable!(),
-                                };
-                                self.push(if result { 1 } else { 2 });
-                                ip += 1;
-                                #[cfg(debug_assertions)]
-                                self.dis(dis, ip, &instructions);
-                                continue;
-                            }
-                        };
-                        let index = self.ctx.constants.add(value);
-                        self.push(index);
+                    use BinaryOperator::*;
+
+                    let (i, a, b) = if let Some((i, j)) = self.pop_top_two() {
+                        let a = self.ctx.get_obj(i).unwrap();
+                        let b = self.ctx.get_obj(j).unwrap();
+                        (i, a, b.clone())
                     } else {
-                        let message = format!("Binary op: {}", op);
-                        self.err(RuntimeErrKind::NotEnoughValuesOnStack(message))?;
+                        return self.err(RuntimeErrKind::NotEnoughValuesOnStack(
+                            format!("Binary op: {}", op),
+                        ));
                     };
+
+                    match op {
+                        // In place update operators
+                        AddEqual | SubEqual => {
+                            let result = match op {
+                                AddEqual => a.add(b, &self.ctx)?,
+                                SubEqual => a.sub(b, &self.ctx)?,
+                                _ => unreachable!(),
+                            };
+                            self.ctx.replace_obj(i, result);
+                            self.push(i);
+                        }
+
+                        // Math operators
+                        Pow | Mul | Div | FloorDiv | Mod | Add | Sub => {
+                            let result = match op {
+                                Pow => a.pow(b, &self.ctx)?,
+                                Mul => a.mul(b, &self.ctx)?,
+                                Div => a.div(b, &self.ctx)?,
+                                FloorDiv => a.floor_div(b, &self.ctx)?,
+                                Mod => a.modulo(b, &self.ctx)?,
+                                Add => a.add(b, &self.ctx)?,
+                                Sub => a.sub(b, &self.ctx)?,
+                                _ => unreachable!(),
+                            };
+                            let index = self.ctx.add_obj(result);
+                            self.push(index);
+                        }
+
+                        // Operators that return bool
+                        _ => {
+                            let result = match op {
+                                IsEqual => a.is_equal(b, &self.ctx)?,
+                                Is => a.class().is(&b.class()) && a.id() == b.id(),
+                                NotEqual => a.not_equal(b, &self.ctx)?,
+                                And => a.and(b, &self.ctx)?,
+                                Or => a.or(b, &self.ctx)?,
+                                LessThan => a.less_than(b, &self.ctx)?,
+                                LessThanOrEqual => {
+                                    a.less_than(b.clone(), &self.ctx)?
+                                        || a.is_equal(b, &self.ctx)?
+                                }
+                                GreaterThan => a.greater_than(b, &self.ctx)?,
+                                GreaterThanOrEqual => {
+                                    a.greater_than(b.clone(), &self.ctx)?
+                                        || a.is_equal(b, &self.ctx)?
+                                }
+                                _ => unreachable!(),
+                            };
+                            self.push(if result { 1 } else { 2 });
+                        }
+                    }
                 }
                 Inst::ScopeStart => {
                     self.ctx.enter_scope();
@@ -184,7 +231,7 @@ impl VM {
                 }
                 Inst::Print => match self.stack.peek() {
                     Some(index) => {
-                        let val = self.ctx.constants.get(*index).unwrap();
+                        let val = self.ctx.get_obj(*index).unwrap();
                         let print;
                         if cfg!(debug_assertions) {
                             self.dis(dis, ip, &instructions);
@@ -309,7 +356,7 @@ impl VM {
     //             if string.is_format_string() {
     //                 let formatted = string.format(self)?;
     //                 let formatted = Rc::new(formatted);
-    //                 self.ctx.constants.replace(const_index, formatted);
+    //                 self.ctx.replace_obj(const_index, formatted);
     //             }
     //         }
     //         if let Some(tuple) = obj.as_any().downcast_ref::<Tuple>() {
@@ -330,7 +377,7 @@ impl VM {
     //             }
     //             if num_formatted > 0 {
     //                 let new_tuple = self.ctx.builtins.new_tuple(new_items);
-    //                 self.ctx.constants.replace(const_index, new_tuple);
+    //                 self.ctx.replace_obj(const_index, new_tuple);
     //             }
     //         }
     //     }
@@ -453,8 +500,8 @@ mod tests {
     #[test]
     fn execute_simple_program() {
         let mut vm = VM::default();
-        let i = vm.ctx.constants.add(vm.ctx.builtins.new_int(1));
-        let j = vm.ctx.constants.add(vm.ctx.builtins.new_int(2));
+        let i = vm.ctx.add_obj(vm.ctx.builtins.new_int(1));
+        let j = vm.ctx.add_obj(vm.ctx.builtins.new_int(2));
         let instructions: Chunk = vec![
             Inst::LoadConst(i),
             Inst::LoadConst(j),

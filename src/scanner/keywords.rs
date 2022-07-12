@@ -15,13 +15,12 @@ lazy_static! {
         ("from", From),
         ("package", Package),
         ("as", As),
-        ("is", Is),           // ???
         ("let", Let),         // ???
         ("block", Block),
         ("if", If),
         ("else", Else),
         ("match", Match),
-        ("loop", Loop),       // ???
+        ("loop", Loop),
         ("for", For),         // ???
         ("while", While),     // ???
         ("break", Break),

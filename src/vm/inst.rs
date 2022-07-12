@@ -11,8 +11,14 @@ pub enum Inst {
     // Jump unconditionally
     Jump(usize),
 
-    // If top of stack is true, jump to first address
-    // Otherwise, jump to second address
+    // If top of stack is true, jump to address. Otherwise, continue.
+    JumpIf(usize),
+
+    // If top of stack is false, jump to address. Otherwise, continue.
+    JumpIfNot(usize),
+
+    // If top of stack is true, jump to first address. Otherwise,
+    // jump to second address.
     JumpIfElse(usize, usize),
 
     UnaryOp(UnaryOperator),

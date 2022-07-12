@@ -40,8 +40,8 @@ mod tests {
         let mut ctx = RuntimeContext::default();
         let int = ctx.builtins.new_int(0);
         let int_copy = int.clone();
-        let index = ctx.constants.add(int);
-        let retrieved = ctx.constants.get(index).unwrap();
+        let index = ctx.add_obj(int);
+        let retrieved = ctx.get_obj(index).unwrap();
         assert_eq!(retrieved.class().id(), int_copy.class().id());
         assert_eq!(retrieved.id(), int_copy.id());
         assert!(retrieved.is_equal(int_copy, &ctx).unwrap());

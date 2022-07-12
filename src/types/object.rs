@@ -72,6 +72,9 @@ pub trait Object {
         self.is_equal(rhs, ctx).map(|equal| !equal)
     }
 
+    make_bin_op!(less_than, "<", RuntimeBoolResult);
+    make_bin_op!(greater_than, ">", RuntimeBoolResult);
+
     make_bin_op!(pow, "^", RuntimeResult);
     make_bin_op!(modulo, "%", RuntimeResult);
     make_bin_op!(mul, "*", RuntimeResult);

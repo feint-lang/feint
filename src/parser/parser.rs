@@ -11,7 +11,7 @@ use super::precedence::{
 };
 use super::result::{
     BlockResult, BoolResult, ExprResult, NextInfixResult, NextTokenResult, ParseErr,
-    ParseErrKind, ParseResult, PeekTokenResult, StatementResult, StatementsResult,
+    ParseErrKind, ParseResult, PeekTokenResult, StatementsResult,
 };
 
 /// Parse tokens and return the resulting AST or error.
@@ -276,37 +276,41 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
             if !self.has_tokens()? || self.peek_token_is(&Token::ScopeEnd)? {
                 break;
             }
-            let statement = self.statement()?;
-            statements.push(statement);
+            for statement in self.statement()? {
+                statements.push(statement);
+            }
         }
         Ok(statements)
     }
 
-    /// Get the next statement (which might be an expression).
-    fn statement(&mut self) -> StatementResult {
+    /// Get the next statement (which might be an expression). In
+    /// certain cases, multiple statements may be returned (e.g.,
+    /// loops).
+    fn statement(&mut self) -> StatementsResult {
+        use Token::*;
         let token = self.expect_next_token()?;
         let statement = match token.token {
             // XXX: The print statement is temporary until functions
             //      are implemented. The shenanigans below are so that
             //      print statements have similar syntax to the eventual
             //      built in print function.
-            Token::Print => {
-                self.expect_token(&Token::LParen)?;
-                let expr = if self.peek_token_is(&Token::RParen)? {
+            Print => {
+                self.expect_token(&LParen)?;
+                let expr = if self.peek_token_is(&RParen)? {
                     ast::Expr::new_string("")
                 } else if self.has_tokens()? {
                     self.expr(0)?
                 } else {
                     return Err(self.err(ParseErrKind::ExpectedExpr(self.next_loc())));
                 };
-                self.expect_token(&Token::RParen)?;
-                self.expect_token(&Token::EndOfStatement)?;
+                self.expect_token(&RParen)?;
+                self.expect_token(&EndOfStatement)?;
                 ast::Statement::new_print(expr)
             }
-            Token::Jump => {
+            Jump => {
                 if let Some(ident_token) = self.next_token()? {
-                    if let Token::Ident(name) = ident_token.token {
-                        self.expect_token(&Token::EndOfStatement)?;
+                    if let Ident(name) = ident_token.token {
+                        self.expect_token(&EndOfStatement)?;
                         ast::Statement::new_jump(name)
                     } else {
                         return Err(
@@ -317,69 +321,100 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
                     return Err(self.err(ParseErrKind::ExpectedIdent(self.next_loc())));
                 }
             }
-            Token::Label(name) => ast::Statement::new_label(name),
+            Label(name) => ast::Statement::new_label(name),
+            Break => ast::Statement::new_jump(format!("$loop-end")),
             _ => {
                 self.lookahead_queue.push_front(token);
                 let expr = self.expr(0)?;
-                ast::Statement::new_expr(expr)
+                match expr.kind {
+                    ast::ExprKind::Loop(..) => {
+                        // TODO: I don't think this is a good way to
+                        //       handle breaks. Perhaps the compiler can
+                        //       look for breaks and turn them into
+                        //       jumps without the need for labels.
+                        //
+                        // XXX: This approach doesn't allow for multiple
+                        //      loops at the same level of a given
+                        //      scope. It also doesn't allow for a
+                        //      value to be returned a la Rust.
+                        //
+                        // XXX: Another issue with this approach is that
+                        //      it requires a special case for loops,
+                        //      returning a vec instead of a single
+                        //      statement.
+
+                        // Consume optional EOS
+                        self.next_token_is(&EndOfStatement)?;
+                        return Ok(vec![
+                            ast::Statement::new_expr(expr),
+                            ast::Statement::new_label(format!("$loop-end")),
+                        ]);
+                    }
+                    _ => ast::Statement::new_expr(expr),
+                }
             }
         };
         // Consume optional EOS
-        self.next_token_is(&Token::EndOfStatement)?;
-        Ok(statement)
+        self.next_token_is(&EndOfStatement)?;
+        Ok(vec![statement])
     }
 
     /// Get the next expression, possibly recurring to handle nested
     /// expressions, unary & binary expressions, blocks, functions, etc.
     fn expr(&mut self, prec: u8) -> ExprResult {
+        use Token::*;
         let token = self.expect_next_token()?;
         let mut expr = match token.token {
-            Token::LParen => match self.next_token_is(&Token::RParen)? {
+            LParen => match self.next_token_is(&RParen)? {
                 true => ast::Expr::new_tuple(vec![]),
                 false => self.nested_expr()?,
             },
-            Token::Nil => ast::Expr::new_literal(ast::Literal::new_nil()),
-            Token::True => ast::Expr::new_literal(ast::Literal::new_bool(true)),
-            Token::False => ast::Expr::new_literal(ast::Literal::new_bool(false)),
-            Token::Float(value) => {
-                ast::Expr::new_literal(ast::Literal::new_float(value))
-            }
-            Token::Int(value) => ast::Expr::new_literal(ast::Literal::new_int(value)),
-            Token::String(value) => {
-                ast::Expr::new_literal(ast::Literal::new_string(value))
-            }
-            Token::FormatString(value) => {
+            Nil => ast::Expr::new_literal(ast::Literal::new_nil()),
+            True => ast::Expr::new_literal(ast::Literal::new_bool(true)),
+            False => ast::Expr::new_literal(ast::Literal::new_bool(false)),
+            Float(value) => ast::Expr::new_literal(ast::Literal::new_float(value)),
+            Int(value) => ast::Expr::new_literal(ast::Literal::new_int(value)),
+            String(value) => ast::Expr::new_literal(ast::Literal::new_string(value)),
+            FormatString(value) => {
                 ast::Expr::new_literal(ast::Literal::new_format_string(value))
             }
-            Token::Ident(name) => {
-                if self.next_token_is(&Token::LParen)? {
+            Ident(name) => {
+                if self.next_token_is(&LParen)? {
                     // Function def or call
                     return Ok(self.func(name)?);
                 }
                 ast::Expr::new_ident(ast::Ident::new_ident(name))
             }
-            Token::Block => {
+            Block => {
                 let block = self.block()?;
                 ast::Expr::new_block(block)
             }
-            Token::If => {
+            If => {
                 let mut branches = vec![];
                 branches.push((self.expr(0)?, self.block()?));
                 loop {
-                    match self.next_tokens_are(vec![&Token::Else, &Token::If])? {
+                    match self.next_tokens_are(vec![&Else, &If])? {
                         true => branches.push((self.expr(0)?, self.block()?)),
                         false => break,
                     }
                 }
-                let default = match self.next_token_is(&Token::Else)? {
+                let default = match self.next_token_is(&Else)? {
                     true => Some(self.block()?),
                     false => None,
                 };
                 ast::Expr::new_conditional(branches, default)
             }
+            Loop => {
+                let expr = match self.peek_token_is(&ScopeStart)? {
+                    true => ast::Expr::new_literal(ast::Literal::new_bool(true)),
+                    false => self.expr(0)?,
+                };
+                let block = self.block()?;
+                ast::Expr::new_loop(expr, block)
+            }
             _ => self.expect_unary_expr(&token)?,
         };
-        expr = if self.next_token_is(&Token::Comma)? {
+        expr = if self.next_token_is(&Comma)? {
             self.tuple(expr)?
         } else {
             self.maybe_binary_expr(prec, expr)?

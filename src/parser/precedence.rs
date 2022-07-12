@@ -30,35 +30,36 @@ pub fn is_right_associative(token: &Token) -> bool {
 ///       hashable. That could probably be "fixed", but it would be
 ///       more complicated than this.
 pub fn get_operator_precedence(token: &Token) -> (u8, u8) {
+    use Token::*;
     match token {
-        Token::Comma                    // a, b
-        | Token::Equal       => (0, 1), // a = b
+        Comma                            // a, b
+        | Equal                          // a = b
+        | PlusEqual          => (0, 1),  // a += b
         
-        // TODO: This was added for use in ternary expressions, but
-        //       it doesn't work with if/else blocks. Maybe just use
-        //       `cond ? yes : no`?
-        // | Token::If          => (0, 2), // if ...
-        
-        | Token::Or          => (0, 3), // a || b
-        | Token::And         => (0, 4), // a && b
+        | Or                 => (0, 3),  // a || b
+        | And                => (0, 4),  // a && b
 
-        | Token::Is                     // a == b
-        | Token::EqualEqual             // a == b
-        | Token::NotEqual    => (0, 5), // a != b
+        | EqualEqualEqual                // a === b
+        | EqualEqual                     // a == b
+        | NotEqual                       // a != b
+        | LessThan                       // a < b
+        | LessThanOrEqual                // a <= b
+        | GreaterThan                    // a > b
+        | GreaterThanOrEqual => (0, 5),  // a >= b
         
-        | Token::Plus                   // +a, a + b
-        | Token::Minus       => (9, 6), // -a, a - b
+        | Plus                           // +a, a + b
+        | Minus              => (9, 6),  // -a, a - b
         
-        | Token::Star                   // a * b
-        | Token::Slash                  // a / b     (floating point div)
-        | Token::DoubleSlash            // a // b    (floor div)
-        | Token::Percent     => (0, 7), // a % b
+        | Star                           // a * b
+        | Slash                          // a / b       (floating point div)
+        | DoubleSlash                    // a // b      (floor div)
+        | Percent            => (0, 7),  // a % b
        
-        | Token::Caret       => (0, 8), // a ^ b     (exponentiation)
+        | Caret              => (0, 8),  // a ^ b       (exponentiation)
 
-        | Token::BangBang               // !!a       (as bool)
-        | Token::Bang        => (9, 0), // !a        (logical not)
+        | BangBang                       // !!a         (as bool)
+        | Bang               => (9, 0),  // !a          (logical not)
         
-        _                    => (0, 0), // not an operator
+        _                    => (0, 0),  // not an operator
     }
 }

@@ -5,7 +5,7 @@ use super::namespace::Namespace;
 
 pub struct RuntimeContext {
     pub builtins: Builtins,
-    pub constants: Constants,
+    constants: Constants,
     // Pointers from var names to constant indexes
     namespace_stack: Vec<Namespace>,
 }
@@ -48,6 +48,14 @@ impl RuntimeContext {
         namespace.add(name, const_index);
     }
 
+    pub fn add_obj(&mut self, obj: ObjectRef) -> usize {
+        self.constants.add(obj)
+    }
+
+    pub fn replace_obj(&mut self, index: usize, obj: ObjectRef) {
+        self.constants.replace(index, obj)
+    }
+
     pub fn get_obj_index(&self, name: &str) -> Option<&usize> {
         let mut i = self.depth();
         loop {
@@ -62,15 +70,11 @@ impl RuntimeContext {
         }
     }
 
-    pub fn get_obj(&self, index: usize) -> Option<ObjectRef> {
-        if let Some(obj) = self.constants.get(index) {
-            Some(obj.clone())
-        } else {
-            None
-        }
+    pub fn get_obj(&self, index: usize) -> Option<&ObjectRef> {
+        self.constants.get(index)
     }
 
-    pub fn get_obj_by_name(&self, name: &str) -> Option<ObjectRef> {
+    pub fn get_obj_by_name(&self, name: &str) -> Option<&ObjectRef> {
         if let Some(&index) = self.get_obj_index(name) {
             self.get_obj(index)
         } else {

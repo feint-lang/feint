@@ -37,7 +37,7 @@ pub enum Token {
 
     // Multi-character operators
     EqualEqual,         // ==
-    EqualEqualEqual,    // === (use instead of is???)
+    EqualEqualEqual,    // ===
     And,                // &&
     Or,                 // ||
     DoubleStar,         // **
@@ -69,7 +69,6 @@ pub enum Token {
     Package,       // import from package.<module>: x, y, z
     Export,        // export <object>
     As,            // import <module> as <name>
-    Is,            // Identity (use === instead?)
     Let,           // let (???)
     Block,         // block
     If,            // if
@@ -110,7 +109,9 @@ impl Token {
             Self::Slash => "/",
             Self::Percent => "%",
             Self::Plus => "+",
+            Self::PlusEqual => "+=",
             Self::Minus => "-",
+            Self::MinusEqual => "-=",
             Self::Bang => "!",
             Self::Dot => ".",
             Self::Equal => "=",
@@ -120,6 +121,10 @@ impl Token {
             Self::EqualEqual => "==",
             Self::EqualEqualEqual => "===",
             Self::NotEqual => "!=",
+            Self::LessThan => "<",
+            Self::LessThanOrEqual => "<=",
+            Self::GreaterThan => ">",
+            Self::GreaterThanOrEqual => ">=",
             Self::And => "&&",
             Self::Or => "||",
 

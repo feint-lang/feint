@@ -2,6 +2,7 @@
 use std::any::Any;
 use std::fmt;
 
+use crate::types::util::{gt_int_float, lt_int_float};
 use num_bigint::BigInt;
 use num_traits::{FromPrimitive, ToPrimitive};
 
@@ -93,6 +94,30 @@ impl Object for Int {
         }
     }
 
+    fn less_than(&self, rhs: ObjectRef, _ctx: &RuntimeContext) -> RuntimeBoolResult {
+        if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
+            Ok(self.is(rhs) || self.value() < rhs.value())
+        } else if let Some(rhs) = rhs.as_any().downcast_ref::<Float>() {
+            Ok(lt_int_float(self, rhs))
+        } else {
+            Err(RuntimeErr::new_type_error(format!(
+                "Could not compare Int to {} for less than",
+                rhs.class().name()
+            )))
+        }
+    }
+    fn greater_than(&self, rhs: ObjectRef, _ctx: &RuntimeContext) -> RuntimeBoolResult {
+        if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
+            Ok(self.is(rhs) || self.value() > rhs.value())
+        } else if let Some(rhs) = rhs.as_any().downcast_ref::<Float>() {
+            Ok(gt_int_float(self, rhs))
+        } else {
+            Err(RuntimeErr::new_type_error(format!(
+                "Could not compare Int to {} for greater than",
+                rhs.class().name()
+            )))
+        }
+    }
     fn pow(&self, rhs: ObjectRef, ctx: &RuntimeContext) -> RuntimeResult {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
             // XXX: Return Int

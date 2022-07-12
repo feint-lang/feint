@@ -45,7 +45,7 @@ impl<'a> Visitor<'a> {
     }
 
     fn add_const(&mut self, val: ObjectRef) {
-        let index = self.ctx.constants.add(val);
+        let index = self.ctx.add_obj(val);
         self.push_const(index);
     }
 
@@ -167,6 +167,28 @@ impl<'a> Visitor<'a> {
         Ok(())
     }
 
+    fn visit_loop(
+        &mut self,
+        expr: ast::Expr,
+        block: ast::Block,
+        scope_kind: ScopeKind,
+    ) -> VisitResult {
+        let loop_addr = self.instructions.len();
+        // Evaluate loop expression on every iteration.
+        self.visit_expr(expr)?;
+        // Placeholder for jump-out if result is false.
+        let jump_out_index = self.instructions.len();
+        self.push(Inst::InternalErr("Jump for loop not set".to_owned()));
+        // Run the loop body if result is true.
+        self.visit_block(block, scope_kind)?;
+        // Always jump to top of loop to re-check expression.
+        self.push(Inst::Jump(loop_addr));
+        // Set address of jump-out placeholder.
+        let after_addr = self.instructions.len();
+        self.instructions[jump_out_index] = Inst::JumpIfNot(after_addr);
+        Ok(())
+    }
+
     fn visit_func(&mut self, node: ast::Func) -> VisitResult {
         eprintln!("IMPLEMENT visit_func()!!!");
         eprintln!("{}({})", node.name, node.params.join(", "));
@@ -191,10 +213,12 @@ impl<'a> Visitor<'a> {
                 // with corresponding label address once labels have
                 // been processed. We also take care to exit nested
                 // blocks/scopes before jumping out.
-                self.push(Inst::ScopeEnd(1));
-                self.push(Inst::Jump(0));
-                let addr = self.instructions.len() - 1;
-                self.scope_tree.add_jump(name.as_str(), addr);
+                self.push(Inst::InternalErr("Scope not exited for jump".to_owned()));
+                let jump_addr = self.instructions.len();
+                self.push(Inst::InternalErr(
+                    "Jump address not set to label address".to_owned(),
+                ));
+                self.scope_tree.add_jump(name.as_str(), jump_addr);
             }
             ast::StatementKind::Label(name) => {
                 self.push(Inst::NoOp);
@@ -215,13 +239,16 @@ impl<'a> Visitor<'a> {
             Kind::Conditional(branches, default) => {
                 self.visit_conditional(branches, default, ScopeKind::Block)?
             }
+            Kind::Loop(expr, block) => {
+                self.visit_loop(*expr, block, ScopeKind::Block)?
+            }
             Kind::Func(func) => self.visit_func(func)?,
             Kind::UnaryOp(op, b) => self.visit_unary_op(op, *b)?,
             Kind::BinaryOp(a, op, b) => self.visit_binary_op(*a, op, *b)?,
             Kind::Ident(ident) => self.visit_ident(ident)?,
             Kind::Literal(literal) => self.visit_literal(literal)?,
             Kind::Tuple(items) => self.visit_tuple(items)?,
-            _ => self.err(format!("Unhandled expression: {:?}", node))?,
+            _ => self.err(format!("Unhandled expression:\n{:?}", node))?,
         }
         Ok(())
     }
@@ -238,13 +265,15 @@ impl<'a> Visitor<'a> {
         op: BinaryOperator,
         expr_b: ast::Expr,
     ) -> VisitResult {
-        if let BinaryOperator::Assign = op {
-            self.visit_assignment(expr_a, expr_b)
-        } else {
-            self.visit_expr(expr_a)?;
-            self.visit_expr(expr_b)?;
-            self.push(Inst::BinaryOp(op));
-            Ok(())
+        use BinaryOperator::*;
+        match op {
+            Assign => self.visit_assignment(expr_a, expr_b),
+            _ => {
+                self.visit_expr(expr_a)?;
+                self.visit_expr(expr_b)?;
+                self.push(Inst::BinaryOp(op));
+                Ok(())
+            }
         }
     }
 

@@ -217,6 +217,9 @@ impl<'a, T: BufRead> Scanner<'a, T> {
             Some((c @ '>', _, _)) => {
                 self.pop_bracket_and_return_token(c, start, Token::GreaterThan)?
             }
+            Some(('=', Some('='), Some('='))) => {
+                self.consume_two_chars_and_return_token(Token::EqualEqualEqual)
+            }
             Some(('=', Some('='), _)) => {
                 self.consume_char_and_return_token(Token::EqualEqual)
             }
