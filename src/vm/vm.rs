@@ -130,30 +130,34 @@ impl VM {
                     }
                 }
                 Inst::UnaryOp(op) => {
-                    if let Some(i) = self.pop() {
-                        let a = self.ctx.get_obj(i).unwrap();
-                        let value = match op {
-                            UnaryOperator::Plus => a.clone(), // no-op
-                            UnaryOperator::Negate => a.negate(&self.ctx)?,
-                            op => {
-                                // Operators that return bool
-                                let result = match op {
-                                    UnaryOperator::AsBool => a.as_bool(&self.ctx)?,
-                                    UnaryOperator::Not => a.not(&self.ctx)?,
-                                    _ => unreachable!(),
-                                };
-                                self.push(if result { 1 } else { 2 });
-                                #[cfg(debug_assertions)]
-                                self.dis(dis, ip, &instructions);
-                                ip += 1;
-                                continue;
-                            }
-                        };
-                        let index = self.ctx.add_obj(value);
-                        self.push(index);
+                    use UnaryOperator::*;
+                    let a = if let Some(i) = self.pop() {
+                        self.ctx.get_obj(i).unwrap()
                     } else {
-                        let message = format!("Unary op: {}", op);
-                        self.err(RuntimeErrKind::NotEnoughValuesOnStack(message))?;
+                        return self.err(RuntimeErrKind::NotEnoughValuesOnStack(
+                            format!("Unary op: {}", op),
+                        ));
+                    };
+                    match op {
+                        Plus | Negate => {
+                            let result = match op {
+                                Plus => a.clone(), // no-op
+                                Negate => a.negate(&self.ctx)?,
+                                _ => unreachable!(),
+                            };
+                            let index = self.ctx.add_obj(result);
+                            self.push(index);
+                        }
+
+                        // Operators that return bool
+                        _ => {
+                            let result = match op {
+                                AsBool => a.as_bool(&self.ctx)?,
+                                Not => a.not(&self.ctx)?,
+                                _ => unreachable!(),
+                            };
+                            self.push(if result { 1 } else { 2 });
+                        }
                     };
                 }
                 Inst::BinaryOp(op) => {
