@@ -2,15 +2,17 @@
 //! objects as attributes. This is opposed to fundamental/builtin types,
 //! like `Bool` and `Float` that wrap Rust primitives.
 use std::any::Any;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
+use std::rc::Rc;
 
 use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeErr, RuntimeErrKind};
 
 use super::class::TypeRef;
 use super::object::{Object, ObjectExt, ObjectRef};
 
-pub type Attributes = HashMap<String, ObjectRef>;
+pub type Attributes = RefCell<HashMap<String, ObjectRef>>;
 
 pub struct ComplexObject {
     class: TypeRef,
@@ -19,7 +21,7 @@ pub struct ComplexObject {
 
 impl ComplexObject {
     pub fn new(class: TypeRef) -> Self {
-        Self { class: class.clone(), attributes: HashMap::new() }
+        Self { class, attributes: RefCell::new(HashMap::new()) }
     }
 }
 
@@ -34,8 +36,9 @@ impl Object for ComplexObject {
 
     fn is_equal(&self, rhs: &ObjectRef, ctx: &RuntimeContext) -> RuntimeBoolResult {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
-            Ok(self.is(rhs)
-                || attributes_equal(&self.attributes, &rhs.attributes, ctx)?)
+            Ok(self.is(&rhs)
+                || (self.class() == rhs.class()
+                    && attributes_equal(&self.attributes, &rhs.attributes, ctx)?))
         } else {
             Err(RuntimeErr::new_type_error(format!(
                 "Could not compare {} to {}",
@@ -45,19 +48,15 @@ impl Object for ComplexObject {
         }
     }
 
-    fn get_attribute(&self, name: &str) -> Result<&ObjectRef, RuntimeErr> {
-        if let Some(value) = self.attributes.get(name) {
-            return Ok(value);
+    fn get_attribute(&self, name: &str) -> Result<ObjectRef, RuntimeErr> {
+        if let Some(value) = self.attributes.borrow().get(name) {
+            return Ok(value.clone());
         }
         Err(RuntimeErr::new(RuntimeErrKind::AttributeDoesNotExist(name.to_owned())))
     }
 
-    fn set_attribute(
-        &mut self,
-        name: &str,
-        value: ObjectRef,
-    ) -> Result<(), RuntimeErr> {
-        self.attributes.insert(name.to_owned(), value.clone());
+    fn set_attribute(&self, name: &str, value: ObjectRef) -> Result<(), RuntimeErr> {
+        self.attributes.borrow_mut().insert(name.to_owned(), value.clone());
         Ok(())
     }
 }
@@ -73,11 +72,13 @@ fn attributes_equal(
     rhs: &Attributes,
     ctx: &RuntimeContext,
 ) -> RuntimeBoolResult {
+    let lhs = lhs.borrow();
+    let rhs = rhs.borrow();
     if !(lhs.len() == rhs.len() && lhs.keys().all(|k| rhs.contains_key(k))) {
         return Ok(false);
     }
     for (k, v) in lhs.iter() {
-        if !v.is_equal(rhs[k].clone(), ctx)? {
+        if !v.is_equal(&rhs[k], ctx)? {
             return Ok(false);
         }
     }
@@ -88,8 +89,12 @@ fn attributes_equal(
 
 impl fmt::Display for ComplexObject {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let attrs: Vec<String> =
-            self.attributes.iter().map(|(n, v)| format!("{}={}", n, v)).collect();
+        let attrs: Vec<String> = self
+            .attributes
+            .borrow()
+            .iter()
+            .map(|(n, v)| format!("{}={}", n, v))
+            .collect();
         write!(f, "{}({})", self.class.name(), attrs.join(", "))
     }
 }

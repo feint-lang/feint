@@ -87,15 +87,11 @@ pub trait Object {
 
     // Attributes ------------------------------------------------------
 
-    fn get_attribute(&self, name: &str) -> Result<&ObjectRef, RuntimeErr> {
+    fn get_attribute(&self, name: &str) -> Result<ObjectRef, RuntimeErr> {
         Err(RuntimeErr::new(RuntimeErrKind::AttributeDoesNotExist(name.to_owned())))
     }
 
-    fn set_attribute(
-        &mut self,
-        name: &str,
-        _value: ObjectRef,
-    ) -> Result<(), RuntimeErr> {
+    fn set_attribute(&self, name: &str, _value: ObjectRef) -> Result<(), RuntimeErr> {
         Err(RuntimeErr::new(RuntimeErrKind::AttributeCannotBeSet(name.to_owned())))
     }
 }

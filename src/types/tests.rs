@@ -4,7 +4,7 @@ use crate::vm::RuntimeContext;
 
 use super::class::Type;
 use super::complex::ComplexObject;
-use super::object::Object;
+use super::object::{Object, ObjectRef};
 
 #[test]
 fn test_float() {
@@ -37,16 +37,43 @@ fn test_compare_float_to_int() {
 fn test_custom() {
     let ctx = RuntimeContext::default();
 
-    let type_1 = Rc::new(Type::new("test", "Custom1"));
-    let mut obj_1 = ComplexObject::new(type_1);
-    let value_1 = ctx.builtins.new_int(1);
-    obj_1.set_attribute("value", value_1).expect("Could not set attribute");
+    let t1 = Rc::new(Type::new("test", "Custom1"));
+    let t1_obj1 = Rc::new(ComplexObject::new(t1.clone()));
+    let t1_obj2 = Rc::new(ComplexObject::new(t1.clone()));
+    let t1_obj3 = Rc::new(ComplexObject::new(t1.clone()));
+    t1_obj3
+        .set_attribute("value", ctx.builtins.new_int(1))
+        .expect("Could not set attribute");
 
-    let type_2 = Rc::new(Type::new("test", "Custom2"));
-    let mut obj_2 = ComplexObject::new(type_2);
-    let value_2 = ctx.builtins.new_int(1);
-    obj_2.set_attribute("value", value_2).expect("Could not set attribute");
+    let t2 = Rc::new(Type::new("test", "Custom2"));
+    let t2_obj1 = Rc::new(ComplexObject::new(t2.clone()));
 
-    // FIXME: ???
-    assert!(obj_1.is_equal(Rc::new(obj_2), &ctx).expect("Could not compare objects"))
+    // XXX: All the cloning and casting below seems wonky.
+
+    // An object should be equal to itself.
+    match t1_obj1.is_equal(&(t1_obj1.clone() as ObjectRef), &ctx) {
+        Ok(result) => assert!(result),
+        Err(_) => assert!(false, "Could not compare custom objects"),
+    }
+
+    // An object should be equal to an object of the SAME type with
+    // the same attributes.
+    match t1_obj1.is_equal(&(t1_obj2.clone() as ObjectRef), &ctx) {
+        Ok(result) => assert!(result),
+        Err(_) => assert!(false, "Could not compare custom objects"),
+    }
+
+    // An object should NOT be equal to an object of the SAME type with
+    // the DIFFERENT attributes.
+    match t1_obj1.is_equal(&(t1_obj3.clone() as ObjectRef), &ctx) {
+        Ok(result) => assert!(!result),
+        Err(_) => assert!(false, "Could not compare custom objects"),
+    }
+
+    // An object should NOT equal to an object of a DIFFERENT type,
+    // regardless of attributes.
+    match t1_obj1.is_equal(&(t2_obj1.clone() as ObjectRef), &ctx) {
+        Ok(result) => assert!(!result),
+        Err(_) => assert!(false, "Could not compare custom objects"),
+    }
 }
