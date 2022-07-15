@@ -13,8 +13,6 @@ use super::frame::Frame;
 use super::inst::{Chunk, Inst};
 use super::result::{ExeResult, RuntimeErr, RuntimeErrKind, VMState};
 
-type RustString = std::string::String;
-
 pub struct VM {
     pub ctx: RuntimeContext,
     stack: Stack<usize>,
@@ -241,7 +239,7 @@ impl VM {
                         }
                         if print {
                             if let Some(tuple) = val.as_any().downcast_ref::<Tuple>() {
-                                let items: Vec<RustString> = tuple
+                                let items: Vec<String> = tuple
                                     .items()
                                     .into_iter()
                                     .map(|i| format!("{}", i))
@@ -423,7 +421,7 @@ impl VM {
         }
     }
 
-    fn format_instruction(&self, instructions: &Chunk, inst: &Inst) -> RustString {
+    fn format_instruction(&self, instructions: &Chunk, inst: &Inst) -> String {
         use Inst::*;
         match inst {
             NoOp => format!("NOOP"),
@@ -486,7 +484,7 @@ impl VM {
     }
 
     /// Return a nicely formatted string of instructions.
-    fn format_aligned<T: fmt::Display>(&self, name: &str, value: T) -> RustString {
+    fn format_aligned<T: fmt::Display>(&self, name: &str, value: T) -> String {
         format!("{: <w$}{: <x$}", name, value, w = 16, x = 4)
     }
 }

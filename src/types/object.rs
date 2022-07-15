@@ -9,7 +9,6 @@ use crate::vm::{
 use super::class::TypeRef;
 
 pub type ObjectRef = Rc<dyn Object>;
-type RustString = std::string::String;
 
 macro_rules! make_unary_op {
     ( $meth:ident, $op:literal, $result:ty ) => {
@@ -48,7 +47,7 @@ pub trait Object {
         p
     }
 
-    fn name(&self) -> RustString {
+    fn name(&self) -> String {
         self.class().name().to_owned()
     }
 
