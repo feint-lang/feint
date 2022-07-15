@@ -11,11 +11,11 @@ use super::class::TypeRef;
 pub type ObjectRef = Rc<dyn Object>;
 type RustString = std::string::String;
 
-macro_rules! make_bin_op {
+macro_rules! make_unary_op {
     ( $meth:ident, $op:literal, $result:ty ) => {
-        fn $meth(&self, _rhs: ObjectRef, _ctx: &RuntimeContext) -> $result {
+        fn $meth(&self, _ctx: &RuntimeContext) -> $result {
             Err(RuntimeErr::new_type_error(format!(
-                "Binary operator {} ({}) not implemented for type {}",
+                "Unary operator {} ({}) not implemented for type {}",
                 $op,
                 stringify!($meth),
                 self.class().name()
@@ -24,11 +24,11 @@ macro_rules! make_bin_op {
     };
 }
 
-macro_rules! make_unary_op {
+macro_rules! make_bin_op {
     ( $meth:ident, $op:literal, $result:ty ) => {
-        fn $meth(&self, _ctx: &RuntimeContext) -> $result {
+        fn $meth(&self, _rhs: &ObjectRef, _ctx: &RuntimeContext) -> $result {
             Err(RuntimeErr::new_type_error(format!(
-                "Unary operator {} ({}) not implemented for type {}",
+                "Binary operator {} ({}) not implemented for type {}",
                 $op,
                 stringify!($meth),
                 self.class().name()
@@ -68,7 +68,7 @@ pub trait Object {
     // Binary operations -----------------------------------------------
 
     make_bin_op!(is_equal, "==", RuntimeBoolResult);
-    fn not_equal(&self, rhs: ObjectRef, ctx: &RuntimeContext) -> RuntimeBoolResult {
+    fn not_equal(&self, rhs: &ObjectRef, ctx: &RuntimeContext) -> RuntimeBoolResult {
         self.is_equal(rhs, ctx).map(|equal| !equal)
     }
 

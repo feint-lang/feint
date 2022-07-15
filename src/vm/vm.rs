@@ -158,7 +158,6 @@ impl VM {
                 }
                 Inst::BinaryOp(op) => {
                     use BinaryOperator::*;
-
                     let (i, a, b) = if let Some((i, j)) = self.pop_top_two() {
                         let a = self.ctx.get_obj(i).unwrap();
                         let b = self.ctx.get_obj(j).unwrap();
@@ -168,52 +167,49 @@ impl VM {
                             format!("Binary op: {}", op),
                         ));
                     };
-
                     match op {
                         // In place update operators
                         AddEqual | SubEqual => {
                             let result = match op {
-                                AddEqual => a.add(b, &self.ctx)?,
-                                SubEqual => a.sub(b, &self.ctx)?,
+                                AddEqual => a.add(&b, &self.ctx)?,
+                                SubEqual => a.sub(&b, &self.ctx)?,
                                 _ => unreachable!(),
                             };
                             self.ctx.replace_obj(i, result);
                             self.push(i);
                         }
-
                         // Math operators
                         Pow | Mul | Div | FloorDiv | Mod | Add | Sub => {
                             let result = match op {
-                                Pow => a.pow(b, &self.ctx)?,
-                                Mul => a.mul(b, &self.ctx)?,
-                                Div => a.div(b, &self.ctx)?,
-                                FloorDiv => a.floor_div(b, &self.ctx)?,
-                                Mod => a.modulo(b, &self.ctx)?,
-                                Add => a.add(b, &self.ctx)?,
-                                Sub => a.sub(b, &self.ctx)?,
+                                Pow => a.pow(&b, &self.ctx)?,
+                                Mul => a.mul(&b, &self.ctx)?,
+                                Div => a.div(&b, &self.ctx)?,
+                                FloorDiv => a.floor_div(&b, &self.ctx)?,
+                                Mod => a.modulo(&b, &self.ctx)?,
+                                Add => a.add(&b, &self.ctx)?,
+                                Sub => a.sub(&b, &self.ctx)?,
                                 _ => unreachable!(),
                             };
                             let index = self.ctx.add_obj(result);
                             self.push(index);
                         }
-
                         // Operators that return bool
                         _ => {
                             let result = match op {
-                                IsEqual => a.is_equal(b, &self.ctx)?,
+                                IsEqual => a.is_equal(&b, &self.ctx)?,
                                 Is => a.class().is(&b.class()) && a.id() == b.id(),
-                                NotEqual => a.not_equal(b, &self.ctx)?,
-                                And => a.and(b, &self.ctx)?,
-                                Or => a.or(b, &self.ctx)?,
-                                LessThan => a.less_than(b, &self.ctx)?,
+                                NotEqual => a.not_equal(&b, &self.ctx)?,
+                                And => a.and(&b, &self.ctx)?,
+                                Or => a.or(&b, &self.ctx)?,
+                                LessThan => a.less_than(&b, &self.ctx)?,
                                 LessThanOrEqual => {
-                                    a.less_than(b.clone(), &self.ctx)?
-                                        || a.is_equal(b, &self.ctx)?
+                                    a.less_than(&b, &self.ctx)?
+                                        || a.is_equal(&b, &self.ctx)?
                                 }
-                                GreaterThan => a.greater_than(b, &self.ctx)?,
+                                GreaterThan => a.greater_than(&b, &self.ctx)?,
                                 GreaterThanOrEqual => {
-                                    a.greater_than(b.clone(), &self.ctx)?
-                                        || a.is_equal(b, &self.ctx)?
+                                    a.greater_than(&b, &self.ctx)?
+                                        || a.is_equal(&b, &self.ctx)?
                                 }
                                 _ => unreachable!(),
                             };

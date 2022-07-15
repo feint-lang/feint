@@ -28,7 +28,7 @@ impl Float {
 
 macro_rules! make_op {
     ( $meth:ident, $op:tt, $message:literal, $trunc:literal ) => {
-        fn $meth(&self, rhs: ObjectRef, ctx: &RuntimeContext) -> RuntimeResult {
+        fn $meth(&self, rhs: &ObjectRef, ctx: &RuntimeContext) -> RuntimeResult {
             let value = if let Some(rhs) = rhs.as_any().downcast_ref::<Float>() {
                 *rhs.value()
             } else if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
@@ -63,7 +63,7 @@ impl Object for Float {
         Ok(if *self.value() == 0.0 { false } else { true })
     }
 
-    fn is_equal(&self, rhs: ObjectRef, _ctx: &RuntimeContext) -> RuntimeBoolResult {
+    fn is_equal(&self, rhs: &ObjectRef, _ctx: &RuntimeContext) -> RuntimeBoolResult {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
             Ok(self.is(rhs) || self.value() == rhs.value())
         } else if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
@@ -76,7 +76,7 @@ impl Object for Float {
         }
     }
 
-    fn pow(&self, rhs: ObjectRef, ctx: &RuntimeContext) -> RuntimeResult {
+    fn pow(&self, rhs: &ObjectRef, ctx: &RuntimeContext) -> RuntimeResult {
         let exp = if let Some(rhs) = rhs.as_any().downcast_ref::<Float>() {
             *rhs.value()
         } else if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {

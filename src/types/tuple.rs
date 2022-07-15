@@ -35,7 +35,7 @@ impl Object for Tuple {
         self
     }
 
-    fn is_equal(&self, rhs: ObjectRef, ctx: &RuntimeContext) -> RuntimeBoolResult {
+    fn is_equal(&self, rhs: &ObjectRef, ctx: &RuntimeContext) -> RuntimeBoolResult {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
             if self.is(rhs) {
                 return Ok(true);
@@ -44,7 +44,7 @@ impl Object for Tuple {
                 return Ok(false);
             }
             for (i, j) in self.items().iter().zip(rhs.items()) {
-                if !i.is_equal(j.clone(), ctx)? {
+                if !i.is_equal(j, ctx)? {
                     return Ok(false);
                 }
             }

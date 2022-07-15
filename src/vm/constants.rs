@@ -44,6 +44,6 @@ mod tests {
         let retrieved = ctx.get_obj(index).unwrap();
         assert_eq!(retrieved.class().id(), int_copy.class().id());
         assert_eq!(retrieved.id(), int_copy.id());
-        assert!(retrieved.is_equal(int_copy, &ctx).unwrap());
+        assert!(retrieved.is_equal(&int_copy, &ctx).unwrap());
     }
 }

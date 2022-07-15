@@ -46,7 +46,7 @@ impl Int {
 
 macro_rules! make_op {
     ( $meth:ident, $op:tt, $message:literal ) => {
-        fn $meth(&self, rhs: ObjectRef, ctx: &RuntimeContext) -> RuntimeResult {
+        fn $meth(&self, rhs: &ObjectRef, ctx: &RuntimeContext) -> RuntimeResult {
             if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
                 // XXX: Return Int
                 let value = self.value() $op rhs.value();
@@ -81,7 +81,7 @@ impl Object for Int {
         Ok(if *self.value() == BigInt::from(0) { false } else { true })
     }
 
-    fn is_equal(&self, rhs: ObjectRef, _ctx: &RuntimeContext) -> RuntimeBoolResult {
+    fn is_equal(&self, rhs: &ObjectRef, _ctx: &RuntimeContext) -> RuntimeBoolResult {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
             Ok(self.is(rhs) || self.value() == rhs.value())
         } else if let Some(rhs) = rhs.as_any().downcast_ref::<Float>() {
@@ -94,7 +94,7 @@ impl Object for Int {
         }
     }
 
-    fn less_than(&self, rhs: ObjectRef, _ctx: &RuntimeContext) -> RuntimeBoolResult {
+    fn less_than(&self, rhs: &ObjectRef, _ctx: &RuntimeContext) -> RuntimeBoolResult {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
             Ok(self.is(rhs) || self.value() < rhs.value())
         } else if let Some(rhs) = rhs.as_any().downcast_ref::<Float>() {
@@ -106,7 +106,11 @@ impl Object for Int {
             )))
         }
     }
-    fn greater_than(&self, rhs: ObjectRef, _ctx: &RuntimeContext) -> RuntimeBoolResult {
+    fn greater_than(
+        &self,
+        rhs: &ObjectRef,
+        _ctx: &RuntimeContext,
+    ) -> RuntimeBoolResult {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
             Ok(self.is(rhs) || self.value() > rhs.value())
         } else if let Some(rhs) = rhs.as_any().downcast_ref::<Float>() {
@@ -118,7 +122,7 @@ impl Object for Int {
             )))
         }
     }
-    fn pow(&self, rhs: ObjectRef, ctx: &RuntimeContext) -> RuntimeResult {
+    fn pow(&self, rhs: &ObjectRef, ctx: &RuntimeContext) -> RuntimeResult {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
             // XXX: Return Int
             let base = self.value();
@@ -147,14 +151,14 @@ impl Object for Int {
     make_op!(sub, -, "Could not subtract {} from Int");
 
     // Int division *always* returns a Float
-    fn div(&self, rhs: ObjectRef, ctx: &RuntimeContext) -> RuntimeResult {
+    fn div(&self, rhs: &ObjectRef, ctx: &RuntimeContext) -> RuntimeResult {
         let value = self.div_f64(&rhs)?;
         let value = ctx.builtins.new_float(value);
         Ok(value)
     }
 
     // Int *floor* division *always* returns an Int
-    fn floor_div(&self, rhs: ObjectRef, ctx: &RuntimeContext) -> RuntimeResult {
+    fn floor_div(&self, rhs: &ObjectRef, ctx: &RuntimeContext) -> RuntimeResult {
         let value = self.div_f64(&rhs)?;
         let value = BigInt::from_f64(value).unwrap();
         let value = ctx.builtins.new_int(value);

@@ -1,9 +1,7 @@
-use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::vm::RuntimeContext;
 
-use super::builtins::Builtins;
 use super::class::Type;
 use super::complex::ComplexObject;
 use super::object::Object;
@@ -22,8 +20,8 @@ fn test_float() {
     assert_ne!(float1.id(), float2.id());
     assert_ne!(float2.id(), float3.id());
 
-    assert!(float1.is_equal(float2, &ctx).unwrap());
-    assert!(!float1.is_equal(float3, &ctx).unwrap());
+    assert!(float1.is_equal(&float2, &ctx).unwrap());
+    assert!(!float1.is_equal(&float3, &ctx).unwrap());
 }
 
 #[test]
@@ -31,8 +29,8 @@ fn test_compare_float_to_int() {
     let ctx = RuntimeContext::default();
     let float = ctx.builtins.new_float(1.0);
     let int = ctx.builtins.new_int(1u8);
-    assert!(float.is_equal(int.clone(), &ctx).unwrap());
-    assert!(int.is_equal(float.clone(), &ctx).unwrap());
+    assert!(float.is_equal(&int, &ctx).unwrap());
+    assert!(int.is_equal(&float, &ctx).unwrap());
 }
 
 #[test]

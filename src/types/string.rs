@@ -86,7 +86,7 @@ impl Object for String {
         self
     }
 
-    fn is_equal(&self, rhs: ObjectRef, _ctx: &RuntimeContext) -> RuntimeBoolResult {
+    fn is_equal(&self, rhs: &ObjectRef, _ctx: &RuntimeContext) -> RuntimeBoolResult {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
             Ok(self.is(rhs) || self.value() == rhs.value())
         } else {
@@ -97,7 +97,7 @@ impl Object for String {
         }
     }
 
-    fn add(&self, rhs: ObjectRef, ctx: &RuntimeContext) -> RuntimeResult {
+    fn add(&self, rhs: &ObjectRef, ctx: &RuntimeContext) -> RuntimeResult {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
             let a = self.value();
             let b = rhs.value();

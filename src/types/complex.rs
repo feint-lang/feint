@@ -32,7 +32,7 @@ impl Object for ComplexObject {
         self
     }
 
-    fn is_equal(&self, rhs: ObjectRef, ctx: &RuntimeContext) -> RuntimeBoolResult {
+    fn is_equal(&self, rhs: &ObjectRef, ctx: &RuntimeContext) -> RuntimeBoolResult {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
             Ok(self.is(rhs)
                 || attributes_equal(&self.attributes, &rhs.attributes, ctx)?)

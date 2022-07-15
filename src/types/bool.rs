@@ -39,7 +39,7 @@ impl Object for Bool {
 
     // Binary operations -----------------------------------------------
 
-    fn is_equal(&self, rhs: ObjectRef, _ctx: &RuntimeContext) -> RuntimeBoolResult {
+    fn is_equal(&self, rhs: &ObjectRef, _ctx: &RuntimeContext) -> RuntimeBoolResult {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
             Ok(self.is(rhs) || self.value() == rhs.value())
         } else {
@@ -50,7 +50,7 @@ impl Object for Bool {
         }
     }
 
-    fn and(&self, rhs: ObjectRef, _ctx: &RuntimeContext) -> RuntimeBoolResult {
+    fn and(&self, rhs: &ObjectRef, _ctx: &RuntimeContext) -> RuntimeBoolResult {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
             Ok(*self.value() && *rhs.value())
         } else {
@@ -61,7 +61,7 @@ impl Object for Bool {
         }
     }
 
-    fn or(&self, rhs: ObjectRef, _ctx: &RuntimeContext) -> RuntimeBoolResult {
+    fn or(&self, rhs: &ObjectRef, _ctx: &RuntimeContext) -> RuntimeBoolResult {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
             Ok(*self.value() || *rhs.value())
         } else {
