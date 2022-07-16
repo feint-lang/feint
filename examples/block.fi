@@ -31,16 +31,16 @@ print(b)
 
 a = block ->
     print("    in block")
-    print($"    ${a}")
+    print($"    {a}")
     a = "a2"
-    print($"    ${a}")
-    print($"    ${b}")
+    print($"    {a}")
+    print($"    {b}")
     block ->
         print("        in inner block")
         c = "c3"
-        print($"        ${a}")
-        print($"        ${b}")
-        print($"        ${c}")
+        print($"        {a}")
+        print($"        {b}")
+        print($"        {c}")
     print("    after inner block")
 
 print("after block")
@@ -71,14 +71,14 @@ print("after label: b")
 
 block ->
     print("    in last block")
-    x = "x"
-    print($"    x = ${x}")
+    x = "X"
+    print($"    x = {x}")
     jump out
-    y = "y"
+    y = "Y"
     print("    skipped y")
 
 out:
-print($"jumped out")
+print("jumped out")
 
 yyy: # do-nothing label
 

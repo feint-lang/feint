@@ -4,8 +4,6 @@
 //! mode.
 use std::fmt;
 
-use crate::compiler::compile;
-use crate::types::Tuple;
 use crate::util::{BinaryOperator, Stack, UnaryOperator};
 
 use super::context::RuntimeContext;
@@ -41,29 +39,40 @@ impl VM {
     /// cleared; it can be "restarted" by passing more instructions to
     /// execute.
     pub fn execute(&mut self, instructions: Chunk, dis: bool) -> ExeResult {
+        use Inst::*;
+        use RuntimeErrKind::*;
+
         let mut ip: usize = 0;
 
         loop {
             match &instructions[ip] {
-                Inst::NoOp => {
+                NoOp => {
                     // do nothing
                 }
-                Inst::Push(value) => {
+                Push(value) => {
                     self.push(*value);
                 }
-                Inst::Pop => {
+                Pop => {
                     if self.stack.is_empty() {
-                        self.err(RuntimeErrKind::EmptyStack)?;
+                        self.err(EmptyStack)?;
                     }
                     self.pop();
                 }
-                Inst::Jump(addr) => {
+                ScopeStart => {
+                    self.ctx.enter_scope();
+                }
+                ScopeEnd(count) => {
+                    for _ in 0..*count {
+                        self.ctx.exit_scope();
+                    }
+                }
+                Jump(addr) => {
                     #[cfg(debug_assertions)]
                     self.dis(dis, ip, &instructions);
                     ip = *addr;
                     continue;
                 }
-                Inst::JumpIf(addr) => {
+                JumpIf(addr) => {
                     if let Some(i) = self.pop() {
                         let obj = self.ctx.get_obj(i).unwrap();
                         if obj.as_bool(&self.ctx)? {
@@ -71,10 +80,10 @@ impl VM {
                             continue;
                         }
                     } else {
-                        self.err(RuntimeErrKind::EmptyStack)?;
+                        self.err(EmptyStack)?;
                     };
                 }
-                Inst::JumpIfNot(addr) => {
+                JumpIfNot(addr) => {
                     if let Some(i) = self.pop() {
                         let obj = self.ctx.get_obj(i).unwrap();
                         if !obj.as_bool(&self.ctx)? {
@@ -82,10 +91,10 @@ impl VM {
                             continue;
                         }
                     } else {
-                        self.err(RuntimeErrKind::EmptyStack)?;
+                        self.err(EmptyStack)?;
                     };
                 }
-                Inst::JumpIfElse(if_addr, else_addr) => {
+                JumpIfElse(if_addr, else_addr) => {
                     if let Some(i) = self.pop() {
                         let obj = self.ctx.get_obj(i).unwrap();
                         if obj.as_bool(&self.ctx)? {
@@ -94,47 +103,45 @@ impl VM {
                             ip = *else_addr;
                         }
                     } else {
-                        self.err(RuntimeErrKind::EmptyStack)?;
+                        self.err(EmptyStack)?;
                     };
                     continue;
                 }
-                Inst::LoadConst(index) => {
-                    // self.format_strings(*index)?;
+                LoadConst(index) => {
                     self.push(*index);
                 }
-                Inst::DeclareVar(name) => {
+                DeclareVar(name) => {
                     // NOTE: Currently, declaration and assignment are
                     //       the same thing, so declaration doesn't
                     //       do anything particularly useful ATM.
                     self.ctx.declare_var(name.as_str());
                 }
-                Inst::AssignVar(name) => {
+                AssignVar(name) => {
                     if let Some(i) = self.pop() {
                         self.ctx.assign_var(name, i);
                         self.push(i);
                     } else {
                         let message = format!("Assignment");
-                        self.err(RuntimeErrKind::NotEnoughValuesOnStack(message))?;
+                        self.err(NotEnoughValuesOnStack(message))?;
                     };
                 }
-                Inst::LoadVar(name) => {
+                LoadVar(name) => {
                     if let Some(&index) = self.ctx.get_obj_index(name) {
                         self.push(index);
                     } else {
-                        self.err(RuntimeErrKind::NameErr(format!(
+                        self.err(NameErr(format!(
                             "Name not defined in current scope: {}",
                             name
                         )))?;
                     }
                 }
-                Inst::UnaryOp(op) => {
+                UnaryOp(op) => {
                     use UnaryOperator::*;
                     let a = if let Some(i) = self.pop() {
                         self.ctx.get_obj(i).unwrap()
                     } else {
-                        return self.err(RuntimeErrKind::NotEnoughValuesOnStack(
-                            format!("Unary op: {}", op),
-                        ));
+                        return self
+                            .err(NotEnoughValuesOnStack(format!("Unary op: {}", op)));
                     };
                     match op {
                         Plus | Negate => {
@@ -158,16 +165,15 @@ impl VM {
                         }
                     };
                 }
-                Inst::BinaryOp(op) => {
+                BinaryOp(op) => {
                     use BinaryOperator::*;
                     let (i, a, b) = if let Some((i, j)) = self.pop_top_two() {
                         let a = self.ctx.get_obj(i).unwrap();
                         let b = self.ctx.get_obj(j).unwrap();
                         (i, a, b.clone())
                     } else {
-                        return self.err(RuntimeErrKind::NotEnoughValuesOnStack(
-                            format!("Binary op: {}", op),
-                        ));
+                        return self
+                            .err(NotEnoughValuesOnStack(format!("Binary op: {}", op)));
                     };
                     match op {
                         // In place update operators
@@ -219,15 +225,37 @@ impl VM {
                         }
                     }
                 }
-                Inst::ScopeStart => {
-                    self.ctx.enter_scope();
-                }
-                Inst::ScopeEnd(count) => {
-                    for _ in 0..*count {
-                        self.ctx.exit_scope();
+                MakeString(n) => {
+                    if let Some(indices) = self.pop_n(*n) {
+                        let mut string = String::with_capacity(32);
+                        for i in indices {
+                            let obj = self.ctx.get_obj(i).unwrap();
+                            string.push_str(obj.to_string().as_str());
+                        }
+                        let string_obj = self.ctx.builtins.new_string(string);
+                        let string_i = self.ctx.add_obj(string_obj);
+                        self.push(string_i);
+                    } else {
+                        return self.err(NotEnoughValuesOnStack(format!(
+                            "Format string: {n}"
+                        )));
                     }
                 }
-                Inst::Print => match self.stack.peek() {
+                MakeTuple(n) => {
+                    if let Some(indices) = self.pop_n(*n) {
+                        let mut items = vec![];
+                        for i in indices {
+                            let obj = self.ctx.get_obj(i).unwrap();
+                            items.push(obj.clone());
+                        }
+                        let tuple = self.ctx.builtins.new_tuple(items);
+                        let tuple_i = self.ctx.add_obj(tuple);
+                        self.push(tuple_i);
+                    } else {
+                        return self.err(NotEnoughValuesOnStack(format!("Tuple: {n}")));
+                    }
+                }
+                Print => match self.stack.peek() {
                     Some(index) => {
                         let val = self.ctx.get_obj(*index).unwrap();
                         let print;
@@ -238,37 +266,28 @@ impl VM {
                             print = true;
                         }
                         if print {
-                            if let Some(tuple) = val.as_any().downcast_ref::<Tuple>() {
-                                let items: Vec<String> = tuple
-                                    .items()
-                                    .into_iter()
-                                    .map(|i| format!("{}", i))
-                                    .collect();
-                                println!("{}", items.join(" "));
-                            } else {
-                                println!("{}", val);
-                            }
+                            println!("{}", val);
                         }
                         self.pop();
                     }
                     None => {
-                        self.err(RuntimeErrKind::EmptyStack)?;
+                        self.err(EmptyStack)?;
                     }
                 },
-                Inst::Return => {
+                Return => {
                     // TODO: Implement actual return
                     match self.pop() {
                         Some(v) => println!("{}", v),
                         None => eprintln!("Stack is empty!"),
                     }
                 }
-                Inst::Halt(code) => {
+                Halt(code) => {
                     self.halt();
                     #[cfg(debug_assertions)]
                     self.dis(dis, ip, &instructions);
                     break Ok(VMState::Halted(*code));
                 }
-                Inst::InternalErr(message) => {
+                InternalErr(message) => {
                     self.halt();
                     eprintln!("INTERNAL ERROR: {}", message);
                     break Ok(VMState::Halted(255));
@@ -276,7 +295,7 @@ impl VM {
             }
 
             #[cfg(debug_assertions)]
-            if instructions[ip] != Inst::Print {
+            if instructions[ip] != Print {
                 self.dis(dis, ip, &instructions);
             }
 
@@ -294,7 +313,7 @@ impl VM {
         self.stack.push(item);
     }
 
-    pub fn pop(&mut self) -> Option<usize> {
+    fn pop(&mut self) -> Option<usize> {
         self.stack.pop()
     }
 
@@ -302,22 +321,14 @@ impl VM {
         self.stack.peek()
     }
 
-    /// Pop top two items from stack *if* the stack has at least two
-    /// items. If it doesn't, the stack remains unmodified.
-    ///
-    /// NOTE: The second item down the stack will be *first* and the
-    ///       first item will be *second* in the returned tuple. This
-    ///       puts the items in "logical" order instead of having to
-    ///       remember to swap them in them in the calling code.
+    fn pop_n(&mut self, n: usize) -> Option<Vec<usize>> {
+        self.stack.pop_n(n)
+    }
+
     fn pop_top_two(&mut self) -> Option<(usize, usize)> {
-        let stack = &mut self.stack;
-        match (stack.pop(), stack.pop()) {
-            (Some(top), Some(next)) => Some((next, top)),
-            (Some(top), None) => {
-                stack.push(top);
-                None
-            }
-            _ => None,
+        match self.pop_n(2) {
+            Some(items) => Some((items[0], items[1])),
+            None => None,
         }
     }
 
@@ -336,51 +347,6 @@ impl VM {
     fn err(&self, kind: RuntimeErrKind) -> ExeResult {
         Err(RuntimeErr::new(kind))
     }
-
-    /// Format strings.
-    ///
-    /// This is called whenever an object is loaded (constant or var).
-    /// If the object isn't a $ string or a tuple, this does nothing.
-    ///
-    /// If the object a $ string, it will be formatted and the formatted
-    /// value will *replace* the original constant value.
-    ///
-    /// If the object a tuple, any $ string items will be formatted. If
-    /// any $ strings are present, the original tuple will be *replaced*
-    /// with a new tuple containing the formatted values.
-    // fn format_strings(&mut self, const_index: usize) -> Result<(), RuntimeErr> {
-    //     if let Some(obj) = self.ctx.get_obj(const_index) {
-    //         if let Some(string) = obj.as_any().downcast_ref::<String>() {
-    //             if string.is_format_string() {
-    //                 let formatted = string.format(self)?;
-    //                 let formatted = Rc::new(formatted);
-    //                 self.ctx.replace_obj(const_index, formatted);
-    //             }
-    //         }
-    //         if let Some(tuple) = obj.as_any().downcast_ref::<Tuple>() {
-    //             let mut new_items: Vec<ObjectRef> = Vec::new();
-    //             let mut num_formatted = 0;
-    //             for item in tuple.items() {
-    //                 if let Some(string) = item.as_any().downcast_ref::<String>() {
-    //                     if string.is_format_string() {
-    //                         let formatted = string.format(self)?;
-    //                         new_items.push(Rc::new(formatted));
-    //                         num_formatted += 1;
-    //                     } else {
-    //                         new_items.push(item.clone());
-    //                     }
-    //                 } else {
-    //                     new_items.push(item.clone());
-    //                 }
-    //             }
-    //             if num_formatted > 0 {
-    //                 let new_tuple = self.ctx.builtins.new_tuple(new_items);
-    //                 self.ctx.replace_obj(const_index, new_tuple);
-    //             }
-    //         }
-    //     }
-    //     Ok(())
-    // }
 
     /// Show the contents of the stack (top first).
     pub fn display_stack(&self) {
@@ -430,6 +396,8 @@ impl VM {
                 self.format_aligned("PUSH", format!("{} ({:?})", index, obj))
             }
             Pop => format!("POP"),
+            ScopeStart => format!("SCOPE_START"),
+            ScopeEnd(count) => self.format_aligned("SCOPE_END", count),
             Jump(address) => self.format_aligned(
                 "JUMP",
                 format!(
@@ -468,8 +436,8 @@ impl VM {
             }
             UnaryOp(operator) => self.format_aligned("UNARY_OP", operator),
             BinaryOp(operator) => self.format_aligned("BINARY_OP", operator),
-            ScopeStart => format!("SCOPE_START"),
-            ScopeEnd(count) => self.format_aligned("SCOPE_END", count),
+            MakeString(n) => self.format_aligned("MAKE_STRING", n),
+            MakeTuple(n) => self.format_aligned("MAKE_TUPLE", n),
             Print => match self.peek() {
                 Some(index) => {
                     let obj = self.ctx.get_obj(*index).unwrap();

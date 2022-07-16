@@ -143,7 +143,7 @@ impl<'a> Executor<'a> {
 
     fn print_err_message(&self, message: String, loc: Location) {
         if message.len() > 0 {
-            let marker_loc = loc.col - 1;
+            let marker_loc = if loc.col == 0 { 0 } else { loc.col - 1 };
             eprintln!("    |{:>marker_loc$}^\n\n  {}\n", "", message);
         }
     }
@@ -159,7 +159,7 @@ impl<'a> Executor<'a> {
 
     fn handle_scan_err(&self, err: &ScanErr) {
         use ScanErrKind::*;
-        let loc = err.location.clone();
+        let mut loc = err.location.clone();
         let col = loc.col;
         let message = match &err.kind {
             UnexpectedCharacter(c) => {
@@ -180,8 +180,20 @@ impl<'a> Executor<'a> {
             WhitespaceAfterIndent | UnexpectedWhitespace => {
                 format!("Syntax error: Unexpected whitespace")
             }
+            FormatStringErr(err) => {
+                use crate::format::FormatStringErr::*;
+                match err {
+                    EmptyExpr(pos) => {
+                        loc = Location::new(loc.line, loc.col + 2 + pos);
+                        format!("Syntax error: expected expression")
+                    }
+                    _ => {
+                        format!("Unhandled format string error at {loc}")
+                    }
+                }
+            }
             kind => {
-                format!("Unhandled scan error at {}: {:?}", loc, kind)
+                format!("Unhandled scan error at {loc}: {kind:?}")
             }
         };
         self.print_err_message(message, loc);

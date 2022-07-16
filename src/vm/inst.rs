@@ -34,4 +34,8 @@ pub enum Inst {
     Halt(u8),
 
     InternalErr(String),
+
+    // These make compound objects from the top N items on the stack.
+    MakeString(usize),
+    MakeTuple(usize),
 }

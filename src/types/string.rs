@@ -2,8 +2,6 @@
 use std::any::Any;
 use std::fmt;
 
-use crate::format::{scan, Token as FStringToken};
-
 use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeErr, RuntimeResult};
 
 use crate::types::class::TypeRef;
@@ -14,7 +12,6 @@ type RustString = std::string::String;
 pub struct String {
     class: TypeRef,
     value: RustString,
-    // is_format_string: bool, // is this a format string?
 }
 
 impl String {
@@ -25,56 +22,6 @@ impl String {
     pub fn value(&self) -> &str {
         self.value.as_str()
     }
-
-    // pub fn is_format_string(&self) -> bool {
-    //     self.is_format_string
-    // }
-
-    // TODO: Handle nested ${}
-    // XXX: Not sure this belongs here. Move to its own module?
-    // XXX: Maybe all the scanning/parsing should happen in the main
-    //      scanner? In addition to catching syntax errors early, I
-    //      think this would make it easier to handle nested groups.
-    // pub fn format(&self, vm: &mut VM) -> Result<Self, RuntimeErr> {
-    //     assert!(self.is_format_string, "String is not a format string: {}", self);
-    //
-    //     let value = self.value();
-    //     let result = scan(value);
-    //     let tokens = result.expect("Scanning of format string failed");
-    //     let mut formatted = RustString::with_capacity(64);
-    //
-    //     for token in tokens {
-    //         match token {
-    //             FStringToken::String(part, _) => {
-    //                 formatted.push_str(part.as_str());
-    //             }
-    //             FStringToken::Group(expr, _) => {
-    //                 let result =
-    //                     execute_text(expr.as_str(), Some(vm), false, false, false);
-    //
-    //                 if let Err(err) = result {
-    //                     return Err(RuntimeErr::new(RuntimeErrKind::StringFormatErr(
-    //                         format!("{:?}", err.kind,),
-    //                     )));
-    //                 }
-    //
-    //                 if let Some(i) = vm.pop() {
-    //                     if let Some(obj) = vm.ctx.get_obj(i) {
-    //                         formatted.push_str(obj.to_string().as_str());
-    //                     } else {
-    //                         return Err(RuntimeErr::new(
-    //                             RuntimeErrKind::ObjectNotFound(i),
-    //                         ));
-    //                     }
-    //                 } else {
-    //                     return Err(RuntimeErr::new(RuntimeErrKind::EmptyStack));
-    //                 }
-    //             }
-    //         }
-    //     }
-    //
-    //     Ok(Self::new(self.class().clone(), formatted, false))
-    // }
 }
 
 impl Object for String {
@@ -125,7 +72,6 @@ impl fmt::Display for String {
 
 impl fmt::Debug for String {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // let prefix = if self.is_format_string { "$" } else { "" };
         write!(f, "\"{}\"", self.value())
     }
 }

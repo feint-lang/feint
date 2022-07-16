@@ -3,6 +3,7 @@ use std::collections::VecDeque;
 use std::iter::{Iterator, Peekable};
 
 use crate::ast;
+use crate::format::FormatStringToken;
 use crate::scanner::{ScanErr, ScanResult, Token, TokenWithLocation};
 use crate::util::Location;
 
@@ -375,9 +376,7 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
             Float(value) => ast::Expr::new_literal(ast::Literal::new_float(value)),
             Int(value) => ast::Expr::new_literal(ast::Literal::new_int(value)),
             String(value) => ast::Expr::new_literal(ast::Literal::new_string(value)),
-            FormatString(value) => {
-                ast::Expr::new_literal(ast::Literal::new_format_string(value))
-            }
+            FormatString(tokens) => self.format_string(tokens)?,
             Ident(name) => {
                 if self.next_token_is(&LParen)? {
                     // Function def or call
@@ -420,6 +419,34 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
             self.maybe_binary_expr(prec, expr)?
         };
         Ok(expr)
+    }
+
+    fn format_string(
+        &mut self,
+        format_string_tokens: Vec<FormatStringToken>,
+    ) -> ExprResult {
+        let mut items = vec![];
+        for format_string_token in format_string_tokens {
+            match format_string_token {
+                FormatStringToken::Str(value) => {
+                    items.push(ast::Expr::new_literal(ast::Literal::new_string(value)));
+                }
+                FormatStringToken::Expr(tokens) => {
+                    // TODO: Make location more precise
+                    let loc = self.current_token.as_ref().unwrap().start;
+                    let program = parse_tokens(tokens)?;
+                    for statement in program.statements {
+                        match statement.kind {
+                            ast::StatementKind::Expr(expr) => items.push(expr),
+                            _ => {
+                                return Err(self.err(ParseErrKind::ExpectedExpr(loc)));
+                            }
+                        }
+                    }
+                }
+            };
+        }
+        Ok(ast::Expr::new_format_string(items))
     }
 
     fn tuple(&mut self, first_expr: ast::Expr) -> ExprResult {

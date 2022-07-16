@@ -1,13 +1,13 @@
 x = true
 
 if x ->
-    print($"x: x = ${x}")
+    print($"x: x = {x}")
 
 y = if true ->
     print("y: yes, true is true")
     1
 
-print($"y: y = ${y}")
+print($"y: y = {y}")
 
 z = if false ->
     print("z: if block should NOT be printed")
@@ -17,7 +17,7 @@ else ->
     block ->
         3
 
-print($"z: z = ${z}")
+print($"z: z = {z}")
 
 if 0 ->
     nil

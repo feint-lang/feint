@@ -20,6 +20,19 @@ impl<T> Stack<T> {
         self.storage.pop()
     }
 
+    /// Pop top N items if at least N items are present. The top item in
+    /// the stack will be at the *end* of list of returned items.
+    pub fn pop_n(&mut self, n: usize) -> Option<Vec<T>> {
+        let size = self.size();
+        if size < n {
+            None
+        } else {
+            let start = size - n;
+            let items: Vec<T> = self.storage.drain(start..).collect();
+            Some(items)
+        }
+    }
+
     pub fn peek(&self) -> Option<&T> {
         self.storage.last()
     }

@@ -1,6 +1,7 @@
 use std::collections::VecDeque;
 use std::io::BufRead;
 
+use crate::format::scan_format_string;
 use num_bigint::BigInt;
 use num_traits::Num;
 
@@ -97,13 +98,13 @@ impl<'a, T: BufRead> Scanner<'a, T> {
         // Now we have 0 or more spaces followed by some other char.
         // First, make sure it's a valid indent.
         if num_spaces % 4 != 0 {
-            return Err(ScanErr::new(ScanErrKind::InvalidIndent(num_spaces), start));
+            return self.err(ScanErrKind::InvalidIndent(num_spaces), start);
         }
 
         // Next, make sure the indent isn't followed by additional non-
         // space whitespace, because that would be confusing.
         if whitespace_count > 0 {
-            return Err(ScanErr::new(ScanErrKind::WhitespaceAfterIndent, start));
+            return self.err(ScanErrKind::WhitespaceAfterIndent, start);
         }
 
         // Now we have something that *could* be a valid indent.
@@ -130,10 +131,8 @@ impl<'a, T: BufRead> Scanner<'a, T> {
             match self.previous_token {
                 Token::ScopeStart => (),
                 _ => {
-                    return Err(ScanErr::new(
-                        ScanErrKind::UnexpectedIndent(indent_level),
-                        start,
-                    ));
+                    return self
+                        .err(ScanErrKind::UnexpectedIndent(indent_level), start);
                 }
             }
 
@@ -147,37 +146,40 @@ impl<'a, T: BufRead> Scanner<'a, T> {
             self.indent_level = current_level;
         } else {
             // Increased by *more* than one level
-            return Err(ScanErr::new(
-                ScanErrKind::UnexpectedIndent(indent_level),
-                start,
-            ));
+            return self.err(ScanErrKind::UnexpectedIndent(indent_level), start);
         }
 
         Ok(())
     }
 
+    fn err(&self, kind: ScanErrKind, loc: Location) -> Result<(), ScanErr> {
+        Err(ScanErr::new(kind, loc))
+    }
+
     fn add_tokens_to_queue(&mut self) -> Result<(), ScanErr> {
+        use ScanErrKind::*;
+        use Token::*;
+
         let start = self.source.location();
 
         let token = match self.next_char() {
-            Some((c @ '"' | c @ '\'', _, _)) => match self.read_string(c) {
-                (s, true) => Token::String(s),
+            Some((c @ ('"' | '\''), _, _)) => match self.read_string(c) {
+                (s, true) => String(s),
                 (s, false) => {
-                    return Err(ScanErr::new(
-                        ScanErrKind::UnterminatedString(format!("{}{}", c, s)),
-                        start,
-                    ));
+                    return self.err(UnterminatedString(format!("{c}{s}")), start);
                 }
             },
             Some(('$', Some('"' | '\''), _)) => {
                 let (d, ..) = self.next_char().unwrap();
                 match self.read_string(d) {
-                    (s, true) => Token::FormatString(s),
+                    (s, true) => match scan_format_string(s.as_str()) {
+                        Ok(tokens) => FormatString(tokens),
+                        Err(err) => {
+                            return self.err(FormatStringErr(err), start);
+                        }
+                    },
                     (s, false) => {
-                        return Err(ScanErr::new(
-                            ScanErrKind::UnterminatedString(format!("${}{}", d, s)),
-                            start,
-                        ));
+                        return self.err(UnterminatedString(format!("${d}{s}")), start);
                     }
                 }
             }
@@ -185,153 +187,131 @@ impl<'a, T: BufRead> Scanner<'a, T> {
                 self.consume_comment();
                 return Ok(());
             }
-            Some((':', _, _)) => Token::Colon,
-            Some((',', _, _)) => Token::Comma,
+            Some((':', _, _)) => Colon,
+            Some((',', _, _)) => Comma,
             Some(('(', _, _)) => {
                 self.bracket_stack.push(('(', start));
-                Token::LParen
+                LParen
             }
             Some((c @ ')', _, _)) => {
-                self.pop_bracket_and_return_token(c, start, Token::RParen)?
+                self.pop_bracket_and_return_token(c, start, RParen)?
             }
             Some(('[', _, _)) => {
                 self.bracket_stack.push(('[', start));
-                Token::LBracket
+                LBracket
             }
             Some((c @ ']', _, _)) => {
-                self.pop_bracket_and_return_token(c, start, Token::RBracket)?
+                self.pop_bracket_and_return_token(c, start, RBracket)?
             }
             Some(('<', Some('='), _)) => {
-                self.consume_char_and_return_token(Token::LessThanOrEqual)
+                self.consume_char_and_return_token(LessThanOrEqual)
             }
-            Some(('<', Some('-'), _)) => {
-                self.consume_char_and_return_token(Token::LoopFeed)
-            }
+            Some(('<', Some('-'), _)) => self.consume_char_and_return_token(LoopFeed),
             Some(('<', _, _)) => {
                 self.bracket_stack.push(('<', start));
-                Token::LessThan
+                LessThan
             }
             Some(('>', Some('='), _)) => {
-                self.consume_char_and_return_token(Token::GreaterThanOrEqual)
+                self.consume_char_and_return_token(GreaterThanOrEqual)
             }
             Some((c @ '>', _, _)) => {
-                self.pop_bracket_and_return_token(c, start, Token::GreaterThan)?
+                self.pop_bracket_and_return_token(c, start, GreaterThan)?
             }
             Some(('=', Some('='), Some('='))) => {
-                self.consume_two_chars_and_return_token(Token::EqualEqualEqual)
+                self.consume_two_chars_and_return_token(EqualEqualEqual)
             }
-            Some(('=', Some('='), _)) => {
-                self.consume_char_and_return_token(Token::EqualEqual)
-            }
-            Some(('=', _, _)) => Token::Equal,
-            Some(('&', Some('&'), _)) => self.consume_char_and_return_token(Token::And),
-            Some(('&', _, _)) => self.consume_char_and_return_token(Token::Ampersand),
-            Some(('|', Some('|'), _)) => self.consume_char_and_return_token(Token::Or),
-            Some(('|', _, _)) => self.consume_char_and_return_token(Token::Pipe),
-            Some(('*', Some('*'), _)) => {
-                self.consume_char_and_return_token(Token::DoubleStar)
-            }
-            Some(('*', Some('='), _)) => {
-                self.consume_char_and_return_token(Token::MulEqual)
-            }
-            Some(('*', _, _)) => Token::Star,
-            Some(('/', Some('='), _)) => {
-                self.consume_char_and_return_token(Token::DivEqual)
-            }
+            Some(('=', Some('='), _)) => self.consume_char_and_return_token(EqualEqual),
+            Some(('=', _, _)) => Equal,
+            Some(('&', Some('&'), _)) => self.consume_char_and_return_token(And),
+            Some(('&', _, _)) => self.consume_char_and_return_token(Ampersand),
+            Some(('|', Some('|'), _)) => self.consume_char_and_return_token(Or),
+            Some(('|', _, _)) => self.consume_char_and_return_token(Pipe),
+            Some(('*', Some('*'), _)) => self.consume_char_and_return_token(DoubleStar),
+            Some(('*', Some('='), _)) => self.consume_char_and_return_token(MulEqual),
+            Some(('*', _, _)) => Star,
+            Some(('/', Some('='), _)) => self.consume_char_and_return_token(DivEqual),
             Some(('/', Some('/'), _)) => {
-                self.consume_char_and_return_token(Token::DoubleSlash)
+                self.consume_char_and_return_token(DoubleSlash)
             }
-            Some(('/', _, _)) => Token::Slash,
-            Some(('+', Some('='), _)) => {
-                self.consume_char_and_return_token(Token::PlusEqual)
-            }
+            Some(('/', _, _)) => Slash,
+            Some(('+', Some('='), _)) => self.consume_char_and_return_token(PlusEqual),
             Some(('+', _, _)) => {
                 // Collapse contiguous plus signs down to a single +.
                 // This is safe because + is effectively a no-op.
                 self.consume_contiguous('+');
-                Token::Plus
+                Plus
             }
-            Some(('-', Some('='), _)) => {
-                self.consume_char_and_return_token(Token::MinusEqual)
-            }
+            Some(('-', Some('='), _)) => self.consume_char_and_return_token(MinusEqual),
             Some(('-', Some('>'), _)) => {
                 self.next();
                 self.scope_enter(start);
                 self.consume_whitespace()?;
                 return Ok(());
             }
-            Some(('-', _, _)) => Token::Minus,
-            Some(('!', Some('='), _)) => {
-                self.consume_char_and_return_token(Token::NotEqual)
-            }
+            Some(('-', _, _)) => Minus,
+            Some(('!', Some('='), _)) => self.consume_char_and_return_token(NotEqual),
             Some(('!', _, _)) => {
                 // Collapse contiguous bangs down to a single ! or !!.
                 // This is mainly to ensure !!!x is interpreted as
                 // !(!!(x)) instead of !!(!(x)).
                 let count = self.consume_contiguous('!');
                 match count % 2 {
-                    0 => Token::BangBang,
-                    1 => Token::Bang,
+                    0 => BangBang,
+                    1 => Bang,
                     _ => unreachable!(),
                 }
             }
             Some(('.', Some('.'), Some('.'))) => {
-                self.consume_two_chars_and_return_token(Token::RangeInclusive)
+                self.consume_two_chars_and_return_token(RangeInclusive)
             }
-            Some(('.', Some('.'), _)) => {
-                self.consume_char_and_return_token(Token::Range)
-            }
-            Some(('.', _, _)) => Token::Dot,
-            Some(('%', _, _)) => Token::Percent,
-            Some(('^', _, _)) => Token::Caret,
+            Some(('.', Some('.'), _)) => self.consume_char_and_return_token(Range),
+            Some(('.', _, _)) => Dot,
+            Some(('%', _, _)) => Percent,
+            Some(('^', _, _)) => Caret,
             Some((c @ '0'..='9', _, _)) => match self.read_number(c) {
                 (string, _) if string.contains(".") || string.contains("E") => {
-                    let value = string.parse::<f64>().map_err(|err| {
-                        ScanErr::new(ScanErrKind::ParseFloatErr(err), start)
-                    })?;
-                    Token::Float(value)
+                    let value = string
+                        .parse::<f64>()
+                        .map_err(|err| ScanErr::new(ParseFloatErr(err), start))?;
+                    Float(value)
                 }
                 (string, radix) => {
                     let value = BigInt::from_str_radix(string.as_str(), radix)
-                        .map_err(|err| {
-                            ScanErr::new(ScanErrKind::ParseIntErr(err), start)
-                        })?;
-                    Token::Int(value)
+                        .map_err(|err| ScanErr::new(ParseIntErr(err), start))?;
+                    Int(value)
                 }
             },
             // Identifiers
             // Special case for single underscore placeholder var
             Some(('_', _, _)) => {
                 if self.consume_contiguous('_') > 1 {
-                    return Err(ScanErr::new(
-                        ScanErrKind::UnexpectedCharacter('_'),
+                    return self.err(
+                        UnexpectedCharacter('_'),
                         Location::new(start.line, start.col + 1),
-                    ));
+                    );
                 }
-                Token::Ident("_".to_owned())
+                Ident("_".to_owned())
             }
             Some((c @ 'a'..='z', _, _)) => {
                 let ident = self.read_ident(c);
                 let items = (&self.previous_token, self.source.peek());
-                if let (Token::EndOfStatement, Some(&':')) = items {
+                if let (EndOfStatement, Some(&':')) = items {
                     self.next_char();
-                    Token::Label(ident)
-                } else if let (Token::ScopeStart, Some(&':')) = items {
+                    Label(ident)
+                } else if let (ScopeStart, Some(&':')) = items {
                     self.next_char();
-                    Token::Label(ident)
+                    Label(ident)
                 } else {
                     match KEYWORDS.get(ident.as_str()) {
                         Some(token) => token.clone(),
-                        _ => Token::Ident(ident),
+                        _ => Ident(ident),
                     }
                 }
             }
-            Some((c @ 'A'..='Z', _, _)) => Token::TypeIdent(self.read_type_ident(c)),
-            Some((c @ '@', Some('a'..='z'), _)) => {
-                Token::TypeMethodIdent(self.read_ident(c))
-            }
+            Some((c @ 'A'..='Z', _, _)) => TypeIdent(self.read_type_ident(c)),
+            Some((c @ '@', Some('a'..='z'), _)) => TypeMethodIdent(self.read_ident(c)),
             Some((c @ '$', Some('a'..='z'), _)) => {
-                Token::SpecialMethodIdent(self.read_ident(c))
+                SpecialMethodIdent(self.read_ident(c))
             }
             // Newlines
             Some(('\n', _, _)) => {
@@ -344,11 +324,11 @@ impl<'a, T: BufRead> Scanner<'a, T> {
                 return Ok(());
             }
             Some((c, _, _)) if c.is_whitespace() => {
-                return Err(ScanErr::new(ScanErrKind::UnexpectedWhitespace, start));
+                return self.err(UnexpectedWhitespace, start);
             }
             // Unknown
             Some((c, _, _)) => {
-                return Err(ScanErr::new(ScanErrKind::UnexpectedCharacter(c), start));
+                return self.err(UnexpectedCharacter(c), start);
             }
             // End of input
             None => {
@@ -356,12 +336,9 @@ impl<'a, T: BufRead> Scanner<'a, T> {
                     self.maybe_add_end_of_statement_token(start);
                     self.set_indent_level(0, Location::new(start.line + 1, 1))?;
                 } else if let Some((c, location)) = self.bracket_stack.pop() {
-                    return Err(ScanErr::new(
-                        ScanErrKind::UnmatchedOpeningBracket(c),
-                        location,
-                    ));
+                    return self.err(UnmatchedOpeningBracket(c), location);
                 }
-                Token::EndOfInput
+                EndOfInput
             }
         };
 

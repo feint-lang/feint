@@ -2,6 +2,7 @@ use std::num::ParseFloatError;
 
 use num_bigint::ParseBigIntError;
 
+use crate::format::FormatStringErr;
 use crate::util::Location;
 
 use super::TokenWithLocation;
@@ -33,5 +34,6 @@ pub enum ScanErrKind {
     UnmatchedClosingBracket(char), // Opening bracket with no matching closing bracket
     ParseIntErr(ParseBigIntError),
     ParseFloatErr(ParseFloatError),
+    FormatStringErr(FormatStringErr),
     TooMuchWhitespace,
 }

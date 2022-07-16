@@ -247,6 +247,7 @@ impl<'a> Visitor<'a> {
             Kind::BinaryOp(a, op, b) => self.visit_binary_op(*a, op, *b)?,
             Kind::Ident(ident) => self.visit_ident(ident)?,
             Kind::Literal(literal) => self.visit_literal(literal)?,
+            Kind::FormatString(items) => self.visit_format_string(items)?,
             Kind::Tuple(items) => self.visit_tuple(items)?,
             _ => self.err(format!("Unhandled expression:\n{:?}", node))?,
         }
@@ -312,58 +313,32 @@ impl<'a> Visitor<'a> {
 
     fn visit_literal(&mut self, node: ast::Literal) -> VisitResult {
         type Kind = ast::LiteralKind;
-        let builtins = &self.ctx.builtins;
         match node.kind {
             Kind::Nil => self.push_const(0),
             Kind::Bool(true) => self.push_const(1),
             Kind::Bool(false) => self.push_const(2),
-            Kind::Float(value) => self.add_const(builtins.new_float(value)),
-            Kind::Int(value) => self.add_const(builtins.new_int(value)),
-            Kind::String(value) => self.add_const(builtins.new_string(value)),
-            Kind::FormatString(value) => self.add_const(builtins.new_string(value)),
+            Kind::Float(value) => self.add_const(self.ctx.builtins.new_float(value)),
+            Kind::Int(value) => self.add_const(self.ctx.builtins.new_int(value)),
+            Kind::String(value) => self.add_const(self.ctx.builtins.new_string(value)),
         }
         Ok(())
     }
 
-    /// XXX: The way this works currently, tuples can only contain
-    ///      literal values because there's no way to store a name
-    ///      reference as an object. Python uses a different approach--
-    ///      a BUILD_TUPLE instruction that would probably fix this.
-    fn visit_tuple(&mut self, exprs: Vec<ast::Expr>) -> VisitResult {
-        let items = self.convert_tuple_items(exprs);
-        self.add_const(self.ctx.builtins.new_tuple(items));
+    fn visit_format_string(&mut self, items: Vec<ast::Expr>) -> VisitResult {
+        let num_items = items.len();
+        for item in items {
+            self.visit_expr(item)?;
+        }
+        self.push(Inst::MakeString(num_items));
         Ok(())
     }
 
-    fn convert_tuple_items(&self, exprs: Vec<ast::Expr>) -> Vec<ObjectRef> {
-        type Kind = ast::LiteralKind;
-        let builtins = &self.ctx.builtins;
-        let mut items: Vec<ObjectRef> = vec![];
-        for expr in exprs {
-            let obj: ObjectRef = match expr.kind {
-                ast::ExprKind::Literal(literal) => match literal.kind {
-                    Kind::Nil => builtins.nil_obj.clone(),
-                    Kind::Bool(true) => builtins.true_obj.clone(),
-                    Kind::Bool(false) => builtins.false_obj.clone(),
-                    Kind::Float(value) => builtins.new_float(value),
-                    Kind::Int(value) => builtins.new_int(value),
-                    Kind::String(value) => builtins.new_string(value),
-                    Kind::FormatString(value) => builtins.new_string(value),
-                },
-                ast::ExprKind::Tuple(exprs) => {
-                    let items = self.convert_tuple_items(exprs);
-                    builtins.new_tuple(items)
-                }
-                ast::ExprKind::Ident(ident) => {
-                    unimplemented!("Unhandled identifier in tuple: {:?}", ident)
-                }
-                ast::ExprKind::Func(func) => {
-                    unimplemented!("Unhandled function in tuple: {:?}", func)
-                }
-                _ => unimplemented!("Unhandled tuple expression: {:?}", expr),
-            };
-            items.push(obj);
+    fn visit_tuple(&mut self, items: Vec<ast::Expr>) -> VisitResult {
+        let num_items = items.len();
+        for item in items {
+            self.visit_expr(item)?;
         }
-        items
+        self.push(Inst::MakeTuple(num_items));
+        Ok(())
     }
 }

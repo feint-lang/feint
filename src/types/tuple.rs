@@ -63,7 +63,7 @@ impl Object for Tuple {
 impl fmt::Display for Tuple {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let items: Vec<String> =
-            self.items().iter().map(|i| format!("{:?}", i)).collect();
+            self.items().iter().map(|item| format!("{item}")).collect();
         write!(f, "({})", items.join(", "))
     }
 }

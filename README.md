@@ -15,7 +15,7 @@ MIT. See the LICENSE file.
 
 - Everything is an object of some type
 - Lexical scoping
-- Everything is an expression
+- Almost everything is an expression
 - Significant whitespace (by default, but maybe consider `{...}` blocks
   for certain special cases like passing functions)
 - No this/self on methods but this/self is required to access attributes
@@ -34,9 +34,8 @@ MIT. See the LICENSE file.
 - Float (64-bit)
 - Int (BigInt)
 - String (can use `"` or `'`, multiline)
-- Format String (like `f""` in Python)
-  - Current implementation looks like `$"${var}"`, which is a bit clunky
-    and hard to type
+- Format String (`$"{expr}"`; can use `$"` or `$'`, multiline)
+- Tuple
 - Option
 - Function
 - Range (`0..10` and `1...10`)
@@ -51,11 +50,11 @@ MyType () ->
     # @ indicates class method
     @new (value) ->
         this.value = value
-    
+
     # add operation
     + (other) ->
         MyType(this.value + other.value)
-        
+
     # $ indicates a special method
     # $bool must return the bool value of the object
     $bool ->
@@ -63,7 +62,7 @@ MyType () ->
 
     # $string must return the string representation of the object
     $string ->
-        $"${this.value}"
+        $"{this.value}"
 
 obj1 = MyType.new(1)
 obj2 = MyType.new(2)

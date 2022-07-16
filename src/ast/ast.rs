@@ -113,6 +113,7 @@ pub enum ExprKind {
     Loop(Box<Expr>, Block),
     Ident(Ident),
     Tuple(Vec<Expr>),
+    FormatString(Vec<Expr>),
 }
 
 impl Expr {
@@ -171,6 +172,10 @@ impl Expr {
         Self::new_literal(Literal::new_string(value))
     }
 
+    pub fn new_format_string(items: Vec<Expr>) -> Self {
+        Self::new(ExprKind::FormatString(items))
+    }
+
     pub fn new_tuple(items: Vec<Expr>) -> Self {
         Self::new(ExprKind::Tuple(items))
     }
@@ -210,6 +215,7 @@ impl fmt::Debug for ExprKind {
             Self::Loop(expr, block) => write!(f, "Loop {expr:?}\n{block:?}"),
             Self::Func(func) => write!(f, "{:?}", func),
             Self::Call(func) => write!(f, "{:?}", func),
+            Self::FormatString(items) => write!(f, "{:?}", items),
             Self::Tuple(items) => write!(f, "{:?}", items),
         }
     }
@@ -322,7 +328,6 @@ pub enum LiteralKind {
     Float(f64),
     Int(BigInt),
     String(String),
-    FormatString(String),
 }
 
 impl Literal {
@@ -349,10 +354,6 @@ impl Literal {
     pub fn new_string<S: Into<String>>(value: S) -> Self {
         Self::new(LiteralKind::String(value.into()))
     }
-
-    pub fn new_format_string<S: Into<String>>(value: S) -> Self {
-        Self::new(LiteralKind::FormatString(value.into()))
-    }
 }
 
 impl fmt::Debug for Literal {
@@ -369,7 +370,6 @@ impl fmt::Debug for LiteralKind {
             Self::Float(value) => value.to_string(),
             Self::Int(value) => value.to_string(),
             Self::String(value) => value.clone(),
-            Self::FormatString(value) => value.clone(),
         };
         write!(f, "{}", string)
     }
