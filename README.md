@@ -36,6 +36,7 @@ MIT. See the LICENSE file.
 - String (can use `"` or `'`, multiline)
 - Format String (`$"{expr}"`; can use `$"` or `$'`, multiline)
 - Tuple
+- List
 - Option
 - Function
 - Range (`0..10` and `1...10`)

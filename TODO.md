@@ -1,0 +1,27 @@
+# TODO
+
+- [x] Implement basic types
+- [x] Implement format strings (AKA $ strings)
+- [x] Implement `Tuple`
+- [ ] Implement `List`
+- [ ] Implement vars
+- [ ] Implement dot operator (attribute access)
+- [x] Implement `block`
+- [x] Implement labels
+- [x] Implement `jump` (jump *forward* to label)
+- [x] Implement conditionals
+- [ ] Implement ternary operator
+- [ ] Implement range
+- [ ] Implement `loop`
+  - [x] Implement while loops
+  - [ ] Implement for loops
+  - [ ] Fix `break` (works for simple cases but is wonky)
+- [ ] Implement function calls
+- [ ] Implement `print` function
+- [ ] Implement custom classes
+- [ ] Implement `import`
+  - [ ] `import <name>`
+  - [ ] `import from <name>: <names>`
+- [ ] Figure out a nice way to do multi-line lambdas
+- [ ] Improve error handling/reporting
+  - [ ] Make source location available in AST and VM
