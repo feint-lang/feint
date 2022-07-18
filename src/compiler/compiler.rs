@@ -178,14 +178,28 @@ impl<'a> Visitor<'a> {
         self.visit_expr(expr)?;
         // Placeholder for jump-out if result is false.
         let jump_out_index = self.instructions.len();
-        self.push(Inst::InternalErr("Jump for loop not set".to_owned()));
+        self.push(Inst::InternalErr("Jump-out for loop not set".to_owned()));
         // Run the loop body if result is true.
         self.visit_block(block, scope_kind)?;
-        // Always jump to top of loop to re-check expression.
+        // Jump to top of loop to re-check expression.
         self.push(Inst::Jump(loop_addr));
-        // Set address of jump-out placeholder.
+        // Jump-out address.
         let after_addr = self.instructions.len();
+        // Set address of jump-out placeholder.
         self.instructions[jump_out_index] = Inst::JumpIfNot(after_addr);
+        // Set address of breaks.
+        for addr in loop_addr..after_addr {
+            match self.instructions[addr] {
+                Inst::Break => self.instructions[addr] = Inst::Jump(after_addr),
+                _ => (),
+            }
+        }
+        Ok(())
+    }
+
+    fn visit_break(&mut self, expr: ast::Expr) -> VisitResult {
+        self.visit_expr(expr)?;
+        self.instructions.push(Inst::Break);
         Ok(())
     }
 
@@ -242,6 +256,7 @@ impl<'a> Visitor<'a> {
             Kind::Loop(expr, block) => {
                 self.visit_loop(*expr, block, ScopeKind::Block)?
             }
+            Kind::Break(expr) => self.visit_break(*expr)?,
             Kind::Func(func) => self.visit_func(func)?,
             Kind::UnaryOp(op, b) => self.visit_unary_op(op, *b)?,
             Kind::BinaryOp(a, op, b) => self.visit_binary_op(*a, op, *b)?,

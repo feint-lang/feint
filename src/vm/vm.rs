@@ -107,6 +107,7 @@ impl VM {
                     };
                     continue;
                 }
+                Break => unreachable!("break was not converted to jump"),
                 LoadConst(index) => {
                     self.push(*index);
                 }
@@ -419,6 +420,7 @@ impl VM {
                     format!("[EMPTY] ? {} : {}", if_addr, else_addr),
                 ),
             },
+            Break => unreachable!("break was not converted to jump"),
             LoadConst(index) => {
                 let obj = self.ctx.get_obj(*index).unwrap();
                 self.format_aligned("LOAD_CONST", format!("{} ({:?})", index, obj))

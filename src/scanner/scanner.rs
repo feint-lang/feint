@@ -207,16 +207,11 @@ impl<'a, T: BufRead> Scanner<'a, T> {
                 self.consume_char_and_return_token(LessThanOrEqual)
             }
             Some(('<', Some('-'), _)) => self.consume_char_and_return_token(LoopFeed),
-            Some(('<', _, _)) => {
-                self.bracket_stack.push(('<', start));
-                LessThan
-            }
+            Some(('<', _, _)) => LessThan,
             Some(('>', Some('='), _)) => {
                 self.consume_char_and_return_token(GreaterThanOrEqual)
             }
-            Some((c @ '>', _, _)) => {
-                self.pop_bracket_and_return_token(c, start, GreaterThan)?
-            }
+            Some(('>', _, _)) => GreaterThan,
             Some(('=', Some('='), Some('='))) => {
                 self.consume_two_chars_and_return_token(EqualEqualEqual)
             }
@@ -398,7 +393,6 @@ impl<'a, T: BufRead> Scanner<'a, T> {
         match (self.bracket_stack.pop(), closing_bracket) {
             | (Some(('(', _)), ')')
             | (Some(('[', _)), ']')
-            | (Some(('<', _)), '>')
             => {
                 Ok(token)
             }

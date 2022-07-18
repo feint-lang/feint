@@ -1,0 +1,39 @@
+i = 1
+result = loop ->
+    print($"i = {i}")
+    if i > 3 ->
+        break "break out"
+    i += 1
+
+print($"\nloop result = {result}\n")
+
+i = 1
+result = loop ->
+    print($"i = {i}")
+    j = 0 + i
+    inner_result = loop ->
+        print($"j = {j}")
+        if j > 5 ->
+            break $"break inner i = {i}"
+        j += 1
+    print($"inner loop result = {inner_result}")
+    if i > 5 ->
+        break "outer"
+    i += 1
+    print()
+
+print($"\nloop result = {result}\n")
+
+i = 0
+result = loop i < 5 ->
+    print($"i = {i}")
+    break
+
+print($"\nloop result = {result} (should be nil)\n")
+
+i = 0
+result = loop i < 5 ->
+    print($"i = {i}")
+    i += 1
+
+print($"\nloop result = {result} (should be 5)\n")

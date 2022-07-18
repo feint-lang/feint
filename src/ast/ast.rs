@@ -111,6 +111,7 @@ pub enum ExprKind {
     Call(Call),
     Literal(Literal),
     Loop(Box<Expr>, Block),
+    Break(Box<Expr>),
     Ident(Ident),
     Tuple(Vec<Expr>),
     FormatString(Vec<Expr>),
@@ -134,6 +135,10 @@ impl Expr {
 
     pub fn new_loop(expr: Expr, block: Block) -> Self {
         Self::new(ExprKind::Loop(Box::new(expr), block))
+    }
+
+    pub fn new_break(expr: Expr) -> Self {
+        Self::new(ExprKind::Break(Box::new(expr)))
     }
 
     pub fn new_func(name: String, params: Vec<String>, block: Block) -> Self {
@@ -212,7 +217,8 @@ impl fmt::Debug for ExprKind {
             Self::Conditional(branches, default) => {
                 write!(f, "{branches:?} {default:?}")
             }
-            Self::Loop(expr, block) => write!(f, "Loop {expr:?}\n{block:?}"),
+            Self::Loop(expr, block) => write!(f, "loop {expr:?}\n{block:?}"),
+            Self::Break(expr) => write!(f, "break {expr:?}"),
             Self::Func(func) => write!(f, "{:?}", func),
             Self::Call(func) => write!(f, "{:?}", func),
             Self::FormatString(items) => write!(f, "{:?}", items),

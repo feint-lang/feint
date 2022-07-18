@@ -4,6 +4,7 @@ use std::iter::{Iterator, Peekable};
 
 use crate::ast;
 use crate::format::FormatStringToken;
+use crate::parser::result::StatementResult;
 use crate::scanner::{ScanErr, ScanResult, Token, TokenWithLocation};
 use crate::util::Location;
 
@@ -277,9 +278,8 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
             if !self.has_tokens()? || self.peek_token_is(&Token::ScopeEnd)? {
                 break;
             }
-            for statement in self.statement()? {
-                statements.push(statement);
-            }
+            let statement = self.statement()?;
+            statements.push(statement);
         }
         Ok(statements)
     }
@@ -287,7 +287,7 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
     /// Get the next statement (which might be an expression). In
     /// certain cases, multiple statements may be returned (e.g.,
     /// loops).
-    fn statement(&mut self) -> StatementsResult {
+    fn statement(&mut self) -> StatementResult {
         use Token::*;
         let token = self.expect_next_token()?;
         let statement = match token.token {
@@ -323,41 +323,15 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
                 }
             }
             Label(name) => ast::Statement::new_label(name),
-            Break => ast::Statement::new_jump(format!("$loop-end")),
             _ => {
                 self.lookahead_queue.push_front(token);
                 let expr = self.expr(0)?;
-                match expr.kind {
-                    ast::ExprKind::Loop(..) => {
-                        // TODO: I don't think this is a good way to
-                        //       handle breaks. Perhaps the compiler can
-                        //       look for breaks and turn them into
-                        //       jumps without the need for labels.
-                        //
-                        // XXX: This approach doesn't allow for multiple
-                        //      loops at the same level of a given
-                        //      scope. It also doesn't allow for a
-                        //      value to be returned a la Rust.
-                        //
-                        // XXX: Another issue with this approach is that
-                        //      it requires a special case for loops,
-                        //      returning a vec instead of a single
-                        //      statement.
-
-                        // Consume optional EOS
-                        self.next_token_is(&EndOfStatement)?;
-                        return Ok(vec![
-                            ast::Statement::new_expr(expr),
-                            ast::Statement::new_label(format!("$loop-end")),
-                        ]);
-                    }
-                    _ => ast::Statement::new_expr(expr),
-                }
+                ast::Statement::new_expr(expr)
             }
         };
         // Consume optional EOS
         self.next_token_is(&EndOfStatement)?;
-        Ok(vec![statement])
+        Ok(statement)
     }
 
     /// Get the next expression, possibly recurring to handle nested
@@ -411,6 +385,12 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
                 let block = self.block()?;
                 ast::Expr::new_loop(expr, block)
             }
+            Break => ast::Expr::new_break(match self.peek_token()? {
+                Some(TokenWithLocation { token: EndOfStatement, .. }) | None => {
+                    ast::Expr::new_literal(ast::Literal::new_nil())
+                }
+                _ => self.expr(0)?,
+            }),
             _ => self.expect_unary_expr(&token)?,
         };
         expr = if self.next_token_is(&Comma)? {
