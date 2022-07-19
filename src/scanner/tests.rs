@@ -254,6 +254,20 @@ fn scan_unknown() {
     }
 }
 
+#[test]
+fn scan_inline_block() {
+    let source = "block -> true";
+    let tokens = scan_optimistic(source);
+    let mut tokens = tokens.iter();
+    check_token(tokens.next(), Token::Block, 1, 1, 1, 5);
+    check_token(tokens.next(), Token::ScopeStart, 1, 7, 1, 8);
+    check_token(tokens.next(), Token::True, 1, 10, 1, 13);
+    check_token(tokens.next(), Token::EndOfStatement, 1, 14, 1, 14);
+    check_token(tokens.next(), Token::ScopeEnd, 1, 14, 1, 14);
+    check_token(tokens.next(), Token::EndOfStatement, 1, 14, 1, 14);
+    assert!(tokens.next().is_none());
+}
+
 // Utilities -------------------------------------------------------
 
 /// Check token returned by scanner against expected token.

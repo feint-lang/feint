@@ -62,20 +62,6 @@ impl Statement {
     pub fn new_expr(expr: Expr) -> Self {
         Self::new(StatementKind::Expr(expr))
     }
-
-    pub fn tuple_items(&self) -> Option<&Vec<Expr>> {
-        if let StatementKind::Expr(expr) = &self.kind {
-            return expr.tuple_items();
-        }
-        None
-    }
-
-    pub fn ident_name(&self) -> Option<&String> {
-        if let StatementKind::Expr(expr) = &self.kind {
-            return expr.ident_name();
-        }
-        None
-    }
 }
 
 impl fmt::Debug for Statement {
@@ -183,20 +169,6 @@ impl Expr {
 
     pub fn new_tuple(items: Vec<Expr>) -> Self {
         Self::new(ExprKind::Tuple(items))
-    }
-
-    pub fn tuple_items(&self) -> Option<&Vec<Expr>> {
-        if let ExprKind::Tuple(items) = &self.kind {
-            return Some(items);
-        }
-        None
-    }
-
-    pub fn ident_name(&self) -> Option<&String> {
-        if let ExprKind::Ident(Ident { kind: IdentKind::Ident(name) }) = &self.kind {
-            return Some(name);
-        }
-        None
     }
 }
 

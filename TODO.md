@@ -7,6 +7,7 @@
 - [ ] Implement vars
 - [ ] Implement dot operator (attribute access)
 - [x] Implement `block`
+- [x] Implement inline blocks (`block -> <expr>`)
 - [x] Implement labels
 - [x] Implement `jump` (jump *forward* to label)
 - [x] Implement conditionals

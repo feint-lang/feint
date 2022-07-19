@@ -224,6 +224,8 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
         &mut self,
         token: &Token,
     ) -> Result<(bool, Vec<TokenWithLocation>), ParseErr> {
+        use ParseErrKind::MismatchedBracket;
+        use Token::{LBracket, LParen, RBracket, RParen};
         let mut collector = vec![];
         let mut nesting_stack = vec![];
         while let Some(t) = self.next_token()? {
@@ -231,20 +233,16 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
                 return Ok((true, collector));
             }
             match t.token {
-                Token::LParen => nesting_stack.push('('),
-                Token::LBracket => nesting_stack.push('['),
-                Token::RParen => {
+                LParen => nesting_stack.push('('),
+                LBracket => nesting_stack.push('['),
+                RParen => {
                     if nesting_stack.pop() != Some('(') {
-                        return Err(
-                            self.err(ParseErrKind::MismatchedBracket(self.loc()))
-                        );
+                        return Err(self.err(MismatchedBracket(self.loc())));
                     }
                 }
-                Token::RBracket => {
+                RBracket => {
                     if nesting_stack.pop() != Some('[') {
-                        return Err(
-                            self.err(ParseErrKind::MismatchedBracket(self.loc()))
-                        );
+                        return Err(self.err(MismatchedBracket(self.loc())));
                     }
                 }
                 _ => (),
@@ -252,20 +250,6 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
             collector.push(t);
         }
         Ok((false, collector))
-    }
-
-    /// Expect the start of a scope. This is really just a check to
-    /// make sure the token stream is valid.
-    fn expect_scope(&mut self) -> Result<(), ParseErr> {
-        self.expect_token(&Token::ScopeStart)?;
-        Ok(())
-    }
-
-    /// Expect the end of a scope.
-    fn expect_scope_end(&mut self) -> Result<(), ParseErr> {
-        self.expect_token(&Token::ScopeEnd)?;
-        self.expect_token(&Token::EndOfStatement)?;
-        Ok(())
     }
 
     // Grammar ---------------------------------------------------------
@@ -305,13 +289,11 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
                     return Err(self.err(ParseErrKind::ExpectedExpr(self.next_loc())));
                 };
                 self.expect_token(&RParen)?;
-                self.expect_token(&EndOfStatement)?;
                 ast::Statement::new_print(expr)
             }
             Jump => {
                 if let Some(ident_token) = self.next_token()? {
                     if let Ident(name) = ident_token.token {
-                        self.expect_token(&EndOfStatement)?;
                         ast::Statement::new_jump(name)
                     } else {
                         return Err(
@@ -329,8 +311,7 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
                 ast::Statement::new_expr(expr)
             }
         };
-        // Consume optional EOS
-        self.next_token_is(&EndOfStatement)?;
+        self.expect_token(&EndOfStatement)?;
         Ok(statement)
     }
 
@@ -366,15 +347,16 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
                 let mut branches = vec![];
                 branches.push((self.expr(0)?, self.block()?));
                 loop {
-                    match self.next_tokens_are(vec![&Else, &If])? {
+                    match self.next_tokens_are(vec![&EndOfStatement, &Else, &If])? {
                         true => branches.push((self.expr(0)?, self.block()?)),
                         false => break,
                     }
                 }
-                let default = match self.next_token_is(&Else)? {
-                    true => Some(self.block()?),
-                    false => None,
-                };
+                let default =
+                    match self.next_tokens_are(vec![&EndOfStatement, &Else])? {
+                        true => Some(self.block()?),
+                        false => None,
+                    };
                 ast::Expr::new_conditional(branches, default)
             }
             Loop => {
@@ -508,17 +490,18 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
 
     /// Handle `block ->`, `if <expr> ->`, etc.
     fn block(&mut self) -> BlockResult {
-        self.expect_scope()?;
+        self.expect_token(&Token::ScopeStart)?;
         let statements = self.statements()?;
         if statements.is_empty() {
             return Err(self.err(ParseErrKind::ExpectedBlock(self.next_loc())));
         }
-        self.expect_scope_end()?;
+        self.expect_token(&Token::ScopeEnd)?;
         Ok(ast::Block::new(statements))
     }
 
     /// Handle `func () -> ...` (definition) and `func()` (call).
     fn func(&mut self, name: String) -> ExprResult {
+        let loc = self.loc();
         let (found, mut tokens) = self.collect_until(&Token::RParen)?;
 
         if !found {
@@ -528,60 +511,45 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
             );
         }
 
-        // Add a trailing comma for consistency
-        if let Some(t) = tokens.last() {
-            if t.token != Token::Comma {
-                let start = Location::new(t.start.line, t.start.col + 1);
-                tokens.push(TokenWithLocation::new(Token::Comma, start, start));
+        let items = if tokens.len() == 0 {
+            // Empty params or args list.
+            vec![]
+        } else {
+            let scanner: Vec<ScanResult> = vec![];
+            let mut parser = Parser::new(scanner.into_iter());
+            parser.lookahead_queue.extend(tokens);
+            // Add a trailing comma so the tokens are parsed as a tuple.
+            if let Some(t) = parser.lookahead_queue.back() {
+                if t.token != Token::Comma {
+                    let loc = Location::new(t.start.line, t.start.col + 1);
+                    let token = TokenWithLocation::new(Token::Comma, loc, loc);
+                    parser.lookahead_queue.push_back(token);
+                }
             }
-        }
+            let expr = parser.expr(0)?;
+            match expr.kind {
+                ast::ExprKind::Tuple(items) => items,
+                _ => return Err(self.err(ParseErrKind::SyntaxErr(loc))),
+            }
+        };
 
         if self.peek_token_is(&Token::ScopeStart)? {
-            // Function def - tokens are parameters
-            let params = self.parse_params(tokens)?;
+            // Function definition
+            let mut params = vec![];
+            // Ensure all items are identifiers
+            for item in items.iter() {
+                match &item.kind {
+                    ast::ExprKind::Ident(ast::Ident {
+                        kind: ast::IdentKind::Ident(name),
+                    }) => params.push(name.clone()),
+                    _ => return Err(self.err(ParseErrKind::ExpectedIdent(loc))),
+                }
+            }
             let block = self.block()?;
             Ok(ast::Expr::new_func(name.clone(), params, block))
         } else {
-            // Function call -- tokens are args
-            let args = parse_tokens(tokens)?;
-            let args = args.statements;
-            let args = vec![];
-            Ok(ast::Expr::new_call(name.clone(), args))
+            // Function call
+            Ok(ast::Expr::new_call(name.clone(), items))
         }
-    }
-
-    fn parse_params(
-        &self,
-        tokens: Vec<TokenWithLocation>,
-    ) -> Result<Vec<String>, ParseErr> {
-        let mut params = vec![];
-
-        if tokens.is_empty() {
-            return Ok(params);
-        }
-
-        let start = tokens[0].start.clone();
-        let program = parse_tokens(tokens)?;
-        let statements = program.statements;
-
-        if statements.is_empty() || statements.len() > 1 {
-            return Err(self.err(ParseErrKind::SyntaxErr(start)));
-        }
-
-        let statement = statements.last().unwrap();
-
-        if let Some(items) = statement.tuple_items() {
-            for expr in items.iter() {
-                if let Some(name) = expr.ident_name() {
-                    params.push(name.clone());
-                } else {
-                    return Err(self.err(ParseErrKind::SyntaxErr(start)));
-                }
-            }
-        } else {
-            return Err(self.err(ParseErrKind::SyntaxErr(start)));
-        }
-
-        Ok(params)
     }
 }

@@ -1,10 +1,10 @@
 use std::collections::VecDeque;
 use std::io::BufRead;
 
-use crate::format::scan_format_string;
 use num_bigint::BigInt;
 use num_traits::Num;
 
+use crate::format::scan_format_string;
 use crate::util::{Location, Source, Stack};
 
 use super::keywords::KEYWORDS;
@@ -29,6 +29,9 @@ pub struct Scanner<'a, T: BufRead> {
     /// Keep track of whether we're at the start of a line so indents
     /// can be handled specially.
     indent_level: u8,
+    /// Flag to indicate when an inline block is encountered (e.g.,
+    /// `block -> true` where there's no newline after the `->`).
+    inline_block: bool,
     /// Opening brackets are pushed and later popped when the closing
     /// bracket is encountered. This gives us a way to verify brackets
     /// are matched and also lets us know when we're inside a group
@@ -45,6 +48,7 @@ impl<'a, T: BufRead> Scanner<'a, T> {
             queue: VecDeque::new(),
             scope_level: 0,
             indent_level: 0,
+            inline_block: false,
             bracket_stack: Stack::new(),
             previous_token: Token::EndOfStatement,
         }
@@ -238,9 +242,16 @@ impl<'a, T: BufRead> Scanner<'a, T> {
             }
             Some(('-', Some('='), _)) => self.consume_char_and_return_token(MinusEqual),
             Some(('-', Some('>'), _)) => {
-                self.next();
+                self.next_char(); // consume >
                 self.scope_enter(start);
                 self.consume_whitespace()?;
+                if self.source.peek() == Some(&'#') {
+                    self.next_char();
+                    self.consume_comment();
+                }
+                if self.source.peek() != Some(&'\n') {
+                    self.inline_block = true;
+                }
                 return Ok(());
             }
             Some(('-', _, _)) => Minus,
@@ -289,11 +300,8 @@ impl<'a, T: BufRead> Scanner<'a, T> {
             }
             Some((c @ 'a'..='z', _, _)) => {
                 let ident = self.read_ident(c);
-                let items = (&self.previous_token, self.source.peek());
-                if let (EndOfStatement, Some(&':')) = items {
-                    self.next_char();
-                    Label(ident)
-                } else if let (ScopeStart, Some(&':')) = items {
+                let (prev, next) = (&self.previous_token, self.source.peek());
+                if let (EndOfStatement | ScopeStart, Some(':')) = (prev, next) {
                     self.next_char();
                     Label(ident)
                 } else {
@@ -312,6 +320,10 @@ impl<'a, T: BufRead> Scanner<'a, T> {
             Some(('\n', _, _)) => {
                 if self.bracket_stack.size() == 0 {
                     self.maybe_add_end_of_statement_token(start);
+                    if self.inline_block {
+                        self.scope_exit(self.source.location());
+                        self.inline_block = false;
+                    }
                     self.handle_indents()?;
                 } else {
                     self.consume_whitespace()?;
@@ -329,6 +341,10 @@ impl<'a, T: BufRead> Scanner<'a, T> {
             None => {
                 if self.bracket_stack.size() == 0 {
                     self.maybe_add_end_of_statement_token(start);
+                    if self.inline_block {
+                        self.scope_exit(self.source.location());
+                        self.inline_block = false;
+                    }
                     self.set_indent_level(0, Location::new(start.line + 1, 1))?;
                 } else if let Some((c, location)) = self.bracket_stack.pop() {
                     return self.err(UnmatchedOpeningBracket(c), location);
@@ -343,11 +359,10 @@ impl<'a, T: BufRead> Scanner<'a, T> {
     }
 
     fn maybe_add_end_of_statement_token(&mut self, loc: Location) {
+        use Token::{EndOfStatement, ScopeEnd, ScopeStart};
         match self.previous_token {
-            Token::EndOfStatement | Token::ScopeStart => (),
-            _ => {
-                self.add_token_to_queue(Token::EndOfStatement, loc, Some(loc));
-            }
+            EndOfStatement | ScopeStart | ScopeEnd => (),
+            _ => self.add_token_to_queue(EndOfStatement, loc, Some(loc)),
         };
     }
 

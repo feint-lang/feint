@@ -54,6 +54,21 @@ fn parse_empty() {
     }
 
 #[test]
+fn parse_inline_block() {
+    let result = parse_text("block -> true");
+    assert!(result.is_ok());
+    let program = result.unwrap();
+    let statements = program.statements;
+    // eprintln!("{statements:?}");
+    // check_token(tokens.next(), Token::Block, 1, 1, 1, 5);
+    // check_token(tokens.next(), Token::ScopeStart, 1, 7, 1, 8);
+    // check_token(tokens.next(), Token::True, 1, 10, 1, 13);
+    // check_token(tokens.next(), Token::ScopeEnd, 1, 14, 1, 14);
+    // check_token(tokens.next(), Token::EndOfStatement, 1, 14, 1, 14);
+    // assert!(tokens.next().is_none());
+}
+
+#[test]
 fn parse_simple_assignment() {
     //      R
     //      |
