@@ -231,6 +231,12 @@ impl<'a> Executor<'a> {
             ExpectedIdent(loc) => {
                 (loc.clone(), format!("Parse error: expected identifier at {loc}",))
             }
+            UnexpectedBreak(loc) => (
+                loc.clone(),
+                format!(
+                    "Parse error: unexpected break at {loc} (break must be in a loop)"
+                ),
+            ),
             SyntaxErr(loc) => (loc.clone(), format!("Syntax error at {loc}",)),
             kind => (Location::new(0, 0), format!("Unhandled parse error: {:?}", kind)),
         };

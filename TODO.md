@@ -4,7 +4,7 @@
 - [x] Implement format strings (AKA $ strings)
 - [x] Implement `Tuple`
 - [ ] Implement `List`
-- [ ] Implement vars
+- [x] Implement vars
 - [ ] Implement dot operator (attribute access)
 - [x] Implement `block`
 - [x] Implement inline blocks (`block -> <expr>`)
@@ -25,5 +25,5 @@
   - [ ] `import from <name>: <names>`
 - [ ] Figure out a nice way to do multi-line lambdas
 - [ ] Improve error handling/reporting
-  - [-] Make source location available in AST
+  - [ ] Make source location available in AST
   - [ ] Make source location available in VM

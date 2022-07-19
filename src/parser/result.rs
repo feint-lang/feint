@@ -40,4 +40,5 @@ pub enum ParseErrKind {
 
     UnexpectedBlock(Location),
     UnexpectedToken(TokenWithLocation),
+    UnexpectedBreak(Location),
 }

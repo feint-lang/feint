@@ -28,6 +28,7 @@ pub struct Parser<I: Iterator<Item = ScanResult>> {
     current_token: Option<TokenWithLocation>,
     token_stream: Peekable<I>,
     lookahead_queue: VecDeque<TokenWithLocation>,
+    loop_level: u8,
 }
 
 impl<I: Iterator<Item = ScanResult>> Parser<I> {
@@ -36,6 +37,7 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
             current_token: None,
             token_stream: token_iter.peekable(),
             lookahead_queue: VecDeque::new(),
+            loop_level: 0,
         }
     }
 
@@ -280,31 +282,8 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
             //      are implemented. The shenanigans below are so that
             //      print statements have similar syntax to the eventual
             //      built in print function.
-            Print => {
-                self.expect_token(&LParen)?;
-                let expr = if self.peek_token_is(&RParen)? {
-                    ast::Expr::new_string("", start, start)
-                } else if self.has_tokens()? {
-                    self.expr(0)?
-                } else {
-                    return Err(self.err(ParseErrKind::ExpectedExpr(self.next_loc())));
-                };
-                self.expect_token(&RParen)?;
-                ast::Statement::new_print(expr, start, self.loc())
-            }
-            Jump => {
-                if let Some(ident_token) = self.next_token()? {
-                    if let Ident(name) = ident_token.token {
-                        ast::Statement::new_jump(name, start, ident_token.end)
-                    } else {
-                        return Err(
-                            self.err(ParseErrKind::UnexpectedToken(ident_token))
-                        );
-                    }
-                } else {
-                    return Err(self.err(ParseErrKind::ExpectedIdent(self.next_loc())));
-                }
-            }
+            Print => self.print(start)?,
+            Jump => self.jump(start)?,
             Label(name) => ast::Statement::new_label(name, start, token.end),
             _ => {
                 self.lookahead_queue.push_front(token);
@@ -315,6 +294,31 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
         };
         self.expect_token(&EndOfStatement)?;
         Ok(statement)
+    }
+
+    fn print(&mut self, start: Location) -> StatementResult {
+        self.expect_token(&Token::LParen)?;
+        let expr = if self.peek_token_is(&Token::RParen)? {
+            ast::Expr::new_string("", start, start)
+        } else if self.has_tokens()? {
+            self.expr(0)?
+        } else {
+            return Err(self.err(ParseErrKind::ExpectedExpr(self.next_loc())));
+        };
+        self.expect_token(&Token::RParen)?;
+        Ok(ast::Statement::new_print(expr, start, self.loc()))
+    }
+
+    fn jump(&mut self, start: Location) -> StatementResult {
+        if let Some(ident_token) = self.next_token()? {
+            if let Token::Ident(name) = ident_token.token {
+                Ok(ast::Statement::new_jump(name, start, ident_token.end))
+            } else {
+                return Err(self.err(ParseErrKind::UnexpectedToken(ident_token)));
+            }
+        } else {
+            return Err(self.err(ParseErrKind::ExpectedIdent(self.next_loc())));
+        }
     }
 
     /// Get the next expression, possibly recurring to handle nested
@@ -342,76 +346,23 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
                 ast::Expr::new_literal(ast::Literal::new_string(value), start, end)
             }
             FormatString(tokens) => self.format_string(tokens)?,
-            Ident(name) => {
-                if self.next_token_is(&LParen)? {
-                    // Function def or call
-                    return Ok(self.func(name, start)?);
-                }
-                ast::Expr::new_ident(ast::Ident::new_ident(name), start, end)
-            }
+            Ident(name) => match self.next_token_is(&LParen)? {
+                true => self.func(name, start)?,
+                false => ast::Expr::new_ident(ast::Ident::new_ident(name), start, end),
+            },
             Block => {
                 let block = self.block()?;
                 let end = block.end;
                 ast::Expr::new_block(block, start, end)
             }
-            If => {
-                let mut branches = vec![];
-                let mut end;
-                let cond = self.expr(0)?;
-                let block = self.block()?;
-                end = block.end;
-                branches.push((cond, block));
-                loop {
-                    match self.next_tokens_are(vec![&EndOfStatement, &Else, &If])? {
-                        true => {
-                            let cond = self.expr(0)?;
-                            let block = self.block()?;
-                            end = block.end;
-                            branches.push((cond, block))
-                        }
-                        false => break,
-                    }
-                }
-                let default =
-                    match self.next_tokens_are(vec![&EndOfStatement, &Else])? {
-                        true => {
-                            let block = self.block()?;
-                            end = block.end;
-                            Some(block)
-                        }
-                        false => None,
-                    };
-                ast::Expr::new_conditional(branches, default, start, self.next_loc())
-            }
-            Loop => {
-                let expr = match self.peek_token_is(&ScopeStart)? {
-                    true => ast::Expr::new_literal(
-                        ast::Literal::new_bool(true),
-                        self.next_loc(),
-                        self.next_loc(),
-                    ),
-                    false => self.expr(0)?,
-                };
-                let block = self.block()?;
-                let end = block.end;
-                ast::Expr::new_loop(expr, block, start, end)
-            }
-            Break => {
-                let expr = match self.peek_token()? {
-                    Some(TokenWithLocation { token: EndOfStatement, .. }) | None => {
-                        ast::Expr::new_literal(ast::Literal::new_nil(), start, end)
-                    }
-                    _ => self.expr(0)?,
-                };
-                let end = expr.end;
-                ast::Expr::new_break(expr, start, end)
-            }
+            If => self.conditional(start)?,
+            Loop => self.loop_(start)?,
+            Break => self.break_(start)?,
             _ => self.expect_unary_expr(&token)?,
         };
-        expr = if self.next_token_is(&Comma)? {
-            self.tuple(expr)?
-        } else {
-            self.maybe_binary_expr(prec, expr)?
+        expr = match self.next_token_is(&Comma)? {
+            true => self.tuple(expr)?,
+            false => self.maybe_binary_expr(prec, expr)?,
         };
         Ok(expr)
     }
@@ -451,6 +402,8 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
         Ok(ast::Expr::new_format_string(items, start, self.next_loc()))
     }
 
+    /// Handle tuples. Tuples may or may not be contained within
+    /// parentheses.
     fn tuple(&mut self, first_expr: ast::Expr) -> ExprResult {
         let start = first_expr.start;
         let mut items = vec![first_expr];
@@ -544,6 +497,70 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
         let start = statements[0].start;
         let end = statements[statements.len() - 1].end;
         Ok(ast::Block::new(statements, start, end))
+    }
+
+    /// Handle `if <expr> -> ...`.
+    fn conditional(&mut self, start: Location) -> ExprResult {
+        use Token::{Else, EndOfStatement, If};
+        let mut branches = vec![];
+        let mut end;
+        let cond = self.expr(0)?;
+        let block = self.block()?;
+        end = block.end;
+        branches.push((cond, block));
+        loop {
+            match self.next_tokens_are(vec![&EndOfStatement, &Else, &If])? {
+                true => {
+                    let cond = self.expr(0)?;
+                    let block = self.block()?;
+                    end = block.end;
+                    branches.push((cond, block))
+                }
+                false => break,
+            }
+        }
+        let default = match self.next_tokens_are(vec![&EndOfStatement, &Else])? {
+            true => {
+                let block = self.block()?;
+                end = block.end;
+                Some(block)
+            }
+            false => None,
+        };
+        Ok(ast::Expr::new_conditional(branches, default, start, self.next_loc()))
+    }
+
+    /// Handle `loop -> ...` and `loop <cond> -> ...` (`while` loops).
+    /// TODO: Handle `for` loops.
+    fn loop_(&mut self, start: Location) -> ExprResult {
+        self.loop_level += 1;
+        let expr = match self.peek_token_is(&Token::ScopeStart)? {
+            true => ast::Expr::new_literal(
+                ast::Literal::new_bool(true),
+                self.next_loc(),
+                self.next_loc(),
+            ),
+            false => self.expr(0)?,
+        };
+        let block = self.block()?;
+        let end = block.end;
+        self.loop_level -= 1;
+        Ok(ast::Expr::new_loop(expr, block, start, end))
+    }
+
+    /// Handle `break`, ensuring it's contained in a `loop`.
+    fn break_(&mut self, start: Location) -> ExprResult {
+        if self.loop_level == 0 {
+            return Err(self.err(ParseErrKind::UnexpectedBreak(start)));
+        }
+        let expr = match self.peek_token()? {
+            Some(TokenWithLocation { token: Token::EndOfStatement, .. }) | None => {
+                ast::Expr::new_literal(ast::Literal::new_nil(), start, start)
+            }
+            _ => self.expr(0)?,
+        };
+        let end = expr.end;
+        Ok(ast::Expr::new_break(expr, start, end))
     }
 
     /// Handle `func () -> ...` (definition) and `func()` (call).
