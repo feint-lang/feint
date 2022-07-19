@@ -15,9 +15,9 @@
 - [ ] Implement `loop`
   - [x] Implement while loops
   - [ ] Implement for loops
-  - [ ] Fix `break` (works for simple cases but is wonky)
+  - [x] Fix `break` (works for simple cases but is wonky)
 - [ ] Implement function calls
-- [ ] Implement `print` function
+- [ ] Implement `print` function (`print` is currently implemented as a statement and has limited functionality)
 - [ ] Implement custom classes
 - [ ] Implement `import`
   - [ ] `import <name>`
