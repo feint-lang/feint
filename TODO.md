@@ -25,4 +25,5 @@
   - [ ] `import from <name>: <names>`
 - [ ] Figure out a nice way to do multi-line lambdas
 - [ ] Improve error handling/reporting
-  - [ ] Make source location available in AST and VM
+  - [-] Make source location available in AST
+  - [ ] Make source location available in VM

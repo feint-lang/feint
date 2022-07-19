@@ -5,7 +5,7 @@ use num_bigint::BigInt;
 use crate::ast;
 use crate::parser::*;
 use crate::scanner::Scanner;
-use crate::util::{source_from_text, BinaryOperator};
+use crate::util::{source_from_text, BinaryOperator, Location};
 
 /// Scan the text into tokens, parse the tokens, and return the
 /// resulting AST or error.
@@ -46,9 +46,13 @@ fn parse_empty() {
                                     BigInt::from(1)
                                 )
                             }
-                        )
+                        ),
+                        start: Location::new(1, 1),
+                        end: Location::new(1, 1),
                     }
-                )
+                ),
+                start: Location::new(1, 1),
+                end: Location::new(1, 1),
             }
         );
     }
@@ -59,13 +63,35 @@ fn parse_inline_block() {
     assert!(result.is_ok());
     let program = result.unwrap();
     let statements = program.statements;
-    // eprintln!("{statements:?}");
-    // check_token(tokens.next(), Token::Block, 1, 1, 1, 5);
-    // check_token(tokens.next(), Token::ScopeStart, 1, 7, 1, 8);
-    // check_token(tokens.next(), Token::True, 1, 10, 1, 13);
-    // check_token(tokens.next(), Token::ScopeEnd, 1, 14, 1, 14);
-    // check_token(tokens.next(), Token::EndOfStatement, 1, 14, 1, 14);
-    // assert!(tokens.next().is_none());
+    assert_eq!(statements.len(), 1);
+    let statement = statements.first().unwrap();
+    eprintln!("{}:{}", statement.start, statement.end);
+    assert_eq!(
+        *statement,
+        ast::Statement {
+            kind: ast::StatementKind::Expr(ast::Expr {
+                kind: ast::ExprKind::Block(ast::Block {
+                    statements: vec![ast::Statement {
+                        kind: ast::StatementKind::Expr(ast::Expr {
+                            kind: ast::ExprKind::Literal(ast::Literal {
+                                kind: ast::LiteralKind::Bool(true)
+                            }),
+                            start: Location::new(1, 10),
+                            end: Location::new(1, 13),
+                        }),
+                        start: Location::new(1, 10),
+                        end: Location::new(1, 13),
+                    }],
+                    start: Location::new(1, 10),
+                    end: Location::new(1, 13),
+                },),
+                start: Location::new(1, 1),
+                end: Location::new(1, 13),
+            }),
+            start: Location::new(1, 1),
+            end: Location::new(1, 13),
+        }
+    );
 }
 
 #[test]
@@ -110,8 +136,10 @@ fn parse_add() {
                             ast::Expr {
                                 kind: ast::ExprKind::Literal(ast::Literal {
                                     kind: ast::LiteralKind::Int(BigInt::from(1))
-                                })
-                            }
+                                }),
+                                start: Location::new(1, 1),
+                                end: Location::new(1, 1),
+                            },
                         ),
                         // +
                         BinaryOperator::Add,
@@ -120,12 +148,18 @@ fn parse_add() {
                             ast::Expr {
                                 kind: ast::ExprKind::Literal(ast::Literal {
                                     kind: ast::LiteralKind::Int(BigInt::from(2))
-                                })
-                            }
+                                }),
+                                start: Location::new(1, 5),
+                                end: Location::new(1, 5),
+                            },
                         ),
-                    )
+                    ),
+                    start: Location::new(1, 1),
+                    end: Location::new(1, 5),
                 }
-            )
+            ),
+            start: Location::new(1, 1),
+            end: Location::new(1, 5),
         }
     );
 }

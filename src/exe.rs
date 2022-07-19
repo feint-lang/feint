@@ -228,6 +228,10 @@ impl<'a> Executor<'a> {
             ExpectedExpr(loc) => {
                 (loc.clone(), format!("Parse error: expected expression at {loc}",))
             }
+            ExpectedIdent(loc) => {
+                (loc.clone(), format!("Parse error: expected identifier at {loc}",))
+            }
+            SyntaxErr(loc) => (loc.clone(), format!("Syntax error at {loc}",)),
             kind => (Location::new(0, 0), format!("Unhandled parse error: {:?}", kind)),
         };
         self.print_err_message(message, loc);

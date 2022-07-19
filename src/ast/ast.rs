@@ -3,7 +3,7 @@ use std::str::FromStr;
 
 use num_bigint::BigInt;
 
-use crate::util::{BinaryOperator, UnaryOperator};
+use crate::util::{BinaryOperator, Location, UnaryOperator};
 
 /// Program - a list of statements.
 #[derive(PartialEq)]
@@ -32,6 +32,8 @@ impl fmt::Debug for Program {
 #[derive(PartialEq)]
 pub struct Statement {
     pub kind: StatementKind,
+    pub start: Location,
+    pub end: Location,
 }
 
 #[derive(PartialEq)]
@@ -42,31 +44,32 @@ pub enum StatementKind {
     Expr(Expr),
 }
 
+// TODO: Pass correct location from parser to all constructors
 impl Statement {
-    pub fn new(kind: StatementKind) -> Self {
-        Self { kind }
+    pub fn new(kind: StatementKind, start: Location, end: Location) -> Self {
+        Self { kind, start, end }
     }
 
-    pub fn new_print(expr: Expr) -> Self {
-        Self::new(StatementKind::Print(expr))
+    pub fn new_print(expr: Expr, start: Location, end: Location) -> Self {
+        Self::new(StatementKind::Print(expr), start, end)
     }
 
-    pub fn new_jump(name: String) -> Self {
-        Self::new(StatementKind::Jump(name))
+    pub fn new_jump(name: String, start: Location, end: Location) -> Self {
+        Self::new(StatementKind::Jump(name), start, end)
     }
 
-    pub fn new_label(name: String) -> Self {
-        Self::new(StatementKind::Label(name))
+    pub fn new_label(name: String, start: Location, end: Location) -> Self {
+        Self::new(StatementKind::Label(name), start, end)
     }
 
-    pub fn new_expr(expr: Expr) -> Self {
-        Self::new(StatementKind::Expr(expr))
+    pub fn new_expr(expr: Expr, start: Location, end: Location) -> Self {
+        Self::new(StatementKind::Expr(expr), start, end)
     }
 }
 
 impl fmt::Debug for Statement {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Statement({:?})", self.kind)
+        write!(f, "Statement[{}, {}]({:?})", self.start, self.end, self.kind)
     }
 }
 
@@ -85,6 +88,8 @@ impl fmt::Debug for StatementKind {
 #[derive(PartialEq)]
 pub struct Expr {
     pub kind: ExprKind,
+    pub start: Location,
+    pub end: Location,
 }
 
 #[derive(PartialEq)]
@@ -104,77 +109,101 @@ pub enum ExprKind {
 }
 
 impl Expr {
-    pub fn new(kind: ExprKind) -> Self {
-        Self { kind }
+    pub fn new(kind: ExprKind, start: Location, end: Location) -> Self {
+        Self { kind, start, end }
     }
 
-    pub fn new_block(block: Block) -> Self {
-        Self::new(ExprKind::Block(block))
+    pub fn new_block(block: Block, start: Location, end: Location) -> Self {
+        Self::new(ExprKind::Block(block), start, end)
     }
 
     pub fn new_conditional(
         branches: Vec<(Expr, Block)>,
         default: Option<Block>,
+        start: Location,
+        end: Location,
     ) -> Self {
-        Self::new(ExprKind::Conditional(branches, default))
+        Self::new(ExprKind::Conditional(branches, default), start, end)
     }
 
-    pub fn new_loop(expr: Expr, block: Block) -> Self {
-        Self::new(ExprKind::Loop(Box::new(expr), block))
+    pub fn new_loop(expr: Expr, block: Block, start: Location, end: Location) -> Self {
+        Self::new(ExprKind::Loop(Box::new(expr), block), start, end)
     }
 
-    pub fn new_break(expr: Expr) -> Self {
-        Self::new(ExprKind::Break(Box::new(expr)))
+    pub fn new_break(expr: Expr, start: Location, end: Location) -> Self {
+        Self::new(ExprKind::Break(Box::new(expr)), start, end)
     }
 
-    pub fn new_func(name: String, params: Vec<String>, block: Block) -> Self {
-        Self::new(ExprKind::Func(Func::new(name, params, block)))
+    pub fn new_func(
+        name: String,
+        params: Vec<String>,
+        block: Block,
+        start: Location,
+        end: Location,
+    ) -> Self {
+        Self::new(ExprKind::Func(Func::new(name, params, block)), start, end)
     }
 
-    pub fn new_call(name: String, args: Vec<Expr>) -> Self {
-        Self::new(ExprKind::Call(Call::new(name, args)))
+    pub fn new_call(
+        name: String,
+        args: Vec<Expr>,
+        start: Location,
+        end: Location,
+    ) -> Self {
+        Self::new(ExprKind::Call(Call::new(name, args)), start, end)
     }
 
-    pub fn new_unary_op(operator: &str, a: Expr) -> Self {
+    pub fn new_unary_op(
+        operator: &str,
+        a: Expr,
+        start: Location,
+        end: Location,
+    ) -> Self {
         let operator = match UnaryOperator::from_str(operator) {
             Ok(op) => op,
             Err(err) => panic!("{}", err),
         };
-        Self::new(ExprKind::UnaryOp(operator, Box::new(a)))
+        Self::new(ExprKind::UnaryOp(operator, Box::new(a)), start, end)
     }
 
-    pub fn new_binary_op(a: Expr, operator: &str, b: Expr) -> Self {
+    pub fn new_binary_op(
+        a: Expr,
+        operator: &str,
+        b: Expr,
+        start: Location,
+        end: Location,
+    ) -> Self {
         let operator = match BinaryOperator::from_str(operator) {
             Ok(op) => op,
             Err(err) => panic!("{}", err),
         };
-        Self::new(ExprKind::BinaryOp(Box::new(a), operator, Box::new(b)))
+        Self::new(ExprKind::BinaryOp(Box::new(a), operator, Box::new(b)), start, end)
     }
 
-    pub fn new_ident(ident: Ident) -> Self {
-        Self::new(ExprKind::Ident(ident))
+    pub fn new_ident(ident: Ident, start: Location, end: Location) -> Self {
+        Self::new(ExprKind::Ident(ident), start, end)
     }
 
-    pub fn new_literal(literal: Literal) -> Self {
-        Self::new(ExprKind::Literal(literal))
+    pub fn new_literal(literal: Literal, start: Location, end: Location) -> Self {
+        Self::new(ExprKind::Literal(literal), start, end)
     }
 
-    pub fn new_string(value: &str) -> Self {
-        Self::new_literal(Literal::new_string(value))
+    pub fn new_string(value: &str, start: Location, end: Location) -> Self {
+        Self::new_literal(Literal::new_string(value), start, end)
     }
 
-    pub fn new_format_string(items: Vec<Expr>) -> Self {
-        Self::new(ExprKind::FormatString(items))
+    pub fn new_format_string(items: Vec<Expr>, start: Location, end: Location) -> Self {
+        Self::new(ExprKind::FormatString(items), start, end)
     }
 
-    pub fn new_tuple(items: Vec<Expr>) -> Self {
-        Self::new(ExprKind::Tuple(items))
+    pub fn new_tuple(items: Vec<Expr>, start: Location, end: Location) -> Self {
+        Self::new(ExprKind::Tuple(items), start, end)
     }
 }
 
 impl fmt::Debug for Expr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self.kind)
+        write!(f, "[{}, {}] {:?}", self.start, self.end, self.kind)
     }
 }
 
@@ -203,11 +232,13 @@ impl fmt::Debug for ExprKind {
 #[derive(PartialEq)]
 pub struct Block {
     pub statements: Vec<Statement>,
+    pub start: Location,
+    pub end: Location,
 }
 
 impl Block {
-    pub fn new(statements: Vec<Statement>) -> Self {
-        Self { statements }
+    pub fn new(statements: Vec<Statement>, start: Location, end: Location) -> Self {
+        Self { statements, start, end }
     }
 }
 
