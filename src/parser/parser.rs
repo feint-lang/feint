@@ -343,10 +343,6 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
                 ast::Expr::new_literal(ast::Literal::new_string(value), start, end)
             }
             FormatString(tokens) => self.format_string(tokens)?,
-            Ident(name) => match self.next_token_is(&LParen)? {
-                true => self.func(name, start)?,
-                false => ast::Expr::new_ident(ast::Ident::new_ident(name), start, end),
-            },
             Block => {
                 let block = self.block()?;
                 let end = block.end;
@@ -355,6 +351,10 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
             If => self.conditional(start)?,
             Loop => self.loop_(start)?,
             Break => self.break_(start)?,
+            Ident(name) => match self.next_token_is(&LParen)? {
+                true => self.func(name, start)?,
+                false => ast::Expr::new_ident(ast::Ident::new_ident(name), start, end),
+            },
             _ => self.expect_unary_expr(&token)?,
         };
         // If the expression is followed by a binary operator, a binary
@@ -401,6 +401,7 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
         Ok(expr)
     }
 
+    /// Handle format strings (AKA $ strings).
     fn format_string(
         &mut self,
         format_string_tokens: Vec<FormatStringToken>,
@@ -434,50 +435,6 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
         }
         // TODO: Fix end
         Ok(ast::Expr::new_format_string(items, start, self.next_loc()))
-    }
-
-    /// The current token should represent a unary operator and should
-    /// be followed by an expression.
-    fn expect_unary_expr(&mut self, op_token: &TokenWithLocation) -> ExprResult {
-        let prec = get_unary_precedence(&op_token.token);
-        if prec == 0 {
-            return Err(self.err(ParseErrKind::UnexpectedToken(op_token.clone())));
-        }
-        if !self.has_tokens()? {
-            return Err(self.err(ParseErrKind::ExpectedOperand(op_token.end)));
-        }
-        let rhs = self.expr(prec)?;
-        let op = op_token.as_str();
-        let (start, end) = (op_token.start, rhs.end);
-        Ok(ast::Expr::new_unary_op(op, rhs, start, end))
-    }
-
-    /// See if the expr is followed by an infix operator. If so, get the
-    /// RHS expression and return a binary expression. If not, just
-    /// return the original expr.
-    fn maybe_binary_expr(&mut self, prec: u8, mut expr: ast::Expr) -> ExprResult {
-        let start = expr.start;
-        loop {
-            let next = self.next_infix_token(prec)?;
-            if let Some((infix_token, mut infix_prec)) = next {
-                if !self.has_tokens()? {
-                    return Err(
-                        self.err(ParseErrKind::ExpectedOperand(infix_token.end))
-                    );
-                }
-                // Lower precedence of right-associative operator when
-                // fetching its RHS expr.
-                if is_right_associative(&infix_token.token) {
-                    infix_prec -= 1;
-                }
-                let rhs = self.expr(infix_prec)?;
-                let op = infix_token.as_str();
-                let end = rhs.end;
-                expr = ast::Expr::new_binary_op(expr, op, rhs, start, end);
-            } else {
-                break Ok(expr);
-            }
-        }
     }
 
     /// Handle `block ->`, `if <expr> ->`, etc.
@@ -583,6 +540,50 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
         } else {
             // Function call
             Ok(ast::Expr::new_call(name.clone(), items, start, call_end))
+        }
+    }
+
+    /// The current token should represent a unary operator and should
+    /// be followed by an expression.
+    fn expect_unary_expr(&mut self, op_token: &TokenWithLocation) -> ExprResult {
+        let prec = get_unary_precedence(&op_token.token);
+        if prec == 0 {
+            return Err(self.err(ParseErrKind::UnexpectedToken(op_token.clone())));
+        }
+        if !self.has_tokens()? {
+            return Err(self.err(ParseErrKind::ExpectedOperand(op_token.end)));
+        }
+        let rhs = self.expr(prec)?;
+        let op = op_token.as_str();
+        let (start, end) = (op_token.start, rhs.end);
+        Ok(ast::Expr::new_unary_op(op, rhs, start, end))
+    }
+
+    /// See if the expr is followed by an infix operator. If so, get the
+    /// RHS expression and return a binary expression. If not, just
+    /// return the original expr.
+    fn maybe_binary_expr(&mut self, prec: u8, mut expr: ast::Expr) -> ExprResult {
+        let start = expr.start;
+        loop {
+            let next = self.next_infix_token(prec)?;
+            if let Some((infix_token, mut infix_prec)) = next {
+                if !self.has_tokens()? {
+                    return Err(
+                        self.err(ParseErrKind::ExpectedOperand(infix_token.end))
+                    );
+                }
+                // Lower precedence of right-associative operator when
+                // fetching its RHS expr.
+                if is_right_associative(&infix_token.token) {
+                    infix_prec -= 1;
+                }
+                let rhs = self.expr(infix_prec)?;
+                let op = infix_token.as_str();
+                let end = rhs.end;
+                expr = ast::Expr::new_binary_op(expr, op, rhs, start, end);
+            } else {
+                break Ok(expr);
+            }
         }
     }
 }
