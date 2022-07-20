@@ -321,8 +321,8 @@ impl<'a, T: BufRead> Scanner<'a, T> {
                 if self.bracket_stack.size() == 0 {
                     self.maybe_add_end_of_statement_token(start);
                     if self.inline_block {
-                        self.scope_exit(self.source.location());
                         self.inline_block = false;
+                        self.scope_exit(self.source.location());
                     }
                     self.handle_indents()?;
                 } else {
@@ -342,8 +342,8 @@ impl<'a, T: BufRead> Scanner<'a, T> {
                 if self.bracket_stack.size() == 0 {
                     self.maybe_add_end_of_statement_token(start);
                     if self.inline_block {
-                        self.scope_exit(self.source.location());
                         self.inline_block = false;
+                        self.scope_exit(self.source.location());
                     }
                     self.set_indent_level(0, Location::new(start.line + 1, 1))?;
                 } else if let Some((c, location)) = self.bracket_stack.pop() {
