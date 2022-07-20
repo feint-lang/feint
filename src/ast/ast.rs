@@ -38,7 +38,7 @@ pub struct Statement {
 
 #[derive(PartialEq)]
 pub enum StatementKind {
-    Print(Expr),
+    Print(Vec<Expr>),
     Jump(String),
     Label(String),
     Expr(Expr),
@@ -50,8 +50,8 @@ impl Statement {
         Self { kind, start, end }
     }
 
-    pub fn new_print(expr: Expr, start: Location, end: Location) -> Self {
-        Self::new(StatementKind::Print(expr), start, end)
+    pub fn new_print(items: Vec<Expr>, start: Location, end: Location) -> Self {
+        Self::new(StatementKind::Print(items), start, end)
     }
 
     pub fn new_jump(name: String, start: Location, end: Location) -> Self {
@@ -77,7 +77,7 @@ impl fmt::Debug for StatementKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Expr(expr) => write!(f, "Expr({:?})", expr),
-            Self::Print(_expr) => write!(f, "Print"),
+            Self::Print(_items) => write!(f, "Print"),
             Self::Label(label_index) => write!(f, "Label: {}", label_index),
             Self::Jump(label_index) => write!(f, "Jump: {}", label_index),
         }

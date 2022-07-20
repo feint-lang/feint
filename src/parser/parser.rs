@@ -296,19 +296,18 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
         Ok(statement)
     }
 
+    /// Handle print statement.
     fn print(&mut self, start: Location) -> StatementResult {
         self.expect_token(&Token::LParen)?;
-        let expr = if self.peek_token_is(&Token::RParen)? {
-            ast::Expr::new_string("", start, start)
-        } else if self.has_tokens()? {
-            self.expr(0)?
-        } else {
-            return Err(self.err(ParseErrKind::ExpectedExpr(self.next_loc())));
+        let call = self.func("print".to_owned(), start)?;
+        let args = match call.kind {
+            ast::ExprKind::Call(call) => call.args,
+            _ => return Err(self.err(ParseErrKind::SyntaxErr(self.next_loc()))),
         };
-        self.expect_token(&Token::RParen)?;
-        Ok(ast::Statement::new_print(expr, start, self.loc()))
+        Ok(ast::Statement::new_print(args, start, self.loc()))
     }
 
+    /// Handle jump statement.
     fn jump(&mut self, start: Location) -> StatementResult {
         if let Some(ident_token) = self.next_token()? {
             if let Token::Ident(name) = ident_token.token {

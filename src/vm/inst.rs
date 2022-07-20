@@ -32,7 +32,7 @@ pub enum Inst {
     LoadVar(String),
     ScopeStart,
     ScopeEnd(usize),
-    Print, // Print value at top of stack
+    Print(usize), // Print N values at top of stack
     Return,
     Halt(u8),
 

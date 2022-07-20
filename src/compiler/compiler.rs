@@ -217,9 +217,12 @@ impl<'a> Visitor<'a> {
 
     fn visit_statement(&mut self, node: ast::Statement) -> VisitResult {
         match node.kind {
-            ast::StatementKind::Print(expr) => {
-                self.visit_expr(expr)?;
-                self.push(Inst::Print);
+            ast::StatementKind::Print(items) => {
+                let num_items = items.len();
+                for item in items {
+                    self.visit_expr(item)?;
+                }
+                self.push(Inst::Print(num_items));
                 self.push(Inst::Push(0));
             }
             ast::StatementKind::Jump(name) => {

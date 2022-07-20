@@ -132,7 +132,7 @@ impl<'a> Repl<'a> {
             if let Some(&index) = self.executor.vm.peek() {
                 // Don't print nil when the result of an expression is nil
                 if index != 0 {
-                    instructions.push(Inst::Print);
+                    instructions.push(Inst::Print(1));
                 }
             }
             if let Err(err) = self.executor.vm.execute(instructions, false) {

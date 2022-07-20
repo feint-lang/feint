@@ -256,25 +256,40 @@ impl VM {
                         return self.err(NotEnoughValuesOnStack(format!("Tuple: {n}")));
                     }
                 }
-                Print => match self.stack.peek() {
-                    Some(index) => {
-                        let val = self.ctx.get_obj(*index).unwrap();
-                        let print;
-                        if cfg!(debug_assertions) {
-                            self.dis(dis, ip, &instructions);
-                            print = !dis;
+                Print(n) => {
+                    let do_print;
+                    if cfg!(debug_assertions) {
+                        do_print = !dis;
+                    } else {
+                        do_print = true;
+                    }
+                    if do_print {
+                        if *n == 0 {
+                            println!();
                         } else {
-                            print = true;
+                            match self.stack.pop_n(*n) {
+                                Some(indices) => {
+                                    let last = n - 1;
+                                    for i in 0..=last {
+                                        let index = indices[i];
+                                        let val = self.ctx.get_obj(index).unwrap();
+                                        if i == last {
+                                            print!("{}", val);
+                                        } else {
+                                            print!("{} ", val);
+                                        }
+                                    }
+                                    println!();
+                                }
+                                None => {
+                                    return self.err(NotEnoughValuesOnStack(format!(
+                                        "Print: {n}"
+                                    )));
+                                }
+                            }
                         }
-                        if print {
-                            println!("{}", val);
-                        }
-                        self.pop();
                     }
-                    None => {
-                        self.err(EmptyStack)?;
-                    }
-                },
+                }
                 Return => {
                     // TODO: Implement actual return
                     match self.pop() {
@@ -296,9 +311,7 @@ impl VM {
             }
 
             #[cfg(debug_assertions)]
-            if instructions[ip] != Print {
-                self.dis(dis, ip, &instructions);
-            }
+            self.dis(dis, ip, &instructions);
 
             ip += 1;
 
@@ -440,13 +453,7 @@ impl VM {
             BinaryOp(operator) => self.format_aligned("BINARY_OP", operator),
             MakeString(n) => self.format_aligned("MAKE_STRING", n),
             MakeTuple(n) => self.format_aligned("MAKE_TUPLE", n),
-            Print => match self.peek() {
-                Some(index) => {
-                    let obj = self.ctx.get_obj(*index).unwrap();
-                    self.format_aligned("PRINT", format!("{} ({:?})", index, obj))
-                }
-                None => self.format_aligned("PRINT", "[EMPTY]"),
-            },
+            Print(n) => self.format_aligned("PRINT", format!("({n})")),
             Return => format!("RETURN"),
             Halt(code) => self.format_aligned("HALT", code),
             other => format!("{:?}", other),
@@ -474,7 +481,7 @@ mod tests {
             Inst::LoadConst(i),
             Inst::LoadConst(j),
             Inst::BinaryOp(BinaryOperator::Add),
-            Inst::Print,
+            Inst::Print(0),
             Inst::Halt(0),
         ];
         if let Ok(result) = vm.execute(instructions, false) {
