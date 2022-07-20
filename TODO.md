@@ -12,6 +12,7 @@
 - [x] Implement `jump` (jump *forward* to label)
 - [x] Implement conditionals
 - [ ] Implement ternary operator
+- [ ] Implement `match`?
 - [ ] Implement range
 - [ ] Implement `loop`
   - [x] Implement while loops
@@ -25,5 +26,6 @@
   - [ ] `import from <name>: <names>`
 - [ ] Figure out a nice way to do multi-line lambdas
 - [ ] Improve error handling/reporting
-  - [ ] Make source location available in AST
+  - [ ] Make source location available in AST (started)
+  - [ ] Fix locations in format strings
   - [ ] Make source location available in VM
