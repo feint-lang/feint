@@ -62,9 +62,11 @@ impl Object for Tuple {
 
 impl fmt::Display for Tuple {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let num_items = self.items().len();
         let items: Vec<String> =
             self.items().iter().map(|item| format!("{item}")).collect();
-        write!(f, "({})", items.join(", "))
+        let trailing_comma = if num_items == 1 { "," } else { "" };
+        write!(f, "({}{})", items.join(", "), trailing_comma)
     }
 }
 
