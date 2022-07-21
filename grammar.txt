@@ -127,7 +127,7 @@ block :
     | "block" "->" suite
 
 inline_block :
-    | "block" "->" expr
+    | "block" "->" (jump | basic_expr | simple_expr | inline_expr)
 
 if :
     | "if" cond "->" suite (else_if | inline_else_if)
