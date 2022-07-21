@@ -21,8 +21,10 @@ pub enum Inst {
     // jump to second address.
     JumpIfElse(usize, usize),
 
-    // Placeholder loop breaks that will be converted to Jumps
+    // The break and continue instructions are placeholders that will
+    // be converted to jumps by the compiler.
     Break,
+    Continue,
 
     UnaryOp(UnaryOperator),
     BinaryOp(BinaryOperator),

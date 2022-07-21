@@ -285,6 +285,7 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
             Print => self.print(start)?,
             Jump => self.jump(start)?,
             Label(name) => ast::Statement::new_label(name, start, token.end),
+            Continue => self.continue_(start, token.end)?,
             _ => {
                 self.lookahead_queue.push_front(token);
                 let expr = self.expr(0)?;
@@ -511,6 +512,14 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
         };
         let end = expr.end;
         Ok(ast::Expr::new_break(expr, start, end))
+    }
+
+    /// Handle `continue`, ensuring it's contained in a `loop`.
+    fn continue_(&mut self, start: Location, end: Location) -> StatementResult {
+        if self.loop_level == 0 {
+            return Err(self.err(ParseErrKind::UnexpectedContinue(start)));
+        }
+        Ok(ast::Statement::new_continue(start, end))
     }
 
     /// Handle `func () -> ...` (definition) and `func()` (call).

@@ -237,6 +237,12 @@ impl<'a> Executor<'a> {
                     "Parse error: unexpected break at {loc} (break must be in a loop)"
                 ),
             ),
+            UnexpectedContinue(loc) => (
+                loc.clone(),
+                format!(
+                    "Parse error: unexpected continue at {loc} (continue must be in a loop)"
+                ),
+            ),
             SyntaxErr(loc) => (loc.clone(), format!("Syntax error at {loc}",)),
             kind => (Location::new(0, 0), format!("Unhandled parse error: {:?}", kind)),
         };

@@ -41,6 +41,7 @@ pub enum StatementKind {
     Print(Vec<Expr>),
     Jump(String),
     Label(String),
+    Continue,
     Expr(Expr),
 }
 
@@ -62,6 +63,10 @@ impl Statement {
         Self::new(StatementKind::Label(name), start, end)
     }
 
+    pub fn new_continue(start: Location, end: Location) -> Self {
+        Self::new(StatementKind::Continue, start, end)
+    }
+
     pub fn new_expr(expr: Expr, start: Location, end: Location) -> Self {
         Self::new(StatementKind::Expr(expr), start, end)
     }
@@ -80,6 +85,7 @@ impl fmt::Debug for StatementKind {
             Self::Print(_items) => write!(f, "Print"),
             Self::Label(label_index) => write!(f, "Label: {}", label_index),
             Self::Jump(label_index) => write!(f, "Jump: {}", label_index),
+            Self::Continue => write!(f, "Continue"),
         }
     }
 }

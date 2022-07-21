@@ -18,6 +18,7 @@
   - [x] Implement while loops
   - [ ] Implement for loops
   - [x] Fix `break` (works for simple cases but is wonky)
+  - [ ] Implement `continue`
 - [ ] Implement function calls
 - [ ] Implement `print` function (`print` is currently implemented as a statement and has limited functionality)
 - [ ] Implement custom classes

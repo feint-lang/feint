@@ -11,6 +11,7 @@ statement :
 statement_type :
     | jump
     | label
+    | continue
     | expr
 
 jump :

@@ -37,3 +37,14 @@ result = loop i < 5 ->
     i += 1
 
 print($"\nloop result = {result} (should be 5)\n")
+
+i = 0
+result = loop i < 5 ->
+    if i == 2 ->
+        print("continuing (skipping i = 2 and i = 3)")
+        i += 2
+        continue
+    print($"i = {i}")
+    i += 1
+
+print($"\nloop result = {result} (should be 5)\n")

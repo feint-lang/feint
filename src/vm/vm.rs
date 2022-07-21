@@ -108,6 +108,7 @@ impl VM {
                     continue;
                 }
                 Break => unreachable!("break was not converted to jump"),
+                Continue => unreachable!("continue was not converted to jump"),
                 LoadConst(index) => {
                     self.push(*index);
                 }
@@ -434,6 +435,7 @@ impl VM {
                 ),
             },
             Break => unreachable!("break was not converted to jump"),
+            Continue => unreachable!("continue was not converted to jump"),
             LoadConst(index) => {
                 let obj = self.ctx.get_obj(*index).unwrap();
                 self.format_aligned("LOAD_CONST", format!("{} ({:?})", index, obj))

@@ -187,10 +187,11 @@ impl<'a> Visitor<'a> {
         let after_addr = self.instructions.len();
         // Set address of jump-out placeholder.
         self.instructions[jump_out_index] = Inst::JumpIfNot(after_addr);
-        // Set address of breaks.
+        // Set address of breaks and continues.
         for addr in loop_addr..after_addr {
             match self.instructions[addr] {
                 Inst::Break => self.instructions[addr] = Inst::Jump(after_addr),
+                Inst::Continue => self.instructions[addr] = Inst::Jump(loop_addr),
                 _ => (),
             }
         }
@@ -200,6 +201,12 @@ impl<'a> Visitor<'a> {
     fn visit_break(&mut self, expr: ast::Expr) -> VisitResult {
         self.visit_expr(expr)?;
         self.instructions.push(Inst::Break);
+        Ok(())
+    }
+
+    fn visit_continue(&mut self) -> VisitResult {
+        eprintln!("XXX: visit continue");
+        self.instructions.push(Inst::Continue);
         Ok(())
     }
 
@@ -216,8 +223,9 @@ impl<'a> Visitor<'a> {
     }
 
     fn visit_statement(&mut self, node: ast::Statement) -> VisitResult {
+        type Kind = ast::StatementKind;
         match node.kind {
-            ast::StatementKind::Print(items) => {
+            Kind::Print(items) => {
                 let num_items = items.len();
                 for item in items {
                     self.visit_expr(item)?;
@@ -225,7 +233,7 @@ impl<'a> Visitor<'a> {
                 self.push(Inst::Print(num_items));
                 self.push(Inst::Push(0));
             }
-            ast::StatementKind::Jump(name) => {
+            Kind::Jump(name) => {
                 // Insert placeholder jump instruction to be filled in
                 // with corresponding label address once labels have
                 // been processed. We also take care to exit nested
@@ -237,14 +245,15 @@ impl<'a> Visitor<'a> {
                 ));
                 self.scope_tree.add_jump(name.as_str(), jump_addr);
             }
-            ast::StatementKind::Label(name) => {
+            Kind::Label(name) => {
                 self.push(Inst::NoOp);
                 let addr = self.instructions.len() - 1;
                 if self.scope_tree.add_label(name.as_str(), addr).is_some() {
                     self.err(format!("Duplicate label in scope: {}", name))?;
                 }
             }
-            ast::StatementKind::Expr(expr) => self.visit_expr(expr)?,
+            Kind::Continue => self.visit_continue()?,
+            Kind::Expr(expr) => self.visit_expr(expr)?,
         }
         Ok(())
     }
