@@ -1,71 +1,73 @@
-# Every program contains 0 or more statements.
+# Program --------------------------------------------------------------
+
 program :
     | statement*
 
-# Statements includes expressions that return values and other
-# statements that don't values. The intent is for most constructs to be
-# expressions. For things like loops it's not clear what the returned
-# value should be, so those probably won't be implemented as
-# expressions.
+# Statements -----------------------------------------------------------
+
 statement :
+    | statement_type NEWLINE
+
+statement_type :
+    | jump
+    | label
     | expr
 
+jump :
+    | "jump" IDENTIFIER
+
+label :
+    | IDENTIFIER ":"
+
+# Expressions ----------------------------------------------------------
+
 expr :
-    | "(" expr ")"
-    | assignment
+    | print
+    | basic_expr
+    | simple_expr
+    | compound_expr
+
+print :
+    | "print" "(" args ")"
+
+# Basic Expressions ----------------------------------------------------
+#
+# Basic expressions can be used anywhere.
+
+basic_expr :
+    | "(" basic_expr ")"
     | atom
     | sum
-    | block
-    | function
-    | operation
-    | type
-
-assignment :
-    | IDENTIFIER "=" expr
+    | assignment
 
 atom :
-    | bool
-    | float
-    | int
-    | string
-    | name
-
-bool :
-    | "true"
-    | "false"
-
-float :
+    | nil
+    | "true" | "false"
+    | INT
     | FLOAT
+    | string
+    | format_string
+    | tuple
+    | NAME
 
-int :
-    | INT_02
-    | INT_08
-    | INT_10
-    | INT_16
+string :
+    | QUOTE CHAR* QUOTE
 
-string:
-    | "\"" CHAR* "\""
+format_string :
+    | "$" QUOTE format_string_part* QUOTE
 
-# TODO: Figure out how to delineate blocks.
-block :
-    | BLOCK_START expr+ BLOCK_END
+format_string_part :
+    | "{" expr "}"
+    | CHAR*
 
-type :
-    | TYPE_IDENTIFIER "(" parameter_list? ")" "\n" block
+tuple_expr :
+    | basic_expr
+    | inline_expr
 
-function :
-    | IDENTIFIER? "(" parameter_list? ")" type_annotation "->" (expr| "\n" block)
-
-parameter_list :
-    | parameter "," parameter_list
-    | parameter
-
-parameter :
-    | IDENTIFIER type_annotation
-
-type_annotation :
-    | ""
-    | ":" TYPE_IDENTIFIER
+tuple :
+    | "(" ")"
+    | "(" tuple_expr "," ")"
+    | "(" tuple_expr ("," tuple_expr)+ [","] ")"
 
 sum :
     | expr ("+" | "-") product
@@ -77,36 +79,146 @@ power :
     | expr ("^" power)
     | expr
 
-name:
-    | IDENTIFIER
-    | TYPE_IDENTIFIER
-    | TYPE_METHOD_IDENTIFIER
+assignment :
+    | IDENTIFIER "=" expr
+
+# Simple Expressions ---------------------------------------------------
+#
+# Simple expressions are non-compound expressions that may not be valid
+# in certain places.
+
+simple_expr :
+    | "(" simple_expr ")"
+    | break
+
+break :
+    | "break"
+    | "break" expr
+
+# Compound Expressions -------------------------------------------------
+#
+# Compound expressions contain either an indented block of statements
+# or an inline expression on the same line. Inline compound expressions
+# can be used in all the same places as basic expressions.
+
+compound_expr :
+    | block
+    | if
+    | loop
+    | function
+    | call
+    | type
+    | inline_expr
+
+inline_expr :
+    | inline_block
+    | inline_if
+    | inline_loop
+    | inline_function
+    | inline_type
+
+# A suite is an indented block of statements, often referred to as
+# a block. The name suite is used here to distinguish from block
+# expressions.
+suite :
+    | NEWLINE INDENT statement+ DEDENT
+
+block :
+    | "block" "->" suite
+
+inline_block :
+    | "block" "->" expr
+
+if :
+    | "if" cond "->" suite (else_if | inline_else_if)
+    | "if" cond "->" suite [(else | inline_else)]
+else_if :
+    | "else if" cond "->" suite (else_if | inline_else_if)
+    | "else if" cond "->" suite [(else | inline_else)]
+else :
+    | "else" "->" suite
+
+inline_if :
+    | "if" cond "->" expr inline_else_if
+    | "if" cond "->" expr [inline_else]
+inline_else_if :
+    | "else if" cond "->" expr inline_else_if
+    | "else if" cond "->" expr [inline_else]
+inline_else :
+    | "else" "->" expr
+
+loop :
+    | "loop" "->" suite
+    | "loop" cond "->" suite
+    | "loop" IDENTIFIER "<-" expr "->" suite
+
+inline_loop :
+    | "loop" "->" expr
+    | "loop" expr "->" expr
+    | "loop" IDENTIFIER "<-" expr "->" expr
+
+cond :
+    | basic_expr
+    | call
+    | inline_block
+
+function :
+    | [IDENTIFIER] "(" [params] ")" "->" suite
+
+inline_function :
+    | [IDENTIFIER] "(" [params] ")" "->" expr
+
+params :
+    | IDENTIFIER ("," IDENTIFIER)* [","]
+
+call :
+    | IDENTIFIER "(" [args] ")"
+
+args :
+    | tuple_expr ("," tuple_expr)* [","]
+
+type :
+    | TYPE_IDENTIFIER params "->" suite
+
+inline_type :
+    | TYPE_IDENTIFIER params "->" expr
+
+# Imports --------------------------------------------------------------
 
 import :
     | import IMPORT_PATH
     | import IMPORT_PATH as IDENTIFIER
-    | import from IMPORT_PATH: IMPORTED_IDENTIFIER*
+    | import from IMPORT_PATH: IMPORT_IDENTIFIER*
+
+# Comments -------------------------------------------------------------
 
 comment :
-    | "#" COMMENT_CHARACTER*
+    | "#" COMMENT_CHAR*
 
-CHARACTER : ".*"
-COMMENT_CHARACTER : "[^\n]*"
+# Character classes ----------------------------------------------------
+
+CHAR : ".*"
+COMMENT_CHAR : "[^\n]*"
+QUOTE : "[\"']"
+
+NAME:
+    | IDENTIFIER
+    | TYPE_IDENTIFIER
+    | TYPE_METHOD_IDENTIFIER
 
 # Identifiers
 IDENTIFIER             : "[a-z]|[a-z][a-z0-9_]*[a-z0-9]"
 TYPE_IDENTIFIER        : "[A-Z]|[A-Z][A-Za-z0-9]*[A-Za-z0-9]"
-TYPE_METHOD_IDENTIFIER : "\$IDENTIFIER"
+TYPE_METHOD_IDENTIFIER : "$" IDENTIFIER
 
 # Imports
 IMPORT_PATH    :
     | IMPORT_SEGMENT "." IMPORT_PATH
     | IDENTIFIER "as" IDENTIFIER
     | IDENTIFIER
-IMPORTED_IDENTIFIER :
-    | name "," IMPORTED_IDENTIFIER*
-    | name "as" name
-    | name
+IMPORT_IDENTIFIER :
+    | NAME ["as" NAME] "," IMPORT_IDENTIFIER*
+    | NAME ["as" NAME]
 
 # Numeric character sets allowing for underscores between digits
 ZERO    : "0(_?0+)*"
@@ -116,12 +228,14 @@ DECIMAL : "[0-9](_?[0-9]+)*"
 NATURAL : "[1-9](_?[0-9]+)*"
 HEX     : "[A-Za-z0-9](_?[A-Za-z0-9]+)*"
 
-FLOAT :
-    | "{ DECIMAL }\.{ DECIMAL }"
-    | "{ DECIMAL }(\.{ DECIMAL })?(e|E)[+-]?{ DECIMAL }"
+INT : (INT_02 | INT_08 | INT_10 | INT_16)
 
 # Integers
 INT_02  : "(+|-)?0b_?{ BINARY }"
 INT_08  : "(+|-)?0o_?{ OCTAL }"
 INT_10  : "(+|-)?({ ZERO }|{ NATURAL })"
 INT_16  : "(+|-)?0x_{ HEX }"
+
+FLOAT :
+    | "{ DECIMAL }\.{ DECIMAL }"
+    | "{ DECIMAL }(\.{ DECIMAL })?(e|E)[+-]?{ DECIMAL }"
