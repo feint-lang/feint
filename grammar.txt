@@ -22,13 +22,9 @@ label :
 # Expressions ----------------------------------------------------------
 
 expr :
-    | print
     | basic_expr
     | simple_expr
     | compound_expr
-
-print :
-    | "print" "(" args ")"
 
 # Basic Expressions ----------------------------------------------------
 #
