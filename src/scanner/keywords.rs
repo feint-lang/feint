@@ -15,17 +15,15 @@ lazy_static! {
         ("from", From),
         ("package", Package),
         ("as", As),
-        ("let", Let),         // ???
+        ("let", Let),
         ("block", Block),
         ("if", If),
         ("else", Else),
         ("match", Match),
         ("loop", Loop),
-        ("for", For),         // ???
-        ("while", While),     // ???
         ("break", Break),
         ("continue", Continue),
-        ("jump", Jump),       // goto label
+        ("jump", Jump),
         ("print", Print),
     ]
     .iter()
