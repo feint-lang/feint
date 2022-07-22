@@ -174,6 +174,12 @@ impl<'a> Executor<'a> {
             InvalidIndent(num_spaces) => {
                 format!("Syntax error: Invalid indent with {num_spaces} spaces (should be a multiple of 4)")
             }
+            ExpectedBlock => {
+                format!("Syntax error: Expected block")
+            }
+            ExpectedIndentedBlock(_) => {
+                format!("Syntax error: Expected indented block")
+            }
             UnexpectedIndent(_) => {
                 format!("Syntax error: Unexpected indent")
             }

@@ -174,7 +174,7 @@ impl<T: BufRead> Source<T> {
         None
     }
 
-    pub fn location(&self) -> Location {
+    pub fn loc(&self) -> Location {
         Location::new(self.line_no, self.col)
     }
 }

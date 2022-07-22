@@ -25,6 +25,14 @@ pub fn scan_optimistic(text: &str) -> Vec<TokenWithLocation> {
     }
 }
 
+/// Scan text and assume success, returning inner tokens.
+/// Panic on error. Mainly useful for testing.
+pub fn scan_to_tokens(text: &str) -> Vec<Token> {
+    let tokens = scan_optimistic(text);
+    let tokens: Vec<Token> = tokens.iter().map(|t| t.token.clone()).collect();
+    tokens
+}
+
 #[test]
 fn scan_empty() {
     let tokens = scan_optimistic("");
@@ -176,8 +184,8 @@ g (y) ->  # 6
     check_token(tokens.next(), Token::EndOfStatement, 2, 14, 2, 14);
     check_token(tokens.next(), Token::Int(BigInt::from(1)), 3, 5, 3, 5);
     check_token(tokens.next(), Token::EndOfStatement, 3, 14, 3, 14);
-    check_token(tokens.next(), Token::ScopeEnd, 6, 0, 6, 0);
-    check_token(tokens.next(), Token::EndOfStatement, 6, 0, 6, 0);
+    check_token(tokens.next(), Token::ScopeEnd, 4, 0, 4, 0);
+    check_token(tokens.next(), Token::EndOfStatement, 4, 0, 4, 0);
 
     // g
     check_token(tokens.next(), Token::Ident("g".to_string()), 6, 1, 6, 1);
@@ -255,17 +263,124 @@ fn scan_unknown() {
 }
 
 #[test]
-fn scan_inline_block() {
-    let source = "block -> true";
-    let tokens = scan_optimistic(source);
-    let mut tokens = tokens.iter();
-    check_token(tokens.next(), Token::Block, 1, 1, 1, 5);
-    check_token(tokens.next(), Token::ScopeStart, 1, 7, 1, 8);
-    check_token(tokens.next(), Token::True, 1, 10, 1, 13);
-    check_token(tokens.next(), Token::EndOfStatement, 1, 14, 1, 14);
-    check_token(tokens.next(), Token::ScopeEnd, 1, 14, 1, 14);
-    check_token(tokens.next(), Token::EndOfStatement, 1, 14, 1, 14);
-    assert!(tokens.next().is_none());
+fn scan_inline_block_simple() {
+    use Token::*;
+    let tokens = scan_to_tokens("block -> true");
+    assert_eq!(
+        tokens,
+        vec![Block, InlineScopeStart, True, InlineScopeEnd, EndOfStatement]
+    );
+}
+
+#[test]
+fn scan_inline_block_simple_in_parens() {
+    use Token::*;
+    let tokens = scan_to_tokens("(block -> true)");
+    assert_eq!(
+        tokens,
+        vec![
+            LParen,
+            Block,
+            InlineScopeStart,
+            True,
+            InlineScopeEnd,
+            RParen,
+            EndOfStatement,
+        ]
+    );
+}
+
+#[test]
+fn scan_inline_block_1() {
+    use Token::*;
+    let tokens = scan_to_tokens("block -> ()");
+    assert_eq!(
+        tokens,
+        vec![Block, InlineScopeStart, LParen, RParen, InlineScopeEnd, EndOfStatement]
+    );
+}
+
+#[test]
+fn scan_inline_block_2() {
+    use Token::*;
+    let tokens = scan_to_tokens("(block -> 1, block -> 2)");
+    assert_eq!(
+        tokens,
+        vec![
+            LParen,
+            Block,
+            InlineScopeStart,
+            Int(BigInt::from(1)),
+            InlineScopeEnd,
+            Comma,
+            Block,
+            InlineScopeStart,
+            Int(BigInt::from(2)),
+            InlineScopeEnd,
+            RParen,
+            EndOfStatement,
+        ]
+    );
+}
+
+#[test]
+fn scan_inline_block_3() {
+    use Token::*;
+    let tokens = scan_to_tokens("block -> (1, 2)");
+    assert_eq!(
+        tokens,
+        vec![
+            Block,
+            InlineScopeStart,
+            LParen,
+            Int(BigInt::from(1)),
+            Comma,
+            Int(BigInt::from(2)),
+            RParen,
+            InlineScopeEnd,
+            EndOfStatement,
+        ]
+    );
+}
+
+#[test]
+fn scan_inline_block_4() {
+    use Token::*;
+    let tokens = scan_to_tokens("block -> block -> true");
+    assert_eq!(
+        tokens,
+        vec![
+            Block,
+            InlineScopeStart,
+            Block,
+            InlineScopeStart,
+            True,
+            InlineScopeEnd,
+            InlineScopeEnd,
+            EndOfStatement,
+        ]
+    );
+}
+
+#[test]
+fn scan_inline_block_5() {
+    use Token::*;
+    let tokens = scan_to_tokens("(block -> block -> true)");
+    assert_eq!(
+        tokens,
+        vec![
+            LParen,
+            Block,
+            InlineScopeStart,
+            Block,
+            InlineScopeStart,
+            True,
+            InlineScopeEnd,
+            InlineScopeEnd,
+            RParen,
+            EndOfStatement,
+        ]
+    );
 }
 
 // Utilities -------------------------------------------------------

@@ -61,6 +61,9 @@ pub enum Token {
     ScopeStart, // -> (start of scope: function, block, etc)
     ScopeEnd,   // end of scope (implicit, no symbol)
 
+    InlineScopeStart, // -> (start of inline scope: function, block, etc)
+    InlineScopeEnd,   // end of inline scope (implicit, no symbol)
+
     // Keywords
     Nil,           // nil
     True,          // true
@@ -131,6 +134,9 @@ impl Token {
 
             Self::ScopeStart => "->",
             Self::ScopeEnd => "<scope end>",
+
+            Self::InlineScopeStart => "-> (inline)",
+            Self::InlineScopeEnd => "<inline scope end>",
 
             // Keywords
             Self::Block => "block",

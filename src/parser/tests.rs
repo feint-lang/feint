@@ -57,41 +57,50 @@ fn parse_empty() {
         );
     }
 
-#[test]
-fn parse_inline_block() {
-    let result = parse_text("block -> true");
+fn check_inline_block(result: ParseResult) {
     assert!(result.is_ok());
     let program = result.unwrap();
     let statements = program.statements;
     assert_eq!(statements.len(), 1);
-    let statement = statements.first().unwrap();
-    eprintln!("{}:{}", statement.start, statement.end);
-    assert_eq!(
-        *statement,
-        ast::Statement {
-            kind: ast::StatementKind::Expr(ast::Expr {
-                kind: ast::ExprKind::Block(ast::Block {
-                    statements: vec![ast::Statement {
-                        kind: ast::StatementKind::Expr(ast::Expr {
-                            kind: ast::ExprKind::Literal(ast::Literal {
-                                kind: ast::LiteralKind::Bool(true)
-                            }),
-                            start: Location::new(1, 10),
-                            end: Location::new(1, 13),
+    let parsed = statements.first().unwrap();
+    eprintln!("{}:{}", parsed.start, parsed.end);
+    let expected = ast::Statement {
+        kind: ast::StatementKind::Expr(ast::Expr {
+            kind: ast::ExprKind::Block(ast::Block {
+                statements: vec![ast::Statement {
+                    kind: ast::StatementKind::Expr(ast::Expr {
+                        kind: ast::ExprKind::Literal(ast::Literal {
+                            kind: ast::LiteralKind::Bool(true),
                         }),
                         start: Location::new(1, 10),
                         end: Location::new(1, 13),
-                    }],
+                    }),
                     start: Location::new(1, 10),
                     end: Location::new(1, 13),
-                },),
-                start: Location::new(1, 1),
+                }],
+                start: Location::new(1, 10),
                 end: Location::new(1, 13),
             }),
             start: Location::new(1, 1),
             end: Location::new(1, 13),
-        }
-    );
+        }),
+        start: Location::new(1, 1),
+        end: Location::new(1, 13),
+    };
+    assert_eq!(*parsed, expected);
+}
+
+#[test]
+fn parse_inline_block() {
+    let result = parse_text("block -> true");
+    check_inline_block(result);
+}
+
+#[test]
+fn parse_inline_block_in_parens() {
+    // Should be parsed into the same statement as without parens
+    let result = parse_text("(block -> true)");
+    check_inline_block(result);
 }
 
 #[test]

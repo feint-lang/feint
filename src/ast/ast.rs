@@ -97,6 +97,7 @@ pub enum ExprKind {
     UnaryOp(UnaryOperator, Box<Expr>),
     BinaryOp(Box<Expr>, BinaryOperator, Box<Expr>),
     Block(Block),
+    InlineBlock(Box<Expr>),
     Conditional(Vec<(Expr, Block)>, Option<Block>),
     Func(Func),
     Call(Call),
@@ -116,6 +117,10 @@ impl Expr {
 
     pub fn new_block(block: Block, start: Location, end: Location) -> Self {
         Self::new(ExprKind::Block(block), start, end)
+    }
+
+    pub fn new_inline_block(expr: Expr, start: Location, end: Location) -> Self {
+        Self::new(ExprKind::InlineBlock(Box::new(expr)), start, end)
     }
 
     pub fn new_conditional(
@@ -220,6 +225,7 @@ impl fmt::Debug for ExprKind {
             Self::BinaryOp(a, op, b) => write!(f, "({:?} {:?} {:?})", a, op, b),
             Self::Ident(ident) => write!(f, "{:?}", ident),
             Self::Block(block) => write!(f, "{:?}", block),
+            Self::InlineBlock(expr) => write!(f, "{:?}", expr),
             Self::Conditional(branches, default) => {
                 write!(f, "{branches:?} {default:?}")
             }

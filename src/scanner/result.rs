@@ -28,6 +28,8 @@ pub enum ScanErrKind {
     UnexpectedIndent(u8), // Indent in unexpected place (indent level)
     WhitespaceAfterIndent, // Non-space whitespace after indent
     UnexpectedWhitespace, // Other unexpected whitespace
+    ExpectedBlock,     // Block expected but not provided
+    ExpectedIndentedBlock(u8), // Expected an indented block
     UnterminatedString(String), // String with no closing quote
     UnexpectedCharacter(char), // Char not recognized as token or start of token
     UnmatchedOpeningBracket(char), // Closing bracket with no matching opening bracket

@@ -24,14 +24,12 @@ pub struct Scanner<'a, T: BufRead> {
     /// the complexity of indents, because there are cases where
     /// multiple tokens will need to be emitted.
     queue: VecDeque<TokenWithLocation>,
-    /// Keep track of scope level.
-    scope_level: u16,
     /// Keep track of whether we're at the start of a line so indents
     /// can be handled specially.
     indent_level: u8,
-    /// Flag to indicate when an inline block is encountered (e.g.,
-    /// `block -> true` where there's no newline after the `->`).
-    inline_block: bool,
+    /// Stack to keep track of inline blocks (e.g., `block -> true`
+    /// where there's no newline after the `->`).
+    inline_scope_stack: Stack<(Token, Location)>,
     /// Opening brackets are pushed and later popped when the closing
     /// bracket is encountered. This gives us a way to verify brackets
     /// are matched and also lets us know when we're inside a group
@@ -46,9 +44,8 @@ impl<'a, T: BufRead> Scanner<'a, T> {
         Scanner {
             source,
             queue: VecDeque::new(),
-            scope_level: 0,
             indent_level: 0,
-            inline_block: false,
+            inline_scope_stack: Stack::new(),
             bracket_stack: Stack::new(),
             previous_token: Token::EndOfStatement,
         }
@@ -63,99 +60,6 @@ impl<'a, T: BufRead> Scanner<'a, T> {
         Ok(token)
     }
 
-    fn scope_enter(&mut self, start: Location) {
-        let end = Location::new(start.line, start.col + 1);
-        self.scope_level += 1;
-        self.add_token_to_queue(Token::ScopeStart, start, Some(end));
-    }
-
-    fn scope_exit(&mut self, loc: Location) {
-        self.scope_level -= 1;
-        self.add_token_to_queue(Token::ScopeEnd, loc, Some(loc));
-        self.add_token_to_queue(Token::EndOfStatement, loc, Some(loc));
-    }
-
-    fn handle_indents(&mut self) -> Result<(), ScanErr> {
-        assert_eq!(
-            self.source.current_char,
-            Some('\n'),
-            "This method should only be called when at the start of a line"
-        );
-
-        let start = self.source.location();
-        let num_spaces = self.read_indent()?;
-        let whitespace_count = self.consume_whitespace()?;
-
-        match self.source.peek() {
-            None | Some('\n') => {
-                // Blank or whitespace-only line; skip it.
-                return Ok(());
-            }
-            Some('#') => {
-                // Line containing just a comment; skip it.
-                self.consume_comment();
-                return Ok(());
-            }
-            _ => (),
-        }
-
-        // Now we have 0 or more spaces followed by some other char.
-        // First, make sure it's a valid indent.
-        if num_spaces % 4 != 0 {
-            return self.err(ScanErrKind::InvalidIndent(num_spaces), start);
-        }
-
-        // Next, make sure the indent isn't followed by additional non-
-        // space whitespace, because that would be confusing.
-        if whitespace_count > 0 {
-            return self.err(ScanErrKind::WhitespaceAfterIndent, start);
-        }
-
-        // Now we have something that *could* be a valid indent.
-        self.set_indent_level(num_spaces / 4, start)
-    }
-
-    /// Maybe update the current indent level. If the new indent level
-    /// is the same as the current indent level, do nothing. If it has
-    /// increased, that signals the start of a block (scopes). If it has
-    /// decreased, that signals the end of one or more blocks (scopes).
-    fn set_indent_level(
-        &mut self,
-        indent_level: u8,
-        start: Location,
-    ) -> Result<(), ScanErr> {
-        let mut current_level = self.indent_level;
-
-        if indent_level == current_level {
-            // Stayed the same; nothing to do
-        } else if indent_level == current_level + 1 {
-            // Increased by one level
-
-            // Ensure this indent is preceded by a scope start token.
-            match self.previous_token {
-                Token::ScopeStart => (),
-                _ => {
-                    return self
-                        .err(ScanErrKind::UnexpectedIndent(indent_level), start);
-                }
-            }
-
-            self.indent_level = indent_level;
-        } else if indent_level < current_level {
-            // Decreased by one or more levels
-            while current_level > indent_level {
-                self.scope_exit(Location::new(start.line, 0));
-                current_level -= 1;
-            }
-            self.indent_level = current_level;
-        } else {
-            // Increased by *more* than one level
-            return self.err(ScanErrKind::UnexpectedIndent(indent_level), start);
-        }
-
-        Ok(())
-    }
-
     fn err(&self, kind: ScanErrKind, loc: Location) -> Result<(), ScanErr> {
         Err(ScanErr::new(kind, loc))
     }
@@ -163,8 +67,7 @@ impl<'a, T: BufRead> Scanner<'a, T> {
     fn add_tokens_to_queue(&mut self) -> Result<(), ScanErr> {
         use ScanErrKind::*;
         use Token::*;
-
-        let start = self.source.location();
+        let start = self.source.loc();
 
         let token = match self.next_char() {
             Some((c @ ('"' | '\''), _, _)) => match self.read_string(c) {
@@ -174,7 +77,7 @@ impl<'a, T: BufRead> Scanner<'a, T> {
                 }
             },
             Some(('$', Some('"' | '\''), _)) => {
-                let (d, ..) = self.next_char().unwrap();
+                let d = self.source.next().unwrap();
                 match self.read_string(d) {
                     (s, true) => match scan_format_string(s.as_str()) {
                         Ok(tokens) => FormatString(tokens),
@@ -192,12 +95,16 @@ impl<'a, T: BufRead> Scanner<'a, T> {
                 return Ok(());
             }
             Some((':', _, _)) => Colon,
-            Some((',', _, _)) => Comma,
+            Some((',', _, _)) => {
+                self.maybe_exit_inline_scope(start, false);
+                Comma
+            }
             Some(('(', _, _)) => {
                 self.bracket_stack.push(('(', start));
                 LParen
             }
             Some((c @ ')', _, _)) => {
+                self.maybe_exit_inline_scope(start, false);
                 self.pop_bracket_and_return_token(c, start, RParen)?
             }
             Some(('[', _, _)) => {
@@ -205,6 +112,7 @@ impl<'a, T: BufRead> Scanner<'a, T> {
                 LBracket
             }
             Some((c @ ']', _, _)) => {
+                self.maybe_exit_inline_scope(start, false);
                 self.pop_bracket_and_return_token(c, start, RBracket)?
             }
             Some(('<', Some('='), _)) => {
@@ -242,15 +150,25 @@ impl<'a, T: BufRead> Scanner<'a, T> {
             }
             Some(('-', Some('='), _)) => self.consume_char_and_return_token(MinusEqual),
             Some(('-', Some('>'), _)) => {
-                self.next_char(); // consume >
-                self.scope_enter(start);
-                self.consume_whitespace()?;
+                let block_token = self.previous_token.clone();
+                let end = Location::new(start.line, start.col + 1);
+                self.source.next(); // consume >
+                self.consume_whitespace();
                 if self.source.peek() == Some(&'#') {
-                    self.next_char();
+                    self.source.next();
                     self.consume_comment();
                 }
-                if self.source.peek() != Some(&'\n') {
-                    self.inline_block = true;
+                if self.source.peek().is_none() {
+                    return self.err(ExpectedBlock, self.source.loc());
+                } else if self.next_char_is('\n') {
+                    // Block
+                    self.add_token_to_queue(ScopeStart, start, Some(end));
+                    self.expect_indent()?;
+                } else {
+                    // Inline block
+                    let end = Location::new(start.line, start.col + 1);
+                    self.add_token_to_queue(InlineScopeStart, start, Some(end));
+                    self.inline_scope_stack.push((block_token, start));
                 }
                 return Ok(());
             }
@@ -260,7 +178,7 @@ impl<'a, T: BufRead> Scanner<'a, T> {
                 // Collapse contiguous bangs down to a single ! or !!.
                 // This is mainly to ensure !!!x is interpreted as
                 // !(!!(x)) instead of !!(!(x)).
-                let count = self.consume_contiguous('!');
+                let count = self.consume_contiguous('!') + 1;
                 match count % 2 {
                     0 => BangBang,
                     1 => Bang,
@@ -290,7 +208,7 @@ impl<'a, T: BufRead> Scanner<'a, T> {
             // Identifiers
             // Special case for single underscore placeholder var
             Some(('_', _, _)) => {
-                if self.consume_contiguous('_') > 1 {
+                if self.consume_contiguous('_') > 0 {
                     return self.err(
                         UnexpectedCharacter('_'),
                         Location::new(start.line, start.col + 1),
@@ -302,11 +220,16 @@ impl<'a, T: BufRead> Scanner<'a, T> {
                 let ident = self.read_ident(c);
                 let (prev, next) = (&self.previous_token, self.source.peek());
                 if let (EndOfStatement | ScopeStart, Some(':')) = (prev, next) {
-                    self.next_char();
+                    self.source.next();
                     Label(ident)
                 } else {
                     match KEYWORDS.get(ident.as_str()) {
-                        Some(token) => token.clone(),
+                        Some(token) => {
+                            if token == &Else {
+                                self.maybe_exit_inline_scope(start, true);
+                            }
+                            token.clone()
+                        }
                         _ => Ident(ident),
                     }
                 }
@@ -319,14 +242,11 @@ impl<'a, T: BufRead> Scanner<'a, T> {
             // Newlines
             Some(('\n', _, _)) => {
                 if self.bracket_stack.size() == 0 {
+                    self.maybe_exit_inline_scope(start, false);
                     self.maybe_add_end_of_statement_token(start);
-                    if self.inline_block {
-                        self.inline_block = false;
-                        self.scope_exit(self.source.location());
-                    }
-                    self.handle_indents()?;
+                    self.dedent()?;
                 } else {
-                    self.consume_whitespace()?;
+                    self.consume_whitespace();
                 }
                 return Ok(());
             }
@@ -340,11 +260,8 @@ impl<'a, T: BufRead> Scanner<'a, T> {
             // End of input
             None => {
                 if self.bracket_stack.size() == 0 {
+                    self.maybe_exit_inline_scope(start, false);
                     self.maybe_add_end_of_statement_token(start);
-                    if self.inline_block {
-                        self.inline_block = false;
-                        self.scope_exit(self.source.location());
-                    }
                     self.set_indent_level(0, Location::new(start.line + 1, 1))?;
                 } else if let Some((c, location)) = self.bracket_stack.pop() {
                     return self.err(UnmatchedOpeningBracket(c), location);
@@ -354,14 +271,136 @@ impl<'a, T: BufRead> Scanner<'a, T> {
         };
 
         self.add_token_to_queue(token, start, None);
-        self.consume_whitespace()?;
+        self.consume_whitespace();
+
         Ok(())
     }
 
+    fn assert_start_of_line(&self, name: &str) {
+        assert_eq!(
+            self.source.current_char,
+            Some('\n'),
+            "Method should only be called at the start of a line: {name}",
+        );
+    }
+
+    /// Get the next indent level. Blank lines, whitespace-only lines,
+    /// and comment-only lines are skipped over.
+    fn get_next_indent_level(&mut self) -> Result<u8, ScanErr> {
+        use ScanErrKind::{InvalidIndent, WhitespaceAfterIndent};
+        let next_level = loop {
+            let num_spaces = self.consume_contiguous(' ');
+            let whitespace_count = self.consume_whitespace();
+            if let Some(char) = self.source.peek() {
+                if *char == '\n' {
+                    // Blank or whitespace-only line; skip it.
+                    self.source.next();
+                    continue;
+                } else if *char == '#' {
+                    self.consume_comment();
+                    continue;
+                }
+                if num_spaces % 4 != 0 {
+                    let loc = self.source.loc();
+                    return Err(ScanErr::new(InvalidIndent(num_spaces), loc));
+                }
+                if whitespace_count > 0 {
+                    let loc = self.source.loc();
+                    return Err(ScanErr::new(WhitespaceAfterIndent, loc));
+                }
+                break num_spaces / 4;
+            } else {
+                break 0;
+            }
+        };
+        Ok(next_level)
+    }
+
+    /// Expect the indent level to increase by one.
+    fn expect_indent(&mut self) -> Result<(), ScanErr> {
+        self.assert_start_of_line("expect_indent");
+        let loc = self.source.loc();
+        let loc = Location::new(loc.line + 1, 1);
+        let current_level = self.indent_level;
+        let expected_level = current_level + 1;
+        let new_level = self.get_next_indent_level()?;
+        if new_level < expected_level {
+            return self.err(ScanErrKind::ExpectedIndentedBlock(expected_level), loc);
+        }
+        self.set_indent_level(new_level, loc)
+    }
+
+    /// Handle dedent after a newline is encountered.
+    fn dedent(&mut self) -> Result<(), ScanErr> {
+        self.assert_start_of_line("dedent");
+        let start = self.source.loc();
+        let next_level = self.get_next_indent_level()?;
+        if next_level > self.indent_level {
+            return self.err(ScanErrKind::UnexpectedIndent(next_level), start);
+        }
+        self.set_indent_level(next_level, start)
+    }
+
+    /// Maybe update the current indent level. If the new indent level
+    /// is the same as the current indent level, do nothing. If it has
+    /// increased, that signals the start of a block (scopes). If it has
+    /// decreased, that signals the end of one or more blocks (scopes).
+    fn set_indent_level(
+        &mut self,
+        indent_level: u8,
+        start: Location,
+    ) -> Result<(), ScanErr> {
+        let mut current_level = self.indent_level;
+        if indent_level == current_level {
+            // Stayed the same; nothing to do
+        } else if indent_level == current_level + 1 {
+            // Increased by one level
+            self.indent_level = indent_level;
+        } else if indent_level < current_level {
+            // Decreased by one or more levels
+            while current_level > indent_level {
+                self.exit_block_scope(Location::new(start.line, 0));
+                current_level -= 1;
+            }
+            self.indent_level = current_level;
+        } else {
+            // Increased by *more* than one level
+            return self.err(ScanErrKind::UnexpectedIndent(indent_level), start);
+        }
+        Ok(())
+    }
+
+    fn exit_block_scope(&mut self, loc: Location) {
+        self.add_token_to_queue(Token::ScopeEnd, loc, Some(loc));
+        self.add_token_to_queue(Token::EndOfStatement, loc, Some(loc));
+    }
+
+    fn exit_inline_scope(&mut self, loc: Location, is_else: bool) {
+        while !self.inline_scope_stack.is_empty() {
+            let (token, _) = self.inline_scope_stack.pop().unwrap();
+            self.add_token_to_queue(Token::InlineScopeEnd, loc, Some(loc));
+            if is_else && (token == Token::If || token == Token::Else) {
+                break;
+            }
+        }
+    }
+
+    /// The scope for an inline block ends when one of the following
+    /// tokens is encountered: comma, closing bracket, newline, end of
+    /// input.
+    fn maybe_exit_inline_scope(&mut self, loc: Location, is_else: bool) {
+        if !self.inline_scope_stack.is_empty() {
+            self.exit_inline_scope(loc, is_else);
+        }
+    }
+
     fn maybe_add_end_of_statement_token(&mut self, loc: Location) {
-        use Token::{EndOfStatement, ScopeEnd, ScopeStart};
+        use Token::{
+            EndOfStatement, InlineScopeEnd, InlineScopeStart, ScopeEnd, ScopeStart,
+        };
         match self.previous_token {
-            EndOfStatement | ScopeStart | ScopeEnd => (),
+            EndOfStatement | InlineScopeStart | InlineScopeEnd | ScopeStart
+            | ScopeEnd => (),
             _ => self.add_token_to_queue(EndOfStatement, loc, Some(loc)),
         };
     }
@@ -385,14 +424,14 @@ impl<'a, T: BufRead> Scanner<'a, T> {
 
     /// Consume the next character and return the specified token.
     fn consume_char_and_return_token(&mut self, token: Token) -> Token {
-        self.next_char();
+        self.source.next();
         token
     }
 
     /// Consume the next two characters and return the specified token.
     fn consume_two_chars_and_return_token(&mut self, token: Token) -> Token {
-        self.next_char();
-        self.next_char();
+        self.source.next();
+        self.source.next();
         token
     }
 
@@ -427,6 +466,22 @@ impl<'a, T: BufRead> Scanner<'a, T> {
                 Some((c, d, e))
             }
             _ => None,
+        }
+    }
+
+    /// Consume the next character if it's equal to the specified
+    /// character.
+    fn next_char_is(&mut self, char: char) -> bool {
+        match self.source.peek() {
+            Some(next_char) => {
+                if *next_char == char {
+                    self.source.next();
+                    true
+                } else {
+                    false
+                }
+            }
+            None => false,
         }
     }
 
@@ -489,20 +544,12 @@ impl<'a, T: BufRead> Scanner<'a, T> {
 
     /// Consume contiguous whitespace up to the end of the line. Return
     /// the number of whitespace characters consumed.
-    fn consume_whitespace(&mut self) -> Result<u8, ScanErr> {
+    fn consume_whitespace(&mut self) -> u8 {
         let mut count = 0;
         loop {
-            match self.next_char_if(|&c| c.is_whitespace() && c != '\n') {
-                Some(_) => {
-                    if count == u8::MAX {
-                        return Err(ScanErr::new(
-                            ScanErrKind::TooMuchWhitespace,
-                            self.source.location(),
-                        ));
-                    }
-                    count += 1
-                }
-                None => break Ok(count),
+            match self.next_char_if(|&c| c != '\n' && c.is_whitespace()) {
+                Some(_) => count += 1,
+                None => break count,
             }
         }
     }
@@ -513,33 +560,12 @@ impl<'a, T: BufRead> Scanner<'a, T> {
     }
 
     /// Consume contiguous chars and return count.
-    fn consume_contiguous(&mut self, c: char) -> u8 {
-        let mut count = 1;
-        while self.next_char_if(|&next_char| next_char == c).is_some() {
+    fn consume_contiguous(&mut self, char: char) -> u8 {
+        let mut count = 0;
+        while self.next_char_is(char) {
             count += 1;
         }
         count
-    }
-
-    /// Returns the number of contiguous space characters at the start
-    /// of a line. An indent is defined as 4*N space characters followed
-    /// by a non-whitespace character.
-    fn read_indent(&mut self) -> Result<u8, ScanErr> {
-        let mut count = 0;
-        loop {
-            match self.next_char_if(|&c| c == ' ') {
-                Some(_) => {
-                    if count == u8::MAX {
-                        return Err(ScanErr::new(
-                            ScanErrKind::TooMuchWhitespace,
-                            self.source.location(),
-                        ));
-                    }
-                    count += 1;
-                }
-                None => break Ok(count),
-            }
-        }
     }
 
     /// Read a number. Base 2, 8, 10, and 16 ints are supported as well
@@ -565,7 +591,7 @@ impl<'a, T: BufRead> Scanner<'a, T> {
             string.push(first_digit);
         } else {
             // Skip leading zero *and* type char.
-            self.next_char();
+            self.source.next();
         }
 
         string.push_str(self.collect_digits(radix).as_str());
@@ -680,11 +706,11 @@ impl<'a, T: BufRead> Scanner<'a, T> {
                     }
                 }
             } else {
-                match self.next_char() {
+                match self.source.next() {
                     // Found closing quote; return string.
-                    Some((c, _, _)) if c == quote => break (string, true),
+                    Some(c) if c == quote => break (string, true),
                     // Append current char and continue.
-                    Some((c, _, _)) => string.push(c),
+                    Some(c) => string.push(c),
                     // End of input reached without finding closing quote :(
                     None => break (string, false),
                 }

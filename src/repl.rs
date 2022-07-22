@@ -200,11 +200,13 @@ impl<'a> Repl<'a> {
         use ScanErrKind::*;
         match err.kind {
             ExeErrKind::ScanErr(scan_err_kind) => match scan_err_kind {
-                UnmatchedOpeningBracket(_) | UnterminatedString(_) => true,
+                ScanErrKind::ExpectedBlock
+                | UnmatchedOpeningBracket(_)
+                | UnterminatedString(_) => true,
                 _ => false,
             },
             ExeErrKind::ParseErr(parse_err_kind) => match parse_err_kind {
-                ExpectedBlock(_) => true,
+                ParseErrKind::ExpectedBlock(_) => true,
                 _ => false,
             },
             _ => false,

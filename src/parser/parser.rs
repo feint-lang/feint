@@ -264,7 +264,7 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
             if !self.has_tokens()? || self.peek_token_is(&Token::ScopeEnd)? {
                 break;
             }
-            let statement = self.statement()?;
+            let statement = self.statement(true)?;
             statements.push(statement);
         }
         Ok(statements)
@@ -273,7 +273,7 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
     /// Get the next statement (which might be an expression). In
     /// certain cases, multiple statements may be returned (e.g.,
     /// loops).
-    fn statement(&mut self) -> StatementResult {
+    fn statement(&mut self, expect_end_of_statement: bool) -> StatementResult {
         use Token::*;
         let token = self.expect_next_token()?;
         let start = token.start;
@@ -288,7 +288,9 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
                 ast::Statement::new_expr(expr, start, end)
             }
         };
-        self.expect_token(&EndOfStatement)?;
+        if expect_end_of_statement {
+            self.expect_token(&EndOfStatement)?;
+        }
         Ok(statement)
     }
 
@@ -426,12 +428,22 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
 
     /// Handle `block ->`, `if <expr> ->`, etc.
     fn block(&mut self) -> BlockResult {
-        self.expect_token(&Token::ScopeStart)?;
-        let statements = self.statements()?;
-        if statements.is_empty() {
-            return Err(self.err(ParseErrKind::ExpectedBlock(self.next_loc())));
-        }
-        self.expect_token(&Token::ScopeEnd)?;
+        use ParseErrKind::{ExpectedBlock, ExpectedToken};
+        use Token::{InlineScopeEnd, InlineScopeStart, ScopeEnd, ScopeStart};
+        let statements = if self.next_token_is(&ScopeStart)? {
+            let statements = self.statements()?;
+            if statements.is_empty() {
+                return Err(self.err(ExpectedBlock(self.next_loc())));
+            }
+            self.expect_token(&ScopeEnd)?;
+            statements
+        } else if self.next_token_is(&InlineScopeStart)? {
+            let statement = self.statement(false)?;
+            self.expect_token(&InlineScopeEnd)?;
+            vec![statement]
+        } else {
+            return Err(self.err(ExpectedToken(self.next_loc(), ScopeStart)));
+        };
         let start = statements[0].start;
         let end = statements[statements.len() - 1].end;
         Ok(ast::Block::new(statements, start, end))
