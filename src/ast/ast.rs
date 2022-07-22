@@ -302,7 +302,7 @@ impl fmt::Debug for Func {
             .collect();
         write!(
             f,
-            "Function {} ({}) ->\n    {}",
+            "Func {} ({}) ->\n    {}",
             self.name,
             self.params.join(", "),
             items.join("    \n    ")

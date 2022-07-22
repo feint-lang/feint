@@ -128,19 +128,18 @@ impl<'a> Repl<'a> {
         if let Ok(vm_state) = result {
             // Assign _ to value at top of stack
             let var = "_";
-            let mut instructions = vec![Inst::AssignVar(var.to_owned())];
+            let mut chunk = vec![Inst::AssignVar(var.to_owned())];
             if let Some(&index) = self.executor.vm.peek() {
                 // Don't print nil when the result of an expression is nil
                 if index != 0 {
-                    instructions.push(Inst::Print(1));
+                    chunk.push(Inst::Print(1));
                 }
             }
-            if let Err(err) = self.executor.vm.execute(instructions, false) {
+            if let Err(err) = self.executor.vm.execute(&chunk, false) {
                 // If stack is empty, assign _ to nil
                 if let RuntimeErrKind::NotEnoughValuesOnStack(_) = err.kind {
-                    let instructions =
-                        vec![Inst::Push(0), Inst::AssignVar(var.to_owned())];
-                    if let Err(err) = self.executor.vm.execute(instructions, false) {
+                    let chunk = vec![Inst::Push(0), Inst::AssignVar(var.to_owned())];
+                    if let Err(err) = self.executor.vm.execute(&chunk, false) {
                         eprintln!(
                             "ERROR: Could not assign _ to top of stack or to nil:\n{}",
                             err

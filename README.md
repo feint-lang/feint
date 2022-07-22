@@ -38,7 +38,7 @@ MIT. See the LICENSE file.
 - Tuple
 - List
 - Option
-- Function
+- Func
 - Range (`0..10` and `1...10`)
 
 ## Custom Types
@@ -90,19 +90,19 @@ block ->
 
 ```
 # Named function
-<name> ([parameters]) ->
+<name> ([params]) ->
     <block>
 
-<name> ([parameters]) -> <expression>
+<name> ([params]) -> <expression>
 
 # Anonymous function assigned to a var
-<name> = ([parameters]) ->
+<name> = ([params]) ->
     <body>
 
-<name> = ([parameters]) -> <expression>
+<name> = ([params]) -> <expression>
 
 # Immediate invocation of anonymous function
-(([parameters]) -> <expression>)([arguments])
+(([params]) -> <expression>)([arguments])
 
 my_func (func) -> func()
 my_func(() -> nil)

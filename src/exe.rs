@@ -107,7 +107,7 @@ impl<'a> Executor<'a> {
             } else if self.debug {
                 eprintln!("{:=<72}", "OUTPUT ");
             }
-            self.vm.execute(chunk, self.dis)
+            self.vm.execute(&chunk, self.dis)
         } else if self.dis {
             eprintln!("{:=<72}", "INSTRUCTIONS ");
             let result = self.vm.dis_list(&chunk);
@@ -117,7 +117,7 @@ impl<'a> Executor<'a> {
             if self.debug {
                 eprintln!("{:=<72}", "OUTPUT ");
             }
-            self.vm.execute(chunk, false)
+            self.vm.execute(&chunk, false)
         };
         if self.debug {
             eprintln!("{:=<72}", "STACK ");

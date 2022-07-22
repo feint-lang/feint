@@ -1,16 +1,24 @@
 use std::collections::HashMap;
 
-use crate::types::ObjectRef;
+use crate::types::{Func, ObjectRef};
+use crate::vm::Chunk;
 
 /// VM call stack frame.
 pub struct Frame {
-    parameters: HashMap<String, ObjectRef>,
-    locals: HashMap<String, ObjectRef>,
-    return_address: usize,
+    func: ObjectRef,
+    args: Vec<ObjectRef>,
+    return_addr: usize,
 }
 
 impl Frame {
-    pub fn new(return_address: usize) -> Self {
-        Frame { parameters: HashMap::new(), locals: HashMap::new(), return_address }
+    pub fn new(func: ObjectRef, args: Vec<ObjectRef>, return_addr: usize) -> Self {
+        Frame { func, args, return_addr }
+    }
+
+    pub fn chunk(&self) -> Option<Chunk> {
+        if let Some(func) = self.func.as_any().downcast_ref::<Func>() {
+            // return Some(func.chunk);
+        }
+        None
     }
 }

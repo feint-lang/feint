@@ -7,17 +7,17 @@ use std::rc::Rc;
 
 pub type TypeRef = Rc<Type>;
 
-pub struct Function {
+pub struct Func {
     module: String,
     name: String,
-    parameters: Vec<String>,
+    params: Vec<String>,
 }
 
 /// Represents a type, whether builtin or user-defined.
 pub struct Type {
     module: String,
     name: String,
-    methods: HashMap<String, Function>,
+    methods: HashMap<String, Func>,
 }
 
 impl Type {

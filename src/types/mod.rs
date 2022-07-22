@@ -1,4 +1,5 @@
 pub(crate) use builtins::Builtins;
+pub(crate) use func::Func;
 pub(crate) use object::ObjectRef;
 
 mod bool;
@@ -6,7 +7,7 @@ mod builtins;
 mod class;
 mod complex;
 mod float;
-mod function;
+mod func;
 mod int;
 mod nil;
 mod object;

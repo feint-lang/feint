@@ -29,9 +29,10 @@ pub enum Inst {
     LoadVar(String),
     ScopeStart,
     ScopeEnd(usize),
+
+    Call(usize),  // Call function with N values from top of stack
     Print(usize), // Print N values at top of stack
     Return,
-    Halt(u8),
 
     // These make compound objects from the top N items on the stack.
     MakeString(usize),
@@ -40,4 +41,6 @@ pub enum Inst {
     Placeholder(usize, Box<Inst>, String),
     BreakPlaceholder(usize),
     ContinuePlaceholder(usize),
+
+    Halt(u8),
 }

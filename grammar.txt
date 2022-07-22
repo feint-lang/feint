@@ -102,7 +102,7 @@ compound_expr :
     | block
     | if
     | loop
-    | function
+    | func
     | call
     | type
     | inline_expr
@@ -111,7 +111,7 @@ inline_expr :
     | inline_block
     | inline_if
     | inline_loop
-    | inline_function
+    | inline_func
     | inline_type
 
 # A suite is an indented block of statements, often referred to as
@@ -159,10 +159,10 @@ cond :
     | call
     | inline_block
 
-function :
+func :
     | [IDENTIFIER] "(" [params] ")" "->" suite
 
-inline_function :
+inline_func :
     | [IDENTIFIER] "(" [params] ")" "->" expr
 
 params :

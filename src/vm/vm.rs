@@ -4,6 +4,7 @@
 //! mode.
 use std::fmt;
 
+use crate::types::ObjectRef;
 use crate::util::{BinaryOperator, Stack, UnaryOperator};
 
 use super::context::RuntimeContext;
@@ -38,14 +39,14 @@ impl VM {
     /// When a HALT instruction is encountered, the VM's state will be
     /// cleared; it can be "restarted" by passing more instructions to
     /// execute.
-    pub fn execute(&mut self, instructions: Chunk, dis: bool) -> ExeResult {
+    pub fn execute(&mut self, chunk: &Chunk, dis: bool) -> ExeResult {
         use Inst::*;
         use RuntimeErrKind::*;
 
         let mut ip: usize = 0;
 
         loop {
-            match &instructions[ip] {
+            match &chunk[ip] {
                 NoOp => {
                     // do nothing
                 }
@@ -296,6 +297,31 @@ impl VM {
                         }
                     }
                 }
+                Call(n) => match self.stack.pop_n(*n + 1) {
+                    Some(indices) => {
+                        // TODO: This doesn't work
+
+                        let func = self.ctx.get_obj(indices[0]).unwrap();
+
+                        let mut args: Vec<ObjectRef> = vec![];
+                        if indices.len() > 1 {
+                            for i in 1..args.len() {
+                                let arg = self.ctx.get_obj(indices[i]).unwrap();
+                                args.push(arg.clone())
+                            }
+                        }
+
+                        let return_address = ip + 1;
+                        let frame = Frame::new(func.clone(), args, return_address);
+                        self.push_frame(frame);
+
+                        // XXX: Fake return value
+                        self.push(0);
+                    }
+                    None => {
+                        return self.err(NotEnoughValuesOnStack(format!("Call: {n}")));
+                    }
+                },
                 Return => {
                     // TODO: Implement actual return
                     match self.pop() {
@@ -306,7 +332,7 @@ impl VM {
                 Halt(code) => {
                     self.halt();
                     #[cfg(debug_assertions)]
-                    self.dis(dis, ip, &instructions);
+                    self.dis(dis, ip, &chunk);
                     break Ok(VMState::Halted(*code));
                 }
                 Placeholder(addr, inst, message) => {
@@ -329,11 +355,11 @@ impl VM {
             }
 
             #[cfg(debug_assertions)]
-            self.dis(dis, ip, &instructions);
+            self.dis(dis, ip, &chunk);
 
             ip += 1;
 
-            if ip == instructions.len() {
+            if ip == chunk.len() {
                 break Ok(VMState::Idle);
             }
         }
@@ -402,24 +428,24 @@ impl VM {
     // more useful info like jump targets, values, etc.
 
     /// Disassemble a list of instructions.
-    pub fn dis_list(&mut self, instructions: &Chunk) -> ExeResult {
-        for (ip, _) in instructions.iter().enumerate() {
-            self.dis(true, ip, instructions);
+    pub fn dis_list(&mut self, chunk: &Chunk) -> ExeResult {
+        for (ip, _) in chunk.iter().enumerate() {
+            self.dis(true, ip, chunk);
         }
         Ok(VMState::Halted(0))
     }
 
     /// Disassemble a single instruction. The `flag` arg is so that
     /// we don't have to wrap every call in `if dis { self.dis(...) }`.
-    pub fn dis(&self, flag: bool, ip: usize, instructions: &Chunk) {
+    pub fn dis(&self, flag: bool, ip: usize, chunk: &Chunk) {
         if flag {
-            let inst = &instructions[ip];
-            let formatted = self.format_instruction(instructions, inst);
+            let inst = &chunk[ip];
+            let formatted = self.format_instruction(chunk, inst);
             eprintln!("{:0>4} {}", ip, formatted);
         }
     }
 
-    fn format_instruction(&self, instructions: &Chunk, inst: &Inst) -> String {
+    fn format_instruction(&self, chunk: &Chunk, inst: &Inst) -> String {
         use Inst::*;
 
         let obj_str = |index| match self.ctx.get_obj(index) {
@@ -478,7 +504,7 @@ impl VM {
             Return => format!("RETURN"),
             Halt(code) => self.format_aligned("HALT", code),
             Placeholder(addr, inst, message) => {
-                let formatted_inst = self.format_instruction(instructions, inst);
+                let formatted_inst = self.format_instruction(chunk, inst);
                 self.format_aligned(
                     "PLACEHOLDER",
                     format!("{formatted_inst} @ {addr} ({message})"),
@@ -511,14 +537,14 @@ mod tests {
         let mut vm = VM::default();
         let i = vm.ctx.add_obj(vm.ctx.builtins.new_int(1));
         let j = vm.ctx.add_obj(vm.ctx.builtins.new_int(2));
-        let instructions: Chunk = vec![
+        let chunk: Chunk = vec![
             Inst::LoadConst(i),
             Inst::LoadConst(j),
             Inst::BinaryOp(BinaryOperator::Add),
             Inst::Print(0),
             Inst::Halt(0),
         ];
-        if let Ok(result) = vm.execute(instructions, false) {
+        if let Ok(result) = vm.execute(&chunk, false) {
             assert_eq!(result, VMState::Halted(0));
         }
     }

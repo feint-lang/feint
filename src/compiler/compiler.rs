@@ -12,7 +12,7 @@ use super::scope::{Scope, ScopeKind, ScopeTree};
 pub fn compile(vm: &mut VM, program: ast::Program) -> CompilationResult {
     let mut visitor = Visitor::new(&mut vm.ctx);
     visitor.visit_program(program)?;
-    Ok(visitor.instructions)
+    Ok(visitor.chunk)
 }
 
 // Visitor -------------------------------------------------------------
@@ -21,13 +21,13 @@ type VisitResult = Result<(), CompilationErr>;
 
 struct Visitor<'a> {
     ctx: &'a mut RuntimeContext,
-    instructions: Chunk,
+    chunk: Chunk,
     scope_tree: ScopeTree,
 }
 
 impl<'a> Visitor<'a> {
     fn new(ctx: &'a mut RuntimeContext) -> Self {
-        Self { ctx, instructions: Chunk::new(), scope_tree: ScopeTree::new() }
+        Self { ctx, chunk: Chunk::new(), scope_tree: ScopeTree::new() }
     }
 
     // Utilities -------------------------------------------------------
@@ -37,7 +37,7 @@ impl<'a> Visitor<'a> {
     }
 
     fn push(&mut self, inst: Inst) {
-        self.instructions.push(inst);
+        self.chunk.push(inst);
     }
 
     fn push_const(&mut self, index: usize) {
@@ -62,7 +62,7 @@ impl<'a> Visitor<'a> {
 
     /// Update jump instructions with their target label addresses.
     fn fix_jumps(&mut self) -> VisitResult {
-        let instructions = &mut self.instructions;
+        let chunk = &mut self.chunk;
         let scope_tree = &self.scope_tree;
         let mut not_found: Option<String> = None;
         scope_tree.walk_up(&mut |scope: &Scope, jump_depth: usize| {
@@ -70,11 +70,11 @@ impl<'a> Visitor<'a> {
                 let result = scope.find_label(scope_tree, name, None);
                 if let Some((label_addr, label_depth)) = result {
                     let depth = jump_depth - label_depth;
-                    instructions[*jump_addr - 1] = match depth {
+                    chunk[*jump_addr - 1] = match depth {
                         0 => Inst::NoOp,
                         _ => Inst::ScopeEnd(depth),
                     };
-                    instructions[*jump_addr] = Inst::Jump(label_addr);
+                    chunk[*jump_addr] = Inst::Jump(label_addr);
                 } else {
                     not_found = Some(name.clone());
                     return false;
@@ -132,7 +132,7 @@ impl<'a> Visitor<'a> {
             self.visit_expr(expr)?;
 
             // Placeholder for jump depending on result of branch expr.
-            let jump_index = self.instructions.len();
+            let jump_index = self.chunk.len();
             self.push(Inst::Placeholder(
                 jump_index,
                 Box::new(Inst::JumpIfElse(0, 0)),
@@ -146,7 +146,7 @@ impl<'a> Visitor<'a> {
 
             // Placeholder for jump out of conditional suite if this
             // branch is selected.
-            let jump_out_addr = self.instructions.len();
+            let jump_out_addr = self.chunk.len();
             jump_out_addrs.push(jump_out_addr);
             self.push(Inst::Placeholder(
                 jump_out_addr,
@@ -155,9 +155,9 @@ impl<'a> Visitor<'a> {
             ));
 
             // Jump target if branch condition is false.
-            let next_addr = self.instructions.len();
+            let next_addr = self.chunk.len();
 
-            self.instructions[jump_index] = Inst::JumpIfElse(block_addr, next_addr);
+            self.chunk[jump_index] = Inst::JumpIfElse(block_addr, next_addr);
         }
 
         // Default block (if present).
@@ -166,11 +166,11 @@ impl<'a> Visitor<'a> {
         }
 
         // Address of instruction after conditional suite.
-        let after_addr = self.instructions.len();
+        let after_addr = self.chunk.len();
 
         // Replace jump-out placeholders with actual jumps.
         for addr in jump_out_addrs {
-            self.instructions[addr] = Inst::Jump(after_addr);
+            self.chunk[addr] = Inst::Jump(after_addr);
         }
 
         Ok(())
@@ -182,11 +182,11 @@ impl<'a> Visitor<'a> {
         block: ast::Block,
         scope_kind: ScopeKind,
     ) -> VisitResult {
-        let loop_addr = self.instructions.len();
+        let loop_addr = self.chunk.len();
         // Evaluate loop expression on every iteration.
         self.visit_expr(expr)?;
         // Placeholder for jump-out if result is false.
-        let jump_out_index = self.instructions.len();
+        let jump_out_index = self.chunk.len();
         self.push(Inst::Placeholder(
             jump_out_index,
             Box::new(Inst::JumpIfNot(0)),
@@ -197,17 +197,17 @@ impl<'a> Visitor<'a> {
         // Jump to top of loop to re-check expression.
         self.push(Inst::Jump(loop_addr));
         // Jump-out address.
-        let after_addr = self.instructions.len();
+        let after_addr = self.chunk.len();
         // Set address of jump-out placeholder.
-        self.instructions[jump_out_index] = Inst::JumpIfNot(after_addr);
+        self.chunk[jump_out_index] = Inst::JumpIfNot(after_addr);
         // Set address of breaks and continues.
         for addr in loop_addr..after_addr {
-            match self.instructions[addr] {
+            match self.chunk[addr] {
                 Inst::BreakPlaceholder(break_addr) => {
-                    self.instructions[break_addr] = Inst::Jump(after_addr)
+                    self.chunk[break_addr] = Inst::Jump(after_addr)
                 }
                 Inst::ContinuePlaceholder(continue_addr) => {
-                    self.instructions[continue_addr] = Inst::Jump(loop_addr)
+                    self.chunk[continue_addr] = Inst::Jump(loop_addr)
                 }
                 _ => (),
             }
@@ -217,24 +217,38 @@ impl<'a> Visitor<'a> {
 
     fn visit_break(&mut self, expr: ast::Expr) -> VisitResult {
         self.visit_expr(expr)?;
-        self.instructions.push(Inst::BreakPlaceholder(self.instructions.len()));
+        self.chunk.push(Inst::BreakPlaceholder(self.chunk.len()));
         Ok(())
     }
 
     fn visit_continue(&mut self) -> VisitResult {
-        self.instructions.push(Inst::ContinuePlaceholder(self.instructions.len()));
+        self.chunk.push(Inst::ContinuePlaceholder(self.chunk.len()));
         Ok(())
     }
 
     fn visit_func(&mut self, node: ast::Func) -> VisitResult {
-        eprintln!("IMPLEMENT visit_func()!!!");
-        eprintln!("{}({})", node.name, node.params.join(", "));
+        let mut func_visitor = Visitor::new(&mut self.ctx);
+        let name = node.name;
+        let params = node.params;
+        let func_program = ast::Program::new(node.block.statements);
+        func_visitor.visit_program(func_program)?;
+        let chunk = func_visitor.chunk;
+        self.push(Inst::DeclareVar(name.clone()));
+        self.add_const(self.ctx.builtins.new_func(name.clone(), params, chunk));
+        self.push(Inst::AssignVar(name));
         Ok(())
     }
 
     fn visit_call(&mut self, node: ast::Call) -> VisitResult {
-        eprintln!("IMPLEMENT visit_call()!!!");
-        eprintln!("{}()", node.name);
+        let name = node.name;
+        let args = node.args;
+        let n_args = args.len();
+        self.push(Inst::LoadVar(name));
+        for arg in args {
+            self.visit_expr(arg)?;
+        }
+        self.push(Inst::Call(n_args));
+        self.push(Inst::Return);
         Ok(())
     }
 
@@ -251,7 +265,7 @@ impl<'a> Visitor<'a> {
                     Box::new(Inst::ScopeEnd(0)),
                     "Scope not exited for jump".to_owned(),
                 ));
-                let jump_addr = self.instructions.len();
+                let jump_addr = self.chunk.len();
                 self.push(Inst::Placeholder(
                     0,
                     Box::new(Inst::Jump(0)),
@@ -261,7 +275,7 @@ impl<'a> Visitor<'a> {
             }
             Kind::Label(name) => {
                 self.push(Inst::NoOp);
-                let addr = self.instructions.len() - 1;
+                let addr = self.chunk.len() - 1;
                 if self.scope_tree.add_label(name.as_str(), addr).is_some() {
                     self.err(format!("Duplicate label in scope: {}", name))?;
                 }
@@ -284,6 +298,7 @@ impl<'a> Visitor<'a> {
             }
             Kind::Break(expr) => self.visit_break(*expr)?,
             Kind::Func(func) => self.visit_func(func)?,
+            Kind::Call(call) => self.visit_call(call)?,
             Kind::Print(items) => {
                 let num_items = items.len();
                 for item in items {

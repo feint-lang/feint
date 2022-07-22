@@ -14,7 +14,7 @@ main (argv: List<String>) ->
 # some ideas about how functions are defined
 f (x: Int): Int -> x * x
 
-g (h: Function()) ->
+g (h: Func) ->
     h()
 
 g((x) -> x)

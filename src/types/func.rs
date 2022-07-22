@@ -7,27 +7,25 @@ use crate::vm::{Chunk, RuntimeBoolResult, RuntimeContext, RuntimeErr, RuntimeRes
 use super::class::TypeRef;
 use super::object::{Object, ObjectExt, ObjectRef};
 
-pub struct Function {
+pub struct Func {
     class: TypeRef,
     name: String,
-    parameters: Vec<String>,
-    instructions: Chunk,
+    params: Vec<String>,
+    pub chunk: Chunk,
 }
 
-impl Function {
+impl Func {
     pub fn new<S: Into<String>>(
         class: TypeRef,
         name: S,
-        parameters: Vec<String>,
-        instructions: Chunk,
+        params: Vec<String>,
+        chunk: Chunk,
     ) -> Self {
-        Self { class, name: name.into(), parameters, instructions }
+        Self { class, name: name.into(), params, chunk }
     }
-
-    pub fn call(&self, this: Option<ObjectRef>, args: Vec<ObjectRef>) {}
 }
 
-impl Object for Function {
+impl Object for Func {
     fn class(&self) -> &TypeRef {
         &self.class
     }
@@ -39,13 +37,13 @@ impl Object for Function {
 
 // Display -------------------------------------------------------------
 
-impl fmt::Display for Function {
+impl fmt::Display for Func {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}()", self.name)
+        write!(f, "{} ({}) -> ...", self.name, self.params.len())
     }
 }
 
-impl fmt::Debug for Function {
+impl fmt::Debug for Func {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self)
     }

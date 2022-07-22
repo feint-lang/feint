@@ -219,9 +219,9 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
 
     /// Collect tokens until the specified token is reached. This is
     /// used for lookahead. For example, it's used to find the
-    /// parameters/args for a function def/call since the number of
-    /// args is unknown up front and we can't use single-peek token
-    /// inspection techniques.
+    /// params/args for a function def/call since the number of args is
+    /// unknown up front and we can't use single-peek token inspection
+    /// techniques.
     fn collect_until(
         &mut self,
         token: &Token,

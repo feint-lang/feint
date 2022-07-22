@@ -35,7 +35,7 @@ impl Builtins {
         types.insert("Nil", nil_type);
         types.insert("Bool", bool_type);
         types.insert("Float", Self::create_type("Float"));
-        types.insert("Function", Self::create_type("Function"));
+        types.insert("Func", Self::create_type("Func"));
         types.insert("Int", Self::create_type("Int"));
         types.insert("String", Self::create_type("String"));
         types.insert("Tuple", tuple_type);
@@ -69,14 +69,14 @@ impl Builtins {
         self.new_float(value)
     }
 
-    pub fn new_function<S: Into<String>>(
+    pub fn new_func<S: Into<String>>(
         &self,
         name: S,
-        parameters: Vec<String>,
-        instructions: Chunk,
+        params: Vec<String>,
+        chunk: Chunk,
     ) -> ObjectRef {
-        let class = self.get_type("Function").clone();
-        Rc::new(super::function::Function::new(class, name, parameters, instructions))
+        let class = self.get_type("Func").clone();
+        Rc::new(super::func::Func::new(class, name, params, chunk))
     }
 
     pub fn new_int<I: Into<BigInt>>(&self, value: I) -> ObjectRef {
