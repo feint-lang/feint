@@ -278,11 +278,6 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
         let token = self.expect_next_token()?;
         let start = token.start;
         let statement = match token.token {
-            // XXX: The print statement is temporary until functions
-            //      are implemented. The shenanigans below are so that
-            //      print statements have similar syntax to the eventual
-            //      built in print function.
-            Print => self.print(start)?,
             Jump => self.jump(start)?,
             Label(name) => ast::Statement::new_label(name, start, token.end),
             Continue => self.continue_(start, token.end)?,
@@ -295,17 +290,6 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
         };
         self.expect_token(&EndOfStatement)?;
         Ok(statement)
-    }
-
-    /// Handle print statement.
-    fn print(&mut self, start: Location) -> StatementResult {
-        self.expect_token(&Token::LParen)?;
-        let call = self.func("print".to_owned(), start)?;
-        let args = match call.kind {
-            ast::ExprKind::Call(call) => call.args,
-            _ => return Err(self.err(ParseErrKind::SyntaxErr(self.next_loc()))),
-        };
-        Ok(ast::Statement::new_print(args, start, self.loc()))
     }
 
     /// Handle jump statement.
@@ -355,6 +339,9 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
                 true => self.func(name, start)?,
                 false => ast::Expr::new_ident(ast::Ident::new_ident(name), start, end),
             },
+            // XXX: The print pseudo-function is temporary until
+            //      functions are implemented.
+            Print => self.print(start)?,
             _ => self.expect_unary_expr(&token)?,
         };
         // If the expression is followed by a binary operator, a binary
@@ -549,6 +536,17 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
             // Function call
             Ok(ast::Expr::new_call(name.clone(), items, start, call_end))
         }
+    }
+
+    /// Handle print().
+    fn print(&mut self, start: Location) -> ExprResult {
+        self.expect_token(&Token::LParen)?;
+        let call = self.func("print".to_owned(), start)?;
+        let args = match call.kind {
+            ast::ExprKind::Call(call) => call.args,
+            _ => return Err(self.err(ParseErrKind::SyntaxErr(self.next_loc()))),
+        };
+        Ok(ast::Expr::new_print(args, start, self.loc()))
     }
 
     /// The current token should represent a unary operator and should
