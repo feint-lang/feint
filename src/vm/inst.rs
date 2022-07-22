@@ -21,11 +21,6 @@ pub enum Inst {
     // jump to second address.
     JumpIfElse(usize, usize),
 
-    // The break and continue instructions are placeholders that will
-    // be converted to jumps by the compiler.
-    Break,
-    Continue,
-
     UnaryOp(UnaryOperator),
     BinaryOp(BinaryOperator),
     LoadConst(usize),
@@ -38,9 +33,11 @@ pub enum Inst {
     Return,
     Halt(u8),
 
-    InternalErr(String),
-
     // These make compound objects from the top N items on the stack.
     MakeString(usize),
     MakeTuple(usize),
+
+    Placeholder(usize, Box<Inst>, String),
+    BreakPlaceholder(usize),
+    ContinuePlaceholder(usize),
 }

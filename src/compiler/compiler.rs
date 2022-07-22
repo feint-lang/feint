@@ -133,7 +133,11 @@ impl<'a> Visitor<'a> {
 
             // Placeholder for jump depending on result of branch expr.
             let jump_index = self.instructions.len();
-            self.push(Inst::InternalErr("JumpIfElse not set".to_owned()));
+            self.push(Inst::Placeholder(
+                jump_index,
+                Box::new(Inst::JumpIfElse(0, 0)),
+                "Branch condition jump not set".to_owned(),
+            ));
 
             // Start of branch block (jump target if branch condition is
             // true).
@@ -142,8 +146,13 @@ impl<'a> Visitor<'a> {
 
             // Placeholder for jump out of conditional suite if this
             // branch is selected.
-            jump_out_addrs.push(self.instructions.len());
-            self.push(Inst::InternalErr("Jump for if not set".to_owned()));
+            let jump_out_addr = self.instructions.len();
+            jump_out_addrs.push(jump_out_addr);
+            self.push(Inst::Placeholder(
+                jump_out_addr,
+                Box::new(Inst::Jump(0)),
+                "Branch jump out not set".to_owned(),
+            ));
 
             // Jump target if branch condition is false.
             let next_addr = self.instructions.len();
@@ -178,7 +187,11 @@ impl<'a> Visitor<'a> {
         self.visit_expr(expr)?;
         // Placeholder for jump-out if result is false.
         let jump_out_index = self.instructions.len();
-        self.push(Inst::InternalErr("Jump-out for loop not set".to_owned()));
+        self.push(Inst::Placeholder(
+            jump_out_index,
+            Box::new(Inst::JumpIfNot(0)),
+            "Jump-out for loop not set".to_owned(),
+        ));
         // Run the loop body if result is true.
         self.visit_block(block, scope_kind)?;
         // Jump to top of loop to re-check expression.
@@ -190,8 +203,12 @@ impl<'a> Visitor<'a> {
         // Set address of breaks and continues.
         for addr in loop_addr..after_addr {
             match self.instructions[addr] {
-                Inst::Break => self.instructions[addr] = Inst::Jump(after_addr),
-                Inst::Continue => self.instructions[addr] = Inst::Jump(loop_addr),
+                Inst::BreakPlaceholder(break_addr) => {
+                    self.instructions[break_addr] = Inst::Jump(after_addr)
+                }
+                Inst::ContinuePlaceholder(continue_addr) => {
+                    self.instructions[continue_addr] = Inst::Jump(loop_addr)
+                }
                 _ => (),
             }
         }
@@ -200,13 +217,12 @@ impl<'a> Visitor<'a> {
 
     fn visit_break(&mut self, expr: ast::Expr) -> VisitResult {
         self.visit_expr(expr)?;
-        self.instructions.push(Inst::Break);
+        self.instructions.push(Inst::BreakPlaceholder(self.instructions.len()));
         Ok(())
     }
 
     fn visit_continue(&mut self) -> VisitResult {
-        eprintln!("XXX: visit continue");
-        self.instructions.push(Inst::Continue);
+        self.instructions.push(Inst::ContinuePlaceholder(self.instructions.len()));
         Ok(())
     }
 
@@ -238,9 +254,15 @@ impl<'a> Visitor<'a> {
                 // with corresponding label address once labels have
                 // been processed. We also take care to exit nested
                 // blocks/scopes before jumping out.
-                self.push(Inst::InternalErr("Scope not exited for jump".to_owned()));
+                self.push(Inst::Placeholder(
+                    0,
+                    Box::new(Inst::ScopeEnd(0)),
+                    "Scope not exited for jump".to_owned(),
+                ));
                 let jump_addr = self.instructions.len();
-                self.push(Inst::InternalErr(
+                self.push(Inst::Placeholder(
+                    0,
+                    Box::new(Inst::Jump(0)),
                     "Jump address not set to label address".to_owned(),
                 ));
                 self.scope_tree.add_jump(name.as_str(), jump_addr);

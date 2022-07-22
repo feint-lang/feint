@@ -67,48 +67,53 @@ impl VM {
                     }
                 }
                 Jump(addr) => {
-                    #[cfg(debug_assertions)]
-                    self.dis(dis, ip, &instructions);
-                    ip = *addr;
-                    continue;
+                    if !dis {
+                        ip = *addr;
+                        continue;
+                    }
                 }
                 JumpIf(addr) => {
                     if let Some(i) = self.pop() {
                         let obj = self.ctx.get_obj(i).unwrap();
                         if obj.as_bool(&self.ctx)? {
-                            ip = *addr;
-                            continue;
+                            if !dis {
+                                ip = *addr;
+                                continue;
+                            }
                         }
                     } else {
-                        self.err(EmptyStack)?;
+                        return self.err(EmptyStack);
                     };
                 }
                 JumpIfNot(addr) => {
                     if let Some(i) = self.pop() {
                         let obj = self.ctx.get_obj(i).unwrap();
                         if !obj.as_bool(&self.ctx)? {
-                            ip = *addr;
-                            continue;
+                            if !dis {
+                                ip = *addr;
+                                continue;
+                            }
                         }
                     } else {
-                        self.err(EmptyStack)?;
+                        return self.err(EmptyStack);
                     };
                 }
                 JumpIfElse(if_addr, else_addr) => {
-                    if let Some(i) = self.pop() {
+                    let addr = if let Some(i) = self.pop() {
                         let obj = self.ctx.get_obj(i).unwrap();
                         if obj.as_bool(&self.ctx)? {
-                            ip = *if_addr;
+                            *if_addr
                         } else {
-                            ip = *else_addr;
+                            *else_addr
                         }
                     } else {
-                        self.err(EmptyStack)?;
+                        return self.err(EmptyStack);
                     };
-                    continue;
+                    if !dis {
+                        ip = addr;
+                        continue;
+                    }
                 }
-                Break => unreachable!("break was not converted to jump"),
-                Continue => unreachable!("continue was not converted to jump"),
                 LoadConst(index) => {
                     self.push(*index);
                 }
@@ -304,9 +309,21 @@ impl VM {
                     self.dis(dis, ip, &instructions);
                     break Ok(VMState::Halted(*code));
                 }
-                InternalErr(message) => {
+                Placeholder(addr, inst, message) => {
                     self.halt();
-                    eprintln!("INTERNAL ERROR: {}", message);
+                    eprintln!(
+                        "Placeholder at {addr} was not updated: {inst:?}\n{message}"
+                    );
+                    break Ok(VMState::Halted(255));
+                }
+                BreakPlaceholder(addr) => {
+                    self.halt();
+                    eprintln!("Break placeholder at {addr} was not updated");
+                    break Ok(VMState::Halted(255));
+                }
+                ContinuePlaceholder(addr) => {
+                    self.halt();
+                    eprintln!("Continue placeholder at {addr} was not updated");
                     break Ok(VMState::Halted(255));
                 }
             }
@@ -404,52 +421,54 @@ impl VM {
 
     fn format_instruction(&self, instructions: &Chunk, inst: &Inst) -> String {
         use Inst::*;
+
+        let obj_str = |index| match self.ctx.get_obj(index) {
+            Some(obj) => format!("{obj:?}").replace("\n", "\\n").replace("\r", "\\r"),
+            None => format!("[Object not found at {index}]"),
+        };
+
         match inst {
             NoOp => format!("NOOP"),
             Push(index) => {
-                let obj = self.ctx.get_obj(*index).unwrap();
-                self.format_aligned("PUSH", format!("{} ({:?})", index, obj))
+                let obj_str = obj_str(*index);
+                self.format_aligned("PUSH", format!("{index} ({obj_str})"))
             }
             Pop => format!("POP"),
             ScopeStart => format!("SCOPE_START"),
             ScopeEnd(count) => self.format_aligned("SCOPE_END", count),
-            Jump(address) => self.format_aligned(
-                "JUMP",
-                format!(
-                    "{} ({})",
-                    address,
-                    self.format_instruction(instructions, &instructions[*address])
-                ),
-            ),
+            Jump(addr) => self.format_aligned("JUMP", format!("{addr}",)),
+            JumpIf(addr) => self.format_aligned("JUMP_IF", format!("{addr}",)),
+            JumpIfNot(addr) => self.format_aligned("JUMP_IF_NOT", format!("{addr}",)),
             JumpIfElse(if_addr, else_addr) => match self.peek() {
                 Some(index) => {
-                    let obj = self.ctx.get_obj(*index).unwrap();
+                    let obj_str = obj_str(*index);
                     self.format_aligned(
                         "JUMP_IF_ELSE",
-                        format!("{} ({}) ? {} : {:?}", obj, index, if_addr, else_addr),
+                        format!("{index} ({obj_str}) ? {if_addr} : {else_addr}"),
                     )
                 }
                 None => self.format_aligned(
                     "JUMP_IF_ELSE",
-                    format!("[EMPTY] ? {} : {}", if_addr, else_addr),
+                    format!("[EMPTY] ? {if_addr} : {else_addr}"),
                 ),
             },
-            Break => unreachable!("break was not converted to jump"),
-            Continue => unreachable!("continue was not converted to jump"),
             LoadConst(index) => {
-                let obj = self.ctx.get_obj(*index).unwrap();
-                self.format_aligned("LOAD_CONST", format!("{} ({:?})", index, obj))
+                let obj_str = obj_str(*index);
+                self.format_aligned("LOAD_CONST", format!("{index} ('{obj_str}')"))
             }
             DeclareVar(name) => self.format_aligned("DECLARE_VAR", name),
             AssignVar(name) => {
                 let index = self.peek().unwrap_or(&0);
-                let obj = self.ctx.get_obj(*index).unwrap();
-                self.format_aligned("ASSIGN_VAR", format!("{} ({:?})", name, obj))
+                let obj_str = obj_str(*index);
+                self.format_aligned(
+                    "ASSIGN_VAR",
+                    format!("{name} = {index} ('{obj_str}')"),
+                )
             }
             LoadVar(name) => {
                 let index = self.peek().unwrap_or(&0);
-                let obj = self.ctx.get_obj(*index).unwrap();
-                self.format_aligned("LOAD_VAR", format!("{} ({:?})", name, obj))
+                let obj_str = obj_str(*index);
+                self.format_aligned("LOAD_VAR", format!("{index} ({obj_str})"))
             }
             UnaryOp(operator) => self.format_aligned("UNARY_OP", operator),
             BinaryOp(operator) => self.format_aligned("BINARY_OP", operator),
@@ -458,6 +477,19 @@ impl VM {
             Print(n) => self.format_aligned("PRINT", format!("({n})")),
             Return => format!("RETURN"),
             Halt(code) => self.format_aligned("HALT", code),
+            Placeholder(addr, inst, message) => {
+                let formatted_inst = self.format_instruction(instructions, inst);
+                self.format_aligned(
+                    "PLACEHOLDER",
+                    format!("{formatted_inst} @ {addr} ({message})"),
+                )
+            }
+            BreakPlaceholder(addr) => {
+                self.format_aligned("PLACEHOLDER", format!("BREAK @ {addr}"))
+            }
+            ContinuePlaceholder(addr) => {
+                self.format_aligned("PLACEHOLDER", format!("CONTINUE @ {addr}"))
+            }
             other => format!("{:?}", other),
         }
     }
