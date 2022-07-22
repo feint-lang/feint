@@ -163,6 +163,8 @@ impl<'a> Visitor<'a> {
         // Default block (if present).
         if let Some(default_block) = default {
             self.visit_block(default_block, scope_kind)?;
+        } else {
+            self.push(Inst::LoadConst(0));
         }
 
         // Address of instruction after conditional suite.
