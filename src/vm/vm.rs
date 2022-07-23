@@ -494,7 +494,7 @@ impl VM {
             LoadVar(name) => {
                 let index = self.peek().unwrap_or(&0);
                 let obj_str = obj_str(*index);
-                self.format_aligned("LOAD_VAR", format!("{index} ({obj_str})"))
+                self.format_aligned("LOAD_VAR", format!("{name} = {index} ({obj_str})"))
             }
             UnaryOp(operator) => self.format_aligned("UNARY_OP", operator),
             BinaryOp(operator) => self.format_aligned("BINARY_OP", operator),
@@ -528,8 +528,6 @@ impl VM {
 
 #[cfg(test)]
 mod tests {
-    use crate::types::Builtins;
-
     use super::*;
 
     #[test]

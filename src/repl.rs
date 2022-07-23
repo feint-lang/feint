@@ -196,21 +196,20 @@ impl<'a> Repl<'a> {
     }
 
     fn continue_on_err(&self, err: ExeErr) -> bool {
-        use ParseErrKind::*;
-        use ScanErrKind::*;
-        match err.kind {
-            ExeErrKind::ScanErr(scan_err_kind) => match scan_err_kind {
-                ScanErrKind::ExpectedBlock
-                | UnmatchedOpeningBracket(_)
-                | UnterminatedStr(_) => true,
-                _ => false,
-            },
-            ExeErrKind::ParseErr(parse_err_kind) => match parse_err_kind {
-                ParseErrKind::ExpectedBlock(_) => true,
-                _ => false,
-            },
-            _ => false,
+        if let ExeErrKind::ScanErr(kind) = err.kind {
+            use ScanErrKind::*;
+            if let ExpectedBlock | UnmatchedOpeningBracket(_) | UnterminatedStr(_) =
+                kind
+            {
+                return true;
+            }
+        } else if let ExeErrKind::ParseErr(kind) = err.kind {
+            use ParseErrKind::*;
+            if let ExpectedBlock(_) = kind {
+                return true;
+            }
         }
+        false
     }
 
     fn load_history(&mut self) {
@@ -282,8 +281,8 @@ mod tests {
         let executor = Executor::new(&mut vm, false, false, false);
         let mut repl = Repl::new(None, executor);
         match repl.eval(input, true) {
-            Some(Ok(string)) => assert!(false),
-            Some(Err((code, string))) => assert!(false),
+            Some(Ok(_)) => assert!(false),
+            Some(Err(_)) => assert!(false),
             None => assert!(true), // eval returns None on valid input
         }
     }

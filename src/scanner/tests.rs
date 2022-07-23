@@ -1,5 +1,3 @@
-use std::io::Cursor;
-
 use num_bigint::BigInt;
 
 use crate::util::{source_from_text, Location};

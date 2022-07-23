@@ -217,43 +217,6 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
         self.err(ParseErrKind::ScanErr(err))
     }
 
-    /// Collect tokens until the specified token is reached. This is
-    /// used for lookahead. For example, it's used to find the
-    /// params/args for a function def/call since the number of args is
-    /// unknown up front and we can't use single-peek token inspection
-    /// techniques.
-    fn collect_until(
-        &mut self,
-        token: &Token,
-    ) -> Result<(bool, Vec<TokenWithLocation>), ParseErr> {
-        use ParseErrKind::MismatchedBracket;
-        use Token::{LBracket, LParen, RBracket, RParen};
-        let mut collector = vec![];
-        let mut nesting_stack = vec![];
-        while let Some(t) = self.next_token()? {
-            if &t.token == token && nesting_stack.is_empty() {
-                return Ok((true, collector));
-            }
-            match t.token {
-                LParen => nesting_stack.push('('),
-                LBracket => nesting_stack.push('['),
-                RParen => {
-                    if nesting_stack.pop() != Some('(') {
-                        return Err(self.err(MismatchedBracket(self.loc())));
-                    }
-                }
-                RBracket => {
-                    if nesting_stack.pop() != Some('[') {
-                        return Err(self.err(MismatchedBracket(self.loc())));
-                    }
-                }
-                _ => (),
-            }
-            collector.push(t);
-        }
-        Ok((false, collector))
-    }
-
     // Grammar ---------------------------------------------------------
 
     /// Get a list of statements. Collect statements until there's
@@ -316,18 +279,12 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
         let end = token.end; // Default end location for simple expressions
         let expr = match token.token {
             LParen => self.parenthesized(start)?,
-            Nil => ast::Expr::new_literal(ast::Literal::new_nil(), start, end),
-            True => ast::Expr::new_literal(ast::Literal::new_bool(true), start, end),
-            False => ast::Expr::new_literal(ast::Literal::new_bool(false), start, end),
-            Float(value) => {
-                ast::Expr::new_literal(ast::Literal::new_float(value), start, end)
-            }
-            Int(value) => {
-                ast::Expr::new_literal(ast::Literal::new_int(value), start, end)
-            }
-            Str(value) => {
-                ast::Expr::new_literal(ast::Literal::new_string(value), start, end)
-            }
+            Nil => ast::Expr::new_nil(start, end),
+            True => ast::Expr::new_true(start, end),
+            False => ast::Expr::new_false(start, end),
+            Int(value) => ast::Expr::new_int(value, start, end),
+            Float(value) => ast::Expr::new_float(value, start, end),
+            Str(string) => ast::Expr::new_string(string, start, end),
             FormatStr(tokens) => self.format_string(tokens)?,
             Block => {
                 let block = self.block()?;
@@ -401,8 +358,8 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
             match format_string_token {
                 FormatStrToken::Str(value) => {
                     // TODO: Fix location
-                    items.push(ast::Expr::new_literal(
-                        ast::Literal::new_string(value),
+                    items.push(ast::Expr::new_string(
+                        value,
                         Location::new(1, 1),
                         Location::new(1, 1),
                     ));
@@ -485,11 +442,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
     fn loop_(&mut self, start: Location) -> ExprResult {
         self.loop_level += 1;
         let expr = match self.peek_token_is(&Token::ScopeStart)? {
-            true => ast::Expr::new_literal(
-                ast::Literal::new_bool(true),
-                self.next_loc(),
-                self.next_loc(),
-            ),
+            true => ast::Expr::new_true(self.next_loc(), self.next_loc()),
             false => self.expr(0)?,
         };
         let block = self.block()?;
@@ -505,7 +458,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
         }
         let expr = match self.peek_token()? {
             Some(TokenWithLocation { token: Token::EndOfStatement, .. }) | None => {
-                ast::Expr::new_literal(ast::Literal::new_nil(), start, start)
+                ast::Expr::new_nil(start, start)
             }
             _ => self.expr(0)?,
         };

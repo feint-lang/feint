@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use crate::types::{Func, ObjectRef};
 use crate::vm::Chunk;
 

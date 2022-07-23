@@ -32,7 +32,6 @@ impl Default for Constants {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::vm::context::RuntimeContext;
 
     #[test]

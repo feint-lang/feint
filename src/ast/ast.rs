@@ -94,25 +94,61 @@ pub struct Expr {
 
 #[derive(PartialEq)]
 pub enum ExprKind {
-    UnaryOp(UnaryOperator, Box<Expr>),
-    BinaryOp(Box<Expr>, BinaryOperator, Box<Expr>),
+    Tuple(Vec<Expr>),
+    Literal(Literal),
+    FormatString(Vec<Expr>),
+    Ident(Ident),
     Block(Block),
     InlineBlock(Box<Expr>),
     Conditional(Vec<(Expr, Block)>, Option<Block>),
+    Loop(Box<Expr>, Block),
+    Break(Box<Expr>),
     Func(Func),
     Call(Call),
     Print(Vec<Expr>),
-    Literal(Literal),
-    Loop(Box<Expr>, Block),
-    Break(Box<Expr>),
-    Ident(Ident),
-    Tuple(Vec<Expr>),
-    FormatString(Vec<Expr>),
+    UnaryOp(UnaryOperator, Box<Expr>),
+    BinaryOp(Box<Expr>, BinaryOperator, Box<Expr>),
 }
 
 impl Expr {
     pub fn new(kind: ExprKind, start: Location, end: Location) -> Self {
         Self { kind, start, end }
+    }
+
+    pub fn new_tuple(items: Vec<Expr>, start: Location, end: Location) -> Self {
+        Self::new(ExprKind::Tuple(items), start, end)
+    }
+
+    fn new_literal(literal: Literal, start: Location, end: Location) -> Self {
+        Self::new(ExprKind::Literal(literal), start, end)
+    }
+
+    pub fn new_nil(start: Location, end: Location) -> Self {
+        Self::new_literal(Literal::new_nil(), start, end)
+    }
+
+    pub fn new_true(start: Location, end: Location) -> Self {
+        Self::new_literal(Literal::new_bool(true), start, end)
+    }
+
+    pub fn new_false(start: Location, end: Location) -> Self {
+        Self::new_literal(Literal::new_bool(false), start, end)
+    }
+
+    pub fn new_int(value: BigInt, start: Location, end: Location) -> Self {
+        Self::new_literal(Literal::new_int(value), start, end)
+    }
+
+    pub fn new_float(value: f64, start: Location, end: Location) -> Self {
+        Self::new_literal(Literal::new_float(value), start, end)
+    }
+
+    pub fn new_string(string: String, start: Location, end: Location) -> Self {
+        Self::new_literal(Literal::new_string(string), start, end)
+    }
+
+    pub fn new_format_string(items: Vec<Expr>, start: Location, end: Location) -> Self {
+        Self::new(ExprKind::FormatString(items), start, end)
     }
 
     pub fn new_block(block: Block, start: Location, end: Location) -> Self {
@@ -138,6 +174,10 @@ impl Expr {
 
     pub fn new_break(expr: Expr, start: Location, end: Location) -> Self {
         Self::new(ExprKind::Break(Box::new(expr)), start, end)
+    }
+
+    pub fn new_ident(ident: Ident, start: Location, end: Location) -> Self {
+        Self::new(ExprKind::Ident(ident), start, end)
     }
 
     pub fn new_func(
@@ -189,26 +229,6 @@ impl Expr {
         };
         Self::new(ExprKind::BinaryOp(Box::new(a), operator, Box::new(b)), start, end)
     }
-
-    pub fn new_ident(ident: Ident, start: Location, end: Location) -> Self {
-        Self::new(ExprKind::Ident(ident), start, end)
-    }
-
-    pub fn new_literal(literal: Literal, start: Location, end: Location) -> Self {
-        Self::new(ExprKind::Literal(literal), start, end)
-    }
-
-    pub fn new_string(value: &str, start: Location, end: Location) -> Self {
-        Self::new_literal(Literal::new_string(value), start, end)
-    }
-
-    pub fn new_format_string(items: Vec<Expr>, start: Location, end: Location) -> Self {
-        Self::new(ExprKind::FormatString(items), start, end)
-    }
-
-    pub fn new_tuple(items: Vec<Expr>, start: Location, end: Location) -> Self {
-        Self::new(ExprKind::Tuple(items), start, end)
-    }
 }
 
 impl fmt::Debug for Expr {
@@ -220,9 +240,9 @@ impl fmt::Debug for Expr {
 impl fmt::Debug for ExprKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Tuple(items) => write!(f, "{:?}", items),
             Self::Literal(literal) => write!(f, "{:?}", literal),
-            Self::UnaryOp(op, b) => write!(f, "({:?}{:?})", op, b),
-            Self::BinaryOp(a, op, b) => write!(f, "({:?} {:?} {:?})", a, op, b),
+            Self::FormatString(items) => write!(f, "{:?}", items),
             Self::Ident(ident) => write!(f, "{:?}", ident),
             Self::Block(block) => write!(f, "{:?}", block),
             Self::InlineBlock(expr) => write!(f, "{:?}", expr),
@@ -232,10 +252,10 @@ impl fmt::Debug for ExprKind {
             Self::Loop(expr, block) => write!(f, "loop {expr:?}\n{block:?}"),
             Self::Break(expr) => write!(f, "break {expr:?}"),
             Self::Func(func) => write!(f, "{:?}", func),
-            Self::Print(_items) => write!(f, "Print"),
             Self::Call(func) => write!(f, "{:?}", func),
-            Self::FormatString(items) => write!(f, "{:?}", items),
-            Self::Tuple(items) => write!(f, "{:?}", items),
+            Self::Print(_items) => write!(f, "Print"),
+            Self::UnaryOp(op, b) => write!(f, "({:?}{:?})", op, b),
+            Self::BinaryOp(a, op, b) => write!(f, "({:?} {:?} {:?})", a, op, b),
         }
     }
 }
@@ -262,25 +282,6 @@ impl fmt::Debug for Block {
             .map(|statement| format!("{:?}", statement))
             .collect();
         write!(f, "Block ->\n    {}", items.join("\n    "))
-    }
-}
-
-/// Conditional
-#[derive(PartialEq)]
-pub struct Conditional {
-    pub if_expr: Expr,
-    pub if_statements: Vec<Statement>,
-}
-
-impl Conditional {
-    pub fn new(if_expr: Expr, if_statements: Vec<Statement>) -> Self {
-        Self { if_expr, if_statements }
-    }
-}
-
-impl fmt::Debug for Conditional {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Conditional")
     }
 }
 
@@ -364,12 +365,12 @@ impl Literal {
         Self::new(LiteralKind::Bool(value))
     }
 
-    pub fn new_float(value: f64) -> Self {
-        Self::new(LiteralKind::Float(value))
-    }
-
     pub fn new_int(value: BigInt) -> Self {
         Self::new(LiteralKind::Int(value))
+    }
+
+    pub fn new_float(value: f64) -> Self {
+        Self::new(LiteralKind::Float(value))
     }
 
     pub fn new_string<S: Into<String>>(value: S) -> Self {
@@ -388,8 +389,8 @@ impl fmt::Debug for LiteralKind {
         let string = match self {
             Self::Nil => "nil".to_string(),
             Self::Bool(value) => value.to_string(),
-            Self::Float(value) => value.to_string(),
             Self::Int(value) => value.to_string(),
+            Self::Float(value) => value.to_string(),
             Self::String(value) => value.clone(),
         };
         write!(f, "{}", string)
