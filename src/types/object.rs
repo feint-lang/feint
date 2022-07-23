@@ -151,10 +151,11 @@ impl fmt::Debug for dyn Object {
             self,
             super::nil::Nil,
             super::bool::Bool,
-            super::float::Float,
             super::int::Int,
+            super::float::Float,
             super::str::Str,
             super::tuple::Tuple,
+            super::func::Func,
             super::complex::ComplexObject
         );
         // Fallback
