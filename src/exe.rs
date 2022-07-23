@@ -152,7 +152,7 @@ impl<'a> Executor<'a> {
         use ScanErrKind::*;
         self.incremental
             && match &err.kind {
-                UnmatchedOpeningBracket(_) | UnterminatedString(_) => true,
+                UnmatchedOpeningBracket(_) | UnterminatedStr(_) => true,
                 _ => false,
             }
     }
@@ -162,13 +162,13 @@ impl<'a> Executor<'a> {
         let mut loc = err.location.clone();
         let col = loc.col;
         let message = match &err.kind {
-            UnexpectedCharacter(c) => {
+            UnexpectedChar(c) => {
                 format!("Syntax error: Unexpected character at column {}: '{}'", col, c)
             }
             UnmatchedOpeningBracket(_) => {
                 format!("Unmatched open bracket at {loc}")
             }
-            UnterminatedString(_) => {
+            UnterminatedStr(_) => {
                 format!("Syntax error: Unterminated string literal at {loc}")
             }
             InvalidIndent(num_spaces) => {
@@ -186,8 +186,8 @@ impl<'a> Executor<'a> {
             WhitespaceAfterIndent | UnexpectedWhitespace => {
                 format!("Syntax error: Unexpected whitespace")
             }
-            FormatStringErr(err) => {
-                use crate::format::FormatStringErr::*;
+            FormatStrErr(err) => {
+                use crate::format::FormatStrErr::*;
                 match err {
                     EmptyExpr(pos) => {
                         loc = Location::new(loc.line, loc.col + 2 + pos);

@@ -2,7 +2,7 @@ use std::num::ParseFloatError;
 
 use num_bigint::ParseBigIntError;
 
-use crate::format::FormatStringErr;
+use crate::format::FormatStrErr;
 use crate::util::Location;
 
 use super::TokenWithLocation;
@@ -30,12 +30,12 @@ pub enum ScanErrKind {
     UnexpectedWhitespace, // Other unexpected whitespace
     ExpectedBlock,     // Block expected but not provided
     ExpectedIndentedBlock(u8), // Expected an indented block
-    UnterminatedString(String), // String with no closing quote
-    UnexpectedCharacter(char), // Char not recognized as token or start of token
+    UnterminatedStr(String), // String with no closing quote
+    UnexpectedChar(char), // Char not recognized as token or start of token
     UnmatchedOpeningBracket(char), // Closing bracket with no matching opening bracket
     UnmatchedClosingBracket(char), // Opening bracket with no matching closing bracket
     ParseIntErr(ParseBigIntError),
     ParseFloatErr(ParseFloatError),
-    FormatStringErr(FormatStringErr),
+    FormatStrErr(FormatStrErr),
     TooMuchWhitespace,
 }

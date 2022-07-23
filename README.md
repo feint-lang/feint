@@ -33,13 +33,24 @@ MIT. See the LICENSE file.
 - Bool (`true` and `false` keywords, not ints)
 - Float (64-bit)
 - Int (BigInt)
-- String (can use `"` or `'`, multiline)
-- Format String (`$"{expr}"`; can use `$"` or `$'`, multiline)
+- Str (can use `"` or `'`, multiline)
 - Tuple
 - List
 - Option
 - Func
 - Range (`0..10` and `1...10`)
+
+## Format Strings
+
+Similar to f-strings in Python. Sometimes called $-strings since they
+use a `$` to mark strings as format strings.
+
+```
+x = 1
+s = $"{x}"
+print(s)
+# -> 1
+```
 
 ## Custom Types
 

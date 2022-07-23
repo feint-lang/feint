@@ -11,7 +11,7 @@ mod func;
 mod int;
 mod nil;
 mod object;
-mod string;
+mod str;
 mod tuple;
 mod util;
 

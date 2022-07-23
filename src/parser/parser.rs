@@ -3,7 +3,7 @@ use std::collections::VecDeque;
 use std::iter::{Iterator, Peekable};
 
 use crate::ast;
-use crate::format::FormatStringToken;
+use crate::format::FormatStrToken;
 use crate::parser::result::StatementResult;
 use crate::scanner::{ScanErr, ScanResult, Token, TokenWithLocation};
 use crate::util::Location;
@@ -325,10 +325,10 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
             Int(value) => {
                 ast::Expr::new_literal(ast::Literal::new_int(value), start, end)
             }
-            String(value) => {
+            Str(value) => {
                 ast::Expr::new_literal(ast::Literal::new_string(value), start, end)
             }
-            FormatString(tokens) => self.format_string(tokens)?,
+            FormatStr(tokens) => self.format_string(tokens)?,
             Block => {
                 let block = self.block()?;
                 let end = block.end;
@@ -393,13 +393,13 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
     /// Handle format strings (AKA $ strings).
     fn format_string(
         &mut self,
-        format_string_tokens: Vec<FormatStringToken>,
+        format_string_tokens: Vec<FormatStrToken>,
     ) -> ExprResult {
         let start = self.loc();
         let mut items = vec![];
         for format_string_token in format_string_tokens {
             match format_string_token {
-                FormatStringToken::Str(value) => {
+                FormatStrToken::Str(value) => {
                     // TODO: Fix location
                     items.push(ast::Expr::new_literal(
                         ast::Literal::new_string(value),
@@ -407,7 +407,7 @@ impl<I: Iterator<Item = ScanResult>> Parser<I> {
                         Location::new(1, 1),
                     ));
                 }
-                FormatStringToken::Expr(tokens) => {
+                FormatStrToken::Expr(tokens) => {
                     // TODO: Make location more precise
                     let loc = self.current_token.as_ref().unwrap().start;
                     let program = parse_tokens(tokens)?;

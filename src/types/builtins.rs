@@ -37,7 +37,7 @@ impl Builtins {
         types.insert("Float", Self::create_type("Float"));
         types.insert("Func", Self::create_type("Func"));
         types.insert("Int", Self::create_type("Int"));
-        types.insert("String", Self::create_type("String"));
+        types.insert("Str", Self::create_type("Str"));
         types.insert("Tuple", tuple_type);
 
         Self { types, nil_obj, true_obj, false_obj, empty_tuple }
@@ -92,9 +92,9 @@ impl Builtins {
     }
 
     pub fn new_string<S: Into<String>>(&self, value: S) -> ObjectRef {
-        let class = self.get_type("String").clone();
+        let class = self.get_type("Str").clone();
         let value = value.into();
-        Rc::new(super::string::String::new(class, value))
+        Rc::new(super::str::Str::new(class, value))
     }
 
     pub fn new_tuple(&self, items: Vec<ObjectRef>) -> ObjectRef {

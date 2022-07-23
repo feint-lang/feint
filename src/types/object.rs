@@ -134,7 +134,7 @@ impl fmt::Display for dyn Object {
             super::bool::Bool,
             super::float::Float,
             super::int::Int,
-            super::string::String,
+            super::str::Str,
             super::tuple::Tuple,
             super::complex::ComplexObject
         );
@@ -152,7 +152,7 @@ impl fmt::Debug for dyn Object {
             super::bool::Bool,
             super::float::Float,
             super::int::Int,
-            super::string::String,
+            super::str::Str,
             super::tuple::Tuple,
             super::complex::ComplexObject
         );

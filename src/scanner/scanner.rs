@@ -71,22 +71,22 @@ impl<'a, T: BufRead> Scanner<'a, T> {
 
         let token = match self.next_char() {
             Some((c @ ('"' | '\''), _, _)) => match self.read_string(c) {
-                (s, true) => String(s),
+                (s, true) => Str(s),
                 (s, false) => {
-                    return self.err(UnterminatedString(format!("{c}{s}")), start);
+                    return self.err(UnterminatedStr(format!("{c}{s}")), start);
                 }
             },
             Some(('$', Some('"' | '\''), _)) => {
                 let d = self.source.next().unwrap();
                 match self.read_string(d) {
                     (s, true) => match scan_format_string(s.as_str()) {
-                        Ok(tokens) => FormatString(tokens),
+                        Ok(tokens) => FormatStr(tokens),
                         Err(err) => {
-                            return self.err(FormatStringErr(err), start);
+                            return self.err(FormatStrErr(err), start);
                         }
                     },
                     (s, false) => {
-                        return self.err(UnterminatedString(format!("${d}{s}")), start);
+                        return self.err(UnterminatedStr(format!("${d}{s}")), start);
                     }
                 }
             }
@@ -210,7 +210,7 @@ impl<'a, T: BufRead> Scanner<'a, T> {
             Some(('_', _, _)) => {
                 if self.consume_contiguous('_') > 0 {
                     return self.err(
-                        UnexpectedCharacter('_'),
+                        UnexpectedChar('_'),
                         Location::new(start.line, start.col + 1),
                     );
                 }
@@ -255,7 +255,7 @@ impl<'a, T: BufRead> Scanner<'a, T> {
             }
             // Unknown
             Some((c, _, _)) => {
-                return self.err(UnexpectedCharacter(c), start);
+                return self.err(UnexpectedChar(c), start);
             }
             // End of input
             None => {

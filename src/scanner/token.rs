@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::format::FormatStringToken;
+use crate::format::FormatStrToken;
 use num_bigint::BigInt;
 
 use crate::util::Location;
@@ -16,10 +16,10 @@ pub enum Token {
     Comma, // ,
 
     // Fundamental types
-    Float(f64),                           // 1.0, 1.0E+10
-    Int(BigInt),                          // 1, 1_000, 0b1, 0o1, ox1 (digits, radix)
-    String(String),                       // "words words words"
-    FormatString(Vec<FormatStringToken>), // $"words {name_in_scope} words"
+    Float(f64),                     // 1.0, 1.0E+10
+    Int(BigInt),                    // 1, 1_000, 0b1, 0o1, ox1 (digits, radix)
+    Str(String),                    // "words words words"
+    FormatStr(Vec<FormatStrToken>), // $"words {name_in_scope} words"
 
     // Single-character operators
     Caret,       // ^

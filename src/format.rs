@@ -2,26 +2,24 @@ use crate::scanner::{ScanTokensResult, Scanner, TokenWithLocation};
 use crate::util::source_from_text;
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum FormatStringToken {
+pub enum FormatStrToken {
     Str(String),
     Expr(Vec<TokenWithLocation>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum FormatStringErr {
+pub enum FormatStrErr {
     EmptyExpr(usize),
     UnmatchedOpeningBracket(usize),
     UnmatchedClosingBracket(usize),
     ScanErr(usize, usize),
 }
 
-pub fn scan_format_string(
-    string: &str,
-) -> Result<Vec<FormatStringToken>, FormatStringErr> {
-    use FormatStringErr::*;
-    use FormatStringToken::*;
+pub fn scan_format_string(string: &str) -> Result<Vec<FormatStrToken>, FormatStrErr> {
+    use FormatStrErr::*;
+    use FormatStrToken::*;
 
-    let mut tokens: Vec<FormatStringToken> = Vec::new();
+    let mut tokens: Vec<FormatStrToken> = Vec::new();
     let mut chars = string.chars();
     let mut peek_chars = string.chars();
     let mut stack = vec![];
@@ -101,11 +99,11 @@ mod tests {
     use crate::scanner::Token;
     use crate::util::Location;
 
-    use super::FormatStringErr::*;
-    use super::FormatStringToken::*;
+    use super::FormatStrErr::*;
+    use super::FormatStrToken::*;
     use super::*;
 
-    fn scan_ok(string: &str, expected_num_tokens: usize) -> Vec<FormatStringToken> {
+    fn scan_ok(string: &str, expected_num_tokens: usize) -> Vec<FormatStrToken> {
         let result = scan_format_string(string);
         assert!(result.is_ok());
         let tokens = result.unwrap();
@@ -163,7 +161,7 @@ mod tests {
         token = tokens.get(3).unwrap();
         let expected = Expr(vec![
             TokenWithLocation::new(
-                Token::String("2".to_owned()),
+                Token::Str("2".to_owned()),
                 Location::new(1, 1),
                 Location::new(1, 3),
             ),

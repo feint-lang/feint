@@ -202,7 +202,7 @@ impl<'a> Repl<'a> {
             ExeErrKind::ScanErr(scan_err_kind) => match scan_err_kind {
                 ScanErrKind::ExpectedBlock
                 | UnmatchedOpeningBracket(_)
-                | UnterminatedString(_) => true,
+                | UnterminatedStr(_) => true,
                 _ => false,
             },
             ExeErrKind::ParseErr(parse_err_kind) => match parse_err_kind {

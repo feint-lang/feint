@@ -7,15 +7,13 @@ use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeErr, RuntimeResult};
 use crate::types::class::TypeRef;
 use crate::types::object::{Object, ObjectExt, ObjectRef};
 
-type RustString = std::string::String;
-
-pub struct String {
+pub struct Str {
     class: TypeRef,
-    value: RustString,
+    value: String,
 }
 
-impl String {
-    pub fn new<S: Into<RustString>>(class: TypeRef, value: S) -> Self {
+impl Str {
+    pub fn new<S: Into<String>>(class: TypeRef, value: S) -> Self {
         Self { class, value: value.into() }
     }
 
@@ -24,7 +22,7 @@ impl String {
     }
 }
 
-impl Object for String {
+impl Object for Str {
     fn class(&self) -> &TypeRef {
         &self.class
     }
@@ -48,7 +46,7 @@ impl Object for String {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
             let a = self.value();
             let b = rhs.value();
-            let mut value = RustString::with_capacity(a.len() + b.len());
+            let mut value = String::with_capacity(a.len() + b.len());
             value.push_str(a);
             value.push_str(b);
             let value = ctx.builtins.new_string(value);
@@ -64,13 +62,13 @@ impl Object for String {
 
 // Display -------------------------------------------------------------
 
-impl fmt::Display for String {
+impl fmt::Display for Str {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.value())
     }
 }
 
-impl fmt::Debug for String {
+impl fmt::Debug for Str {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "\"{}\"", self.value())
     }

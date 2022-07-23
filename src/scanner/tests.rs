@@ -142,7 +142,7 @@ fn scan_string_unclosed() {
     let source = "\"abc";
     match scan_text(source) {
         Err(err) => match err {
-            ScanErr { kind: ScanErrKind::UnterminatedString(string), location } => {
+            ScanErr { kind: ScanErrKind::UnterminatedStr(string), location } => {
                 assert_eq!(string, source.to_string());
                 assert_eq!(location, Location::new(1, 1));
                 let new_source = source.to_string() + "\"";
@@ -252,7 +252,7 @@ fn scan_unknown() {
     match scan_text(source) {
         Ok(_tokens) => assert!(false),
         Err(err) => match err {
-            ScanErr { kind: ScanErrKind::UnexpectedCharacter(c), location } => {
+            ScanErr { kind: ScanErrKind::UnexpectedChar(c), location } => {
                 assert_eq!(c, '{');
                 assert_eq!(location.line, 1);
                 assert_eq!(location.col, 1);
@@ -410,7 +410,7 @@ fn check_string_token(
     assert!(actual.is_some());
     match actual {
         Some(TokenWithLocation {
-            token: Token::String(actual_string),
+            token: Token::Str(actual_string),
             start: Location { line: actual_start_line, col: actual_start_col },
             end: Location { line: actual_end_line, col: actual_end_col },
         }) => {
