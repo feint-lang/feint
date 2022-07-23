@@ -9,6 +9,8 @@
 - [x] Implement `block`
 - [x] Implement inline blocks (`block -> <expr>`)
 - [x] Implement labels
+  - [ ] Fix `label: <expr>` syntax (this used to work but was broken
+    recently)
 - [x] Implement `jump` (jump *forward* to label)
 - [x] Implement conditionals
 - [ ] Implement ternary operator
@@ -18,7 +20,7 @@
   - [x] Implement while loops
   - [ ] Implement for loops
   - [x] Fix `break` (works for simple cases but is wonky)
-  - [ ] Implement `continue`
+  - [x] Implement `continue`
 - [ ] Implement function calls
 - [ ] Implement `print` function (`print` is currently implemented as a statement and has limited functionality)
 - [ ] Implement custom classes
