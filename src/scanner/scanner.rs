@@ -382,7 +382,6 @@ impl<'a, T: BufRead> Scanner<'a, T> {
     fn expect_indent(&mut self) -> AddTokensResult {
         self.assert_start_of_line("expect_indent");
         let loc = self.source.loc();
-        let loc = Location::new(loc.line + 1, 1);
         let current_level = self.indent_level;
         let expected_level = current_level + 1;
         let new_level = self.get_next_indent_level()?;
@@ -398,23 +397,22 @@ impl<'a, T: BufRead> Scanner<'a, T> {
     /// Handle dedent after a newline is encountered.
     fn dedent(&mut self) -> AddTokensResult {
         self.assert_start_of_line("dedent");
-        let start = self.source.loc();
+        let loc = self.source.loc();
+        let line = if loc.line == 1 { 1 } else { loc.line + 1 };
+        let loc = Location::new(line, 1);
         let next_level = self.get_next_indent_level()?;
         if next_level > self.indent_level {
-            return Err(ScanErr::new(ErrKind::UnexpectedIndent(next_level), start));
+            println!("{loc}");
+            return Err(ScanErr::new(ErrKind::UnexpectedIndent(next_level), loc));
         }
-        self.set_indent_level(next_level, start)
+        self.set_indent_level(next_level, loc)
     }
 
     /// Maybe update the current indent level. If the new indent level
     /// is the same as the current indent level, do nothing. If it has
     /// increased, that signals the start of a block (scopes). If it has
     /// decreased, that signals the end of one or more blocks (scopes).
-    fn set_indent_level(
-        &mut self,
-        indent_level: u8,
-        start: Location,
-    ) -> AddTokensResult {
+    fn set_indent_level(&mut self, indent_level: u8, loc: Location) -> AddTokensResult {
         let mut current_level = self.indent_level;
         if indent_level == current_level {
             // Stayed the same; nothing to do
@@ -424,13 +422,13 @@ impl<'a, T: BufRead> Scanner<'a, T> {
         } else if indent_level < current_level {
             // Decreased by one or more levels
             while current_level > indent_level {
-                self.exit_block_scope(Location::new(start.line + 1, 0));
+                self.exit_block_scope(loc);
                 current_level -= 1;
             }
             self.indent_level = current_level;
         } else {
             // Increased by *more* than one level
-            return Err(ScanErr::new(ErrKind::UnexpectedIndent(indent_level), start));
+            return Err(ScanErr::new(ErrKind::UnexpectedIndent(indent_level), loc));
         }
         Ok(())
     }

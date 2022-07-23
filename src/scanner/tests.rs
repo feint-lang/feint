@@ -188,8 +188,8 @@ g (y) ->  # 6
     check_token(tokens.next(), Token::EndOfStatement, 2, 6, 2, 6);
     check_token(tokens.next(), Token::Int(BigInt::from(1)), 3, 5, 3, 5);
     check_token(tokens.next(), Token::EndOfStatement, 3, 6, 3, 6);
-    check_token(tokens.next(), Token::ScopeEnd, 4, 0, 4, 0);
-    check_token(tokens.next(), Token::EndOfStatement, 4, 0, 4, 0);
+    check_token(tokens.next(), Token::ScopeEnd, 4, 1, 4, 1);
+    check_token(tokens.next(), Token::EndOfStatement, 4, 1, 4, 1);
 
     // g
     check_token(tokens.next(), Token::Ident("g".to_string()), 6, 1, 6, 1);
@@ -199,8 +199,8 @@ g (y) ->  # 6
     check_token(tokens.next(), Token::ScopeStart, 6, 7, 6, 8);
     check_token(tokens.next(), Token::Ident("y".to_string()), 7, 5, 7, 5);
     check_token(tokens.next(), Token::EndOfStatement, 7, 6, 7, 6);
-    check_token(tokens.next(), Token::ScopeEnd, 8, 0, 8, 0);
-    check_token(tokens.next(), Token::EndOfStatement, 8, 0, 8, 0);
+    check_token(tokens.next(), Token::ScopeEnd, 8, 1, 8, 1);
+    check_token(tokens.next(), Token::EndOfStatement, 8, 1, 8, 1);
 
     assert!(tokens.next().is_none());
 }
@@ -213,7 +213,7 @@ fn scan_unexpected_indent_on_first_line() {
     match result.unwrap_err() {
         ScanErr { kind: ScanErrKind::UnexpectedIndent(1), location } => {
             assert_eq!(location.line, 1);
-            assert_eq!(location.col, 0);
+            assert_eq!(location.col, 1);
         }
         err => assert!(false, "Unexpected error: {:?}", err),
     }
