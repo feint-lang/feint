@@ -242,7 +242,13 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
         let start = token.start;
         let statement = match token.token {
             Jump => self.jump(start)?,
-            Label(name) => ast::Statement::new_label(name, start, token.end),
+            Label(name) => {
+                let label = ast::Statement::new_label(name, start, token.end);
+                if !self.peek_token_is(&EndOfStatement)? {
+                    return Ok(label);
+                }
+                label
+            }
             Continue => self.continue_(start, token.end)?,
             _ => {
                 self.lookahead_queue.push_front(token);

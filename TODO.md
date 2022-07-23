@@ -9,9 +9,10 @@
 - [x] Implement `block`
 - [x] Implement inline blocks (`block -> <expr>`)
 - [x] Implement labels
-  - [ ] Fix `label: <expr>` syntax (this used to work but was broken
+  - [x] Fix `label: <expr>` syntax (this used to work but was broken
     recently)
 - [x] Implement `jump` (jump *forward* to label)
+  - Allow multiple `jump`s to the same label in a given scope
 - [x] Implement conditionals
 - [ ] Implement ternary operator
 - [ ] Implement `match`?
