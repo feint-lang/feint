@@ -169,6 +169,11 @@ impl<'a, T: BufRead> Scanner<'a, T> {
         Ok(())
     }
 
+    fn add_token_to_queue(&mut self, token: Token, start: Location, end: Location) {
+        let token_with_location = TokenWithLocation::new(token, start, end);
+        self.queue.push_back(token_with_location);
+    }
+
     // Token Handlers --------------------------------------------------
 
     fn handle_bang(&mut self) -> AddTokenResult {
@@ -438,45 +443,7 @@ impl<'a, T: BufRead> Scanner<'a, T> {
         }
     }
 
-    fn add_token_to_queue(&mut self, token: Token, start: Location, end: Location) {
-        let token_with_location = TokenWithLocation::new(token, start, end);
-        self.queue.push_back(token_with_location);
-    }
-
-    /// Consume the next character and return the specified token.
-    fn consume_char_and_return_token(&mut self, token: Token) -> Token {
-        self.source.next();
-        token
-    }
-
-    /// Consume the next two characters and return the specified token.
-    fn consume_two_chars_and_return_token(&mut self, token: Token) -> Token {
-        self.source.next();
-        self.source.next();
-        token
-    }
-
-    /// Check the specified closing bracket to ensure the last opening
-    /// bracket matches. If it does, the specified token is returned.
-    #[rustfmt::skip]
-    fn pop_bracket_and_return_token(
-        &mut self,
-        closing_bracket: char,
-        location: Location,
-        token: Token,
-    ) -> Result<Token, ScanErr> {
-        match (self.bracket_stack.pop(), closing_bracket) {
-            | (Some(('(', _)), ')')
-            | (Some(('[', _)), ']')
-            => {
-                Ok(token)
-            }
-            _ => Err(ScanErr::new(
-                ErrKind::UnmatchedClosingBracket(closing_bracket),
-                location,
-            ))
-        }
-    }
+    // Utilities -------------------------------------------------------
 
     /// Consume and return the next character. The following two
     /// characters are included as well for easy peeking.
@@ -560,6 +527,36 @@ impl<'a, T: BufRead> Scanner<'a, T> {
                 false => None,
             },
             _ => None,
+        }
+    }
+
+    /// Consume the next character and return the specified token.
+    fn consume_char_and_return_token(&mut self, token: Token) -> Token {
+        self.source.next();
+        token
+    }
+
+    /// Consume the next two characters and return the specified token.
+    fn consume_two_chars_and_return_token(&mut self, token: Token) -> Token {
+        self.source.next();
+        self.source.next();
+        token
+    }
+
+    /// Check the specified closing bracket to ensure the last opening
+    /// bracket matches. If it does, the specified token is returned.
+    fn pop_bracket_and_return_token(
+        &mut self,
+        closing_bracket: char,
+        location: Location,
+        token: Token,
+    ) -> Result<Token, ScanErr> {
+        match (self.bracket_stack.pop(), closing_bracket) {
+            (Some(('(', _)), ')') | (Some(('[', _)), ']') => Ok(token),
+            _ => Err(ScanErr::new(
+                ErrKind::UnmatchedClosingBracket(closing_bracket),
+                location,
+            )),
         }
     }
 
