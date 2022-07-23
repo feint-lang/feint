@@ -480,7 +480,7 @@ impl VM {
             },
             LoadConst(index) => {
                 let obj_str = obj_str(*index);
-                self.format_aligned("LOAD_CONST", format!("{index} ('{obj_str}')"))
+                self.format_aligned("LOAD_CONST", format!("{index} ({obj_str})"))
             }
             DeclareVar(name) => self.format_aligned("DECLARE_VAR", name),
             AssignVar(name) => {
@@ -488,7 +488,7 @@ impl VM {
                 let obj_str = obj_str(*index);
                 self.format_aligned(
                     "ASSIGN_VAR",
-                    format!("{name} = {index} ('{obj_str}')"),
+                    format!("{name} = {index} ({obj_str})"),
                 )
             }
             LoadVar(name) => {
