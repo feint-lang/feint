@@ -2,7 +2,7 @@
 use std::any::Any;
 use std::fmt;
 
-use crate::vm::Chunk;
+use crate::vm::{Chunk, RuntimeBoolResult, RuntimeContext, RuntimeErr, RuntimeResult};
 
 use super::class::TypeRef;
 use super::object::{Object, ObjectExt, ObjectRef};
@@ -32,6 +32,18 @@ impl Object for Func {
 
     fn as_any(&self) -> &dyn Any {
         self
+    }
+
+    fn is_equal(&self, rhs: &ObjectRef, _ctx: &RuntimeContext) -> RuntimeBoolResult {
+        if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
+            Ok(self.is(&rhs))
+        } else {
+            Err(RuntimeErr::new_type_error(format!(
+                "Could not compare {} to {}",
+                self.class().name(),
+                rhs.class().name()
+            )))
+        }
     }
 }
 
