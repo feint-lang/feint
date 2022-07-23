@@ -26,7 +26,8 @@ struct Repl<'a> {
 
 impl<'a> Repl<'a> {
     fn new(history_path: Option<&'a Path>, executor: Executor<'a>) -> Self {
-        let mut reader = rustyline::Editor::<()>::new();
+        let mut reader =
+            rustyline::Editor::<()>::new().expect("Could initialize readline");
         reader.set_indent_size(4);
         reader.set_tab_stop(4);
         Repl { reader, history_path, executor }
