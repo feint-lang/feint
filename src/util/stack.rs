@@ -27,8 +27,7 @@ impl<T> Stack<T> {
         if size < n {
             None
         } else {
-            let start = size - n;
-            let items: Vec<T> = self.storage.drain(start..).collect();
+            let items = self.storage.split_off(size - n);
             Some(items)
         }
     }
