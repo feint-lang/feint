@@ -5,10 +5,12 @@ use num_bigint::BigInt;
 use num_traits::Num;
 
 use crate::format::scan_format_string;
+use crate::scanner::result::AddTokenResult;
 use crate::util::{Location, Source, Stack};
 
 use super::keywords::KEYWORDS;
-use super::result::{ScanErr, ScanErrKind, ScanResult};
+use super::result::ScanErrKind as ErrKind;
+use super::result::{AddTokensResult, ScanErr, ScanTokenResult};
 use super::token::{Token, TokenWithLocation};
 
 type NextOption<'a> = Option<(char, Option<&'a char>, Option<&'a char>)>;
@@ -51,7 +53,11 @@ impl<'a, T: BufRead> Scanner<'a, T> {
         }
     }
 
-    fn next_token_from_queue(&mut self) -> ScanResult {
+    /// Get the next token. If the token queue is empty, scanning will
+    /// proceed from the current source location to refill the queue.
+    /// When the end of the input is reached, an EndOfInput token is
+    /// returned.
+    fn next_token_from_queue(&mut self) -> ScanTokenResult {
         while self.queue.is_empty() {
             self.add_tokens_to_queue()?;
         }
@@ -60,36 +66,18 @@ impl<'a, T: BufRead> Scanner<'a, T> {
         Ok(token)
     }
 
-    fn err(&self, kind: ScanErrKind, loc: Location) -> Result<(), ScanErr> {
-        Err(ScanErr::new(kind, loc))
-    }
-
-    fn add_tokens_to_queue(&mut self) -> Result<(), ScanErr> {
-        use ScanErrKind::*;
+    /// Scan input starting from current source location and add one or
+    /// more tokens to the queue.
+    fn add_tokens_to_queue(&mut self) -> AddTokensResult {
+        use ErrKind::*;
         use Token::*;
-        let start = self.source.loc();
+
+        let loc = self.source.loc();
+        let start = Location::new(loc.line, loc.col + 1);
 
         let token = match self.next_char() {
-            Some((c @ ('"' | '\''), _, _)) => match self.read_string(c) {
-                (s, true) => Str(s),
-                (s, false) => {
-                    return self.err(UnterminatedStr(format!("{c}{s}")), start);
-                }
-            },
-            Some(('$', Some('"' | '\''), _)) => {
-                let d = self.source.next().unwrap();
-                match self.read_string(d) {
-                    (s, true) => match scan_format_string(s.as_str()) {
-                        Ok(tokens) => FormatStr(tokens),
-                        Err(err) => {
-                            return self.err(FormatStrErr(err), start);
-                        }
-                    },
-                    (s, false) => {
-                        return self.err(UnterminatedStr(format!("${d}{s}")), start);
-                    }
-                }
-            }
+            Some((quote @ ('"' | '\''), _, _)) => self.handle_string(quote, start)?,
+            Some(('$', Some('"' | '\''), _)) => self.handle_format_string(start)?,
             Some(('#', _, _)) => {
                 self.consume_comment();
                 return Ok(());
@@ -149,42 +137,10 @@ impl<'a, T: BufRead> Scanner<'a, T> {
                 Plus
             }
             Some(('-', Some('='), _)) => self.consume_char_and_return_token(MinusEqual),
-            Some(('-', Some('>'), _)) => {
-                let block_token = self.previous_token.clone();
-                let end = Location::new(start.line, start.col + 1);
-                self.source.next(); // consume >
-                self.consume_whitespace();
-                if self.source.peek() == Some(&'#') {
-                    self.source.next();
-                    self.consume_comment();
-                }
-                if self.source.peek().is_none() {
-                    return self.err(ExpectedBlock, self.source.loc());
-                } else if self.next_char_is('\n') {
-                    // Block
-                    self.add_token_to_queue(ScopeStart, start, Some(end));
-                    self.expect_indent()?;
-                } else {
-                    // Inline block
-                    let end = Location::new(start.line, start.col + 1);
-                    self.add_token_to_queue(InlineScopeStart, start, Some(end));
-                    self.inline_scope_stack.push((block_token, start));
-                }
-                return Ok(());
-            }
+            Some(('-', Some('>'), _)) => return self.handle_scope_start(start),
             Some(('-', _, _)) => Minus,
             Some(('!', Some('='), _)) => self.consume_char_and_return_token(NotEqual),
-            Some(('!', _, _)) => {
-                // Collapse contiguous bangs down to a single ! or !!.
-                // This is mainly to ensure !!!x is interpreted as
-                // !(!!(x)) instead of !!(!(x)).
-                let count = self.consume_contiguous('!') + 1;
-                match count % 2 {
-                    0 => BangBang,
-                    1 => Bang,
-                    _ => unreachable!(),
-                }
-            }
+            Some(('!', _, _)) => self.handle_bang()?,
             Some(('.', Some('.'), Some('.'))) => {
                 self.consume_two_chars_and_return_token(RangeInclusive)
             }
@@ -192,89 +148,172 @@ impl<'a, T: BufRead> Scanner<'a, T> {
             Some(('.', _, _)) => Dot,
             Some(('%', _, _)) => Percent,
             Some(('^', _, _)) => Caret,
-            Some((c @ '0'..='9', _, _)) => match self.read_number(c) {
-                (string, _) if string.contains(".") || string.contains("E") => {
-                    let value = string
-                        .parse::<f64>()
-                        .map_err(|err| ScanErr::new(ParseFloatErr(err), start))?;
-                    Float(value)
-                }
-                (string, radix) => {
-                    let value = BigInt::from_str_radix(string.as_str(), radix)
-                        .map_err(|err| ScanErr::new(ParseIntErr(err), start))?;
-                    Int(value)
-                }
-            },
-            // Identifiers
-            // Special case for single underscore placeholder var
-            Some(('_', _, _)) => {
-                if self.consume_contiguous('_') > 0 {
-                    return self.err(
-                        UnexpectedChar('_'),
-                        Location::new(start.line, start.col + 1),
-                    );
-                }
-                Ident("_".to_owned())
-            }
-            Some((c @ 'a'..='z', _, _)) => {
-                let ident = self.read_ident(c);
-                let (prev, next) = (&self.previous_token, self.source.peek());
-                if let (EndOfStatement | ScopeStart, Some(':')) = (prev, next) {
-                    self.source.next();
-                    Label(ident)
-                } else {
-                    match KEYWORDS.get(ident.as_str()) {
-                        Some(token) => {
-                            if token == &Else {
-                                self.maybe_exit_inline_scope(start, true);
-                            }
-                            token.clone()
-                        }
-                        _ => Ident(ident),
-                    }
-                }
-            }
+            Some((c @ '0'..='9', _, _)) => self.handle_number(c, start)?,
+            Some(('_', _, _)) => self.handle_ident('_', start)?,
+            Some((c @ 'a'..='z', _, _)) => self.handle_ident(c, start)?,
             Some((c @ 'A'..='Z', _, _)) => TypeIdent(self.read_type_ident(c)),
-            Some((c @ '@', Some('a'..='z'), _)) => TypeMethodIdent(self.read_ident(c)),
-            Some((c @ '$', Some('a'..='z'), _)) => {
-                SpecialMethodIdent(self.read_ident(c))
-            }
-            // Newlines
-            Some(('\n', _, _)) => {
-                if self.bracket_stack.size() == 0 {
-                    self.maybe_exit_inline_scope(start, false);
-                    self.maybe_add_end_of_statement_token(start);
-                    self.dedent()?;
-                } else {
-                    self.consume_whitespace();
-                }
-                return Ok(());
-            }
+            Some((c @ '@', Some('a'..='z'), _)) => TypeMethIdent(self.read_ident(c)),
+            Some((c @ '$', Some('a'..='z'), _)) => SpecialMethIdent(self.read_ident(c)),
+            Some(('\n', _, _)) => return self.handle_newline(start),
             Some((c, _, _)) if c.is_whitespace() => {
-                return self.err(UnexpectedWhitespace, start);
+                return Err(ScanErr::new(UnexpectedWhitespace, start));
             }
-            // Unknown
-            Some((c, _, _)) => {
-                return self.err(UnexpectedChar(c), start);
-            }
-            // End of input
-            None => {
-                if self.bracket_stack.size() == 0 {
-                    self.maybe_exit_inline_scope(start, false);
-                    self.maybe_add_end_of_statement_token(start);
-                    self.set_indent_level(0, Location::new(start.line + 1, 1))?;
-                } else if let Some((c, location)) = self.bracket_stack.pop() {
-                    return self.err(UnmatchedOpeningBracket(c), location);
-                }
-                EndOfInput
-            }
+            Some((c, _, _)) => return Err(ScanErr::new(UnexpectedChar(c), start)),
+            None => return self.handle_end_of_input(start),
         };
 
-        self.add_token_to_queue(token, start, None);
+        let end = self.source.loc();
+        self.add_token_to_queue(token, start, end);
         self.consume_whitespace();
 
         Ok(())
     }
+
+    // Token Handlers --------------------------------------------------
+
+    fn handle_bang(&mut self) -> AddTokenResult {
+        // Collapse contiguous bangs down to a single ! or !!. This is
+        // mainly to ensure !!!x is interpreted as !(!!(x)) instead of
+        // !!(!(x)).
+        let count = self.consume_contiguous('!') + 1;
+        if count % 2 == 0 {
+            Ok(Token::BangBang)
+        } else {
+            Ok(Token::Bang)
+        }
+    }
+
+    fn handle_string(&mut self, quote: char, start: Location) -> AddTokenResult {
+        let (string, terminated) = self.read_string(quote);
+        if terminated {
+            Ok(Token::Str(string))
+        } else {
+            Err(ScanErr::new(
+                ErrKind::UnterminatedStr(format!("{quote}{string}")),
+                start,
+            ))
+        }
+    }
+
+    fn handle_format_string(&mut self, start: Location) -> AddTokenResult {
+        let quote = self.source.next().unwrap();
+        let (string, terminated) = self.read_string(quote);
+        if terminated {
+            let format_string_tokens = scan_format_string(string.as_str())
+                .map_err(|err| ScanErr::new(ErrKind::FormatStrErr(err), start))?;
+            Ok(Token::FormatStr(format_string_tokens))
+        } else {
+            Err(ScanErr::new(
+                ErrKind::UnterminatedStr(format!("${quote}{string}")),
+                start,
+            ))
+        }
+    }
+
+    fn handle_number(&mut self, first_digit: char, start: Location) -> AddTokenResult {
+        let (string, radix) = self.read_number(first_digit);
+        let is_float = string.contains(".") || string.contains("E");
+        if is_float {
+            let value = string
+                .parse::<f64>()
+                .map_err(|err| ScanErr::new(ErrKind::ParseFloatErr(err), start))?;
+            Ok(Token::Float(value))
+        } else {
+            let value = BigInt::from_str_radix(string.as_str(), radix)
+                .map_err(|err| ScanErr::new(ErrKind::ParseIntErr(err), start))?;
+            Ok(Token::Int(value))
+        }
+    }
+
+    fn handle_ident(&mut self, first_char: char, start: Location) -> AddTokenResult {
+        use Token::{Else, EndOfStatement, Ident, Label, ScopeStart};
+        // Special case for underscore placeholder vars.
+        if first_char == '_' {
+            let count = self.consume_contiguous('_') + 1;
+            let mut ident = String::with_capacity(count as usize);
+            for _ in 0..count {
+                ident.push('_');
+            }
+            return Ok(Ident(ident));
+        }
+        let ident = self.read_ident(first_char);
+        let (prev, next) = (&self.previous_token, self.source.peek());
+        let token = if let (EndOfStatement | ScopeStart, Some(':')) = (prev, next) {
+            self.source.next();
+            Label(ident)
+        } else {
+            if let Some(token) = KEYWORDS.get(ident.as_str()) {
+                if token == &Else {
+                    self.maybe_exit_inline_scope(start, true);
+                }
+                token.clone()
+            } else {
+                Ident(ident)
+            }
+        };
+        Ok(token)
+    }
+
+    fn handle_scope_start(&mut self, start: Location) -> AddTokensResult {
+        let block_token = self.previous_token.clone();
+        let end = Location::new(start.line, start.col + 1);
+        self.source.next(); // consume >
+        self.consume_whitespace();
+        if self.source.peek() == Some(&'#') {
+            self.source.next();
+            self.consume_comment();
+        }
+        if self.source.peek().is_none() {
+            return Err(ScanErr::new(ErrKind::ExpectedBlock, self.source.loc()));
+        } else if self.next_char_is('\n') {
+            // Block
+            self.add_token_to_queue(Token::ScopeStart, start, end);
+            self.expect_indent()?;
+        } else {
+            // Inline block
+            let end = Location::new(start.line, start.col + 1);
+            self.add_token_to_queue(Token::InlineScopeStart, start, end);
+            self.inline_scope_stack.push((block_token, start));
+        }
+        return Ok(());
+    }
+
+    fn handle_newline(&mut self, start: Location) -> AddTokensResult {
+        if self.bracket_stack.size() == 0 {
+            self.maybe_exit_inline_scope(start, false);
+            self.maybe_add_end_of_statement_token(start);
+            self.dedent()?;
+        } else {
+            self.consume_whitespace();
+        }
+        return Ok(());
+    }
+
+    fn handle_end_of_input(&mut self, start: Location) -> AddTokensResult {
+        let loc = Location::new(start.line + 1, 1);
+        if let Some((c, bracket_loc)) = self.bracket_stack.pop() {
+            return Err(ScanErr::new(ErrKind::UnmatchedOpeningBracket(c), bracket_loc));
+        } else {
+            self.maybe_exit_inline_scope(start, false);
+            self.maybe_add_end_of_statement_token(start);
+            self.set_indent_level(0, loc)?;
+        }
+        self.add_token_to_queue(Token::EndOfInput, loc, loc);
+        return Ok(());
+    }
+
+    fn maybe_add_end_of_statement_token(&mut self, loc: Location) {
+        use Token::{
+            EndOfStatement, InlineScopeEnd, InlineScopeStart, ScopeEnd, ScopeStart,
+        };
+        match self.previous_token {
+            EndOfStatement | InlineScopeStart | InlineScopeEnd | ScopeStart
+            | ScopeEnd => (),
+            _ => self.add_token_to_queue(EndOfStatement, loc, loc),
+        };
+    }
+
+    // Indentation Handlers --------------------------------------------
 
     fn assert_start_of_line(&self, name: &str) {
         assert_eq!(
@@ -287,7 +326,7 @@ impl<'a, T: BufRead> Scanner<'a, T> {
     /// Get the next indent level. Blank lines, whitespace-only lines,
     /// and comment-only lines are skipped over.
     fn get_next_indent_level(&mut self) -> Result<u8, ScanErr> {
-        use ScanErrKind::{InvalidIndent, WhitespaceAfterIndent};
+        use ErrKind::{InvalidIndent, WhitespaceAfterIndent};
         let next_level = loop {
             let num_spaces = self.consume_contiguous(' ');
             let whitespace_count = self.consume_whitespace();
@@ -317,7 +356,7 @@ impl<'a, T: BufRead> Scanner<'a, T> {
     }
 
     /// Expect the indent level to increase by one.
-    fn expect_indent(&mut self) -> Result<(), ScanErr> {
+    fn expect_indent(&mut self) -> AddTokensResult {
         self.assert_start_of_line("expect_indent");
         let loc = self.source.loc();
         let loc = Location::new(loc.line + 1, 1);
@@ -325,18 +364,21 @@ impl<'a, T: BufRead> Scanner<'a, T> {
         let expected_level = current_level + 1;
         let new_level = self.get_next_indent_level()?;
         if new_level < expected_level {
-            return self.err(ScanErrKind::ExpectedIndentedBlock(expected_level), loc);
+            return Err(ScanErr::new(
+                ErrKind::ExpectedIndentedBlock(expected_level),
+                loc,
+            ));
         }
         self.set_indent_level(new_level, loc)
     }
 
     /// Handle dedent after a newline is encountered.
-    fn dedent(&mut self) -> Result<(), ScanErr> {
+    fn dedent(&mut self) -> AddTokensResult {
         self.assert_start_of_line("dedent");
         let start = self.source.loc();
         let next_level = self.get_next_indent_level()?;
         if next_level > self.indent_level {
-            return self.err(ScanErrKind::UnexpectedIndent(next_level), start);
+            return Err(ScanErr::new(ErrKind::UnexpectedIndent(next_level), start));
         }
         self.set_indent_level(next_level, start)
     }
@@ -349,7 +391,7 @@ impl<'a, T: BufRead> Scanner<'a, T> {
         &mut self,
         indent_level: u8,
         start: Location,
-    ) -> Result<(), ScanErr> {
+    ) -> AddTokensResult {
         let mut current_level = self.indent_level;
         if indent_level == current_level {
             // Stayed the same; nothing to do
@@ -365,20 +407,22 @@ impl<'a, T: BufRead> Scanner<'a, T> {
             self.indent_level = current_level;
         } else {
             // Increased by *more* than one level
-            return self.err(ScanErrKind::UnexpectedIndent(indent_level), start);
+            return Err(ScanErr::new(ErrKind::UnexpectedIndent(indent_level), start));
         }
         Ok(())
     }
 
+    // Scope handlers --------------------------------------------------
+
     fn exit_block_scope(&mut self, loc: Location) {
-        self.add_token_to_queue(Token::ScopeEnd, loc, Some(loc));
-        self.add_token_to_queue(Token::EndOfStatement, loc, Some(loc));
+        self.add_token_to_queue(Token::ScopeEnd, loc, loc);
+        self.add_token_to_queue(Token::EndOfStatement, loc, loc);
     }
 
     fn exit_inline_scope(&mut self, loc: Location, is_else: bool) {
         while !self.inline_scope_stack.is_empty() {
             let (token, _) = self.inline_scope_stack.pop().unwrap();
-            self.add_token_to_queue(Token::InlineScopeEnd, loc, Some(loc));
+            self.add_token_to_queue(Token::InlineScopeEnd, loc, loc);
             if is_else && (token == Token::If || token == Token::Else) {
                 break;
             }
@@ -394,30 +438,7 @@ impl<'a, T: BufRead> Scanner<'a, T> {
         }
     }
 
-    fn maybe_add_end_of_statement_token(&mut self, loc: Location) {
-        use Token::{
-            EndOfStatement, InlineScopeEnd, InlineScopeStart, ScopeEnd, ScopeStart,
-        };
-        match self.previous_token {
-            EndOfStatement | InlineScopeStart | InlineScopeEnd | ScopeStart
-            | ScopeEnd => (),
-            _ => self.add_token_to_queue(EndOfStatement, loc, Some(loc)),
-        };
-    }
-
-    fn add_token_to_queue(
-        &mut self,
-        token: Token,
-        start: Location,
-        end_option: Option<Location>,
-    ) {
-        let end = match end_option {
-            Some(end) => end,
-            None => Location::new(
-                self.source.line_no,
-                if self.source.col == 0 { 0 } else { self.source.col - 1 },
-            ),
-        };
+    fn add_token_to_queue(&mut self, token: Token, start: Location, end: Location) {
         let token_with_location = TokenWithLocation::new(token, start, end);
         self.queue.push_back(token_with_location);
     }
@@ -451,7 +472,7 @@ impl<'a, T: BufRead> Scanner<'a, T> {
                 Ok(token)
             }
             _ => Err(ScanErr::new(
-                ScanErrKind::UnmatchedClosingBracket(closing_bracket),
+                ErrKind::UnmatchedClosingBracket(closing_bracket),
                 location,
             ))
         }
@@ -572,7 +593,6 @@ impl<'a, T: BufRead> Scanner<'a, T> {
     /// as base 10 floats.
     fn read_number(&mut self, first_digit: char) -> (String, u32) {
         let mut string = String::new();
-
         let radix: u32 = if first_digit == '0' {
             match self.source.peek() {
                 Some('b') | Some('B') => 2,
@@ -586,16 +606,13 @@ impl<'a, T: BufRead> Scanner<'a, T> {
         } else {
             10
         };
-
         if radix == 10 {
             string.push(first_digit);
         } else {
             // Skip leading zero *and* type char.
             self.source.next();
         }
-
         string.push_str(self.collect_digits(radix).as_str());
-
         if radix == 10 {
             match self.next_two_chars_if(|&c| c == '.', |&d| d.is_digit(radix)) {
                 // If the number is followed by a dot and at least one
@@ -635,7 +652,6 @@ impl<'a, T: BufRead> Scanner<'a, T> {
                 _ => (),
             }
         }
-
         (string, radix)
     }
 
@@ -724,10 +740,6 @@ impl<'a, T: BufRead> Scanner<'a, T> {
     ///
     /// - start with a lower case ASCII letter (a-z)
     /// - contain lower case ASCII letters, numbers, and underscores
-    /// - end with a lower case ASCII letter or number
-    ///
-    /// NOTE: Identifiers that don't end with a char as noted above will
-    ///       cause an error later.
     fn read_ident(&mut self, first_char: char) -> String {
         let mut string = first_char.to_string();
         loop {
@@ -758,7 +770,7 @@ impl<'a, T: BufRead> Scanner<'a, T> {
 }
 
 impl<'a, T: BufRead> Iterator for Scanner<'a, T> {
-    type Item = ScanResult;
+    type Item = ScanTokenResult;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.next_token_from_queue() {

@@ -209,7 +209,7 @@ fn scan_unexpected_indent_on_first_line() {
     match result.unwrap_err() {
         ScanErr { kind: ScanErrKind::UnexpectedIndent(1), location } => {
             assert_eq!(location.line, 1);
-            assert_eq!(location.col, 1);
+            assert_eq!(location.col, 0);
         }
         err => assert!(false, "Unexpected error: {:?}", err),
     }

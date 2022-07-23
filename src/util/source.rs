@@ -106,7 +106,7 @@ impl<T: BufRead> Source<T> {
                         panic!("Line is too long (> {})", MAX_LINE_LENGTH);
                     }
                     self.line_no += 1;
-                    self.col = 1;
+                    self.col = 0;
                     self.current_line = Some(self.buffer.clone());
                     self.queue.extend(self.buffer.chars());
                 }

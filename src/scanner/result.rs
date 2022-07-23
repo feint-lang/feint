@@ -5,9 +5,11 @@ use num_bigint::ParseBigIntError;
 use crate::format::FormatStrErr;
 use crate::util::Location;
 
-use super::TokenWithLocation;
+use super::{Token, TokenWithLocation};
 
-pub type ScanResult = Result<TokenWithLocation, ScanErr>;
+pub type AddTokenResult = Result<Token, ScanErr>;
+pub type AddTokensResult = Result<(), ScanErr>;
+pub type ScanTokenResult = Result<TokenWithLocation, ScanErr>;
 pub type ScanTokensResult = Result<Vec<TokenWithLocation>, ScanErr>;
 
 #[derive(Clone, Debug)]

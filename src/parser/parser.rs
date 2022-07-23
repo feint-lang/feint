@@ -5,7 +5,7 @@ use std::iter::{Iterator, Peekable};
 use crate::ast;
 use crate::format::FormatStrToken;
 use crate::parser::result::StatementResult;
-use crate::scanner::{ScanErr, ScanResult, Token, TokenWithLocation};
+use crate::scanner::{ScanErr, ScanTokenResult, Token, TokenWithLocation};
 use crate::util::Location;
 
 use super::precedence::{
@@ -18,20 +18,20 @@ use super::result::{
 
 /// Parse tokens and return the resulting AST or error.
 pub fn parse_tokens(tokens: Vec<TokenWithLocation>) -> ParseResult {
-    let scanner: Vec<ScanResult> = vec![];
+    let scanner: Vec<ScanTokenResult> = vec![];
     let mut parser = Parser::new(scanner.into_iter());
     parser.lookahead_queue.extend(tokens);
     parser.parse()
 }
 
-pub struct Parser<I: Iterator<Item = ScanResult>> {
+pub struct Parser<I: Iterator<Item = ScanTokenResult>> {
     current_token: Option<TokenWithLocation>,
     token_stream: Peekable<I>,
     lookahead_queue: VecDeque<TokenWithLocation>,
     loop_level: u8,
 }
 
-impl<I: Iterator<Item = ScanResult>> Parser<I> {
+impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
     pub fn new(token_iter: I) -> Self {
         Self {
             current_token: None,
