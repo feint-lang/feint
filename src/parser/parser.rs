@@ -206,6 +206,17 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
         Ok(false)
     }
 
+    /// Check whether the next token is a block or inline scope start
+    /// token.
+    fn peek_token_is_scope_start(&mut self) -> BoolResult {
+        use Token::{InlineScopeStart, ScopeStart};
+        if let Some(TokenWithLocation { token, .. }) = self.peek_token()? {
+            Ok(token == &ScopeStart || token == &InlineScopeStart)
+        } else {
+            Ok(false)
+        }
+    }
+
     // Utilities -------------------------------------------------------
 
     /// Make creating errors a little less tedious.
@@ -444,15 +455,16 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
     /// Handle `loop -> ...` and `loop <cond> -> ...` (`while` loops).
     /// TODO: Handle `for` loops.
     fn loop_(&mut self, start: Location) -> ExprResult {
+        use Token::{InlineScopeStart, ScopeStart};
         self.loop_level += 1;
-        let expr = match self.peek_token_is(&Token::ScopeStart)? {
+        let cond = match self.peek_token_is_scope_start()? {
             true => ast::Expr::new_true(self.next_loc(), self.next_loc()),
             false => self.expr(0)?,
         };
         let block = self.block()?;
         let end = block.end;
         self.loop_level -= 1;
-        Ok(ast::Expr::new_loop(expr, block, start, end))
+        Ok(ast::Expr::new_loop(cond, block, start, end))
     }
 
     /// Handle `break`, ensuring it's contained in a `loop`.
@@ -480,15 +492,14 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
 
     /// Handle `func () -> ...` (definition) and `func()` (call).
     fn func(&mut self, name: String, start: Location) -> ExprResult {
+        use Token::{InlineScopeStart, ScopeStart};
         let expr = self.parenthesized(self.loc())?;
         let call_end = expr.end;
         let items = match expr.kind {
             ast::ExprKind::Tuple(items) => items,
             _ => vec![expr],
         };
-        if self.peek_token_is(&Token::ScopeStart)?
-            || self.peek_token_is(&Token::InlineScopeStart)?
-        {
+        if self.peek_token_is_scope_start()? {
             // Function definition
             let mut params = vec![];
             // Ensure all items are identifiers
