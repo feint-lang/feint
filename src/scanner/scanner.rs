@@ -38,7 +38,7 @@ pub struct Scanner<'a, T: BufRead> {
     /// where leading whitespace can be ignored.
     bracket_stack: Stack<(char, Location)>,
     /// The last token that was popped from the queue.
-    previous_token: Token,
+    last_token_from_queue: Token,
 }
 
 impl<'a, T: BufRead> Scanner<'a, T> {
@@ -49,7 +49,7 @@ impl<'a, T: BufRead> Scanner<'a, T> {
             indent_level: 0,
             inline_scope_stack: Stack::new(),
             bracket_stack: Stack::new(),
-            previous_token: Token::EndOfStatement,
+            last_token_from_queue: Token::EndOfStatement,
         }
     }
 
@@ -62,8 +62,18 @@ impl<'a, T: BufRead> Scanner<'a, T> {
             self.add_tokens_to_queue()?;
         }
         let token = self.queue.pop_front().unwrap();
-        self.previous_token = token.token.clone();
+        self.last_token_from_queue = token.token.clone();
         Ok(token)
+    }
+
+    /// Get the last token. If there are pending tokens in the queue,
+    /// the last pending token will be returned. Otherwise, the last
+    /// processed token will be returned.
+    fn last_token(&self) -> &Token {
+        match self.queue.back() {
+            Some(t) => &t.token,
+            None => &self.last_token_from_queue,
+        }
     }
 
     /// Scan input starting from current source location and add one or
@@ -242,25 +252,26 @@ impl<'a, T: BufRead> Scanner<'a, T> {
             return Ok(Ident(ident));
         }
         let ident = self.read_ident(first_char);
-        let (prev, next) = (&self.previous_token, self.source.peek());
-        let token = if let (EndOfStatement | ScopeStart, Some(':')) = (prev, next) {
-            self.source.next();
-            Label(ident)
-        } else {
-            if let Some(token) = KEYWORDS.get(ident.as_str()) {
-                if token == &Else {
-                    self.maybe_exit_inline_scope(start, true);
-                }
-                token.clone()
-            } else {
-                Ident(ident)
+        // Label
+        if let EndOfStatement | ScopeStart = self.last_token() {
+            if let Some(':') = self.source.peek() {
+                self.source.next();
+                return Ok(Label(ident));
             }
-        };
-        Ok(token)
+        }
+        // Keyword
+        if let Some(token) = KEYWORDS.get(ident.as_str()) {
+            if token == &Else {
+                self.maybe_exit_inline_scope(start, true);
+            }
+            return Ok(token.clone());
+        }
+        // Ident
+        Ok(Ident(ident))
     }
 
     fn handle_scope_start(&mut self, start: Location) -> AddTokensResult {
-        let block_token = self.previous_token.clone();
+        let block_token = self.last_token().clone();
         let end = Location::new(start.line, start.col + 1);
         self.source.next(); // consume >
         self.consume_whitespace();
@@ -304,14 +315,12 @@ impl<'a, T: BufRead> Scanner<'a, T> {
     }
 
     fn maybe_add_end_of_statement_token(&mut self, loc: Location) {
-        use Token::{
-            EndOfStatement, InlineScopeEnd, InlineScopeStart, ScopeEnd, ScopeStart,
-        };
-        match self.previous_token {
+        use Token::*;
+        match self.last_token() {
             EndOfStatement | InlineScopeStart | InlineScopeEnd | ScopeStart
             | ScopeEnd => (),
             _ => self.add_token_to_queue(EndOfStatement, loc, loc),
-        };
+        }
     }
 
     // Indentation Handlers --------------------------------------------
