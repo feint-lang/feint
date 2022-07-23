@@ -199,8 +199,10 @@ impl<'a> Repl<'a> {
     fn continue_on_err(&self, err: ExeErr) -> bool {
         if let ExeErrKind::ScanErr(kind) = err.kind {
             use ScanErrKind::*;
-            if let ExpectedBlock | UnmatchedOpeningBracket(_) | UnterminatedStr(_) =
-                kind
+            if let ExpectedBlock
+            | ExpectedIndentedBlock(_)
+            | UnmatchedOpeningBracket(_)
+            | UnterminatedStr(_) = kind
             {
                 return true;
             }

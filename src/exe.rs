@@ -152,7 +152,10 @@ impl<'a> Executor<'a> {
         use ScanErrKind::*;
         self.incremental
             && match &err.kind {
-                UnmatchedOpeningBracket(_) | UnterminatedStr(_) => true,
+                ExpectedBlock
+                | ExpectedIndentedBlock(_)
+                | UnmatchedOpeningBracket(_)
+                | UnterminatedStr(_) => true,
                 _ => false,
             }
     }
