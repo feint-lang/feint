@@ -24,6 +24,7 @@
   - [x] Implement `continue`
 - [ ] Implement function calls
 - [ ] Implement `print` function (`print` is currently implemented as a statement and has limited functionality)
+- [ ] Check tuple items / args and throw error when invalid items are included (e.g., `break` isn't allowed)
 - [ ] Implement custom classes
 - [ ] Implement `import`
   - [ ] `import <name>`
