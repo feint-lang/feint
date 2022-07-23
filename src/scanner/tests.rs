@@ -185,9 +185,9 @@ g (y) ->  # 6
     check_token(tokens.next(), Token::RParen, 1, 5, 1, 5);
     check_token(tokens.next(), Token::ScopeStart, 1, 7, 1, 8);
     check_token(tokens.next(), Token::Ident("x".to_string()), 2, 5, 2, 5);
-    check_token(tokens.next(), Token::EndOfStatement, 2, 14, 2, 14);
+    check_token(tokens.next(), Token::EndOfStatement, 2, 6, 2, 6);
     check_token(tokens.next(), Token::Int(BigInt::from(1)), 3, 5, 3, 5);
-    check_token(tokens.next(), Token::EndOfStatement, 3, 14, 3, 14);
+    check_token(tokens.next(), Token::EndOfStatement, 3, 6, 3, 6);
     check_token(tokens.next(), Token::ScopeEnd, 4, 0, 4, 0);
     check_token(tokens.next(), Token::EndOfStatement, 4, 0, 4, 0);
 
@@ -198,7 +198,7 @@ g (y) ->  # 6
     check_token(tokens.next(), Token::RParen, 6, 5, 6, 5);
     check_token(tokens.next(), Token::ScopeStart, 6, 7, 6, 8);
     check_token(tokens.next(), Token::Ident("y".to_string()), 7, 5, 7, 5);
-    check_token(tokens.next(), Token::EndOfStatement, 7, 14, 7, 14);
+    check_token(tokens.next(), Token::EndOfStatement, 7, 6, 7, 6);
     check_token(tokens.next(), Token::ScopeEnd, 8, 0, 8, 0);
     check_token(tokens.next(), Token::EndOfStatement, 8, 0, 8, 0);
 
@@ -242,7 +242,7 @@ b = 3
     check_token(tokens.next(), Token::Int(BigInt::from(2)), 6, 3, 6, 3);
     check_token(tokens.next(), Token::Comma, 6, 4, 6, 4);
     check_token(tokens.next(), Token::RBracket, 7, 1, 7, 1);
-    check_token(tokens.next(), Token::EndOfStatement, 7, 21, 7, 21);
+    check_token(tokens.next(), Token::EndOfStatement, 7, 2, 7, 2);
     check_token(tokens.next(), Token::Ident("b".to_string()), 9, 1, 9, 1);
     check_token(tokens.next(), Token::Equal, 9, 3, 9, 3);
     check_token(tokens.next(), Token::Int(BigInt::from(3)), 9, 5, 9, 5);

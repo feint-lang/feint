@@ -176,6 +176,20 @@ impl<'a, T: BufRead> Scanner<'a, T> {
         self.add_token_to_queue(token, start, end);
         self.consume_whitespace();
 
+        // The following ensures that if a token is followed by only
+        // trailing whitespace and/or a comment that the EndOfStatement
+        // token, if one is added, will have the correct location.
+        if self.next_char_is('#') {
+            self.consume_comment();
+        }
+        if self.next_char_is('\n') {
+            let loc = Location::new(end.line, end.col + 1);
+            self.handle_newline(loc)?;
+        } else if self.source.peek().is_none() {
+            let loc = Location::new(end.line, end.col + 1);
+            self.handle_end_of_input(loc)?;
+        }
+
         Ok(())
     }
 
@@ -294,10 +308,10 @@ impl<'a, T: BufRead> Scanner<'a, T> {
         return Ok(());
     }
 
-    fn handle_newline(&mut self, start: Location) -> AddTokensResult {
+    fn handle_newline(&mut self, loc: Location) -> AddTokensResult {
         if self.bracket_stack.size() == 0 {
-            self.maybe_exit_inline_scope(start, false);
-            self.maybe_add_end_of_statement_token(start);
+            self.maybe_exit_inline_scope(loc, false);
+            self.maybe_add_end_of_statement_token(loc);
             self.dedent()?;
         } else {
             self.consume_whitespace();
@@ -305,8 +319,7 @@ impl<'a, T: BufRead> Scanner<'a, T> {
         return Ok(());
     }
 
-    fn handle_end_of_input(&mut self, start: Location) -> AddTokensResult {
-        let loc = Location::new(start.line + 1, 1);
+    fn handle_end_of_input(&mut self, loc: Location) -> AddTokensResult {
         if let Some((c, bracket_loc)) = self.bracket_stack.pop() {
             return Err(ScanErr::new(ErrKind::UnmatchedOpeningBracket(c), bracket_loc));
         }
@@ -411,7 +424,7 @@ impl<'a, T: BufRead> Scanner<'a, T> {
         } else if indent_level < current_level {
             // Decreased by one or more levels
             while current_level > indent_level {
-                self.exit_block_scope(Location::new(start.line, 0));
+                self.exit_block_scope(Location::new(start.line + 1, 0));
                 current_level -= 1;
             }
             self.indent_level = current_level;
