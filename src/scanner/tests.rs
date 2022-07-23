@@ -137,25 +137,31 @@ fn scan_string_with_escaped_regular_char() {
 
 #[test]
 fn scan_string_unclosed() {
-    let source = "\"abc";
-    match scan_text(source) {
-        Err(err) => match err {
-            ScanErr { kind: ScanErrKind::UnterminatedStr(string), location } => {
-                assert_eq!(string, source.to_string());
-                assert_eq!(location, Location::new(1, 1));
-                let new_source = source.to_string() + "\"";
-                match scan_text(new_source.as_str()) {
-                    Ok(tokens) => {
-                        assert_eq!(tokens.len(), 2);
-                        check_string_token(tokens.get(0), "abc", 1, 1, 1, 5);
+    let items = vec![
+        ("\"abc", "abc", 1, 1, 1, 5),
+        ("\"abc\n", "abc\n", 1, 1, 2, 1),
+        ("\"abc\n\n", "abc\n\n", 1, 1, 3, 1),
+    ];
+    for (source, expected, l1, c1, l2, c2) in items {
+        match scan_text(source) {
+            Err(err) => match err {
+                ScanErr { kind: ScanErrKind::UnterminatedStr(string), location } => {
+                    assert_eq!(string, source.to_string());
+                    assert_eq!(location, Location::new(1, 1));
+                    let new_source = source.to_string() + "\"";
+                    match scan_text(new_source.as_str()) {
+                        Ok(tokens) => {
+                            assert_eq!(tokens.len(), 2);
+                            check_string_token(tokens.get(0), expected, l1, c1, l2, c2);
+                        }
+                        _ => assert!(false),
                     }
-                    _ => assert!(false),
                 }
-            }
+                _ => assert!(false),
+            },
             _ => assert!(false),
-        },
-        _ => assert!(false),
-    };
+        }
+    }
 }
 
 #[test]

@@ -298,10 +298,6 @@ impl<'a, T: BufRead> Scanner<'a, T> {
         let loc = Location::new(start.line + 1, 1);
         if let Some((c, bracket_loc)) = self.bracket_stack.pop() {
             return Err(ScanErr::new(ErrKind::UnmatchedOpeningBracket(c), bracket_loc));
-        } else {
-            self.maybe_exit_inline_scope(start, false);
-            self.maybe_add_end_of_statement_token(start);
-            self.set_indent_level(0, loc)?;
         }
         self.add_token_to_queue(Token::EndOfInput, loc, loc);
         return Ok(());
@@ -725,7 +721,12 @@ impl<'a, T: BufRead> Scanner<'a, T> {
                     // Append current char and continue.
                     Some(c) => string.push(c),
                     // End of input reached without finding closing quote :(
-                    None => break (string, false),
+                    None => {
+                        if self.source.newline_added {
+                            string.pop();
+                        }
+                        break (string, false);
+                    }
                 }
             }
         }

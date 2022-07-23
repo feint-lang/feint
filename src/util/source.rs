@@ -50,10 +50,11 @@ pub fn source_from_stdin() -> Source<BufReader<io::Stdin>> {
 ///
 /// - Emits an initial newline to prime the queue and allow for
 ///   consistent start-of-line handling/logic.
+/// - Emits a final newline even if the source doesn't end with a
+///   newline.
 /// - Normalizes \r\n line endings to \n. NOTE: \r as a line ending
 ///   is *not* handled. TODO: Detect use of \r as line ending?
 /// - Tracks current line and column.
-/// - Tracks previous and current characters.
 /// - Panics when lines are too long.
 pub struct Source<T: BufRead> {
     stream: Take<T>,
@@ -63,9 +64,11 @@ pub struct Source<T: BufRead> {
     queue: VecDeque<char>,
     pub line_no: usize,
     pub col: usize,
-    pub previous_char: Option<char>,
-    pub current_char: Option<char>,
     pub current_line: Option<String>,
+    pub current_char: Option<char>,
+    // Indicates whether a newline was added because the source didn't
+    // end with one.
+    pub newline_added: bool,
 }
 
 impl<T: BufRead> Source<T> {
@@ -76,9 +79,9 @@ impl<T: BufRead> Source<T> {
             queue: VecDeque::with_capacity(INITIAL_CAPACITY),
             line_no: 0,
             col: 0,
-            previous_char: None,
-            current_char: None,
             current_line: None,
+            current_char: None,
+            newline_added: false,
         };
         source.queue.push_back('\n');
         source
@@ -92,14 +95,13 @@ impl<T: BufRead> Source<T> {
         }
     }
 
-    fn check_queue(&mut self) -> bool {
+    fn fill_queue(&mut self) {
         if self.queue.is_empty() {
-            // See if character queue can be refilled from the next line.
+            // See if character queue can be refilled from next line.
             self.buffer.clear();
             match self.stream.read_line(&mut self.buffer) {
                 Ok(0) => {
                     // All lines read; done.
-                    return false;
                 }
                 Ok(n) => {
                     if n > MAX_LINE_LENGTH_USIZE {
@@ -107,71 +109,58 @@ impl<T: BufRead> Source<T> {
                     }
                     self.line_no += 1;
                     self.col = 0;
+                    // Store unmodified copy of current line.
                     self.current_line = Some(self.buffer.clone());
                     self.queue.extend(self.buffer.chars());
+                    if self.queue.back() == Some(&'\n') {
+                        if self.queue.len() > 1 {
+                            let cr_index = self.queue.len() - 2;
+                            // Normalize \r\n to \n
+                            if let Some('\r') = self.queue.get(cr_index) {
+                                self.queue.truncate(cr_index);
+                                self.queue.push_back('\n');
+                            }
+                        }
+                    } else {
+                        self.queue.push_back('\n');
+                        self.newline_added = true;
+                    }
                 }
                 Err(err) => {
                     panic!("Could not read line from source: {}", err);
                 }
             };
         }
-        // Queue wasn't empty or was refilled.
-        true
     }
 
     fn next_from_queue(&mut self) -> Option<char> {
-        if self.check_queue() {
-            if let Some(c) = self.queue.pop_front() {
-                if c == '\r' {
-                    if let Some('\n') = self.queue.front() {
-                        self.queue.pop_front();
-                        self.current_char = Some('\n');
-                    }
-                } else {
-                    self.current_char = Some(c);
-                }
-                self.col += 1;
-                self.previous_char = self.current_char;
-                return self.current_char;
-            }
+        self.fill_queue();
+        if let Some(c) = self.queue.pop_front() {
+            self.current_char = Some(c);
+            self.col += 1;
+            return self.current_char;
         }
         None
     }
 
     /// Peek at the next char.
     pub fn peek(&mut self) -> Option<&char> {
-        if self.check_queue() {
-            return self.queue.front();
-        }
-        None
+        self.fill_queue();
+        self.queue.front()
     }
 
     /// Peek at the next two chars.
     pub fn peek_2(&mut self) -> (Option<&char>, Option<&char>) {
-        if self.check_queue() {
-            let queue = &self.queue;
-            return (queue.get(0), queue.get(1));
-        }
-        (None, None)
+        self.fill_queue();
+        let queue = &self.queue;
+        return (queue.get(0), queue.get(1));
     }
 
     /// Peek at the next three chars.
     pub fn peek_3(&mut self) -> (Option<&char>, Option<&char>, Option<&char>) {
-        if self.check_queue() {
-            let queue = &self.queue;
-            return (queue.get(0), queue.get(1), queue.get(2));
-        }
-        (None, None, None)
-    }
-
-    /// Get the next char if it matches the specified condition.
-    pub fn next_if(&mut self, func: impl FnOnce(&char) -> bool) -> Option<char> {
-        if let Some(c) = self.peek() {
-            if func(c) {
-                return self.next();
-            }
-        }
-        None
+        self.fill_queue();
+        let queue = &self.queue;
+        return (queue.get(0), queue.get(1), queue.get(2));
     }
 
     pub fn loc(&self) -> Location {
