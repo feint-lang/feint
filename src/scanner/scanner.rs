@@ -45,7 +45,7 @@ impl<'a, T: BufRead> Scanner<'a, T> {
     pub fn new(source: &'a mut Source<T>) -> Self {
         Scanner {
             source,
-            queue: VecDeque::new(),
+            queue: VecDeque::with_capacity(1024),
             indent_level: 0,
             inline_scope_stack: Stack::new(),
             bracket_stack: Stack::new(),
