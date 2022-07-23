@@ -108,7 +108,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
     fn expect_token(&mut self, token: &Token) -> Result<(), ParseErr> {
         if !self.next_token_is(token)? {
             return Err(
-                self.err(ParseErrKind::ExpectedToken(self.next_loc(), token.clone()))
+                self.err(ParseErrKind::ExpectedToken(self.loc(), token.clone()))
             );
         }
         Ok(())
@@ -227,7 +227,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
             if !self.has_tokens()? || self.peek_token_is(&Token::ScopeEnd)? {
                 break;
             }
-            let statement = self.statement(true)?;
+            let statement = self.statement()?;
             statements.push(statement);
         }
         Ok(statements)
@@ -236,7 +236,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
     /// Get the next statement (which might be an expression). In
     /// certain cases, multiple statements may be returned (e.g.,
     /// loops).
-    fn statement(&mut self, expect_end_of_statement: bool) -> StatementResult {
+    fn statement(&mut self) -> StatementResult {
         use Token::*;
         let token = self.expect_next_token()?;
         let start = token.start;
@@ -251,9 +251,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
                 ast::Statement::new_expr(expr, start, end)
             }
         };
-        if expect_end_of_statement {
-            self.expect_token(&EndOfStatement)?;
-        }
+        self.expect_token(&EndOfStatement)?;
         Ok(statement)
     }
 
@@ -395,7 +393,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
             self.expect_token(&ScopeEnd)?;
             statements
         } else if self.next_token_is(&InlineScopeStart)? {
-            let statement = self.statement(false)?;
+            let statement = self.statement()?;
             self.expect_token(&InlineScopeEnd)?;
             vec![statement]
         } else {
@@ -482,7 +480,9 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
             ast::ExprKind::Tuple(items) => items,
             _ => vec![expr],
         };
-        if self.peek_token_is(&Token::ScopeStart)? {
+        if self.peek_token_is(&Token::ScopeStart)?
+            || self.peek_token_is(&Token::InlineScopeStart)?
+        {
             // Function definition
             let mut params = vec![];
             // Ensure all items are identifiers

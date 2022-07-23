@@ -272,7 +272,14 @@ fn scan_inline_block_simple() {
     let tokens = scan_to_tokens("block -> true");
     assert_eq!(
         tokens,
-        vec![Block, InlineScopeStart, True, InlineScopeEnd, EndOfStatement]
+        vec![
+            Block,
+            InlineScopeStart,
+            True,
+            EndOfStatement,
+            InlineScopeEnd,
+            EndOfStatement
+        ]
     );
 }
 
@@ -287,8 +294,39 @@ fn scan_inline_block_simple_in_parens() {
             Block,
             InlineScopeStart,
             True,
+            EndOfStatement,
             InlineScopeEnd,
             RParen,
+            EndOfStatement,
+        ]
+    );
+}
+
+#[test]
+fn scan_inline_block_if_else() {
+    use Token::*;
+    let tokens = scan_to_tokens("if true -> (1,) else -> (2,)");
+    assert_eq!(
+        tokens,
+        vec![
+            If,
+            True,
+            InlineScopeStart,
+            LParen,
+            Int(BigInt::from(1)),
+            Comma,
+            RParen,
+            EndOfStatement,
+            InlineScopeEnd,
+            EndOfStatement,
+            Else,
+            InlineScopeStart,
+            LParen,
+            Int(BigInt::from(2)),
+            Comma,
+            RParen,
+            EndOfStatement,
+            InlineScopeEnd,
             EndOfStatement,
         ]
     );
@@ -300,7 +338,15 @@ fn scan_inline_block_1() {
     let tokens = scan_to_tokens("block -> ()");
     assert_eq!(
         tokens,
-        vec![Block, InlineScopeStart, LParen, RParen, InlineScopeEnd, EndOfStatement]
+        vec![
+            Block,
+            InlineScopeStart,
+            LParen,
+            RParen,
+            EndOfStatement,
+            InlineScopeEnd,
+            EndOfStatement
+        ]
     );
 }
 
@@ -315,11 +361,13 @@ fn scan_inline_block_2() {
             Block,
             InlineScopeStart,
             Int(BigInt::from(1)),
+            EndOfStatement,
             InlineScopeEnd,
             Comma,
             Block,
             InlineScopeStart,
             Int(BigInt::from(2)),
+            EndOfStatement,
             InlineScopeEnd,
             RParen,
             EndOfStatement,
@@ -341,6 +389,7 @@ fn scan_inline_block_3() {
             Comma,
             Int(BigInt::from(2)),
             RParen,
+            EndOfStatement,
             InlineScopeEnd,
             EndOfStatement,
         ]
@@ -359,7 +408,9 @@ fn scan_inline_block_4() {
             Block,
             InlineScopeStart,
             True,
+            EndOfStatement,
             InlineScopeEnd,
+            EndOfStatement,
             InlineScopeEnd,
             EndOfStatement,
         ]
@@ -379,7 +430,9 @@ fn scan_inline_block_5() {
             Block,
             InlineScopeStart,
             True,
+            EndOfStatement,
             InlineScopeEnd,
+            EndOfStatement,
             InlineScopeEnd,
             RParen,
             EndOfStatement,

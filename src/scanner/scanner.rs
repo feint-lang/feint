@@ -29,14 +29,20 @@ pub struct Scanner<'a, T: BufRead> {
     /// Keep track of whether we're at the start of a line so indents
     /// can be handled specially.
     indent_level: u8,
-    /// Stack to keep track of inline blocks (e.g., `block -> true`
-    /// where there's no newline after the `->`).
-    inline_scope_stack: Stack<(Token, Location)>,
     /// Opening brackets are pushed and later popped when the closing
     /// bracket is encountered. This gives us a way to verify brackets
     /// are matched and also lets us know when we're inside a group
     /// where leading whitespace can be ignored.
     bracket_stack: Stack<(char, Location)>,
+    /// Stack to keep track of inline blocks (e.g., `block -> true`
+    /// where there's no newline after the `->`).
+    inline_scope_stack: Stack<Location>,
+    /// Keep track of where `if`s are encountered. This is used with
+    /// exit from certain inline blocks.
+    /// TODO: Not sure this is the best way to handle this. Currently,
+    ///       any `if` without an `else` will never be removed from this
+    ///       stack.
+    if_stack: Stack<Location>,
     /// The last token that was popped from the queue.
     last_token_from_queue: Token,
 }
@@ -47,8 +53,9 @@ impl<'a, T: BufRead> Scanner<'a, T> {
             source,
             queue: VecDeque::with_capacity(1024),
             indent_level: 0,
-            inline_scope_stack: Stack::new(),
             bracket_stack: Stack::new(),
+            inline_scope_stack: Stack::new(),
+            if_stack: Stack::new(),
             last_token_from_queue: Token::EndOfStatement,
         }
     }
@@ -147,7 +154,9 @@ impl<'a, T: BufRead> Scanner<'a, T> {
                 Plus
             }
             Some(('-', Some('='), _)) => self.consume_char_and_return_token(MinusEqual),
-            Some(('-', Some('>'), _)) => return self.handle_scope_start(start),
+            Some(('-', Some('>'), _)) => {
+                return self.handle_scope_start(start);
+            }
             Some(('-', _, _)) => Minus,
             Some(('!', Some('='), _)) => self.consume_char_and_return_token(NotEqual),
             Some(('!', _, _)) => self.handle_bang()?,
@@ -255,7 +264,7 @@ impl<'a, T: BufRead> Scanner<'a, T> {
     }
 
     fn handle_ident(&mut self, first_char: char, start: Location) -> AddTokenResult {
-        use Token::{Else, EndOfStatement, Ident, Label, ScopeStart};
+        use Token::{Else, EndOfStatement, Ident, If, Label, ScopeStart};
         // Special case for underscore placeholder vars.
         if first_char == '_' {
             let count = self.consume_contiguous('_') + 1;
@@ -275,8 +284,13 @@ impl<'a, T: BufRead> Scanner<'a, T> {
         }
         // Keyword
         if let Some(token) = KEYWORDS.get(ident.as_str()) {
-            if token == &Else {
-                self.maybe_exit_inline_scope(start, true);
+            if token == &If {
+                self.if_stack.push(start);
+            } else if token == &Else {
+                if self.maybe_exit_inline_scope(start, true) {
+                    self.add_token_to_queue(EndOfStatement, start, start);
+                }
+                self.if_stack.pop();
             }
             return Ok(token.clone());
         }
@@ -285,7 +299,6 @@ impl<'a, T: BufRead> Scanner<'a, T> {
     }
 
     fn handle_scope_start(&mut self, start: Location) -> AddTokensResult {
-        let block_token = self.last_token().clone();
         let end = Location::new(start.line, start.col + 1);
         self.source.next(); // consume >
         self.consume_whitespace();
@@ -303,7 +316,7 @@ impl<'a, T: BufRead> Scanner<'a, T> {
             // Inline block
             let end = Location::new(start.line, start.col + 1);
             self.add_token_to_queue(Token::InlineScopeStart, start, end);
-            self.inline_scope_stack.push((block_token, start));
+            self.inline_scope_stack.push(start);
         }
         return Ok(());
     }
@@ -312,7 +325,7 @@ impl<'a, T: BufRead> Scanner<'a, T> {
         if self.bracket_stack.size() == 0 {
             self.maybe_exit_inline_scope(loc, false);
             self.maybe_add_end_of_statement_token(loc);
-            self.dedent()?;
+            self.maybe_dedent()?;
         } else {
             self.consume_whitespace();
         }
@@ -328,11 +341,9 @@ impl<'a, T: BufRead> Scanner<'a, T> {
     }
 
     fn maybe_add_end_of_statement_token(&mut self, loc: Location) {
-        use Token::*;
         match self.last_token() {
-            EndOfStatement | InlineScopeStart | InlineScopeEnd | ScopeStart
-            | ScopeEnd => (),
-            _ => self.add_token_to_queue(EndOfStatement, loc, loc),
+            Token::EndOfStatement => (),
+            _ => self.add_token_to_queue(Token::EndOfStatement, loc, loc),
         }
     }
 
@@ -395,7 +406,7 @@ impl<'a, T: BufRead> Scanner<'a, T> {
     }
 
     /// Handle dedent after a newline is encountered.
-    fn dedent(&mut self) -> AddTokensResult {
+    fn maybe_dedent(&mut self) -> AddTokensResult {
         self.assert_start_of_line("dedent");
         let loc = self.source.loc();
         let line = if loc.line == 1 { 1 } else { loc.line + 1 };
@@ -440,23 +451,46 @@ impl<'a, T: BufRead> Scanner<'a, T> {
         self.add_token_to_queue(Token::EndOfStatement, loc, loc);
     }
 
-    fn exit_inline_scope(&mut self, loc: Location, is_else: bool) {
-        while !self.inline_scope_stack.is_empty() {
-            let (token, _) = self.inline_scope_stack.pop().unwrap();
-            self.add_token_to_queue(Token::InlineScopeEnd, loc, loc);
-            if is_else && (token == Token::If || token == Token::Else) {
-                break;
-            }
-        }
-    }
-
     /// The scope for an inline block ends when one of the following
     /// tokens is encountered: comma, closing bracket, newline, end of
     /// input.
-    fn maybe_exit_inline_scope(&mut self, loc: Location, is_else: bool) {
-        if !self.inline_scope_stack.is_empty() {
-            self.exit_inline_scope(loc, is_else);
+    ///
+    /// If exiting because an `else` was encountered, exit back to the
+    /// matching `if`. If inside a bracket group, exit only as far back
+    /// as the start of the group. Otherwise, all inline scopes are
+    /// exited.
+    fn exit_inline_scope(&mut self, loc: Location, is_else: bool) -> bool {
+        let bracket_loc = match self.bracket_stack.peek() {
+            Some((_, bracket_loc)) => (bracket_loc.line, bracket_loc.col),
+            None => (0, 0),
+        };
+        let if_loc = match self.if_stack.peek() {
+            Some(if_loc) => (if_loc.line, if_loc.col),
+            None => (0, 0),
+        };
+        let mut count = 0;
+        while let Some(scope_start) = self.inline_scope_stack.peek() {
+            let scope_loc = (scope_start.line, scope_start.col);
+            if scope_loc > bracket_loc {
+                if is_else && scope_loc < if_loc {
+                    break;
+                }
+                self.inline_scope_stack.pop();
+                self.add_token_to_queue(Token::EndOfStatement, loc, loc);
+                self.add_token_to_queue(Token::InlineScopeEnd, loc, loc);
+                count += 1;
+            } else {
+                break;
+            }
         }
+        count > 0
+    }
+
+    fn maybe_exit_inline_scope(&mut self, loc: Location, is_else: bool) -> bool {
+        if !self.inline_scope_stack.is_empty() {
+            return self.exit_inline_scope(loc, is_else);
+        }
+        false
     }
 
     // Utilities -------------------------------------------------------
