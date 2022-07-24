@@ -23,11 +23,12 @@ struct Visitor<'a> {
     ctx: &'a mut RuntimeContext,
     chunk: Chunk,
     scope_tree: ScopeTree,
+    scope_depth: usize,
 }
 
 impl<'a> Visitor<'a> {
     fn new(ctx: &'a mut RuntimeContext) -> Self {
-        Self { ctx, chunk: Chunk::new(), scope_tree: ScopeTree::new() }
+        Self { ctx, chunk: Chunk::new(), scope_tree: ScopeTree::new(), scope_depth: 0 }
     }
 
     // Visitors --------------------------------------------------------
@@ -46,19 +47,10 @@ impl<'a> Visitor<'a> {
         type Kind = ast::StatementKind;
         match node.kind {
             Kind::Jump(name) => {
-                // Insert placeholder jump instruction to be filled in
-                // with corresponding label address once labels have
-                // been processed. We also take care to exit nested
-                // blocks/scopes before jumping out.
-                self.push(Inst::Placeholder(
-                    0,
-                    Box::new(Inst::ScopeEnd(0)),
-                    "Scope not exited for jump".to_owned(),
-                ));
                 let jump_addr = self.chunk.len();
                 self.push(Inst::Placeholder(
                     0,
-                    Box::new(Inst::Jump(0)),
+                    Box::new(Inst::Jump(0, 0)),
                     "Jump address not set to label address".to_owned(),
                 ));
                 self.scope_tree.add_jump(name.as_str(), jump_addr);
@@ -204,7 +196,7 @@ impl<'a> Visitor<'a> {
             let jump_index = self.chunk.len();
             self.push(Inst::Placeholder(
                 jump_index,
-                Box::new(Inst::JumpIfElse(0, 0)),
+                Box::new(Inst::JumpIfElse(0, 0, 0)),
                 "Branch condition jump not set".to_owned(),
             ));
 
@@ -219,14 +211,14 @@ impl<'a> Visitor<'a> {
             jump_out_addrs.push(jump_out_addr);
             self.push(Inst::Placeholder(
                 jump_out_addr,
-                Box::new(Inst::Jump(0)),
+                Box::new(Inst::Jump(0, 0)),
                 "Branch jump out not set".to_owned(),
             ));
 
             // Jump target if branch condition is false.
             let next_addr = self.chunk.len();
 
-            self.chunk[jump_index] = Inst::JumpIfElse(block_addr, next_addr);
+            self.chunk[jump_index] = Inst::JumpIfElse(block_addr, next_addr, 0);
         }
 
         // Default block (if present).
@@ -241,7 +233,7 @@ impl<'a> Visitor<'a> {
 
         // Replace jump-out placeholders with actual jumps.
         for addr in jump_out_addrs {
-            self.chunk[addr] = Inst::Jump(after_addr);
+            self.chunk[addr] = Inst::Jump(after_addr, 0);
         }
 
         Ok(())
@@ -253,6 +245,7 @@ impl<'a> Visitor<'a> {
         block: ast::Block,
         scope_kind: ScopeKind,
     ) -> VisitResult {
+        let loop_scope_depth = self.scope_depth;
         let loop_addr = self.chunk.len();
         // Evaluate loop expression on every iteration.
         self.visit_expr(expr)?;
@@ -260,25 +253,27 @@ impl<'a> Visitor<'a> {
         let jump_out_index = self.chunk.len();
         self.push(Inst::Placeholder(
             jump_out_index,
-            Box::new(Inst::JumpIfNot(0)),
+            Box::new(Inst::JumpIfNot(0, 0)),
             "Jump-out for loop not set".to_owned(),
         ));
         // Run the loop body if result is true.
         self.visit_block(block, scope_kind)?;
         // Jump to top of loop to re-check expression.
-        self.push(Inst::Jump(loop_addr));
+        self.push(Inst::Jump(loop_addr, 0));
         // Jump-out address.
         let after_addr = self.chunk.len();
         // Set address of jump-out placeholder.
-        self.chunk[jump_out_index] = Inst::JumpIfNot(after_addr);
+        self.chunk[jump_out_index] = Inst::JumpIfNot(after_addr, 0);
         // Set address of breaks and continues.
         for addr in loop_addr..after_addr {
             match self.chunk[addr] {
-                Inst::BreakPlaceholder(break_addr) => {
-                    self.chunk[break_addr] = Inst::Jump(after_addr)
+                Inst::BreakPlaceholder(break_addr, depth) => {
+                    self.chunk[break_addr] =
+                        Inst::Jump(after_addr, depth - loop_scope_depth);
                 }
-                Inst::ContinuePlaceholder(continue_addr) => {
-                    self.chunk[continue_addr] = Inst::Jump(loop_addr)
+                Inst::ContinuePlaceholder(continue_addr, depth) => {
+                    self.chunk[continue_addr] =
+                        Inst::Jump(loop_addr, depth - loop_scope_depth);
                 }
                 _ => (),
             }
@@ -288,12 +283,12 @@ impl<'a> Visitor<'a> {
 
     fn visit_break(&mut self, expr: ast::Expr) -> VisitResult {
         self.visit_expr(expr)?;
-        self.chunk.push(Inst::BreakPlaceholder(self.chunk.len()));
+        self.chunk.push(Inst::BreakPlaceholder(self.chunk.len(), self.scope_depth));
         Ok(())
     }
 
     fn visit_continue(&mut self) -> VisitResult {
-        self.chunk.push(Inst::ContinuePlaceholder(self.chunk.len()));
+        self.chunk.push(Inst::ContinuePlaceholder(self.chunk.len(), self.scope_depth));
         Ok(())
     }
 
@@ -370,11 +365,13 @@ impl<'a> Visitor<'a> {
     /// current scope.
     fn enter_scope(&mut self, kind: ScopeKind) {
         self.scope_tree.add(kind);
+        self.scope_depth += 1;
     }
 
     /// Move up to the parent scope of the current scope.
     fn exit_scope(&mut self) {
         self.scope_tree.move_up();
+        self.scope_depth -= 1;
     }
 
     /// Update jump instructions with their target label addresses.
@@ -387,11 +384,7 @@ impl<'a> Visitor<'a> {
                 let result = scope.find_label(scope_tree, name, None);
                 if let Some((label_addr, label_depth)) = result {
                     let depth = jump_depth - label_depth;
-                    chunk[*jump_addr - 1] = match depth {
-                        0 => Inst::NoOp,
-                        _ => Inst::ScopeEnd(depth),
-                    };
-                    chunk[*jump_addr] = Inst::Jump(label_addr);
+                    chunk[*jump_addr] = Inst::Jump(label_addr, depth);
                 } else {
                     not_found = Some(name.clone());
                     return false;

@@ -27,6 +27,14 @@ impl RuntimeErr {
         Self { kind }
     }
 
+    pub fn new_object_not_found_err(index: usize) -> Self {
+        Self::new(RuntimeErrKind::ObjectNotFound(index))
+    }
+
+    pub fn new_name_err<S: Into<String>>(message: S) -> Self {
+        Self::new(RuntimeErrKind::NameErr(message.into()))
+    }
+
     pub fn new_type_err<S: Into<String>>(message: S) -> Self {
         Self::new(RuntimeErrKind::TypeErr(message.into()))
     }

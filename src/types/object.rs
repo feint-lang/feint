@@ -7,6 +7,7 @@ use crate::vm::{
 };
 
 use super::class::TypeRef;
+use super::nil::Nil;
 
 pub type ObjectRef = Rc<dyn Object>;
 
@@ -49,6 +50,13 @@ pub trait Object {
 
     fn name(&self) -> String {
         self.class().name().to_owned()
+    }
+
+    fn is_nil(&self) -> bool {
+        match self.as_any().downcast_ref::<Nil>() {
+            Some(_) => true,
+            None => false,
+        }
     }
 
     // Unary operations ------------------------------------------------

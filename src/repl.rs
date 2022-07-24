@@ -129,24 +129,28 @@ impl<'a> Repl<'a> {
         if let Ok(vm_state) = result {
             // Assign _ to value at top of stack
             let var = "_";
-            let mut chunk = vec![Inst::AssignVar(var.to_owned())];
-            if let Some(&index) = self.executor.vm.peek() {
-                // Don't print nil when the result of an expression is nil
-                if index != 0 {
-                    chunk.push(Inst::Print(1));
-                }
-            }
-            if let Err(err) = self.executor.vm.execute(&chunk, false) {
-                // If stack is empty, assign _ to nil
-                if let RuntimeErrKind::NotEnoughValuesOnStack(_) = err.kind {
-                    let chunk = vec![Inst::Push(0), Inst::AssignVar(var.to_owned())];
-                    if let Err(err) = self.executor.vm.execute(&chunk, false) {
-                        eprintln!(
-                            "ERROR: Could not assign _ to top of stack or to nil:\n{}",
-                            err
-                        );
+            let mut chunk = vec![Inst::DeclareVar(var.to_owned())];
+            match self.executor.vm.get_top_value() {
+                Ok(Some(val)) => {
+                    chunk.push(Inst::AssignVar(var.to_owned()));
+                    if !val.is_nil() {
+                        // Don't print nil when the result of an expression is nil
+                        chunk.push(Inst::Print(1));
                     }
                 }
+                Ok(None) => {
+                    // Empty stack
+                    chunk.push(Inst::Push(0));
+                    chunk.push(Inst::AssignVar(var.to_owned()));
+                }
+                Err(err) => {
+                    eprintln!("ERROR: Could not get value at top of stack:\n{err}");
+                    chunk.push(Inst::Push(0));
+                    chunk.push(Inst::AssignVar(var.to_owned()));
+                }
+            };
+            if let Err(err) = self.executor.execute_chunk(chunk) {
+                eprintln!("ERROR: Could not assign or print _:\n{err:?}");
             }
             return self.vm_state_to_exit_result(vm_state);
         }
