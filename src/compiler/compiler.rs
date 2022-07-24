@@ -30,67 +30,6 @@ impl<'a> Visitor<'a> {
         Self { ctx, chunk: Chunk::new(), scope_tree: ScopeTree::new() }
     }
 
-    // Utilities -------------------------------------------------------
-
-    fn err(&self, message: String) -> VisitResult {
-        Err(CompilationErr::new(CompilationErrKind::VisitErr(message)))
-    }
-
-    fn push(&mut self, inst: Inst) {
-        self.chunk.push(inst);
-    }
-
-    fn push_const(&mut self, index: usize) {
-        self.push(Inst::LoadConst(index));
-    }
-
-    fn add_const(&mut self, val: ObjectRef) {
-        let index = self.ctx.add_obj(val);
-        self.push_const(index);
-    }
-
-    /// Add nested scope to current scope then make the new scope the
-    /// current scope.
-    fn enter_scope(&mut self, kind: ScopeKind) {
-        self.scope_tree.add(kind);
-    }
-
-    /// Move up to the parent scope of the current scope.
-    fn exit_scope(&mut self) {
-        self.scope_tree.move_up();
-    }
-
-    /// Update jump instructions with their target label addresses.
-    fn fix_jumps(&mut self) -> VisitResult {
-        let chunk = &mut self.chunk;
-        let scope_tree = &self.scope_tree;
-        let mut not_found: Option<String> = None;
-        scope_tree.walk_up(&mut |scope: &Scope, jump_depth: usize| {
-            for (name, jump_addr) in scope.jumps().iter() {
-                let result = scope.find_label(scope_tree, name, None);
-                if let Some((label_addr, label_depth)) = result {
-                    let depth = jump_depth - label_depth;
-                    chunk[*jump_addr - 1] = match depth {
-                        0 => Inst::NoOp,
-                        _ => Inst::ScopeEnd(depth),
-                    };
-                    chunk[*jump_addr] = Inst::Jump(label_addr);
-                } else {
-                    not_found = Some(name.clone());
-                    return false;
-                }
-            }
-            true
-        });
-        if let Some(name) = not_found {
-            return self.err(format!(
-                "Label not found for jump {} (jump target must be *after* jump)",
-                name
-            ));
-        }
-        Ok(())
-    }
-
     // Visitors --------------------------------------------------------
 
     fn visit_program(&mut self, node: ast::Program) -> VisitResult {
@@ -100,6 +39,136 @@ impl<'a> Visitor<'a> {
         assert_eq!(self.scope_tree.pointer(), 0);
         self.fix_jumps()?;
         self.push(Inst::Halt(0));
+        Ok(())
+    }
+
+    fn visit_statement(&mut self, node: ast::Statement) -> VisitResult {
+        type Kind = ast::StatementKind;
+        match node.kind {
+            Kind::Jump(name) => {
+                // Insert placeholder jump instruction to be filled in
+                // with corresponding label address once labels have
+                // been processed. We also take care to exit nested
+                // blocks/scopes before jumping out.
+                self.push(Inst::Placeholder(
+                    0,
+                    Box::new(Inst::ScopeEnd(0)),
+                    "Scope not exited for jump".to_owned(),
+                ));
+                let jump_addr = self.chunk.len();
+                self.push(Inst::Placeholder(
+                    0,
+                    Box::new(Inst::Jump(0)),
+                    "Jump address not set to label address".to_owned(),
+                ));
+                self.scope_tree.add_jump(name.as_str(), jump_addr);
+            }
+            Kind::Label(name) => {
+                self.push(Inst::NoOp);
+                let addr = self.chunk.len() - 1;
+                if self.scope_tree.add_label(name.as_str(), addr).is_some() {
+                    self.err(format!("Duplicate label in scope: {}", name))?;
+                }
+            }
+            Kind::Continue => self.visit_continue()?,
+            Kind::Expr(expr) => self.visit_expr(expr)?,
+        }
+        Ok(())
+    }
+
+    fn visit_expr(&mut self, node: ast::Expr) -> VisitResult {
+        type Kind = ast::ExprKind;
+        match node.kind {
+            Kind::Tuple(items) => self.visit_tuple(items)?,
+            Kind::Literal(literal) => self.visit_literal(literal)?,
+            Kind::FormatString(items) => self.visit_format_string(items)?,
+            Kind::Ident(ident) => self.visit_ident(ident)?,
+            Kind::Block(block) => self.visit_block(block, ScopeKind::Block)?,
+            Kind::Conditional(branches, default) => {
+                self.visit_conditional(branches, default, ScopeKind::Block)?
+            }
+            Kind::Loop(expr, block) => {
+                self.visit_loop(*expr, block, ScopeKind::Block)?
+            }
+            Kind::Break(expr) => self.visit_break(*expr)?,
+            Kind::Func(func) => self.visit_func(func)?,
+            Kind::Call(call) => self.visit_call(call)?,
+            Kind::Print(items) => {
+                let num_items = items.len();
+                for item in items {
+                    self.visit_expr(item)?;
+                }
+                self.push(Inst::Print(num_items));
+                self.push(Inst::Push(0));
+            }
+            Kind::UnaryOp(op, b) => self.visit_unary_op(op, *b)?,
+            Kind::BinaryOp(a, op, b) => self.visit_binary_op(*a, op, *b)?,
+            _ => self.err(format!("Unhandled expression:\n{:?}", node))?,
+        }
+        Ok(())
+    }
+
+    fn visit_tuple(&mut self, items: Vec<ast::Expr>) -> VisitResult {
+        let num_items = items.len();
+        for item in items {
+            self.visit_expr(item)?;
+        }
+        self.push(Inst::MakeTuple(num_items));
+        Ok(())
+    }
+
+    fn visit_literal(&mut self, node: ast::Literal) -> VisitResult {
+        type Kind = ast::LiteralKind;
+        match node.kind {
+            Kind::Nil => self.push_const(0),
+            Kind::Bool(true) => self.push_const(1),
+            Kind::Bool(false) => self.push_const(2),
+            Kind::Int(value) => self.add_const(self.ctx.builtins.new_int(value)),
+            Kind::Float(value) => self.add_const(self.ctx.builtins.new_float(value)),
+            Kind::String(value) => self.add_const(self.ctx.builtins.new_string(value)),
+        }
+        Ok(())
+    }
+
+    fn visit_format_string(&mut self, items: Vec<ast::Expr>) -> VisitResult {
+        let num_items = items.len();
+        for item in items {
+            self.visit_expr(item)?;
+        }
+        self.push(Inst::MakeString(num_items));
+        Ok(())
+    }
+
+    // Visit identifier as expression (i.e., not as part of an
+    // assignment).
+    fn visit_ident(&mut self, node: ast::Ident) -> VisitResult {
+        type Kind = ast::IdentKind;
+        match node.kind {
+            Kind::Ident(name) => self.push(Inst::LoadVar(name)),
+            Kind::TypeIdent(name) => self.push(Inst::LoadVar(name)),
+        }
+        Ok(())
+    }
+
+    fn visit_assignment(
+        &mut self,
+        name_expr: ast::Expr,
+        value_expr: ast::Expr,
+    ) -> VisitResult {
+        match name_expr.kind {
+            ast::ExprKind::Ident(ident) => match ident.kind {
+                ast::IdentKind::Ident(name) => {
+                    // NOTE: Currently, declaration and assignment are
+                    //       the same thing, so declaration doesn't
+                    //       do anything particularly useful ATM.
+                    self.push(Inst::DeclareVar(name.clone()));
+                    self.visit_expr(value_expr)?;
+                    self.push(Inst::AssignVar(name));
+                }
+                _ => return self.err("Expected identifier".to_owned()),
+            },
+            _ => return self.err("Expected identifier".to_owned()),
+        }
         Ok(())
     }
 
@@ -254,72 +323,6 @@ impl<'a> Visitor<'a> {
         Ok(())
     }
 
-    fn visit_statement(&mut self, node: ast::Statement) -> VisitResult {
-        type Kind = ast::StatementKind;
-        match node.kind {
-            Kind::Jump(name) => {
-                // Insert placeholder jump instruction to be filled in
-                // with corresponding label address once labels have
-                // been processed. We also take care to exit nested
-                // blocks/scopes before jumping out.
-                self.push(Inst::Placeholder(
-                    0,
-                    Box::new(Inst::ScopeEnd(0)),
-                    "Scope not exited for jump".to_owned(),
-                ));
-                let jump_addr = self.chunk.len();
-                self.push(Inst::Placeholder(
-                    0,
-                    Box::new(Inst::Jump(0)),
-                    "Jump address not set to label address".to_owned(),
-                ));
-                self.scope_tree.add_jump(name.as_str(), jump_addr);
-            }
-            Kind::Label(name) => {
-                self.push(Inst::NoOp);
-                let addr = self.chunk.len() - 1;
-                if self.scope_tree.add_label(name.as_str(), addr).is_some() {
-                    self.err(format!("Duplicate label in scope: {}", name))?;
-                }
-            }
-            Kind::Continue => self.visit_continue()?,
-            Kind::Expr(expr) => self.visit_expr(expr)?,
-        }
-        Ok(())
-    }
-
-    fn visit_expr(&mut self, node: ast::Expr) -> VisitResult {
-        type Kind = ast::ExprKind;
-        match node.kind {
-            Kind::Block(block) => self.visit_block(block, ScopeKind::Block)?,
-            Kind::Conditional(branches, default) => {
-                self.visit_conditional(branches, default, ScopeKind::Block)?
-            }
-            Kind::Loop(expr, block) => {
-                self.visit_loop(*expr, block, ScopeKind::Block)?
-            }
-            Kind::Break(expr) => self.visit_break(*expr)?,
-            Kind::Func(func) => self.visit_func(func)?,
-            Kind::Call(call) => self.visit_call(call)?,
-            Kind::Print(items) => {
-                let num_items = items.len();
-                for item in items {
-                    self.visit_expr(item)?;
-                }
-                self.push(Inst::Print(num_items));
-                self.push(Inst::Push(0));
-            }
-            Kind::UnaryOp(op, b) => self.visit_unary_op(op, *b)?,
-            Kind::BinaryOp(a, op, b) => self.visit_binary_op(*a, op, *b)?,
-            Kind::Ident(ident) => self.visit_ident(ident)?,
-            Kind::Literal(literal) => self.visit_literal(literal)?,
-            Kind::FormatString(items) => self.visit_format_string(items)?,
-            Kind::Tuple(items) => self.visit_tuple(items)?,
-            _ => self.err(format!("Unhandled expression:\n{:?}", node))?,
-        }
-        Ok(())
-    }
-
     fn visit_unary_op(&mut self, op: UnaryOperator, expr: ast::Expr) -> VisitResult {
         self.visit_expr(expr)?;
         self.push(Inst::UnaryOp(op));
@@ -344,67 +347,64 @@ impl<'a> Visitor<'a> {
         }
     }
 
-    fn visit_assignment(
-        &mut self,
-        name_expr: ast::Expr,
-        value_expr: ast::Expr,
-    ) -> VisitResult {
-        match name_expr.kind {
-            ast::ExprKind::Ident(ident) => match ident.kind {
-                ast::IdentKind::Ident(name) => {
-                    // NOTE: Currently, declaration and assignment are
-                    //       the same thing, so declaration doesn't
-                    //       do anything particularly useful ATM.
-                    self.push(Inst::DeclareVar(name.clone()));
-                    self.visit_expr(value_expr)?;
-                    self.push(Inst::AssignVar(name));
+    // Utilities -------------------------------------------------------
+
+    fn err(&self, message: String) -> VisitResult {
+        Err(CompilationErr::new(CompilationErrKind::VisitErr(message)))
+    }
+
+    fn push(&mut self, inst: Inst) {
+        self.chunk.push(inst);
+    }
+
+    fn push_const(&mut self, index: usize) {
+        self.push(Inst::LoadConst(index));
+    }
+
+    fn add_const(&mut self, val: ObjectRef) {
+        let index = self.ctx.add_const(val);
+        self.push_const(index);
+    }
+
+    /// Add nested scope to current scope then make the new scope the
+    /// current scope.
+    fn enter_scope(&mut self, kind: ScopeKind) {
+        self.scope_tree.add(kind);
+    }
+
+    /// Move up to the parent scope of the current scope.
+    fn exit_scope(&mut self) {
+        self.scope_tree.move_up();
+    }
+
+    /// Update jump instructions with their target label addresses.
+    fn fix_jumps(&mut self) -> VisitResult {
+        let chunk = &mut self.chunk;
+        let scope_tree = &self.scope_tree;
+        let mut not_found: Option<String> = None;
+        scope_tree.walk_up(&mut |scope: &Scope, jump_depth: usize| {
+            for (name, jump_addr) in scope.jumps().iter() {
+                let result = scope.find_label(scope_tree, name, None);
+                if let Some((label_addr, label_depth)) = result {
+                    let depth = jump_depth - label_depth;
+                    chunk[*jump_addr - 1] = match depth {
+                        0 => Inst::NoOp,
+                        _ => Inst::ScopeEnd(depth),
+                    };
+                    chunk[*jump_addr] = Inst::Jump(label_addr);
+                } else {
+                    not_found = Some(name.clone());
+                    return false;
                 }
-                _ => return self.err("Expected identifier".to_owned()),
-            },
-            _ => return self.err("Expected identifier".to_owned()),
+            }
+            true
+        });
+        if let Some(name) = not_found {
+            return self.err(format!(
+                "Label not found for jump {} (jump target must be *after* jump)",
+                name
+            ));
         }
-        Ok(())
-    }
-
-    // Visit identifier as expression (i.e., not as part of an
-    // assignment).
-    fn visit_ident(&mut self, node: ast::Ident) -> VisitResult {
-        type Kind = ast::IdentKind;
-        match node.kind {
-            Kind::Ident(name) => self.push(Inst::LoadVar(name)),
-            Kind::TypeIdent(name) => self.push(Inst::LoadVar(name)),
-        }
-        Ok(())
-    }
-
-    fn visit_literal(&mut self, node: ast::Literal) -> VisitResult {
-        type Kind = ast::LiteralKind;
-        match node.kind {
-            Kind::Nil => self.push_const(0),
-            Kind::Bool(true) => self.push_const(1),
-            Kind::Bool(false) => self.push_const(2),
-            Kind::Float(value) => self.add_const(self.ctx.builtins.new_float(value)),
-            Kind::Int(value) => self.add_const(self.ctx.builtins.new_int(value)),
-            Kind::String(value) => self.add_const(self.ctx.builtins.new_string(value)),
-        }
-        Ok(())
-    }
-
-    fn visit_format_string(&mut self, items: Vec<ast::Expr>) -> VisitResult {
-        let num_items = items.len();
-        for item in items {
-            self.visit_expr(item)?;
-        }
-        self.push(Inst::MakeString(num_items));
-        Ok(())
-    }
-
-    fn visit_tuple(&mut self, items: Vec<ast::Expr>) -> VisitResult {
-        let num_items = items.len();
-        for item in items {
-            self.visit_expr(item)?;
-        }
-        self.push(Inst::MakeTuple(num_items));
         Ok(())
     }
 }
