@@ -34,7 +34,7 @@ macro_rules! make_op {
             } else if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
                 rhs.value().to_f64().unwrap()
             } else {
-                return Err(RuntimeErr::new_type_error(format!($message, rhs.class().name())));
+                return Err(RuntimeErr::new_type_err(format!($message, rhs.class().name())));
             };
             let mut value = &self.value $op value;
             if $trunc {
@@ -69,7 +69,7 @@ impl Object for Float {
         } else if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
             Ok(eq_int_float(rhs, self))
         } else {
-            Err(RuntimeErr::new_type_error(format!(
+            Err(RuntimeErr::new_type_err(format!(
                 "Could not compare Float to {} for equality",
                 rhs.class().name()
             )))
@@ -82,7 +82,7 @@ impl Object for Float {
         } else if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
             rhs.value().to_f64().unwrap()
         } else {
-            return Err(RuntimeErr::new_type_error(format!(
+            return Err(RuntimeErr::new_type_err(format!(
                 "Could not raise Float by {}",
                 rhs.class().name()
             )));

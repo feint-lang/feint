@@ -27,7 +27,7 @@ impl RuntimeErr {
         Self { kind }
     }
 
-    pub fn new_type_error<S: Into<String>>(message: S) -> Self {
+    pub fn new_type_err<S: Into<String>>(message: S) -> Self {
         Self::new(RuntimeErrKind::TypeErr(message.into()))
     }
 }

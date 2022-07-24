@@ -35,7 +35,7 @@ impl Int {
         } else if let Some(rhs) = rhs.as_any().downcast_ref::<Float>() {
             *rhs.value()
         } else {
-            return Err(RuntimeErr::new_type_error(format!(
+            return Err(RuntimeErr::new_type_err(format!(
                 "Could not divide {} into Int",
                 rhs.class().name()
             )));
@@ -58,7 +58,7 @@ macro_rules! make_op {
                 let value = ctx.builtins.new_float(value);
                 Ok(value)
             } else {
-                Err(RuntimeErr::new_type_error(format!($message, rhs.class().name())))
+                Err(RuntimeErr::new_type_err(format!($message, rhs.class().name())))
             }
         }
     };
@@ -87,7 +87,7 @@ impl Object for Int {
         } else if let Some(rhs) = rhs.as_any().downcast_ref::<Float>() {
             Ok(eq_int_float(self, rhs))
         } else {
-            Err(RuntimeErr::new_type_error(format!(
+            Err(RuntimeErr::new_type_err(format!(
                 "Could not compare Int to {} for equality",
                 rhs.class().name()
             )))
@@ -100,7 +100,7 @@ impl Object for Int {
         } else if let Some(rhs) = rhs.as_any().downcast_ref::<Float>() {
             Ok(lt_int_float(self, rhs))
         } else {
-            Err(RuntimeErr::new_type_error(format!(
+            Err(RuntimeErr::new_type_err(format!(
                 "Could not compare Int to {} for less than",
                 rhs.class().name()
             )))
@@ -116,7 +116,7 @@ impl Object for Int {
         } else if let Some(rhs) = rhs.as_any().downcast_ref::<Float>() {
             Ok(gt_int_float(self, rhs))
         } else {
-            Err(RuntimeErr::new_type_error(format!(
+            Err(RuntimeErr::new_type_err(format!(
                 "Could not compare Int to {} for greater than",
                 rhs.class().name()
             )))
@@ -138,7 +138,7 @@ impl Object for Int {
             let value = ctx.builtins.new_float(value);
             Ok(value)
         } else {
-            Err(RuntimeErr::new_type_error(format!(
+            Err(RuntimeErr::new_type_err(format!(
                 "Could not raise Int by {}",
                 rhs.class().name()
             )))

@@ -38,7 +38,7 @@ impl Object for Func {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
             Ok(self.is(&rhs))
         } else {
-            Err(RuntimeErr::new_type_error(format!(
+            Err(RuntimeErr::new_type_err(format!(
                 "Could not compare {} to {}",
                 self.class().name(),
                 rhs.class().name()

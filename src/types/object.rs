@@ -13,7 +13,7 @@ pub type ObjectRef = Rc<dyn Object>;
 macro_rules! make_unary_op {
     ( $meth:ident, $op:literal, $result:ty ) => {
         fn $meth(&self, _ctx: &RuntimeContext) -> $result {
-            Err(RuntimeErr::new_type_error(format!(
+            Err(RuntimeErr::new_type_err(format!(
                 "Unary operator {} ({}) not implemented for type {}",
                 $op,
                 stringify!($meth),
@@ -26,7 +26,7 @@ macro_rules! make_unary_op {
 macro_rules! make_bin_op {
     ( $meth:ident, $op:literal, $result:ty ) => {
         fn $meth(&self, _rhs: &ObjectRef, _ctx: &RuntimeContext) -> $result {
-            Err(RuntimeErr::new_type_error(format!(
+            Err(RuntimeErr::new_type_err(format!(
                 "Binary operator {} ({}) not implemented for type {}",
                 $op,
                 stringify!($meth),

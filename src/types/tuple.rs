@@ -50,7 +50,7 @@ impl Object for Tuple {
             }
             return Ok(true);
         } else {
-            Err(RuntimeErr::new_type_error(format!(
+            Err(RuntimeErr::new_type_err(format!(
                 "Could not compare Tuple to {} for equality",
                 rhs.class().name()
             )))

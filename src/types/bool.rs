@@ -43,7 +43,7 @@ impl Object for Bool {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
             Ok(self.is(rhs) || self.value() == rhs.value())
         } else {
-            Err(RuntimeErr::new_type_error(format!(
+            Err(RuntimeErr::new_type_err(format!(
                 "Could not compare Bool to {} for equality",
                 rhs.class().name()
             )))
@@ -54,7 +54,7 @@ impl Object for Bool {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
             Ok(*self.value() && *rhs.value())
         } else {
-            Err(RuntimeErr::new_type_error(format!(
+            Err(RuntimeErr::new_type_err(format!(
                 "Bool && {} not implemented",
                 rhs.class().name()
             )))
@@ -65,7 +65,7 @@ impl Object for Bool {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
             Ok(*self.value() || *rhs.value())
         } else {
-            Err(RuntimeErr::new_type_error(format!(
+            Err(RuntimeErr::new_type_err(format!(
                 "Bool || {} not implemented",
                 rhs.class().name()
             )))
