@@ -455,7 +455,6 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
     /// Handle `loop -> ...` and `loop <cond> -> ...` (`while` loops).
     /// TODO: Handle `for` loops.
     fn loop_(&mut self, start: Location) -> ExprResult {
-        use Token::{InlineScopeStart, ScopeStart};
         self.loop_level += 1;
         let cond = match self.peek_token_is_scope_start()? {
             true => ast::Expr::new_true(self.next_loc(), self.next_loc()),
@@ -492,7 +491,6 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
 
     /// Handle `func () -> ...` (definition) and `func()` (call).
     fn func(&mut self, name: String, start: Location) -> ExprResult {
-        use Token::{InlineScopeStart, ScopeStart};
         let expr = self.parenthesized(self.loc())?;
         let call_end = expr.end;
         let items = match expr.kind {
