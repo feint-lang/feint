@@ -6,12 +6,14 @@ pub type Chunk = Vec<Inst>;
 pub enum Inst {
     NoOp,
 
-    Push(usize),
-    Pop,
+    // Truncate stack to the specified size, removing excess items from
+    // the top.
+    Truncate(usize),
+
     LoadConst(usize),
 
     ScopeStart,
-    ScopeEnd(usize),
+    ScopeEnd,
 
     DeclareVar(String),
     AssignVar(String),

@@ -38,8 +38,8 @@ impl RuntimeContext {
         }
     }
 
-    pub fn exit_scopes(&mut self, count: &usize) {
-        for _ in 0..*count {
+    pub fn exit_scopes(&mut self, count: usize) {
+        for _ in 0..count {
             self.exit_scope();
         }
     }

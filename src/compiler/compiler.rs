@@ -161,7 +161,7 @@ impl<'a> Visitor<'a> {
         for statement in node.statements {
             self.visit_statement(statement)?;
         }
-        self.push(Inst::ScopeEnd(1));
+        self.push(Inst::ScopeEnd);
         self.exit_scope();
         Ok(())
     }

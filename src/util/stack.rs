@@ -48,6 +48,10 @@ impl<T> Stack<T> {
         self.storage.clear()
     }
 
+    pub fn truncate(&mut self, len: usize) {
+        self.storage.truncate(len)
+    }
+
     pub fn iter(&self) -> Rev<Iter<T>> {
         self.storage.iter().rev()
     }

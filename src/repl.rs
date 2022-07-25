@@ -8,7 +8,7 @@ use crate::exe::Executor;
 use crate::parser::ParseErrKind;
 use crate::result::{ExeErr, ExeErrKind, ExitResult};
 use crate::scanner::ScanErrKind;
-use crate::vm::{Inst, RuntimeErrKind, VMState, VM};
+use crate::vm::{Inst, VMState, VM};
 
 /// Run FeInt REPL until user exits.
 pub fn run(history_path: Option<&Path>, dis: bool, debug: bool) -> ExitResult {
@@ -130,7 +130,7 @@ impl<'a> Repl<'a> {
             // Assign _ to value at top of stack
             let var = "_";
             let mut chunk = vec![Inst::DeclareVar(var.to_owned())];
-            match self.executor.vm.get_top_value() {
+            match self.executor.vm.peek_obj() {
                 Ok(Some(val)) => {
                     chunk.push(Inst::AssignVar(var.to_owned()));
                     // Print the result if it's not nil
@@ -143,15 +143,16 @@ impl<'a> Repl<'a> {
                 }
                 Ok(None) => {
                     // Empty stack
-                    chunk.push(Inst::Push(0));
+                    chunk.push(Inst::LoadConst(0));
                     chunk.push(Inst::AssignVar(var.to_owned()));
                 }
                 Err(err) => {
                     eprintln!("ERROR: Could not get value at top of stack:\n{err}");
-                    chunk.push(Inst::Push(0));
+                    chunk.push(Inst::LoadConst(0));
                     chunk.push(Inst::AssignVar(var.to_owned()));
                 }
             };
+            chunk.push(Inst::Truncate(0));
             if let Err(err) = self.executor.execute_chunk(chunk) {
                 eprintln!("ERROR: Could not assign or print _:\n{err:?}");
             }

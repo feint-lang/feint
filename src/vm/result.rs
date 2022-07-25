@@ -51,6 +51,7 @@ pub enum RuntimeErrKind {
     EmptyStack,
     ObjectNotFound(usize),
     NotEnoughValuesOnStack(String),
+    ExpectedVar(String),
     ParseErr(ParseErr),
     CompErr(CompErr),
     UnhandledInstruction(String),
