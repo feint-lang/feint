@@ -13,6 +13,10 @@ impl ScopeTree {
         Self { storage: vec![global_scope], pointer: 0 }
     }
 
+    pub fn in_global_scope(&self) -> bool {
+        self.current().is_global()
+    }
+
     // Construction ----------------------------------------------------
     //
     // The methods in this section operate on the current scope, which
@@ -121,7 +125,7 @@ pub struct Scope {
     jumps: HashMap<String, usize>,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ScopeKind {
     Global,
     Block,
@@ -142,6 +146,10 @@ impl Scope {
 
     pub fn index(&self) -> usize {
         self.index
+    }
+
+    fn is_global(&self) -> bool {
+        self.kind == ScopeKind::Global
     }
 
     fn is_leaf(&self) -> bool {

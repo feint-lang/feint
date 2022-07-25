@@ -4,6 +4,8 @@
 //! mode.
 use std::fmt;
 
+use num_traits::ToPrimitive;
+
 use crate::types::ObjectRef;
 use crate::util::{BinaryOperator, Stack, UnaryOperator};
 
@@ -336,6 +338,22 @@ impl VM {
                     self.dis(dis, ip, &chunk);
                     break Ok(VMState::Halted(*code));
                 }
+                HaltTop => {
+                    if let Some(obj) = self.pop_obj()? {
+                        let return_code = match obj.int_val() {
+                            Some(int) => {
+                                self.halt();
+                                #[cfg(debug_assertions)]
+                                self.dis(dis, ip, &chunk);
+                                int.to_u8().unwrap_or(255)
+                            }
+                            None => 0,
+                        };
+                        break Ok(VMState::Halted(return_code));
+                    } else {
+                        return self.err(EmptyStack);
+                    }
+                }
             }
 
             #[cfg(debug_assertions)]
@@ -455,7 +473,7 @@ impl VM {
             let obj = self.get_obj(kind.clone());
             match obj {
                 Ok(obj) => {
-                    eprintln!("{:0>4} ({:?})", i, obj)
+                    eprintln!("{:0>8} {:?}", i, obj)
                 }
                 Err(_) => eprintln!("{:0>4} [NOT AN OBJECT]", i),
             }

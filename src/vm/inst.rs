@@ -52,4 +52,5 @@ pub enum Inst {
     ContinuePlaceholder(usize, usize), // address, scope depth
 
     Halt(u8),
+    HaltTop,
 }

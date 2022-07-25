@@ -2,6 +2,8 @@ use std::any::Any;
 use std::fmt;
 use std::rc::Rc;
 
+use num_bigint::BigInt;
+
 use crate::vm::{
     RuntimeBoolResult, RuntimeContext, RuntimeErr, RuntimeErrKind, RuntimeResult,
 };
@@ -80,6 +82,16 @@ pub trait Object {
     make_type_checker!(is_tuple, Tuple);
     make_type_checker!(is_func, Func);
     make_type_checker!(is_native_func, NativeFunc);
+
+    // Value extractors ------------------------------------------------
+
+    fn int_val(&self) -> Option<BigInt> {
+        if let Some(int) = self.as_any().downcast_ref::<Int>() {
+            Some(int.value().clone())
+        } else {
+            None
+        }
+    }
 
     // Unary operations ------------------------------------------------
 

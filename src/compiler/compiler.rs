@@ -24,11 +24,18 @@ struct Visitor<'a> {
     chunk: Chunk,
     scope_tree: ScopeTree,
     scope_depth: usize,
+    has_main: bool,
 }
 
 impl<'a> Visitor<'a> {
     fn new(ctx: &'a mut RuntimeContext) -> Self {
-        Self { ctx, chunk: Chunk::new(), scope_tree: ScopeTree::new(), scope_depth: 0 }
+        Self {
+            ctx,
+            chunk: Chunk::new(),
+            scope_tree: ScopeTree::new(),
+            scope_depth: 0,
+            has_main: false,
+        }
     }
 
     // Visitors --------------------------------------------------------
@@ -39,7 +46,14 @@ impl<'a> Visitor<'a> {
         }
         assert_eq!(self.scope_tree.pointer(), 0);
         self.fix_jumps()?;
-        self.push(Inst::Halt(0));
+        if self.has_main {
+            self.push(Inst::LoadVar("$main".to_string()));
+            self.push(Inst::Call(0));
+            self.push(Inst::Return);
+            self.push(Inst::HaltTop);
+        } else {
+            self.push(Inst::Halt(0));
+        }
         Ok(())
     }
 
@@ -288,6 +302,9 @@ impl<'a> Visitor<'a> {
         let name = node.name;
         let params = node.params;
         let func_program = ast::Program::new(node.block.statements);
+        if name == "$main" && self.scope_tree.in_global_scope() {
+            self.has_main = true;
+        }
         func_visitor.visit_program(func_program)?;
         let chunk = func_visitor.chunk;
         self.push(Inst::DeclareVar(name.clone()));
