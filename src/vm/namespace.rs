@@ -61,6 +61,12 @@ impl Namespace {
         Ok(index)
     }
 
+    /// Get a var.
+    pub fn get_var(&mut self, name: &str) -> Result<&ObjectRef, RuntimeErr> {
+        let index = self.var_index(name)?;
+        self.get_obj(index)
+    }
+
     /// Get the object index for a var.
     pub fn var_index(&self, name: &str) -> Result<usize, RuntimeErr> {
         if let Some(index) = self.name_index.get(name) {

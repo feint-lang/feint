@@ -73,8 +73,9 @@ impl RuntimeContext {
 
     // Vars ------------------------------------------------------------
 
-    /// Declare a new var. This adds a slot for the var in the current
-    /// namespace and sets its initial value to nil.
+    /// Declare a new var in the current namespace. This adds a slot for
+    /// the var in the current namespace and sets its initial value to
+    /// nil.
     pub fn declare_var(&mut self, name: &str) -> Result<usize, RuntimeErr> {
         let namespace = self.current_namespace();
         namespace.add_var(name)
@@ -92,8 +93,8 @@ impl RuntimeContext {
         Ok((self.depth(), index))
     }
 
-    /// Assign value to var. This looks up the var by depth and object
-    /// index in the current namespace and updates its value.
+    /// Assign value to var--reach into the namespace at depth and set
+    /// the var at the specified index.
     pub fn assign_var_by_depth_and_index(
         &mut self,
         depth: usize,
@@ -103,7 +104,18 @@ impl RuntimeContext {
         self.namespace_stack[depth].set_obj(index, obj)
     }
 
-    pub fn get_var(
+    /// Get var from current namespace.
+    pub fn get_var_in_current_namespace(
+        &mut self,
+        name: &str,
+    ) -> Result<&ObjectRef, RuntimeErr> {
+        let namespace = self.current_namespace();
+        namespace.get_var(name)
+    }
+
+    /// Reach into the namespace at depth and get the var at the
+    /// specified index.
+    pub fn get_var_by_depth_and_index(
         &self,
         depth: usize,
         index: usize,
@@ -111,6 +123,9 @@ impl RuntimeContext {
         self.namespace_stack[depth].get_obj(index)
     }
 
+    /// Find the a var by name in the current namespace or a parent
+    /// namespace, returning the depth where it was found and the index
+    /// the containing namespace's object storage.
     pub fn var_index(&mut self, name: &str) -> Result<(usize, usize), RuntimeErr> {
         let mut depth = self.depth();
         loop {

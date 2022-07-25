@@ -79,7 +79,9 @@ impl VM {
                 }
                 // Vars
                 DeclareVar(name) => {
-                    self.ctx.declare_var(name.as_str())?;
+                    if self.ctx.get_var_in_current_namespace(name).is_err() {
+                        self.ctx.declare_var(name.as_str())?;
+                    }
                 }
                 AssignVar(name) => {
                     if let Some((const_depth, const_index)) = self.pop() {
