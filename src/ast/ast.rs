@@ -391,7 +391,7 @@ impl fmt::Debug for LiteralKind {
     }
 }
 
-/// Identifiers - names for variables, functions, types, and methods
+/// Identifiers - names for variables, functions, and types
 #[derive(PartialEq)]
 pub struct Ident {
     pub kind: IdentKind,

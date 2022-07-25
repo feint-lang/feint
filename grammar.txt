@@ -201,12 +201,12 @@ QUOTE : "[\"']"
 NAME:
     | IDENTIFIER
     | TYPE_IDENTIFIER
-    | TYPE_METHOD_IDENTIFIER
+    | TYPE_FUNC_IDENTIFIER
 
 # Identifiers
-IDENTIFIER             : "[a-z]|[a-z][a-z0-9_]*[a-z0-9]"
-TYPE_IDENTIFIER        : "[A-Z]|[A-Z][A-Za-z0-9]*[A-Za-z0-9]"
-TYPE_METHOD_IDENTIFIER : "$" IDENTIFIER
+IDENTIFIER           : "[a-z]|[a-z][a-z0-9_]*[a-z0-9]"
+TYPE_IDENTIFIER      : "[A-Z]|[A-Z][A-Za-z0-9]*[A-Za-z0-9]"
+TYPE_FUNC_IDENTIFIER : "@" IDENTIFIER
 
 # Imports
 IMPORT_PATH    :

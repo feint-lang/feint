@@ -87,8 +87,8 @@ pub enum Token {
     // Identifiers
     Ident(String),            // name
     TypeIdent(String),        // Name
-    TypeMethIdent(String),    // @name (called via type)
-    SpecialMethIdent(String), // $name (e.g., $bool, $str)
+    TypeFuncIdent(String),    // @name (called via type)
+    SpecialFuncIdent(String), // $name (e.g., $bool, $str)
 
     EndOfStatement,
     EndOfInput,
@@ -146,8 +146,8 @@ impl Token {
             // Identifiers
             Self::Ident(s)
             | Self::TypeIdent(s)
-            | Self::TypeMethIdent(s)
-            | Self::SpecialMethIdent(s) => s.as_str(),
+            | Self::TypeFuncIdent(s)
+            | Self::SpecialFuncIdent(s) => s.as_str(),
 
             Self::EndOfStatement => "end of statement",
             Self::EndOfInput => "EOI",

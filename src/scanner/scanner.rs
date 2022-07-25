@@ -171,8 +171,8 @@ impl<'a, T: BufRead> Scanner<'a, T> {
             Some(('_', _, _)) => self.handle_ident('_', start)?,
             Some((c @ 'a'..='z', _, _)) => self.handle_ident(c, start)?,
             Some((c @ 'A'..='Z', _, _)) => TypeIdent(self.read_type_ident(c)),
-            Some((c @ '@', Some('a'..='z'), _)) => TypeMethIdent(self.read_ident(c)),
-            Some((c @ '$', Some('a'..='z'), _)) => SpecialMethIdent(self.read_ident(c)),
+            Some((c @ '@', Some('a'..='z'), _)) => TypeFuncIdent(self.read_ident(c)),
+            Some((c @ '$', Some('a'..='z'), _)) => SpecialFuncIdent(self.read_ident(c)),
             Some(('\n', _, _)) => return self.handle_newline(start),
             Some((c, _, _)) if c.is_whitespace() => {
                 return Err(ScanErr::new(UnexpectedWhitespace, start));

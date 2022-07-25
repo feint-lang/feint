@@ -5,7 +5,7 @@ Type ()
     @new (x) ->
         this.x = x
 
-    meth (x) ->
+    func (x) ->
         this.x + x
 
     # The $ prefix indicates a computed field (like @property in Python)

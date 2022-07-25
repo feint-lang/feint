@@ -17,12 +17,12 @@ pub struct Func {
 pub struct Type {
     module: String,
     name: String,
-    methods: HashMap<String, Func>,
+    functions: HashMap<String, Func>,
 }
 
 impl Type {
     pub fn new<S: Into<String>>(module: S, name: S) -> Self {
-        Self { module: module.into(), name: name.into(), methods: HashMap::new() }
+        Self { module: module.into(), name: name.into(), functions: HashMap::new() }
     }
 
     pub fn id(&self) -> usize {
