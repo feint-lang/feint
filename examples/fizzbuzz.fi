@@ -1,4 +1,4 @@
-fizz_buzz (end) ->
+fizz_buzz () ->
     "FizzBuzz
 
     Spec:
@@ -9,26 +9,6 @@ fizz_buzz (end) ->
         multiples of both three and five print 'FizzBuzz'.
 
     "
-    # TODO: Implement range
-    # loop i <- 1...end ->
-
-    i = 1
-    loop i <= end ->
-        result = if i % 15 == 0 -> "FizzBuzz"
-        else if i % 3 == 0 -> "Fizz"
-        else if i % 5 == 0 -> "Buzz"
-        else -> i
-        print(result)
-        i += 1
-
-
-# TODO: Implement function call
-# TODO: Implement $main handling (where $main is called by default when
-#       a script/module is run)
-$main () -> fizz_buzz(100)
-
-
-block ->
     i = 1
     loop i <= 100 ->
         result = if i % 15 == 0 -> "FizzBuzz"
@@ -37,3 +17,8 @@ block ->
         else -> i
         print(result)
         i += 1
+
+
+$main () ->
+    fizz_buzz()
+    nil

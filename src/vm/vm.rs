@@ -6,7 +6,7 @@ use std::fmt;
 
 use num_traits::ToPrimitive;
 
-use crate::types::ObjectRef;
+use crate::types::{Func, ObjectRef};
 use crate::util::{BinaryOperator, Stack, UnaryOperator};
 
 use super::context::RuntimeContext;
@@ -298,12 +298,18 @@ impl VM {
                                 args.push(objects.get(i).unwrap().clone());
                             }
                         }
-                        let result = callable.call(args, &self.ctx)?;
-                        let return_val = match result {
-                            Some(return_val) => return_val,
-                            None => self.ctx.builtins.nil_obj.clone(),
+                        if callable.is_native_func() {
+                            let result = callable.call(args, &self.ctx)?;
+                            let return_val = match result {
+                                Some(return_val) => return_val,
+                                None => self.ctx.builtins.nil_obj.clone(),
+                            };
+                            self.push(ReturnVal(return_val));
+                        } else if let Some(func) = callable.as_func() {
+                            self.execute(&func.chunk, dis)?;
+                        } else {
+                            return self.err(NotCallable(callable.clone()));
                         };
-                        self.push(ReturnVal(return_val));
                     }
                     None => {
                         return self

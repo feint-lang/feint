@@ -31,9 +31,7 @@ fn exit(result: ExeResult) -> ExitResult {
     match result {
         Ok(vm_state) => match vm_state {
             VMState::Halted(0) => Ok(None),
-            VMState::Halted(code) => {
-                Err((code, Some(format!("Halted abnormally: {}", code))))
-            }
+            VMState::Halted(code) => Err((code, None)),
             VMState::Idle => Err((255, Some("Never halted".to_owned()))),
         },
         // TODO: Return error code depending on error type?

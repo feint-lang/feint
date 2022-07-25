@@ -93,6 +93,14 @@ pub trait Object {
         }
     }
 
+    fn as_func(&self) -> Option<&Func> {
+        if let Some(func) = self.as_any().downcast_ref::<Func>() {
+            Some(func)
+        } else {
+            None
+        }
+    }
+
     // Unary operations ------------------------------------------------
 
     make_unary_op!(negate, "-", RuntimeResult);

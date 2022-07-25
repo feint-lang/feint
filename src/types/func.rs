@@ -46,11 +46,6 @@ impl Object for Func {
             )))
         }
     }
-
-    fn call(&self, args: Vec<ObjectRef>, ctx: &RuntimeContext) -> CallResult {
-        // TODO:
-        Ok(None)
-    }
 }
 
 // Display -------------------------------------------------------------

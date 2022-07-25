@@ -321,7 +321,9 @@ impl<'a> Visitor<'a> {
         for arg in args {
             self.visit_expr(arg)?;
         }
+        self.push(Inst::ScopeStart);
         self.push(Inst::Call(n_args));
+        self.push(Inst::ScopeEnd);
         self.push(Inst::Return);
         Ok(())
     }

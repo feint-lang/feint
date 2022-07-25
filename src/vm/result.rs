@@ -60,6 +60,7 @@ pub enum RuntimeErrKind {
     TypeErr(String),
     NameErr(String),
     StringFormatErr(String),
+    NotCallable(ObjectRef),
 }
 
 impl fmt::Display for RuntimeErrKind {

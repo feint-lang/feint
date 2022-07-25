@@ -288,9 +288,11 @@ impl<'a> Executor<'a> {
     }
 
     fn handle_runtime_err(&self, err: &RuntimeErr) {
+        use RuntimeErrKind::*;
         let message = match &err.kind {
-            RuntimeErrKind::NameErr(message) => format!("Name error: {message}"),
-            RuntimeErrKind::TypeErr(message) => format!("Type error: {message}"),
+            NameErr(message) => format!("Name error: {message}"),
+            TypeErr(message) => format!("Type error: {message}"),
+            NotCallable(obj) => format!("Object is not callable: {obj:?}"),
             kind => format!("Unhandled runtime error: {:?}", kind),
         };
         eprintln!("    |\n\n  {}", message);
