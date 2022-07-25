@@ -200,11 +200,13 @@ QUOTE : "[\"']"
 
 NAME:
     | IDENTIFIER
+    | SPECIAL_IDENTIFIER
     | TYPE_IDENTIFIER
     | TYPE_FUNC_IDENTIFIER
 
 # Identifiers
 IDENTIFIER           : "[a-z]|[a-z][a-z0-9_]*[a-z0-9]"
+SPECIAL_IDENTIFIER   : "$" IDENTIFIER
 TYPE_IDENTIFIER      : "[A-Z]|[A-Z][A-Za-z0-9]*[A-Za-z0-9]"
 TYPE_FUNC_IDENTIFIER : "@" IDENTIFIER
 

@@ -25,7 +25,7 @@ fizz_buzz (end) ->
 # TODO: Implement function call
 # TODO: Implement $main handling (where $main is called by default when
 #       a script/module is run)
-# $main () -> fizz_buzz(100)
+$main () -> fizz_buzz(100)
 
 
 block ->
