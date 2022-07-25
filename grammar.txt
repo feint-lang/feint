@@ -9,10 +9,15 @@ statement :
     | statement_type NEWLINE
 
 statement_type :
+    | import
     | jump
     | label
     | continue
     | expr
+
+import :
+    | "import" IMPORT_PATH IMPORT_IDENTIFIER
+    | "import" "from" IMPORT_PATH ":" IMPORT_IDENTIFIER ("," IMPORT_IDENTIFIER)*
 
 jump :
     | "jump" IDENTIFIER
@@ -180,13 +185,6 @@ type :
 inline_type :
     | TYPE_IDENTIFIER params "->" expr
 
-# Imports --------------------------------------------------------------
-
-import :
-    | import IMPORT_PATH
-    | import IMPORT_PATH as IDENTIFIER
-    | import from IMPORT_PATH: IMPORT_IDENTIFIER*
-
 # Comments -------------------------------------------------------------
 
 comment :
@@ -211,13 +209,10 @@ TYPE_IDENTIFIER      : "[A-Z]|[A-Z][A-Za-z0-9]*[A-Za-z0-9]"
 TYPE_FUNC_IDENTIFIER : "@" IDENTIFIER
 
 # Imports
-IMPORT_PATH    :
-    | IMPORT_SEGMENT "." IMPORT_PATH
-    | IDENTIFIER "as" IDENTIFIER
-    | IDENTIFIER
+IMPORT_PATH :
+    | IDENTIFIER ("." IDENTIFIER)*
 IMPORT_IDENTIFIER :
-    | NAME ["as" NAME] "," IMPORT_IDENTIFIER*
-    | NAME ["as" NAME]
+    | IDENTIFIER ["as" IDENTIFIER]
 
 # Numeric character sets allowing for underscores between digits
 ZERO    : "0(_?0+)*"
