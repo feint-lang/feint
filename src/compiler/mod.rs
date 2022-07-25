@@ -1,5 +1,5 @@
 pub(crate) use compiler::compile;
-pub(crate) use result::{CompilationErr, CompilationErrKind};
+pub(crate) use result::{CompErr, CompErrKind};
 
 mod compiler;
 mod result;

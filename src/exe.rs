@@ -1,7 +1,7 @@
 //! Front end for executing code from a source on a VM.
 use std::io::BufRead;
 
-use crate::compiler::{compile, CompilationErr, CompilationErrKind};
+use crate::compiler::{compile, CompErr, CompErrKind};
 use crate::parser::{ParseErr, ParseErrKind, Parser};
 use crate::result::{ExeErr, ExeErrKind, ExeResult};
 use crate::scanner::{ScanErr, ScanErrKind, Scanner};
@@ -88,12 +88,14 @@ impl<'a> Executor<'a> {
         let chunk = match compile(self.vm, program) {
             Ok(chunk) => chunk,
             Err(err) => {
-                self.print_err_line(
-                    source.line_no,
-                    source.get_current_line().unwrap_or("<none>"),
-                );
-                self.handle_compilation_err(&err);
-                return Err(ExeErr::new(ExeErrKind::CompilationErr(err.kind)));
+                if !self.ignore_comp_err(&err) {
+                    self.print_err_line(
+                        source.line_no,
+                        source.get_current_line().unwrap_or("<none>"),
+                    );
+                    self.handle_comp_err(&err);
+                }
+                return Err(ExeErr::new(ExeErrKind::CompErr(err.kind)));
             }
         };
         self.execute_chunk(chunk)
@@ -224,9 +226,9 @@ impl<'a> Executor<'a> {
                 unreachable!("Handle ScanErr before calling handle_parse_err");
             }
             UnexpectedToken(token) => {
-                let loc = token.start.clone();
+                let loc = token.start;
                 let token = &token.token;
-                (loc, format!("Parse error: Unhandled token at {loc}: {token:?}"))
+                (loc, format!("Parse error: unexpected token at {loc}: {token:?}"))
             }
             ExpectedBlock(loc) => {
                 (loc.clone(), format!("Parse error: expected indented block at {loc}"))
@@ -258,13 +260,31 @@ impl<'a> Executor<'a> {
         self.print_err_message(message, loc);
     }
 
-    fn handle_compilation_err(&self, err: &CompilationErr) {
+    fn handle_comp_err(&self, err: &CompErr) {
         let message = match &err.kind {
-            CompilationErrKind::VisitErr(message) => {
-                format!("Visitation failed: {message}")
+            CompErrKind::UnhandledExpr(start, end) => {
+                format!("Compilation error: unhandled expression at {start} -> {end}")
+            }
+            CompErrKind::LabelNotFoundInScope(name) => {
+                format!("Compilation error: label not found in scope: {name}")
+            }
+            CompErrKind::DuplicateLabelInScope(name) => {
+                format!("Compilation error: duplicate label in scope: {name}")
+            }
+            CompErrKind::ExpectedIdent => {
+                format!("Compilation error: expected identifier")
             }
         };
         eprintln!("    |\n\n  {}", message);
+    }
+
+    fn ignore_comp_err(&self, err: &CompErr) -> bool {
+        use CompErrKind::*;
+        self.incremental
+            && match &err.kind {
+                LabelNotFoundInScope(_) => true,
+                _ => false,
+            }
     }
 
     fn handle_runtime_err(&self, err: &RuntimeErr) {

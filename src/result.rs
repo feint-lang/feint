@@ -1,4 +1,4 @@
-use crate::compiler::CompilationErrKind;
+use crate::compiler::CompErrKind;
 use crate::parser::ParseErrKind;
 use crate::scanner::ScanErrKind;
 use crate::vm::{RuntimeErrKind, VMState};
@@ -34,6 +34,6 @@ pub enum ExeErrKind {
     CouldNotReadSourceFileErr(String),
     ScanErr(ScanErrKind),
     ParseErr(ParseErrKind),
-    CompilationErr(CompilationErrKind),
+    CompErr(CompErrKind),
     RuntimeErr(RuntimeErrKind),
 }

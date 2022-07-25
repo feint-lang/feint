@@ -1,7 +1,7 @@
 use std::fmt;
 use std::fmt::Formatter;
 
-use crate::compiler::CompilationErr;
+use crate::compiler::CompErr;
 use crate::parser::ParseErr;
 use crate::types::ObjectRef;
 
@@ -52,7 +52,7 @@ pub enum RuntimeErrKind {
     ObjectNotFound(usize),
     NotEnoughValuesOnStack(String),
     ParseErr(ParseErr),
-    CompilationErr(CompilationErr),
+    CompErr(CompErr),
     UnhandledInstruction(String),
     AttributeDoesNotExist(String),
     AttributeCannotBeSet(String),

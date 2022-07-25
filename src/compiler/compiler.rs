@@ -3,13 +3,13 @@ use crate::types::ObjectRef;
 use crate::util::{BinaryOperator, UnaryOperator};
 use crate::vm::{Chunk, Inst, RuntimeContext, VM};
 
-use super::result::{CompilationErr, CompilationErrKind, CompilationResult};
+use super::result::{CompErr, CompResult};
 use super::scope::{Scope, ScopeKind, ScopeTree};
 
 // Compiler ------------------------------------------------------------
 
 /// Compile AST to VM instructions.
-pub fn compile(vm: &mut VM, program: ast::Program) -> CompilationResult {
+pub fn compile(vm: &mut VM, program: ast::Program) -> CompResult {
     let mut visitor = Visitor::new(&mut vm.ctx);
     visitor.visit_program(program)?;
     Ok(visitor.chunk)
@@ -17,7 +17,7 @@ pub fn compile(vm: &mut VM, program: ast::Program) -> CompilationResult {
 
 // Visitor -------------------------------------------------------------
 
-type VisitResult = Result<(), CompilationErr>;
+type VisitResult = Result<(), CompErr>;
 
 struct Visitor<'a> {
     ctx: &'a mut RuntimeContext,
@@ -59,7 +59,7 @@ impl<'a> Visitor<'a> {
                 self.push(Inst::NoOp);
                 let addr = self.chunk.len() - 1;
                 if self.scope_tree.add_label(name.as_str(), addr).is_some() {
-                    self.err(format!("Duplicate label in scope: {}", name))?;
+                    return Err(CompErr::new_duplicate_label_in_scope(name));
                 }
             }
             Kind::Continue => self.visit_continue()?,
@@ -87,7 +87,9 @@ impl<'a> Visitor<'a> {
             Kind::Call(call) => self.visit_call(call)?,
             Kind::UnaryOp(op, b) => self.visit_unary_op(op, *b)?,
             Kind::BinaryOp(a, op, b) => self.visit_binary_op(*a, op, *b)?,
-            _ => self.err(format!("Unhandled expression:\n{:?}", node))?,
+            _ => {
+                return Err(CompErr::new_unhandled_expr(node.start, node.end));
+            }
         }
         Ok(())
     }
@@ -142,16 +144,13 @@ impl<'a> Visitor<'a> {
         match name_expr.kind {
             ast::ExprKind::Ident(ident) => match ident.kind {
                 ast::IdentKind::Ident(name) => {
-                    // NOTE: Currently, declaration and assignment are
-                    //       the same thing, so declaration doesn't
-                    //       do anything particularly useful ATM.
                     self.push(Inst::DeclareVar(name.clone()));
                     self.visit_expr(value_expr)?;
                     self.push(Inst::AssignVar(name));
                 }
-                _ => return self.err("Expected identifier".to_owned()),
+                _ => return Err(CompErr::new_expected_ident()),
             },
-            _ => return self.err("Expected identifier".to_owned()),
+            _ => return Err(CompErr::new_expected_ident()),
         }
         Ok(())
     }
@@ -336,10 +335,6 @@ impl<'a> Visitor<'a> {
 
     // Utilities -------------------------------------------------------
 
-    fn err(&self, message: String) -> VisitResult {
-        Err(CompilationErr::new(CompilationErrKind::VisitErr(message)))
-    }
-
     fn push(&mut self, inst: Inst) {
         self.chunk.push(inst);
     }
@@ -385,10 +380,7 @@ impl<'a> Visitor<'a> {
             true
         });
         if let Some(name) = not_found {
-            return self.err(format!(
-                "Label not found for jump {} (jump target must be *after* jump)",
-                name
-            ));
+            return Err(CompErr::new_label_not_found_in_scope(name));
         }
         Ok(())
     }
