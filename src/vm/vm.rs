@@ -281,68 +281,35 @@ impl VM {
                 // Functions
                 Call(n) => match self.value_stack.pop_n(*n + 1) {
                     Some(indices) => {
-                        // TODO: This doesn't work
-
+                        // Get callable
                         let (depth, index) = indices[0];
-                        let func = self.get_value(depth, index).unwrap();
-
+                        let obj = self.get_value(depth, index).unwrap();
+                        // Collect args
+                        let num_args = *n;
                         let mut args: Vec<ObjectRef> = vec![];
-                        if indices.len() > 1 {
-                            for i in 1..args.len() {
-                                let (depth, index) = indices[0];
+                        if num_args > 0 {
+                            for i in 1..indices.len() {
+                                let (depth, index) = indices[i];
                                 let arg = self.get_value(depth, index).unwrap();
                                 args.push(arg.clone())
                             }
                         }
-
-                        let return_address = ip + 1;
-                        let frame = Frame::new(func.clone(), args, return_address);
-                        self.push_frame(frame);
-
-                        // XXX: Fake return value
-                        self.push(None, 0);
+                        // Call
+                        let result = obj.call(args, &self.ctx)?;
+                        let return_val = match result {
+                            Some(return_val) => return_val,
+                            None => self.ctx.builtins.nil_obj.clone(),
+                        };
+                        let index = self.ctx.add_const(return_val);
+                        self.push(None, index)
                     }
                     None => {
-                        return self.err(NotEnoughValuesOnStack(format!("Call: {n}")));
+                        return self
+                            .err(NotEnoughValuesOnStack(format!("Call: {}", *n + 1)));
                     }
                 },
-                Print(n) => {
-                    let do_print;
-                    if cfg!(debug_assertions) {
-                        do_print = !dis;
-                    } else {
-                        do_print = true;
-                    }
-                    if do_print {
-                        if *n == 0 {
-                            println!();
-                        } else {
-                            if let Some(indices) = self.value_stack.pop_n(*n) {
-                                let last = n - 1;
-                                for i in 0..=last {
-                                    let (depth, index) = indices[i];
-                                    let val = self.get_value(depth, index).unwrap();
-                                    if i == last {
-                                        print!("{}", val);
-                                    } else {
-                                        print!("{} ", val);
-                                    }
-                                }
-                                println!();
-                            } else {
-                                return self.err(NotEnoughValuesOnStack(format!(
-                                    "Print: {n}"
-                                )));
-                            }
-                        }
-                    }
-                }
                 Return => {
                     // TODO: Implement actual return
-                    match self.pop() {
-                        Some(v) => println!("{:?}", v),
-                        None => eprintln!("Stack is empty!"),
-                    }
                 }
                 // Placeholders
                 Placeholder(addr, inst, message) => {
@@ -548,7 +515,6 @@ impl VM {
             BinaryOp(operator) => self.format_aligned("BINARY_OP", operator),
             MakeString(n) => self.format_aligned("MAKE_STRING", n),
             MakeTuple(n) => self.format_aligned("MAKE_TUPLE", n),
-            Print(n) => self.format_aligned("PRINT", format!("({n})")),
             Return => format!("RETURN"),
             Halt(code) => self.format_aligned("HALT", code),
             Placeholder(addr, inst, message) => {
@@ -587,7 +553,6 @@ mod tests {
             Inst::LoadConst(i),
             Inst::LoadConst(j),
             Inst::BinaryOp(BinaryOperator::Add),
-            Inst::Print(0),
             Inst::Halt(0),
         ];
         if let Ok(result) = vm.execute(&chunk, false) {

@@ -4,9 +4,11 @@ use std::rc::Rc;
 use num_bigint::BigInt;
 use num_traits::Num;
 
-use super::class::{Type, TypeRef};
-use super::object::ObjectRef;
 use crate::vm::Chunk;
+
+use super::class::{Type, TypeRef};
+use super::native::NativeFn;
+use super::object::ObjectRef;
 
 pub struct Builtins {
     types: HashMap<&'static str, TypeRef>,
@@ -36,6 +38,7 @@ impl Builtins {
         types.insert("Bool", bool_type);
         types.insert("Float", Self::create_type("Float"));
         types.insert("Func", Self::create_type("Func"));
+        types.insert("NativeFunc", Self::create_type("NativeFunc"));
         types.insert("Int", Self::create_type("Int"));
         types.insert("Str", Self::create_type("Str"));
         types.insert("Tuple", tuple_type);
@@ -77,6 +80,16 @@ impl Builtins {
     ) -> ObjectRef {
         let class = self.get_type("Func").clone();
         Rc::new(super::func::Func::new(class, name, params, chunk))
+    }
+
+    pub fn new_native_func<S: Into<String>>(
+        &self,
+        name: S,
+        func: NativeFn,
+        arg_count: Option<u8>,
+    ) -> ObjectRef {
+        let class = self.get_type("NativeFunc").clone();
+        Rc::new(super::native::NativeFunc::new(class, name, func, arg_count))
     }
 
     pub fn new_int<I: Into<BigInt>>(&self, value: I) -> ObjectRef {

@@ -105,7 +105,6 @@ pub enum ExprKind {
     Break(Box<Expr>),
     Func(Func),
     Call(Call),
-    Print(Vec<Expr>),
     UnaryOp(UnaryOperator, Box<Expr>),
     BinaryOp(Box<Expr>, BinaryOperator, Box<Expr>),
 }
@@ -199,10 +198,6 @@ impl Expr {
         Self::new(ExprKind::Call(Call::new(name, args)), start, end)
     }
 
-    pub fn new_print(items: Vec<Expr>, start: Location, end: Location) -> Self {
-        Self::new(ExprKind::Print(items), start, end)
-    }
-
     pub fn new_unary_op(
         operator: &str,
         a: Expr,
@@ -253,7 +248,6 @@ impl fmt::Debug for ExprKind {
             Self::Break(expr) => write!(f, "break {expr:?}"),
             Self::Func(func) => write!(f, "{:?}", func),
             Self::Call(func) => write!(f, "{:?}", func),
-            Self::Print(_items) => write!(f, "Print"),
             Self::UnaryOp(op, b) => write!(f, "({:?}{:?})", op, b),
             Self::BinaryOp(a, op, b) => write!(f, "({:?} {:?} {:?})", a, op, b),
         }

@@ -133,9 +133,12 @@ impl<'a> Repl<'a> {
             match self.executor.vm.get_top_value() {
                 Ok(Some(val)) => {
                     chunk.push(Inst::AssignVar(var.to_owned()));
+                    // Print the result if it's not nil
                     if !val.is_nil() {
-                        // Don't print nil when the result of an expression is nil
-                        chunk.push(Inst::Print(1));
+                        chunk.push(Inst::LoadVar("print".to_owned()));
+                        chunk.push(Inst::LoadVar("_".to_owned()));
+                        chunk.push(Inst::Call(1));
+                        chunk.push(Inst::Return);
                     }
                 }
                 Ok(None) => {

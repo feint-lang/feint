@@ -85,14 +85,6 @@ impl<'a> Visitor<'a> {
             Kind::Break(expr) => self.visit_break(*expr)?,
             Kind::Func(func) => self.visit_func(func)?,
             Kind::Call(call) => self.visit_call(call)?,
-            Kind::Print(items) => {
-                let num_items = items.len();
-                for item in items {
-                    self.visit_expr(item)?;
-                }
-                self.push(Inst::Print(num_items));
-                self.push(Inst::Push(0));
-            }
             Kind::UnaryOp(op, b) => self.visit_unary_op(op, *b)?,
             Kind::BinaryOp(a, op, b) => self.visit_binary_op(*a, op, *b)?,
             _ => self.err(format!("Unhandled expression:\n{:?}", node))?,

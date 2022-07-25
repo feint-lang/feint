@@ -38,8 +38,7 @@ pub enum Inst {
     UnaryOp(UnaryOperator),
     BinaryOp(BinaryOperator),
 
-    Call(usize),  // Call function with N values from top of stack
-    Print(usize), // Print N values at top of stack
+    Call(usize), // Call function with N values from top of stack
     Return,
 
     // These make compound objects from the top N items on the stack.

@@ -79,13 +79,10 @@ pub enum Token {
     Else,          // else
     Match,         // match
     Loop,          // ??? (while true, like Rust)
-    For,           // ??? or use <-
-    While,         // ??? or use <-
     Break,         // break
     Continue,      // continue
     Jump,          // jump label
     Label(String), // label:
-    Print,         // print (TEMP)
 
     // Identifiers
     Ident(String),            // name

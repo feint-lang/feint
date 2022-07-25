@@ -24,7 +24,6 @@ lazy_static! {
         ("break", Break),
         ("continue", Continue),
         ("jump", Jump),
-        ("print", Print),
     ]
     .iter()
     .cloned()

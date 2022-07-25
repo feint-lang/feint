@@ -1,4 +1,4 @@
-//! Built in function type
+//! Built in native function type
 use std::any::Any;
 use std::fmt;
 
@@ -8,25 +8,27 @@ use super::class::TypeRef;
 use super::object::{Object, ObjectExt, ObjectRef};
 use super::result::CallResult;
 
-pub struct Func {
+pub type NativeFn = fn(Vec<ObjectRef>, &RuntimeContext) -> Option<ObjectRef>;
+
+pub struct NativeFunc {
     class: TypeRef,
     name: String,
-    params: Vec<String>,
-    pub chunk: Chunk,
+    func: NativeFn,
+    arg_count: Option<u8>,
 }
 
-impl Func {
+impl NativeFunc {
     pub fn new<S: Into<String>>(
         class: TypeRef,
         name: S,
-        params: Vec<String>,
-        chunk: Chunk,
+        func: NativeFn,
+        arg_count: Option<u8>,
     ) -> Self {
-        Self { class, name: name.into(), params, chunk }
+        Self { class, name: name.into(), func, arg_count }
     }
 }
 
-impl Object for Func {
+impl Object for NativeFunc {
     fn class(&self) -> &TypeRef {
         &self.class
     }
@@ -48,20 +50,23 @@ impl Object for Func {
     }
 
     fn call(&self, args: Vec<ObjectRef>, ctx: &RuntimeContext) -> CallResult {
-        // TODO:
-        Ok(None)
+        Ok((self.func)(args, ctx))
     }
 }
 
 // Display -------------------------------------------------------------
 
-impl fmt::Display for Func {
+impl fmt::Display for NativeFunc {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} ({}) -> ...", self.name, self.params.len())
+        let num_args = match self.arg_count {
+            Some(n) => n.to_string(),
+            None => "...".to_string(),
+        };
+        write!(f, "{} ({}) ->", self.name, num_args)
     }
 }
 
-impl fmt::Debug for Func {
+impl fmt::Debug for NativeFunc {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self)
     }

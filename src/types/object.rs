@@ -6,10 +6,28 @@ use crate::vm::{
     RuntimeBoolResult, RuntimeContext, RuntimeErr, RuntimeErrKind, RuntimeResult,
 };
 
+use super::bool::Bool;
 use super::class::TypeRef;
+use super::float::Float;
+use super::func::Func;
+use super::int::Int;
+use super::native::NativeFunc;
 use super::nil::Nil;
+use super::str::Str;
+use super::tuple::Tuple;
 
 pub type ObjectRef = Rc<dyn Object>;
+
+macro_rules! make_type_checker {
+    ( $meth:ident, $ty:ty) => {
+        fn $meth(&self) -> bool {
+            match self.as_any().downcast_ref::<$ty>() {
+                Some(_) => true,
+                None => false,
+            }
+        }
+    };
+}
 
 macro_rules! make_unary_op {
     ( $meth:ident, $op:literal, $result:ty ) => {
@@ -52,12 +70,16 @@ pub trait Object {
         self.class().name().to_owned()
     }
 
-    fn is_nil(&self) -> bool {
-        match self.as_any().downcast_ref::<Nil>() {
-            Some(_) => true,
-            None => false,
-        }
-    }
+    // Type checkers ---------------------------------------------------
+
+    make_type_checker!(is_nil, Nil);
+    make_type_checker!(is_bool, Bool);
+    make_type_checker!(is_int, Int);
+    make_type_checker!(is_float, Float);
+    make_type_checker!(is_str, Str);
+    make_type_checker!(is_tuple, Tuple);
+    make_type_checker!(is_func, Func);
+    make_type_checker!(is_native_func, NativeFunc);
 
     // Unary operations ------------------------------------------------
 
@@ -91,6 +113,17 @@ pub trait Object {
     make_bin_op!(sub, "-", RuntimeResult);
     make_bin_op!(and, "&&", RuntimeBoolResult);
     make_bin_op!(or, "||", RuntimeBoolResult);
+
+    // Call ------------------------------------------------------------
+
+    fn call(
+        &self,
+        _args: Vec<ObjectRef>,
+        _ctx: &RuntimeContext,
+    ) -> Result<Option<ObjectRef>, RuntimeErr> {
+        let name = self.class().name();
+        Err(RuntimeErr::new_type_err(format!("Call not implemented for type {name}")))
+    }
 
     // Attributes ------------------------------------------------------
 
@@ -145,6 +178,7 @@ impl fmt::Display for dyn Object {
             super::str::Str,
             super::tuple::Tuple,
             super::func::Func,
+            super::native::NativeFunc,
             super::complex::ComplexObject
         );
         // Fallback
@@ -164,6 +198,7 @@ impl fmt::Debug for dyn Object {
             super::str::Str,
             super::tuple::Tuple,
             super::func::Func,
+            super::native::NativeFunc,
             super::complex::ComplexObject
         );
         // Fallback

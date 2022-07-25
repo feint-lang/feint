@@ -129,17 +129,34 @@ impl RuntimeContext {
 
 impl Default for RuntimeContext {
     fn default() -> Self {
+        use crate::native;
+        use crate::types::NativeFn;
+
         let builtins = Builtins::new();
+
+        // Singletons
         let nil_obj = builtins.nil_obj.clone();
         let true_obj = builtins.true_obj.clone();
         let false_obj = builtins.false_obj.clone();
+
+        // Native functions
+        let fn_print = builtins.new_native_func("print", native::print, None);
+
         let constants = Objects::default();
         let namespace_stack = vec![];
         let mut ctx = RuntimeContext::new(builtins, constants, namespace_stack);
+
+        // Add singleton constants
         ctx.add_const(nil_obj); // 0
         ctx.add_const(true_obj); // 1
         ctx.add_const(false_obj); // 2
+
         ctx.enter_scope(); // global scope
+
+        // Add native functions to global scope
+        ctx.declare_var("print").expect("Could not declare print()");
+        ctx.assign_var("print", fn_print).expect("Could not assign print()");
+
         ctx
     }
 }
