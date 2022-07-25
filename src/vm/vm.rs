@@ -298,7 +298,17 @@ impl VM {
                                 args.push(objects.get(i).unwrap().clone());
                             }
                         }
-                        if callable.is_native_func() {
+                        if let Some(native_func) = callable.as_native_func() {
+                            if let Some(arity) = native_func.arity {
+                                let num_args = args.len();
+                                if num_args != arity as usize {
+                                    let ess = if arity == 1 { "" } else { "s" };
+                                    return Err(RuntimeErr::new_type_err(format!(
+                                        "{}() expected {arity} arg{ess}; got {num_args}",
+                                        native_func.name,
+                                    )));
+                                }
+                            }
                             let result = callable.call(args, &self.ctx)?;
                             let return_val = match result {
                                 Some(return_val) => return_val,

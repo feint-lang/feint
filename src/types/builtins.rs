@@ -86,10 +86,10 @@ impl Builtins {
         &self,
         name: S,
         func: NativeFn,
-        arg_count: Option<u8>,
+        arity: Option<u8>,
     ) -> ObjectRef {
         let class = self.get_type("NativeFunc").clone();
-        Rc::new(super::native::NativeFunc::new(class, name, func, arg_count))
+        Rc::new(super::native::NativeFunc::new(class, name, func, arity))
     }
 
     pub fn new_int<I: Into<BigInt>>(&self, value: I) -> ObjectRef {

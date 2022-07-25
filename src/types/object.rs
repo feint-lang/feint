@@ -21,11 +21,35 @@ use super::tuple::Tuple;
 pub type ObjectRef = Rc<dyn Object>;
 
 macro_rules! make_type_checker {
-    ( $meth:ident, $ty:ty) => {
-        fn $meth(&self) -> bool {
+    ( $func:ident, $ty:ty) => {
+        fn $func(&self) -> bool {
             match self.as_any().downcast_ref::<$ty>() {
                 Some(_) => true,
                 None => false,
+            }
+        }
+    };
+}
+
+macro_rules! make_type_converter {
+    ( $func:ident, $ty:ty) => {
+        fn $func(&self) -> Option<&$ty> {
+            if let Some(obj) = self.as_any().downcast_ref::<$ty>() {
+                Some(obj)
+            } else {
+                None
+            }
+        }
+    };
+}
+
+macro_rules! make_value_extractor {
+    ( $func:ident, $ty:ty, $val_ty:ty, $op:ident) => {
+        fn $func(&self) -> Option<$val_ty> {
+            if let Some(obj) = self.as_any().downcast_ref::<$ty>() {
+                Some(obj.value().$op())
+            } else {
+                None
             }
         }
     };
@@ -45,12 +69,12 @@ macro_rules! make_unary_op {
 }
 
 macro_rules! make_bin_op {
-    ( $meth:ident, $op:literal, $result:ty ) => {
-        fn $meth(&self, _rhs: &ObjectRef, _ctx: &RuntimeContext) -> $result {
+    ( $func:ident, $op:literal, $result:ty ) => {
+        fn $func(&self, _rhs: &ObjectRef, _ctx: &RuntimeContext) -> $result {
             Err(RuntimeErr::new_type_err(format!(
                 "Binary operator {} ({}) not implemented for type {}",
                 $op,
-                stringify!($meth),
+                stringify!($func),
                 self.class().name()
             )))
         }
@@ -83,23 +107,19 @@ pub trait Object {
     make_type_checker!(is_func, Func);
     make_type_checker!(is_native_func, NativeFunc);
 
+    // Type converters -------------------------------------------------
+    //
+    // These convert objects to their concrete types.
+
+    make_type_converter!(as_func, Func);
+    make_type_converter!(as_native_func, NativeFunc);
+
     // Value extractors ------------------------------------------------
+    //
+    // These extract the inner value from an object.
 
-    fn int_val(&self) -> Option<BigInt> {
-        if let Some(int) = self.as_any().downcast_ref::<Int>() {
-            Some(int.value().clone())
-        } else {
-            None
-        }
-    }
-
-    fn as_func(&self) -> Option<&Func> {
-        if let Some(func) = self.as_any().downcast_ref::<Func>() {
-            Some(func)
-        } else {
-            None
-        }
-    }
+    make_value_extractor!(int_val, Int, BigInt, clone);
+    make_value_extractor!(str_val, Str, String, to_owned);
 
     // Unary operations ------------------------------------------------
 
@@ -136,6 +156,7 @@ pub trait Object {
 
     // Call ------------------------------------------------------------
 
+    // TODO: Not sure this is needed
     fn call(
         &self,
         _args: Vec<ObjectRef>,

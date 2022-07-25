@@ -8,13 +8,14 @@ use super::class::TypeRef;
 use super::object::{Object, ObjectExt, ObjectRef};
 use super::result::CallResult;
 
-pub type NativeFn = fn(Vec<ObjectRef>, &RuntimeContext) -> Option<ObjectRef>;
+pub type NativeFn =
+    fn(Vec<ObjectRef>, &RuntimeContext) -> Result<Option<ObjectRef>, RuntimeErr>;
 
 pub struct NativeFunc {
     class: TypeRef,
-    name: String,
+    pub name: String,
     func: NativeFn,
-    arg_count: Option<u8>,
+    pub arity: Option<u8>,
 }
 
 impl NativeFunc {
@@ -22,9 +23,9 @@ impl NativeFunc {
         class: TypeRef,
         name: S,
         func: NativeFn,
-        arg_count: Option<u8>,
+        arity: Option<u8>,
     ) -> Self {
-        Self { class, name: name.into(), func, arg_count }
+        Self { class, name: name.into(), func, arity }
     }
 }
 
@@ -50,7 +51,7 @@ impl Object for NativeFunc {
     }
 
     fn call(&self, args: Vec<ObjectRef>, ctx: &RuntimeContext) -> CallResult {
-        Ok((self.func)(args, ctx))
+        (self.func)(args, ctx)
     }
 }
 
@@ -58,7 +59,7 @@ impl Object for NativeFunc {
 
 impl fmt::Display for NativeFunc {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let num_args = match self.arg_count {
+        let num_args = match self.arity {
             Some(n) => n.to_string(),
             None => "...".to_string(),
         };

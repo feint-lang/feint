@@ -8,5 +8,5 @@ pub fn print(args: Vec<ObjectRef>, _ctx: &RuntimeContext) -> CallResult {
         print!("{arg}");
     }
     println!();
-    None
+    Ok(None)
 }

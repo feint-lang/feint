@@ -61,6 +61,9 @@ pub enum RuntimeErrKind {
     NameErr(String),
     StringFormatErr(String),
     NotCallable(ObjectRef),
+
+    // Move?
+    CouldNotReadFile(String),
 }
 
 impl fmt::Display for RuntimeErrKind {

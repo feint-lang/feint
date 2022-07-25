@@ -1,0 +1,9 @@
+print("Read file as text:")
+text = read_file("Cargo.toml")
+print(text)
+
+print()
+
+print("Read file as lines:")
+lines = read_file_lines("Cargo.toml")
+print(lines)

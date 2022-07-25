@@ -1,4 +1,4 @@
-use crate::types::{Builtins, ObjectRef};
+use crate::types::{Builtins, NativeFn, ObjectRef};
 
 use super::namespace::Namespace;
 use super::objects::Objects;
@@ -140,12 +140,23 @@ impl RuntimeContext {
             depth -= 1;
         }
     }
+
+    fn add_native_func(
+        &mut self,
+        name: &str,
+        func: NativeFn,
+        arity: Option<u8>,
+    ) -> Result<(), RuntimeErr> {
+        let func = self.builtins.new_native_func(name, func, arity);
+        self.declare_var(name)?;
+        self.assign_var(name, func)?;
+        Ok(())
+    }
 }
 
 impl Default for RuntimeContext {
     fn default() -> Self {
         use crate::native;
-        use crate::types::NativeFn;
 
         let builtins = Builtins::new();
 
@@ -153,9 +164,6 @@ impl Default for RuntimeContext {
         let nil_obj = builtins.nil_obj.clone();
         let true_obj = builtins.true_obj.clone();
         let false_obj = builtins.false_obj.clone();
-
-        // Native functions
-        let fn_print = builtins.new_native_func("print", native::print, None);
 
         let constants = Objects::default();
         let namespace_stack = vec![];
@@ -169,8 +177,20 @@ impl Default for RuntimeContext {
         ctx.enter_scope(); // global scope
 
         // Add native functions to global scope
-        ctx.declare_var("print").expect("Could not declare print()");
-        ctx.assign_var("print", fn_print).expect("Could not assign print()");
+        {
+            use native::*;
+            let results = [
+                ctx.add_native_func("print", print, None),
+                ctx.add_native_func("read_file", read_file, Some(1)),
+                ctx.add_native_func("read_file_lines", read_file_lines, Some(1)),
+            ];
+            for result in results {
+                match result {
+                    Ok(_) => (),
+                    Err(err) => panic!("Could not create native function: {err}"),
+                }
+            }
+        }
 
         ctx
     }
