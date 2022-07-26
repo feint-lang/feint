@@ -99,7 +99,6 @@ pub enum ExprKind {
     FormatString(Vec<Expr>),
     Ident(Ident),
     Block(Block),
-    InlineBlock(Box<Expr>),
     Conditional(Vec<(Expr, Block)>, Option<Block>),
     Loop(Box<Expr>, Block),
     Break(Box<Expr>),
@@ -152,10 +151,6 @@ impl Expr {
 
     pub fn new_block(block: Block, start: Location, end: Location) -> Self {
         Self::new(ExprKind::Block(block), start, end)
-    }
-
-    pub fn new_inline_block(expr: Expr, start: Location, end: Location) -> Self {
-        Self::new(ExprKind::InlineBlock(Box::new(expr)), start, end)
     }
 
     pub fn new_conditional(
@@ -240,7 +235,6 @@ impl fmt::Debug for ExprKind {
             Self::FormatString(items) => write!(f, "{:?}", items),
             Self::Ident(ident) => write!(f, "{:?}", ident),
             Self::Block(block) => write!(f, "{:?}", block),
-            Self::InlineBlock(expr) => write!(f, "{:?}", expr),
             Self::Conditional(branches, default) => {
                 write!(f, "{branches:?} {default:?}")
             }

@@ -2,7 +2,7 @@
 use std::any::Any;
 use std::fmt;
 
-use crate::vm::{Chunk, RuntimeBoolResult, RuntimeContext, RuntimeErr, RuntimeResult};
+use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeErr};
 
 use super::class::TypeRef;
 use super::object::{Object, ObjectExt, ObjectRef};

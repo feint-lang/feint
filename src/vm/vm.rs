@@ -6,7 +6,7 @@ use std::fmt;
 
 use num_traits::ToPrimitive;
 
-use crate::types::{Func, ObjectRef};
+use crate::types::ObjectRef;
 use crate::util::{BinaryOperator, Stack, UnaryOperator};
 
 use super::context::RuntimeContext;

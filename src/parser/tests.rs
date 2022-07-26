@@ -1,9 +1,11 @@
 use num_bigint::BigInt;
 
 use crate::ast;
-use crate::parser::*;
 use crate::scanner::Scanner;
 use crate::util::{source_from_text, BinaryOperator, Location};
+
+use super::result::ParseResult;
+use super::*;
 
 /// Scan the text into tokens, parse the tokens, and return the
 /// resulting AST or error.

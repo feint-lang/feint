@@ -101,9 +101,6 @@ impl<'a> Visitor<'a> {
             Kind::Call(call) => self.visit_call(call)?,
             Kind::UnaryOp(op, b) => self.visit_unary_op(op, *b)?,
             Kind::BinaryOp(a, op, b) => self.visit_binary_op(*a, op, *b)?,
-            _ => {
-                return Err(CompErr::new_unhandled_expr(node.start, node.end));
-            }
         }
         Ok(())
     }

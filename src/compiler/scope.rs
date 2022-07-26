@@ -144,10 +144,6 @@ impl Scope {
         }
     }
 
-    pub fn index(&self) -> usize {
-        self.index
-    }
-
     fn is_global(&self) -> bool {
         self.kind == ScopeKind::Global
     }
@@ -158,10 +154,6 @@ impl Scope {
 
     pub fn jumps(&self) -> &HashMap<String, usize> {
         &self.jumps
-    }
-
-    pub fn labels(&self) -> &HashMap<String, usize> {
-        &self.labels
     }
 
     /// Find label for jump target in this scope or its parent scopes.

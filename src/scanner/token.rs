@@ -1,8 +1,8 @@
 use std::fmt;
 
-use crate::format::FormatStrToken;
 use num_bigint::BigInt;
 
+use crate::format::FormatStrToken;
 use crate::util::Location;
 
 #[derive(Clone, Debug, PartialEq)]
