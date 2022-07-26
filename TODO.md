@@ -5,7 +5,7 @@
 - [x] Implement `Tuple`
 - [ ] Implement `List`
 - [x] Implement vars
-- [ ] Implement dot operator (attribute access)
+- [x] Implement dot operator (attribute & item access)
 - [x] Implement `block`
 - [x] Implement inline blocks (`block -> <expr>`)
 - [x] Implement labels

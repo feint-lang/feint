@@ -4,9 +4,9 @@ use std::rc::Rc;
 
 use num_bigint::BigInt;
 
-use crate::vm::{
-    RuntimeBoolResult, RuntimeContext, RuntimeErr, RuntimeErrKind, RuntimeResult,
-};
+use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeErr, RuntimeResult};
+
+use super::result::{GetAttributeResult, SetAttributeResult};
 
 use super::bool::Bool;
 use super::class::TypeRef;
@@ -168,12 +168,30 @@ pub trait Object {
 
     // Attributes ------------------------------------------------------
 
-    fn get_attribute(&self, name: &str) -> Result<ObjectRef, RuntimeErr> {
-        Err(RuntimeErr::new(RuntimeErrKind::AttributeDoesNotExist(name.to_owned())))
+    fn get_attribute(&self, name: &str, _ctx: &RuntimeContext) -> GetAttributeResult {
+        Err(RuntimeErr::new_attribute_does_not_exit(name))
     }
 
-    fn set_attribute(&self, name: &str, _value: ObjectRef) -> Result<(), RuntimeErr> {
-        Err(RuntimeErr::new(RuntimeErrKind::AttributeCannotBeSet(name.to_owned())))
+    fn set_attribute(
+        &self,
+        name: &str,
+        _value: ObjectRef,
+        _ctx: &RuntimeContext,
+    ) -> SetAttributeResult {
+        Err(RuntimeErr::new_attribute_cannot_be_set(name))
+    }
+
+    fn get_item(&self, index: &BigInt, _ctx: &RuntimeContext) -> GetAttributeResult {
+        Err(RuntimeErr::new_item_does_not_exit(index.to_string()))
+    }
+
+    fn set_item(
+        &self,
+        index: &BigInt,
+        _value: ObjectRef,
+        _ctx: &RuntimeContext,
+    ) -> SetAttributeResult {
+        Err(RuntimeErr::new_item_cannot_be_set(index.to_string()))
     }
 }
 

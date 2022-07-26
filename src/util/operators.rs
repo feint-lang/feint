@@ -70,6 +70,7 @@ pub enum BinaryOperator {
     Or,
     Assign,
     Comma,
+    Dot,
 }
 
 impl str::FromStr for BinaryOperator {
@@ -97,6 +98,7 @@ impl str::FromStr for BinaryOperator {
             "||" => Self::Or,
             "=" => Self::Assign,
             "," => Self::Comma,
+            "." => Self::Dot,
             _ => {
                 return Err(format!("Unknown binary operator: {}", op));
             }
@@ -128,6 +130,7 @@ impl fmt::Display for BinaryOperator {
             Self::Or => "||",
             Self::Assign => "=",
             Self::Comma => ",",
+            Self::Dot => ".",
         };
         write!(f, "{}", string)
     }

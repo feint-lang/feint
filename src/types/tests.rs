@@ -42,7 +42,7 @@ fn test_custom() {
     let t1_obj2 = Rc::new(ComplexObject::new(t1.clone()));
     let t1_obj3 = Rc::new(ComplexObject::new(t1.clone()));
     t1_obj3
-        .set_attribute("value", ctx.builtins.new_int(1))
+        .set_attribute("value", ctx.builtins.new_int(1), &ctx)
         .expect("Could not set attribute");
 
     let t2 = Rc::new(Type::new("test", "Custom2"));

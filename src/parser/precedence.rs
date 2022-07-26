@@ -59,6 +59,8 @@ pub fn get_operator_precedence(token: &Token) -> (u8, u8) {
 
         | BangBang                       // !!a         (as bool)
         | Bang               => (9, 0),  // !a          (logical not)
+
+        | Dot                => (0, 10), // x.y
         
         _                    => (0, 0),  // not an operator
     }

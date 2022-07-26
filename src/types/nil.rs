@@ -5,7 +5,7 @@ use std::fmt;
 use crate::vm::{RuntimeBoolResult, RuntimeContext};
 
 use super::class::TypeRef;
-use super::object::{Object, ObjectExt};
+use super::object::Object;
 
 pub struct Nil {
     class: TypeRef,

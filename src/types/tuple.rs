@@ -2,10 +2,14 @@
 use std::any::Any;
 use std::fmt;
 
+use num_bigint::BigInt;
+use num_traits::ToPrimitive;
+
 use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeErr};
 
-use crate::types::class::TypeRef;
-use crate::types::object::{Object, ObjectExt, ObjectRef};
+use super::class::TypeRef;
+use super::object::{Object, ObjectExt, ObjectRef};
+use super::result::GetAttributeResult;
 
 pub struct Tuple {
     class: TypeRef,
@@ -54,6 +58,21 @@ impl Object for Tuple {
                 "Could not compare Tuple to {} for equality",
                 rhs.class().name()
             )))
+        }
+    }
+
+    fn get_attribute(&self, name: &str, ctx: &RuntimeContext) -> GetAttributeResult {
+        match name {
+            "length" => Ok(ctx.builtins.new_int(self.len())),
+            _ => Err(RuntimeErr::new_attribute_does_not_exit(name)),
+        }
+    }
+
+    fn get_item(&self, index: &BigInt, _ctx: &RuntimeContext) -> GetAttributeResult {
+        let index = index.to_usize().unwrap();
+        match self.items.get(index) {
+            Some(obj) => Ok(obj.clone()),
+            None => return Err(RuntimeErr::new_index_out_of_bounds(index)),
         }
     }
 }

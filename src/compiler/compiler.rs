@@ -147,21 +147,38 @@ impl<'a> Visitor<'a> {
         Ok(())
     }
 
+    fn visit_get_attr(
+        &mut self,
+        obj_expr: ast::Expr,
+        name_expr: ast::Expr,
+    ) -> VisitResult {
+        use ast::ExprKind;
+        use ast::{Ident, IdentKind};
+        self.visit_expr(obj_expr)?;
+        let kind = &name_expr.kind;
+        if let ExprKind::Ident(Ident { kind: IdentKind::Ident(name) }) = kind {
+            self.visit_literal(ast::Literal::new_string(name))?;
+        } else {
+            self.visit_expr(name_expr)?;
+        }
+        self.push(Inst::BinaryOp(BinaryOperator::Dot));
+        Ok(())
+    }
+
     fn visit_assignment(
         &mut self,
         name_expr: ast::Expr,
         value_expr: ast::Expr,
     ) -> VisitResult {
-        match name_expr.kind {
-            ast::ExprKind::Ident(ident) => match ident.kind {
-                ast::IdentKind::Ident(name) => {
-                    self.push(Inst::DeclareVar(name.clone()));
-                    self.visit_expr(value_expr)?;
-                    self.push(Inst::AssignVar(name));
-                }
-                _ => return Err(CompErr::new_expected_ident()),
-            },
-            _ => return Err(CompErr::new_expected_ident()),
+        use ast::ExprKind;
+        use ast::{Ident, IdentKind};
+        let kind = name_expr.kind;
+        if let ExprKind::Ident(Ident { kind: IdentKind::Ident(name) }) = kind {
+            self.push(Inst::DeclareVar(name.clone()));
+            self.visit_expr(value_expr)?;
+            self.push(Inst::AssignVar(name));
+        } else {
+            return Err(CompErr::new_expected_ident());
         }
         Ok(())
     }
@@ -339,6 +356,7 @@ impl<'a> Visitor<'a> {
     ) -> VisitResult {
         use BinaryOperator::*;
         match op {
+            Dot => self.visit_get_attr(expr_a, expr_b),
             Assign => self.visit_assignment(expr_a, expr_b),
             _ => {
                 self.visit_expr(expr_a)?;

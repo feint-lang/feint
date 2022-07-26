@@ -10,6 +10,7 @@ use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeErr, RuntimeErrKind};
 
 use super::class::TypeRef;
 use super::object::{Object, ObjectExt, ObjectRef};
+use super::result::{GetAttributeResult, SetAttributeResult};
 
 pub type Attributes = RefCell<HashMap<String, ObjectRef>>;
 
@@ -47,14 +48,19 @@ impl Object for ComplexObject {
         }
     }
 
-    fn get_attribute(&self, name: &str) -> Result<ObjectRef, RuntimeErr> {
+    fn get_attribute(&self, name: &str, _ctx: &RuntimeContext) -> GetAttributeResult {
         if let Some(value) = self.attributes.borrow().get(name) {
             return Ok(value.clone());
         }
         Err(RuntimeErr::new(RuntimeErrKind::AttributeDoesNotExist(name.to_owned())))
     }
 
-    fn set_attribute(&self, name: &str, value: ObjectRef) -> Result<(), RuntimeErr> {
+    fn set_attribute(
+        &self,
+        name: &str,
+        value: ObjectRef,
+        _ctx: &RuntimeContext,
+    ) -> SetAttributeResult {
         self.attributes.borrow_mut().insert(name.to_owned(), value.clone());
         Ok(())
     }

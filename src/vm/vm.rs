@@ -199,6 +199,18 @@ impl VM {
                         return self.err(NotEnoughValuesOnStack(message));
                     };
                     match op {
+                        Dot => {
+                            let result = if let Some(name) = b.str_val() {
+                                a.get_attribute(name.as_str(), &self.ctx)?
+                            } else if let Some(int) = b.int_val() {
+                                a.get_item(&int, &self.ctx)?
+                            } else {
+                                let message =
+                                    format!("Not an attribute name or index: {b:?}");
+                                return Err(RuntimeErr::new_type_err(message));
+                            };
+                            self.push(Temp(result));
+                        }
                         // In-place update operators
                         AddEqual | SubEqual => {
                             if let Var(depth, index) = a_kind {
