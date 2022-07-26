@@ -8,6 +8,8 @@ use crate::types::ObjectRef;
 pub type ExeResult = Result<VMState, RuntimeErr>;
 pub type RuntimeResult = Result<ObjectRef, RuntimeErr>;
 pub type RuntimeBoolResult = Result<bool, RuntimeErr>;
+pub type PopResult = Result<Option<ObjectRef>, RuntimeErr>;
+pub type PopNResult = Result<Option<Vec<ObjectRef>>, RuntimeErr>;
 
 #[derive(Debug, PartialEq)]
 pub enum VMState {

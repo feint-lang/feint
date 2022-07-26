@@ -13,6 +13,7 @@ use super::context::RuntimeContext;
 use super::frame::Frame;
 use super::inst::{Chunk, Inst};
 use super::result::{ExeResult, RuntimeErr, RuntimeErrKind, VMState};
+use super::result::{PopNResult, PopResult};
 
 #[derive(Clone)]
 enum ValueStackKind {
@@ -431,7 +432,7 @@ impl VM {
         self.value_stack.pop()
     }
 
-    fn pop_obj(&mut self) -> Result<Option<ObjectRef>, RuntimeErr> {
+    fn pop_obj(&mut self) -> PopResult {
         let obj = match self.pop() {
             Some(kind) => Some(self.get_obj(kind)?),
             None => None,
@@ -443,7 +444,7 @@ impl VM {
         self.value_stack.pop_n(n)
     }
 
-    fn pop_n_obj(&mut self, n: usize) -> Result<Option<Vec<ObjectRef>>, RuntimeErr> {
+    fn pop_n_obj(&mut self, n: usize) -> PopNResult {
         match self.pop_n(n) {
             Some(kinds) => {
                 let mut objects = vec![];
@@ -460,7 +461,7 @@ impl VM {
         self.value_stack.peek()
     }
 
-    pub fn peek_obj(&mut self) -> Result<Option<ObjectRef>, RuntimeErr> {
+    pub fn peek_obj(&mut self) -> PopResult {
         let obj = match self.peek() {
             Some(kind) => Some(self.get_obj(kind.clone())?),
             None => None,
