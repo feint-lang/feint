@@ -177,11 +177,7 @@ impl VM {
                                 Not => a.not(&self.ctx)?,
                                 _ => unreachable!(),
                             };
-                            let obj = if result {
-                                self.ctx.builtins.true_obj.clone()
-                            } else {
-                                self.ctx.builtins.false_obj.clone()
-                            };
+                            let obj = self.ctx.builtins.bool_obj_from_bool(result);
                             self.push(Temp(obj));
                         }
                     };
@@ -262,11 +258,7 @@ impl VM {
                                 }
                                 _ => unreachable!(),
                             };
-                            let obj = if result {
-                                self.ctx.builtins.true_obj.clone()
-                            } else {
-                                self.ctx.builtins.false_obj.clone()
-                            };
+                            let obj = self.ctx.builtins.bool_obj_from_bool(result);
                             self.push(Temp(obj));
                         }
                     }

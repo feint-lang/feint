@@ -60,6 +60,15 @@ impl Builtins {
 
     // Builtin type constructors
 
+    /// Convert Rust native bool to Bool object
+    pub fn bool_obj_from_bool(&self, value: bool) -> ObjectRef {
+        if value {
+            self.true_obj.clone()
+        } else {
+            self.false_obj.clone()
+        }
+    }
+
     pub fn new_float<F: Into<f64>>(&self, value: F) -> ObjectRef {
         let class = self.get_type("Float").clone();
         let value = value.into();
