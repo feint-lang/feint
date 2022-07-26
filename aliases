@@ -1,0 +1,8 @@
+# build
+alias b="cargo build"
+# test
+alias t='cargo test'
+# run
+alias r="cargo run --"
+alias c="cargo run -- -c"
+alias d="cargo run -- --dis --debug"
