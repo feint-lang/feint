@@ -1,3 +1,6 @@
+use std::rc::Rc;
+
+use crate::types::types::TYPES;
 use crate::types::{Builtins, NativeFn, ObjectRef};
 
 use super::namespace::Namespace;
@@ -141,6 +144,14 @@ impl RuntimeContext {
         }
     }
 
+    fn add_native_types(&mut self) -> Result<(), RuntimeErr> {
+        for (name, class) in TYPES.iter() {
+            self.declare_var(name)?;
+            self.assign_var(name, Rc::new(class.clone()))?;
+        }
+        Ok(())
+    }
+
     fn add_native_func(
         &mut self,
         name: &str,
@@ -175,6 +186,10 @@ impl Default for RuntimeContext {
         ctx.add_const(false_obj); // 2
 
         ctx.enter_scope(); // global scope
+
+        if let Err(err) = ctx.add_native_types() {
+            panic!("Could not add native types: {err}");
+        }
 
         // Add native functions to global scope
         {

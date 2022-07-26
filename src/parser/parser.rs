@@ -141,6 +141,13 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
                 true => self.func(name, start)?,
                 false => ast::Expr::new_ident(ast::Ident::new_ident(name), start, end),
             },
+            // TODO: Handle type & instance creation
+            TypeIdent(name) => match self.next_token_is(&LParen)? {
+                true => self.func(name, start)?,
+                false => {
+                    ast::Expr::new_ident(ast::Ident::new_type_ident(name), start, end)
+                }
+            },
             _ => self.expect_unary_expr(&token)?,
         };
         // If the expression is followed by a binary operator, a binary
