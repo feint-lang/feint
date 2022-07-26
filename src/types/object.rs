@@ -231,6 +231,7 @@ impl fmt::Display for dyn Object {
         write_instance!(
             f,
             self,
+            super::class::Type,
             super::nil::Nil,
             super::bool::Bool,
             super::int::Int,
@@ -251,6 +252,7 @@ impl fmt::Debug for dyn Object {
         debug_instance!(
             f,
             self,
+            super::class::Type,
             super::nil::Nil,
             super::bool::Bool,
             super::int::Int,
