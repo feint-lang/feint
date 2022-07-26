@@ -6,19 +6,19 @@ use num_traits::ToPrimitive;
 
 use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeErr, RuntimeResult};
 
-use super::class::TypeRef;
+use super::class::Type;
 use super::int::Int;
 use super::object::{Object, ObjectExt, ObjectRef};
+use super::types::TYPES;
 use super::util::eq_int_float;
 
 pub struct Float {
-    class: TypeRef,
     value: f64,
 }
 
 impl Float {
-    pub fn new(class: TypeRef, value: f64) -> Self {
-        Self { class, value }
+    pub fn new(value: f64) -> Self {
+        Self { value }
     }
 
     pub fn value(&self) -> &f64 {
@@ -47,8 +47,8 @@ macro_rules! make_op {
 }
 
 impl Object for Float {
-    fn class(&self) -> &TypeRef {
-        &self.class
+    fn class(&self) -> &Type {
+        TYPES.get("Float").unwrap()
     }
 
     fn as_any(&self) -> &dyn Any {

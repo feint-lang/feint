@@ -6,10 +6,10 @@ use num_bigint::BigInt;
 
 use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeErr, RuntimeResult};
 
-use super::result::{GetAttributeResult, SetAttributeResult};
+use super::result::{CallResult, GetAttributeResult, SetAttributeResult};
 
 use super::bool::Bool;
-use super::class::TypeRef;
+use super::class::Type;
 use super::float::Float;
 use super::func::Func;
 use super::int::Int;
@@ -83,7 +83,7 @@ macro_rules! make_bin_op {
 
 /// Represents an instance of some type (AKA "class").
 pub trait Object {
-    fn class(&self) -> &TypeRef;
+    fn class(&self) -> &Type;
     fn as_any(&self) -> &dyn Any;
 
     fn id(&self) -> usize {
@@ -111,6 +111,7 @@ pub trait Object {
     //
     // These convert objects to their concrete types.
 
+    make_type_converter!(as_type, Type);
     make_type_converter!(as_func, Func);
     make_type_converter!(as_native_func, NativeFunc);
 

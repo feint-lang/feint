@@ -4,17 +4,17 @@ use std::fmt;
 
 use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeErr};
 
-use super::class::TypeRef;
+use super::class::Type;
 use super::object::{Object, ObjectExt, ObjectRef};
+use super::types::TYPES;
 
 pub struct Bool {
-    class: TypeRef,
     value: bool,
 }
 
 impl Bool {
-    pub fn new(class: TypeRef, value: bool) -> Self {
-        Self { class, value }
+    pub fn new(value: bool) -> Self {
+        Self { value }
     }
 
     pub fn value(&self) -> &bool {
@@ -23,8 +23,8 @@ impl Bool {
 }
 
 impl Object for Bool {
-    fn class(&self) -> &TypeRef {
-        &self.class
+    fn class(&self) -> &Type {
+        TYPES.get("Bool").unwrap()
     }
 
     fn as_any(&self) -> &dyn Any {

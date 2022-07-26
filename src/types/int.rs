@@ -2,25 +2,25 @@
 use std::any::Any;
 use std::fmt;
 
-use crate::types::util::{gt_int_float, lt_int_float};
 use num_bigint::BigInt;
-use num_traits::{FromPrimitive, ToPrimitive};
+use num_traits::{FromPrimitive, ToPrimitive, Zero};
 
+use crate::types::util::{gt_int_float, lt_int_float};
 use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeErr, RuntimeResult};
 
-use super::class::TypeRef;
+use super::class::Type;
 use super::float::Float;
 use super::object::{Object, ObjectExt, ObjectRef};
+use super::types::TYPES;
 use super::util::eq_int_float;
 
 pub struct Int {
-    class: TypeRef,
     value: BigInt,
 }
 
 impl Int {
-    pub fn new(class: TypeRef, value: BigInt) -> Self {
-        Self { class, value }
+    pub fn new(value: BigInt) -> Self {
+        Self { value }
     }
 
     pub fn value(&self) -> &BigInt {
@@ -65,8 +65,8 @@ macro_rules! make_op {
 }
 
 impl Object for Int {
-    fn class(&self) -> &TypeRef {
-        &self.class
+    fn class(&self) -> &Type {
+        TYPES.get("Int").unwrap()
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -78,7 +78,7 @@ impl Object for Int {
     }
 
     fn as_bool(&self, _ctx: &RuntimeContext) -> RuntimeBoolResult {
-        Ok(if *self.value() == BigInt::from(0) { false } else { true })
+        Ok(self.value().is_zero())
     }
 
     fn is_equal(&self, rhs: &ObjectRef, _ctx: &RuntimeContext) -> RuntimeBoolResult {

@@ -8,26 +8,26 @@ use std::fmt;
 
 use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeErr, RuntimeErrKind};
 
-use super::class::TypeRef;
+use super::class::Type;
 use super::object::{Object, ObjectExt, ObjectRef};
 use super::result::{GetAttributeResult, SetAttributeResult};
 
 pub type Attributes = RefCell<HashMap<String, ObjectRef>>;
 
 pub struct ComplexObject {
-    class: TypeRef,
+    class: ObjectRef,
     attributes: Attributes,
 }
 
 impl ComplexObject {
-    pub fn new(class: TypeRef) -> Self {
+    pub fn new(class: ObjectRef) -> Self {
         Self { class, attributes: RefCell::new(HashMap::new()) }
     }
 }
 
 impl Object for ComplexObject {
-    fn class(&self) -> &TypeRef {
-        &self.class
+    fn class(&self) -> &Type {
+        self.class.as_any().downcast_ref::<Type>().unwrap()
     }
 
     fn as_any(&self) -> &dyn Any {

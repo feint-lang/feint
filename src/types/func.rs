@@ -2,32 +2,27 @@
 use std::any::Any;
 use std::fmt;
 
-use crate::vm::{Chunk, RuntimeErr};
+use crate::vm::Chunk;
 
-use super::class::TypeRef;
-use super::object::{Object, ObjectExt, ObjectRef};
+use super::class::Type;
+use super::object::{Object, ObjectRef};
+use super::types::TYPES;
 
 pub struct Func {
-    class: TypeRef,
     name: String,
     params: Vec<String>,
     pub chunk: Chunk,
 }
 
 impl Func {
-    pub fn new<S: Into<String>>(
-        class: TypeRef,
-        name: S,
-        params: Vec<String>,
-        chunk: Chunk,
-    ) -> Self {
-        Self { class, name: name.into(), params, chunk }
+    pub fn new<S: Into<String>>(name: S, params: Vec<String>, chunk: Chunk) -> Self {
+        Self { name: name.into(), params, chunk }
     }
 }
 
 impl Object for Func {
-    fn class(&self) -> &TypeRef {
-        &self.class
+    fn class(&self) -> &Type {
+        TYPES.get("Func").unwrap()
     }
 
     fn as_any(&self) -> &dyn Any {

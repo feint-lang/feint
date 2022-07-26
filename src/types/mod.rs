@@ -17,6 +17,7 @@ mod object;
 mod result;
 mod str;
 mod tuple;
+pub(crate) mod types;
 mod util;
 
 #[cfg(test)]

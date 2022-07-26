@@ -7,18 +7,18 @@ use num_traits::ToPrimitive;
 
 use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeErr};
 
-use super::class::TypeRef;
+use super::class::Type;
 use super::object::{Object, ObjectExt, ObjectRef};
 use super::result::GetAttributeResult;
+use super::types::TYPES;
 
 pub struct Tuple {
-    class: TypeRef,
     items: Vec<ObjectRef>,
 }
 
 impl Tuple {
-    pub fn new(class: TypeRef, items: Vec<ObjectRef>) -> Self {
-        Self { class, items }
+    pub fn new(items: Vec<ObjectRef>) -> Self {
+        Self { items }
     }
 
     pub fn items(&self) -> &Vec<ObjectRef> {
@@ -31,8 +31,8 @@ impl Tuple {
 }
 
 impl Object for Tuple {
-    fn class(&self) -> &TypeRef {
-        &self.class
+    fn class(&self) -> &Type {
+        TYPES.get("Tuple").unwrap()
     }
 
     fn as_any(&self) -> &dyn Any {

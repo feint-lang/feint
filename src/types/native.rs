@@ -2,36 +2,31 @@
 use std::any::Any;
 use std::fmt;
 
-use crate::vm::{RuntimeContext, RuntimeErr};
+use crate::vm::RuntimeContext;
 
-use super::class::TypeRef;
+use super::class::Type;
 use super::object::{Object, ObjectRef};
 use super::result::CallResult;
+use super::types::TYPES;
 
 pub type NativeFn =
     fn(Vec<ObjectRef>, &RuntimeContext) -> Result<Option<ObjectRef>, RuntimeErr>;
 
 pub struct NativeFunc {
-    class: TypeRef,
     pub name: String,
     func: NativeFn,
     pub arity: Option<u8>,
 }
 
 impl NativeFunc {
-    pub fn new<S: Into<String>>(
-        class: TypeRef,
-        name: S,
-        func: NativeFn,
-        arity: Option<u8>,
-    ) -> Self {
-        Self { class, name: name.into(), func, arity }
+    pub fn new<S: Into<String>>(name: S, func: NativeFn, arity: Option<u8>) -> Self {
+        Self { name: name.into(), func, arity }
     }
 }
 
 impl Object for NativeFunc {
-    fn class(&self) -> &TypeRef {
-        &self.class
+    fn class(&self) -> &Type {
+        TYPES.get("NativeFunc").unwrap()
     }
 
     fn as_any(&self) -> &dyn Any {

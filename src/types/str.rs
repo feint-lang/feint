@@ -4,17 +4,17 @@ use std::fmt;
 
 use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeErr, RuntimeResult};
 
-use crate::types::class::TypeRef;
-use crate::types::object::{Object, ObjectExt, ObjectRef};
+use super::class::Type;
+use super::object::{Object, ObjectExt, ObjectRef};
+use super::types::TYPES;
 
 pub struct Str {
-    class: TypeRef,
     value: String,
 }
 
 impl Str {
-    pub fn new<S: Into<String>>(class: TypeRef, value: S) -> Self {
-        Self { class, value: value.into() }
+    pub fn new<S: Into<String>>(value: S) -> Self {
+        Self { value: value.into() }
     }
 
     pub fn value(&self) -> &str {
@@ -23,8 +23,8 @@ impl Str {
 }
 
 impl Object for Str {
-    fn class(&self) -> &TypeRef {
-        &self.class
+    fn class(&self) -> &Type {
+        TYPES.get("Str").unwrap()
     }
 
     fn as_any(&self) -> &dyn Any {
