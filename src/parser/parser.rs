@@ -43,189 +43,12 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
 
     // Parse entry point -----------------------------------------------
 
-    /// A program is a list of statements.
+    /// Parse token stream a produce a program, which is a sequence of
+    /// statements.
     pub fn parse(&mut self) -> ParseResult {
         let statements = self.statements()?;
         let program = ast::Program::new(statements);
         Ok(program)
-    }
-
-    // Tokens ----------------------------------------------------------
-
-    /// Get the location of the current token.
-    fn loc(&self) -> Location {
-        match &self.current_token {
-            Some(t) => t.start,
-            None => Location::new(0, 0),
-        }
-    }
-
-    /// Get location after current token.
-    fn next_loc(&self) -> Location {
-        if let Some(t) = &self.current_token {
-            match t.token {
-                Token::EndOfStatement => Location::new(t.end.line + 1, 1),
-                _ => Location::new(t.end.line, t.end.col + 1),
-            }
-        } else {
-            Location::new(0, 0)
-        }
-    }
-
-    /// Are there any tokens left in the stream?
-    fn has_tokens(&mut self) -> BoolResult {
-        Ok(self.peek_token()?.is_some())
-    }
-
-    /// Consume and return the next token unconditionally. If no tokens
-    /// are left, return `None`.
-    fn next_token(&mut self) -> NextTokenResult {
-        if let Some(t) = self.lookahead_queue.pop_front() {
-            self.current_token = Some(t.clone());
-            return Ok(Some(t));
-        }
-        if let Some(result) = self.token_stream.next() {
-            return result
-                .map(|t| {
-                    self.current_token = Some(t.clone());
-                    Some(t)
-                })
-                .map_err(|err| self.scan_err(err.clone()));
-        }
-        Ok(None)
-    }
-
-    /// Get the next token. If there isn't a next token, panic! This is
-    /// used where there *should* be a next token and if there isn't
-    /// that indicates an internal logic/processing error.
-    fn expect_next_token(&mut self) -> Result<TokenWithLocation, ParseErr> {
-        Ok(self.next_token()?.expect("Expected token"))
-    }
-
-    /// Expect the next token to be the specified token. If it is,
-    /// consume the token and return nothing. If it's not, return an
-    /// error.
-    fn expect_token(&mut self, token: &Token) -> Result<(), ParseErr> {
-        if !self.next_token_is(token)? {
-            return Err(
-                self.err(ParseErrKind::ExpectedToken(self.loc(), token.clone()))
-            );
-        }
-        Ok(())
-    }
-
-    /// Consume the next token and return it if the specified condition
-    /// is true. Otherwise, return `None`.
-    fn next_token_if(&mut self, func: impl FnOnce(&Token) -> bool) -> NextTokenResult {
-        if let Some(t) = self.peek_token()? {
-            if func(&t.token) {
-                return Ok(self.next_token()?);
-            }
-        }
-        Ok(None)
-    }
-
-    /// Consume next token and return true *if* the next token is equal
-    /// to specified token. Otherwise, leave the token in the stream and
-    /// return false.
-    fn next_token_is(&mut self, token: &Token) -> BoolResult {
-        if let Some(_) = self.next_token_if(|t| t == token)? {
-            return Ok(true);
-        }
-        Ok(false)
-    }
-
-    /// Consume next N tokens and return true *if* the next N tokens are
-    /// equal to specified tokens. Otherwise, leave the tokens in the
-    /// stream and return false.
-    fn next_tokens_are(&mut self, tokens: Vec<&Token>) -> BoolResult {
-        assert!(tokens.len() > 0, "At least one token is required");
-        let mut temp_queue: VecDeque<TokenWithLocation> = VecDeque::new();
-        for token in tokens {
-            match self.next_token_if(|t| t == token)? {
-                Some(token) => {
-                    temp_queue.push_front(token);
-                }
-                None => {
-                    for twl in temp_queue {
-                        self.lookahead_queue.push_front(twl);
-                    }
-                    return Ok(false);
-                }
-            }
-        }
-        Ok(true)
-    }
-
-    /// Return the next token along with its precedence *if* it's both
-    /// an infix operator *and* its precedence is greater than the
-    /// current precedence level.
-    fn next_infix_token(&mut self, current_prec: u8) -> NextInfixResult {
-        if let Some(token) = self.next_token_if(|t| {
-            let p = get_binary_precedence(t);
-            p > 0 && p > current_prec
-        })? {
-            let prec = get_binary_precedence(&token.token);
-            return Ok(Some((token, prec)));
-        }
-        Ok(None)
-    }
-
-    /// Return the next token without consuming it. If no tokens are
-    /// left, return `None`.
-    fn peek_token(&mut self) -> PeekTokenResult {
-        if let Some(t) = self.lookahead_queue.front() {
-            return Ok(Some(t));
-        }
-        if let Some(result) = self.token_stream.peek() {
-            return result
-                .as_ref()
-                .map(|t| Some(t))
-                .map_err(|err| ParseErr::new(ParseErrKind::ScanErr(err.clone())));
-        }
-        Ok(None)
-    }
-
-    /// Look at the next token and return it if it's equal to the
-    /// specified token. Otherwise, return `None`.
-    fn peek_token_if(&mut self, func: impl FnOnce(&Token) -> bool) -> PeekTokenResult {
-        if let Some(t) = self.peek_token()? {
-            if func(&t.token) {
-                return Ok(Some(t));
-            }
-        }
-        Ok(None)
-    }
-
-    /// Look at the next token and return true if it's equal to the
-    /// specified token. Otherwise, return false.
-    fn peek_token_is(&mut self, token: &Token) -> BoolResult {
-        if let Some(_) = self.peek_token_if(|t| t == token)? {
-            return Ok(true);
-        }
-        Ok(false)
-    }
-
-    /// Check whether the next token is a block or inline scope start
-    /// token.
-    fn peek_token_is_scope_start(&mut self) -> BoolResult {
-        use Token::{InlineScopeStart, ScopeStart};
-        if let Some(TokenWithLocation { token, .. }) = self.peek_token()? {
-            Ok(token == &ScopeStart || token == &InlineScopeStart)
-        } else {
-            Ok(false)
-        }
-    }
-
-    // Utilities -------------------------------------------------------
-
-    /// Make creating errors a little less tedious.
-    fn err(&self, kind: ParseErrKind) -> ParseErr {
-        ParseErr::new(kind)
-    }
-
-    fn scan_err(&self, err: ScanErr) -> ParseErr {
-        self.err(ParseErrKind::ScanErr(err))
     }
 
     // Grammar ---------------------------------------------------------
@@ -561,6 +384,184 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
             } else {
                 break Ok(expr);
             }
+        }
+    }
+
+    // Errors ----------------------------------------------------------
+
+    /// Make creating errors a little less tedious.
+    fn err(&self, kind: ParseErrKind) -> ParseErr {
+        ParseErr::new(kind)
+    }
+
+    fn scan_err(&self, err: ScanErr) -> ParseErr {
+        self.err(ParseErrKind::ScanErr(err))
+    }
+
+    // Tokens ----------------------------------------------------------
+
+    /// Are there any tokens left in the stream?
+    fn has_tokens(&mut self) -> BoolResult {
+        Ok(self.peek_token()?.is_some())
+    }
+
+    /// Consume and return the next token unconditionally. If no tokens
+    /// are left, return `None`.
+    fn next_token(&mut self) -> NextTokenResult {
+        if let Some(t) = self.lookahead_queue.pop_front() {
+            self.current_token = Some(t.clone());
+            return Ok(Some(t));
+        }
+        if let Some(result) = self.token_stream.next() {
+            return result
+                .map(|t| {
+                    self.current_token = Some(t.clone());
+                    Some(t)
+                })
+                .map_err(|err| self.scan_err(err.clone()));
+        }
+        Ok(None)
+    }
+
+    /// Get the next token. If there isn't a next token, panic! This is
+    /// used where there *should* be a next token and if there isn't
+    /// that indicates an internal logic/processing error.
+    fn expect_next_token(&mut self) -> Result<TokenWithLocation, ParseErr> {
+        Ok(self.next_token()?.expect("Expected token"))
+    }
+
+    /// Expect the next token to be the specified token. If it is,
+    /// consume the token and return nothing. If it's not, return an
+    /// error.
+    fn expect_token(&mut self, token: &Token) -> Result<(), ParseErr> {
+        if !self.next_token_is(token)? {
+            return Err(
+                self.err(ParseErrKind::ExpectedToken(self.loc(), token.clone()))
+            );
+        }
+        Ok(())
+    }
+
+    /// Consume the next token and return it if the specified condition
+    /// is true. Otherwise, return `None`.
+    fn next_token_if(&mut self, func: impl FnOnce(&Token) -> bool) -> NextTokenResult {
+        if let Some(t) = self.peek_token()? {
+            if func(&t.token) {
+                return Ok(self.next_token()?);
+            }
+        }
+        Ok(None)
+    }
+
+    /// Consume next token and return true *if* the next token is equal
+    /// to specified token. Otherwise, leave the token in the stream and
+    /// return false.
+    fn next_token_is(&mut self, token: &Token) -> BoolResult {
+        if let Some(_) = self.next_token_if(|t| t == token)? {
+            return Ok(true);
+        }
+        Ok(false)
+    }
+
+    /// Consume next N tokens and return true *if* the next N tokens are
+    /// equal to specified tokens. Otherwise, leave the tokens in the
+    /// stream and return false.
+    fn next_tokens_are(&mut self, tokens: Vec<&Token>) -> BoolResult {
+        assert!(tokens.len() > 0, "At least one token is required");
+        let mut temp_queue: VecDeque<TokenWithLocation> = VecDeque::new();
+        for token in tokens {
+            match self.next_token_if(|t| t == token)? {
+                Some(token) => {
+                    temp_queue.push_front(token);
+                }
+                None => {
+                    for twl in temp_queue {
+                        self.lookahead_queue.push_front(twl);
+                    }
+                    return Ok(false);
+                }
+            }
+        }
+        Ok(true)
+    }
+
+    /// Return the next token along with its precedence *if* it's both
+    /// an infix operator *and* its precedence is greater than the
+    /// current precedence level.
+    fn next_infix_token(&mut self, current_prec: u8) -> NextInfixResult {
+        if let Some(token) = self.next_token_if(|t| {
+            let p = get_binary_precedence(t);
+            p > 0 && p > current_prec
+        })? {
+            let prec = get_binary_precedence(&token.token);
+            return Ok(Some((token, prec)));
+        }
+        Ok(None)
+    }
+
+    /// Return the next token without consuming it. If no tokens are
+    /// left, return `None`.
+    fn peek_token(&mut self) -> PeekTokenResult {
+        if let Some(t) = self.lookahead_queue.front() {
+            return Ok(Some(t));
+        }
+        if let Some(result) = self.token_stream.peek() {
+            return result
+                .as_ref()
+                .map(|t| Some(t))
+                .map_err(|err| ParseErr::new(ParseErrKind::ScanErr(err.clone())));
+        }
+        Ok(None)
+    }
+
+    /// Look at the next token and return it if it's equal to the
+    /// specified token. Otherwise, return `None`.
+    fn peek_token_if(&mut self, func: impl FnOnce(&Token) -> bool) -> PeekTokenResult {
+        if let Some(t) = self.peek_token()? {
+            if func(&t.token) {
+                return Ok(Some(t));
+            }
+        }
+        Ok(None)
+    }
+
+    /// Look at the next token and return true if it's equal to the
+    /// specified token. Otherwise, return false.
+    fn peek_token_is(&mut self, token: &Token) -> BoolResult {
+        if let Some(_) = self.peek_token_if(|t| t == token)? {
+            return Ok(true);
+        }
+        Ok(false)
+    }
+
+    /// Check whether the next token is a block or inline scope start
+    /// token.
+    fn peek_token_is_scope_start(&mut self) -> BoolResult {
+        use Token::{InlineScopeStart, ScopeStart};
+        if let Some(TokenWithLocation { token, .. }) = self.peek_token()? {
+            Ok(token == &ScopeStart || token == &InlineScopeStart)
+        } else {
+            Ok(false)
+        }
+    }
+
+    /// Get location of current token.
+    fn loc(&self) -> Location {
+        match &self.current_token {
+            Some(t) => t.start,
+            None => Location::new(0, 0),
+        }
+    }
+
+    /// Get location after current token.
+    fn next_loc(&self) -> Location {
+        if let Some(t) = &self.current_token {
+            match t.token {
+                Token::EndOfStatement => Location::new(t.end.line + 1, 1),
+                _ => Location::new(t.end.line, t.end.col + 1),
+            }
+        } else {
+            Location::new(0, 0)
         }
     }
 }
