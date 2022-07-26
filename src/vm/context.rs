@@ -180,10 +180,14 @@ impl Default for RuntimeContext {
         {
             use native::*;
             let results = [
-                ctx.add_native_func("type_of", type_of, None),
-                ctx.add_native_func("print", print, None),
+                // File
                 ctx.add_native_func("read_file", read_file, Some(1)),
                 ctx.add_native_func("read_file_lines", read_file_lines, Some(1)),
+                // Print
+                ctx.add_native_func("print", print, None),
+                // Type
+                ctx.add_native_func("type_of", type_of, None),
+                ctx.add_native_func("obj_id", obj_id, None),
             ];
             for result in results {
                 match result {
