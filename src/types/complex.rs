@@ -40,11 +40,7 @@ impl Object for ComplexObject {
                 || (self.class() == rhs.class()
                     && attributes_equal(&self.attributes, &rhs.attributes, ctx)?))
         } else {
-            Err(RuntimeErr::new_type_err(format!(
-                "Could not compare {} to {}",
-                self.class().name(),
-                rhs.class().name()
-            )))
+            Ok(false)
         }
     }
 

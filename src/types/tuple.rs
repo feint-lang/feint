@@ -47,17 +47,14 @@ impl Object for Tuple {
             if self.len() != rhs.len() {
                 return Ok(false);
             }
-            for (i, j) in self.items().iter().zip(rhs.items()) {
-                if !i.is_equal(j, ctx)? {
+            for (a, b) in self.items().iter().zip(rhs.items()) {
+                if !a.is_equal(b, ctx)? {
                     return Ok(false);
                 }
             }
             return Ok(true);
         } else {
-            Err(RuntimeErr::new_type_err(format!(
-                "Could not compare Tuple to {} for equality",
-                rhs.class().name()
-            )))
+            Ok(false)
         }
     }
 

@@ -2,10 +2,10 @@
 use std::any::Any;
 use std::fmt;
 
-use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeErr};
+use crate::vm::{RuntimeContext, RuntimeErr};
 
 use super::class::TypeRef;
-use super::object::{Object, ObjectExt, ObjectRef};
+use super::object::{Object, ObjectRef};
 use super::result::CallResult;
 
 pub type NativeFn =
@@ -36,18 +36,6 @@ impl Object for NativeFunc {
 
     fn as_any(&self) -> &dyn Any {
         self
-    }
-
-    fn is_equal(&self, rhs: &ObjectRef, _ctx: &RuntimeContext) -> RuntimeBoolResult {
-        if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
-            Ok(self.is(&rhs))
-        } else {
-            Err(RuntimeErr::new_type_err(format!(
-                "Could not compare {} to {}",
-                self.class().name(),
-                rhs.class().name()
-            )))
-        }
     }
 
     fn call(&self, args: Vec<ObjectRef>, ctx: &RuntimeContext) -> CallResult {

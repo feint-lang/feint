@@ -69,10 +69,7 @@ impl Object for Float {
         } else if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
             Ok(eq_int_float(rhs, self))
         } else {
-            Err(RuntimeErr::new_type_err(format!(
-                "Could not compare Float to {} for equality",
-                rhs.class().name()
-            )))
+            Ok(false)
         }
     }
 

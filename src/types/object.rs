@@ -136,7 +136,12 @@ pub trait Object {
 
     // Binary operations -----------------------------------------------
 
-    make_bin_op!(is_equal, "==", RuntimeBoolResult);
+    fn is_equal(&self, rhs: &ObjectRef, _ctx: &RuntimeContext) -> RuntimeBoolResult {
+        // This duplicates ObjectExt::is(), but that method can't be
+        // used here.
+        Ok(self.class().is(&rhs.class()) && self.id() == rhs.id())
+    }
+
     fn not_equal(&self, rhs: &ObjectRef, ctx: &RuntimeContext) -> RuntimeBoolResult {
         self.is_equal(rhs, ctx).map(|equal| !equal)
     }
