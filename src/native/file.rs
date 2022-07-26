@@ -1,13 +1,11 @@
 use std::fs::{read_to_string, File};
 use std::io::{BufRead, BufReader};
 
-use crate::types::ObjectRef;
+use crate::types::{Args, CallResult};
 use crate::vm::{RuntimeContext, RuntimeErr, RuntimeErrKind};
 
-use super::result::CallResult;
-
 /// Read file into a string.
-pub fn read_file(args: Vec<ObjectRef>, ctx: &RuntimeContext) -> CallResult {
+pub fn read_file(args: Args, ctx: &RuntimeContext) -> CallResult {
     let arg = args.get(0).unwrap();
     if let Some(file_name) = arg.str_val() {
         match read_to_string(file_name) {
@@ -22,7 +20,7 @@ pub fn read_file(args: Vec<ObjectRef>, ctx: &RuntimeContext) -> CallResult {
 }
 
 /// Read lines of file into tuple.
-pub fn read_file_lines(args: Vec<ObjectRef>, ctx: &RuntimeContext) -> CallResult {
+pub fn read_file_lines(args: Args, ctx: &RuntimeContext) -> CallResult {
     let arg = args.get(0).unwrap();
     if let Some(file_name) = arg.str_val() {
         let file = File::open(file_name).unwrap();

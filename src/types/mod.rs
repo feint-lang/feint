@@ -2,6 +2,7 @@ pub(crate) use builtins::Builtins;
 pub(crate) use func::Func;
 pub(crate) use native::NativeFn;
 pub(crate) use object::ObjectRef;
+pub(crate) use result::{Args, CallResult};
 
 mod bool;
 mod builtins;
