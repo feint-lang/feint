@@ -1,6 +1,6 @@
 //! # FeInt code runner
 use crate::exe::Executor;
-use crate::result::{ExeResult, ExitResult};
+use crate::result::{ExeErrKind, ExeResult, ExitResult};
 use crate::vm::{VMState, VM};
 
 /// Run source from file.
@@ -35,7 +35,13 @@ fn exit(result: ExeResult) -> ExitResult {
             VMState::Idle => Err((255, Some("Never halted".to_owned()))),
         },
         // TODO: Return error code depending on error type?
-        Err(_) => Err((1, None)),
+        Err(err) => {
+            let message = match err.kind {
+                ExeErrKind::CouldNotReadSourceFileErr(message) => message,
+                _ => format!("{err:?}"),
+            };
+            Err((1, Some(message)))
+        }
     }
 }
 

@@ -88,12 +88,12 @@ fn main() -> ExitCode {
 
     let return_code = match result {
         Ok(Some(message)) => {
-            println!("{}", message);
+            println!("{message}");
             0
         }
         Ok(None) => 0,
         Err((code, Some(message))) => {
-            eprintln!("{}", message);
+            eprintln!("{message}");
             code
         }
         Err((code, None)) => code,

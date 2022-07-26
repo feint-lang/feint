@@ -31,7 +31,8 @@ impl<'a> Executor<'a> {
                 self.execute_source(&mut source)
             }
             Err(err) => {
-                Err(ExeErr::new(ExeErrKind::CouldNotReadSourceFileErr(err.to_string())))
+                let message = format!("{file_path}: {err}");
+                Err(ExeErr::new(ExeErrKind::CouldNotReadSourceFileErr(message)))
             }
         }
     }
