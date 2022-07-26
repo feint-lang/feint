@@ -1,11 +1,14 @@
 //! "Class" and "type" are used interchangeably and mean exactly the
 //! same thing. Lower case "class" is used instead of "type" because the
 //! latter is a Rust keyword.
-use crate::types::types::TYPES;
 use std::any::Any;
 use std::fmt;
 
+use crate::vm::{RuntimeContext, RuntimeErr, RuntimeResult};
+
 use super::object::Object;
+use super::result::GetAttributeResult;
+use super::types::TYPES;
 
 /// Represents a type, whether builtin or user-defined.
 #[derive(Clone)]
@@ -43,6 +46,15 @@ impl Object for Type {
 
     fn as_any(&self) -> &dyn Any {
         self
+    }
+
+    fn get_attribute(&self, name: &str, ctx: &RuntimeContext) -> GetAttributeResult {
+        match name {
+            "module" => Ok(ctx.builtins.new_string(self.module())),
+            "name" => Ok(ctx.builtins.new_string(self.name())),
+            "id" => Ok(ctx.builtins.new_int(self.id())),
+            _ => Err(RuntimeErr::new_attribute_does_not_exit(name)),
+        }
     }
 }
 

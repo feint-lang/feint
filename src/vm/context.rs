@@ -1,7 +1,7 @@
+use std::collections::HashMap;
 use std::rc::Rc;
 
-use crate::types::types::TYPES;
-use crate::types::{Builtins, NativeFn, ObjectRef};
+use crate::types::{Builtins, NativeFn, ObjectRef, Type, TYPES};
 
 use super::namespace::Namespace;
 use super::objects::Objects;
@@ -11,6 +11,7 @@ pub struct RuntimeContext {
     pub builtins: Builtins,
     constants: Objects,
     namespace_stack: Vec<Namespace>,
+    type_registry: HashMap<String, Rc<Type>>,
 }
 
 impl RuntimeContext {
@@ -19,7 +20,7 @@ impl RuntimeContext {
         constants: Objects,
         namespace_stack: Vec<Namespace>,
     ) -> Self {
-        Self { builtins, constants, namespace_stack }
+        Self { builtins, constants, namespace_stack, type_registry: HashMap::new() }
     }
 
     fn current_namespace(&mut self) -> &mut Namespace {
@@ -144,10 +145,19 @@ impl RuntimeContext {
         }
     }
 
+    pub fn get_type(&self, name: &str) -> ObjectRef {
+        let class = self
+            .type_registry
+            .get(name)
+            .expect(format!("Type not registered: {name}").as_str());
+        class.clone()
+    }
+
     fn add_native_types(&mut self) -> Result<(), RuntimeErr> {
         for (name, class) in TYPES.iter() {
             self.declare_var(name)?;
             self.assign_var(name, Rc::new(class.clone()))?;
+            self.type_registry.insert(name.to_string(), Rc::new(class.clone()));
         }
         Ok(())
     }

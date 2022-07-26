@@ -5,6 +5,7 @@ use crate::types::{Args, CallResult};
 use crate::vm::{RuntimeContext, RuntimeErr, RuntimeErrKind};
 
 /// Read file into a string.
+/// Returns Str
 pub fn read_file(args: Args, ctx: &RuntimeContext) -> CallResult {
     let arg = args.get(0).unwrap();
     if let Some(file_name) = arg.str_val() {
@@ -15,11 +16,12 @@ pub fn read_file(args: Args, ctx: &RuntimeContext) -> CallResult {
             }
         }
     } else {
-        Err(RuntimeErr::new_type_err("Expected a string"))
+        Err(RuntimeErr::new_type_err("Expected string"))
     }
 }
 
 /// Read lines of file into tuple.
+/// Returns Tuple<Str>
 pub fn read_file_lines(args: Args, ctx: &RuntimeContext) -> CallResult {
     let arg = args.get(0).unwrap();
     if let Some(file_name) = arg.str_val() {
@@ -32,6 +34,6 @@ pub fn read_file_lines(args: Args, ctx: &RuntimeContext) -> CallResult {
         }
         Ok(Some(ctx.builtins.new_tuple(items)))
     } else {
-        Err(RuntimeErr::new_type_err("Expected a string"))
+        Err(RuntimeErr::new_type_err("Expected string"))
     }
 }

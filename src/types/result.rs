@@ -1,5 +1,6 @@
-use super::object::ObjectRef;
 use crate::vm::RuntimeErr;
+
+use super::object::ObjectRef;
 
 pub type GetAttributeResult = Result<ObjectRef, RuntimeErr>;
 pub type SetAttributeResult = Result<(), RuntimeErr>;
