@@ -9,8 +9,7 @@ use super::object::{Object, ObjectRef};
 use super::result::CallResult;
 use super::types::TYPES;
 
-pub type NativeFn =
-    fn(Vec<ObjectRef>, &RuntimeContext) -> Result<Option<ObjectRef>, RuntimeErr>;
+pub type NativeFn = fn(Vec<ObjectRef>, &RuntimeContext) -> CallResult;
 
 pub struct NativeFunc {
     pub name: String,

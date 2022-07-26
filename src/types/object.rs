@@ -162,12 +162,7 @@ pub trait Object {
 
     // Call ------------------------------------------------------------
 
-    // TODO: Not sure this is needed
-    fn call(
-        &self,
-        _args: Vec<ObjectRef>,
-        _ctx: &RuntimeContext,
-    ) -> Result<Option<ObjectRef>, RuntimeErr> {
+    fn call(&self, _args: Vec<ObjectRef>, _ctx: &RuntimeContext) -> CallResult {
         let name = self.class().name();
         Err(RuntimeErr::new_type_err(format!("Call not implemented for type {name}")))
     }
