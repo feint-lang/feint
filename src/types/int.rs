@@ -1,18 +1,17 @@
-//! Built in integer type
+//! Integer type
 use std::any::Any;
 use std::fmt;
 
 use num_bigint::BigInt;
 use num_traits::{FromPrimitive, ToPrimitive, Zero};
 
-use crate::types::util::{gt_int_float, lt_int_float};
 use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeErr, RuntimeResult};
 
-use super::class::Type;
+use super::builtin_types::BUILTIN_TYPES;
+use super::class::TypeRef;
 use super::float::Float;
 use super::object::{Object, ObjectExt, ObjectRef};
-use super::types::TYPES;
-use super::util::eq_int_float;
+use super::util::{eq_int_float, gt_int_float, lt_int_float};
 
 pub struct Int {
     value: BigInt,
@@ -37,7 +36,7 @@ impl Int {
         } else {
             return Err(RuntimeErr::new_type_err(format!(
                 "Could not divide {} into Int",
-                rhs.class().name()
+                rhs.type_name()
             )));
         };
         Ok(lhs_val / rhs_val)
@@ -58,15 +57,15 @@ macro_rules! make_op {
                 let value = ctx.builtins.new_float(value);
                 Ok(value)
             } else {
-                Err(RuntimeErr::new_type_err(format!($message, rhs.class().name())))
+                Err(RuntimeErr::new_type_err(format!($message, rhs.type_name())))
             }
         }
     };
 }
 
 impl Object for Int {
-    fn class(&self) -> &Type {
-        TYPES.get("Int").unwrap()
+    fn class(&self) -> &TypeRef {
+        BUILTIN_TYPES.get("Int").unwrap()
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -99,7 +98,7 @@ impl Object for Int {
         } else {
             Err(RuntimeErr::new_type_err(format!(
                 "Could not compare Int to {} for less than",
-                rhs.class().name()
+                rhs.type_name()
             )))
         }
     }
@@ -115,7 +114,7 @@ impl Object for Int {
         } else {
             Err(RuntimeErr::new_type_err(format!(
                 "Could not compare Int to {} for greater than",
-                rhs.class().name()
+                rhs.type_name()
             )))
         }
     }
@@ -137,7 +136,7 @@ impl Object for Int {
         } else {
             Err(RuntimeErr::new_type_err(format!(
                 "Could not raise Int by {}",
-                rhs.class().name()
+                rhs.type_name()
             )))
         }
     }

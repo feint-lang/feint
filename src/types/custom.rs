@@ -1,33 +1,34 @@
-//! A complex object may have builtin objects and other custom/complex
-//! objects as attributes. This is opposed to fundamental/builtin types,
-//! like `Bool` and `Float` that wrap Rust primitives.
+//! A custom object may have builtin objects and other custom objects as
+//! attributes. This is opposed to fundamental/builtin types, like
+//! `Bool` and `Float` that wrap Rust primitives.
 use std::any::Any;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
+use std::sync::Arc;
 
 use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeErr, RuntimeErrKind};
 
-use super::class::Type;
+use super::class::TypeRef;
 use super::object::{Object, ObjectExt, ObjectRef};
 use super::result::{GetAttributeResult, SetAttributeResult};
 
 pub type Attributes = RefCell<HashMap<String, ObjectRef>>;
 
-pub struct ComplexObject {
-    class: ObjectRef,
+pub struct Custom {
+    class: TypeRef,
     attributes: Attributes,
 }
 
-impl ComplexObject {
-    pub fn new(class: ObjectRef) -> Self {
+impl Custom {
+    pub fn new(class: TypeRef) -> Self {
         Self { class, attributes: RefCell::new(HashMap::new()) }
     }
 }
 
-impl Object for ComplexObject {
-    fn class(&self) -> &Type {
-        self.class.as_any().downcast_ref::<Type>().unwrap()
+impl Object for Custom {
+    fn class(&self) -> &TypeRef {
+        &self.class
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -88,7 +89,7 @@ fn attributes_equal(
 
 // Display -------------------------------------------------------------
 
-impl fmt::Display for ComplexObject {
+impl fmt::Display for Custom {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let attrs: Vec<String> = self
             .attributes
@@ -96,11 +97,11 @@ impl fmt::Display for ComplexObject {
             .iter()
             .map(|(n, v)| format!("{}={}", n, v))
             .collect();
-        write!(f, "{}({})", self.class.name(), attrs.join(", "))
+        write!(f, "{}({})", self.type_name(), attrs.join(", "))
     }
 }
 
-impl fmt::Debug for ComplexObject {
+impl fmt::Debug for Custom {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Object {} @ {}", self, self.id())
     }

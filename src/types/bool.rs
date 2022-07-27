@@ -1,12 +1,12 @@
-//! Built in boolean type
+//! Boolean type
 use std::any::Any;
 use std::fmt;
 
 use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeErr};
 
-use super::class::Type;
+use super::builtin_types::BUILTIN_TYPES;
+use super::class::TypeRef;
 use super::object::{Object, ObjectExt, ObjectRef};
-use super::types::TYPES;
 
 pub struct Bool {
     value: bool,
@@ -23,8 +23,8 @@ impl Bool {
 }
 
 impl Object for Bool {
-    fn class(&self) -> &Type {
-        TYPES.get("Bool").unwrap()
+    fn class(&self) -> &TypeRef {
+        BUILTIN_TYPES.get("Bool").unwrap()
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -53,7 +53,7 @@ impl Object for Bool {
         } else {
             Err(RuntimeErr::new_type_err(format!(
                 "Bool && {} not implemented",
-                rhs.class().name()
+                rhs.type_name()
             )))
         }
     }
@@ -64,7 +64,7 @@ impl Object for Bool {
         } else {
             Err(RuntimeErr::new_type_err(format!(
                 "Bool || {} not implemented",
-                rhs.class().name()
+                rhs.type_name()
             )))
         }
     }

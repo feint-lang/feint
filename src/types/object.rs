@@ -1,6 +1,6 @@
 use std::any::Any;
 use std::fmt;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use num_bigint::BigInt;
 
@@ -9,16 +9,16 @@ use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeErr, RuntimeResult};
 use super::result::{CallResult, GetAttributeResult, SetAttributeResult};
 
 use super::bool::Bool;
-use super::class::Type;
+use super::builtin_func::BuiltinFunc;
+use super::class::{Type, TypeRef};
 use super::float::Float;
 use super::func::Func;
 use super::int::Int;
-use super::native::NativeFunc;
 use super::nil::Nil;
 use super::str::Str;
 use super::tuple::Tuple;
 
-pub type ObjectRef = Rc<dyn Object>;
+pub type ObjectRef = Arc<dyn Object>;
 
 macro_rules! make_type_checker {
     ( $func:ident, $ty:ty) => {
@@ -62,7 +62,7 @@ macro_rules! make_unary_op {
                 "Unary operator {} ({}) not implemented for type {}",
                 $op,
                 stringify!($meth),
-                self.class().name()
+                self.type_name()
             )))
         }
     };
@@ -75,7 +75,7 @@ macro_rules! make_bin_op {
                 "Binary operator {} ({}) not implemented for type {}",
                 $op,
                 stringify!($func),
-                self.class().name()
+                self.type_name()
             )))
         }
     };
@@ -83,7 +83,7 @@ macro_rules! make_bin_op {
 
 /// Represents an instance of some type (AKA "class").
 pub trait Object {
-    fn class(&self) -> &Type;
+    fn class(&self) -> &TypeRef;
     fn as_any(&self) -> &dyn Any;
 
     fn id(&self) -> usize {
@@ -92,8 +92,12 @@ pub trait Object {
         p
     }
 
-    fn name(&self) -> String {
-        self.class().name().to_owned()
+    fn type_name(&self) -> String {
+        self.class().name()
+    }
+
+    fn qualified_type_name(&self) -> String {
+        self.class().qualified_name()
     }
 
     // Type checkers ---------------------------------------------------
@@ -105,7 +109,7 @@ pub trait Object {
     make_type_checker!(is_str, Str);
     make_type_checker!(is_tuple, Tuple);
     make_type_checker!(is_func, Func);
-    make_type_checker!(is_native_func, NativeFunc);
+    make_type_checker!(is_builtin_func, BuiltinFunc);
 
     // Type converters -------------------------------------------------
     //
@@ -113,7 +117,7 @@ pub trait Object {
 
     make_type_converter!(as_type, Type);
     make_type_converter!(as_func, Func);
-    make_type_converter!(as_native_func, NativeFunc);
+    make_type_converter!(as_builtin_func, BuiltinFunc);
 
     // Value extractors ------------------------------------------------
     //
@@ -163,7 +167,7 @@ pub trait Object {
     // Call ------------------------------------------------------------
 
     fn call(&self, _args: Vec<ObjectRef>, _ctx: &RuntimeContext) -> CallResult {
-        let name = self.class().name();
+        let name = self.type_name();
         Err(RuntimeErr::new_type_err(format!("Call not implemented for type {name}")))
     }
 
@@ -239,8 +243,8 @@ impl fmt::Display for dyn Object {
             super::str::Str,
             super::tuple::Tuple,
             super::func::Func,
-            super::native::NativeFunc,
-            super::complex::ComplexObject
+            super::builtin_func::BuiltinFunc,
+            super::custom::Custom
         );
         // Fallback
         write!(f, "{}()", self.class())
@@ -260,8 +264,8 @@ impl fmt::Debug for dyn Object {
             super::str::Str,
             super::tuple::Tuple,
             super::func::Func,
-            super::native::NativeFunc,
-            super::complex::ComplexObject
+            super::builtin_func::BuiltinFunc,
+            super::custom::Custom
         );
         // Fallback
         write!(f, "{} object @ {:?} -> {}", self.class(), self.id(), self)

@@ -1,4 +1,4 @@
-//! Built in 64-bit float type
+//! Float type (64 bit)
 use std::any::Any;
 use std::fmt;
 
@@ -6,10 +6,10 @@ use num_traits::ToPrimitive;
 
 use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeErr, RuntimeResult};
 
-use super::class::Type;
+use super::builtin_types::BUILTIN_TYPES;
+use super::class::TypeRef;
 use super::int::Int;
 use super::object::{Object, ObjectExt, ObjectRef};
-use super::types::TYPES;
 use super::util::eq_int_float;
 
 pub struct Float {
@@ -34,7 +34,7 @@ macro_rules! make_op {
             } else if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
                 rhs.value().to_f64().unwrap()
             } else {
-                return Err(RuntimeErr::new_type_err(format!($message, rhs.class().name())));
+                return Err(RuntimeErr::new_type_err(format!($message, rhs.type_name())));
             };
             let mut value = &self.value $op value;
             if $trunc {
@@ -47,8 +47,8 @@ macro_rules! make_op {
 }
 
 impl Object for Float {
-    fn class(&self) -> &Type {
-        TYPES.get("Float").unwrap()
+    fn class(&self) -> &TypeRef {
+        BUILTIN_TYPES.get("Float").unwrap()
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -81,7 +81,7 @@ impl Object for Float {
         } else {
             return Err(RuntimeErr::new_type_err(format!(
                 "Could not raise Float by {}",
-                rhs.class().name()
+                rhs.type_name()
             )));
         };
         let value = self.value().powf(exp);

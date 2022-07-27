@@ -1,12 +1,12 @@
-//! Built in nil type
+//! Nil type
 use std::any::Any;
 use std::fmt;
 
 use crate::vm::{RuntimeBoolResult, RuntimeContext};
 
-use super::class::Type;
+use super::builtin_types::BUILTIN_TYPES;
+use super::class::TypeRef;
 use super::object::Object;
-use super::types::TYPES;
 
 pub struct Nil {}
 
@@ -17,8 +17,8 @@ impl Nil {
 }
 
 impl Object for Nil {
-    fn class(&self) -> &Type {
-        TYPES.get("Nil").unwrap()
+    fn class(&self) -> &TypeRef {
+        BUILTIN_TYPES.get("Nil").unwrap()
     }
 
     fn as_any(&self) -> &dyn Any {

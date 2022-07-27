@@ -55,6 +55,7 @@ impl Default for Objects {
 
 #[cfg(test)]
 mod tests {
+    use crate::types::{Object, ObjectExt};
     use crate::vm::context::RuntimeContext;
 
     #[test]
@@ -64,6 +65,7 @@ mod tests {
         let int_copy = int.clone();
         let index = ctx.add_const(int);
         let retrieved = ctx.get_const(index).unwrap();
+        // TODO: Compare classes directly
         assert_eq!(retrieved.class().id(), int_copy.class().id());
         assert_eq!(retrieved.id(), int_copy.id());
         assert!(retrieved.is_equal(&int_copy, &ctx).unwrap());

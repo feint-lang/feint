@@ -1,12 +1,12 @@
-//! Built in function type
+//! Function type
 use std::any::Any;
 use std::fmt;
 
 use crate::vm::Chunk;
 
-use super::class::Type;
-use super::object::{Object, ObjectRef};
-use super::types::TYPES;
+use super::builtin_types::BUILTIN_TYPES;
+use super::class::TypeRef;
+use super::object::Object;
 
 pub struct Func {
     name: String,
@@ -21,8 +21,8 @@ impl Func {
 }
 
 impl Object for Func {
-    fn class(&self) -> &Type {
-        TYPES.get("Func").unwrap()
+    fn class(&self) -> &TypeRef {
+        BUILTIN_TYPES.get("Func").unwrap()
     }
 
     fn as_any(&self) -> &dyn Any {

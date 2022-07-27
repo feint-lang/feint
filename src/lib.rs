@@ -7,9 +7,9 @@ pub mod repl;
 pub mod run;
 
 mod ast;
+mod builtin_funcs;
 mod compiler;
 mod format;
-mod native;
 mod parser;
 mod result;
 mod scanner;

@@ -1,7 +1,6 @@
-use std::collections::HashMap;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
-use crate::types::{Builtins, NativeFn, ObjectRef, Type, TYPES};
+use crate::types::{BuiltinFn, Builtins, ObjectRef, Type, BUILTIN_TYPES};
 
 use super::namespace::Namespace;
 use super::objects::Objects;
@@ -11,7 +10,6 @@ pub struct RuntimeContext {
     pub builtins: Builtins,
     constants: Objects,
     namespace_stack: Vec<Namespace>,
-    type_registry: HashMap<String, Rc<Type>>,
 }
 
 impl RuntimeContext {
@@ -20,7 +18,7 @@ impl RuntimeContext {
         constants: Objects,
         namespace_stack: Vec<Namespace>,
     ) -> Self {
-        Self { builtins, constants, namespace_stack, type_registry: HashMap::new() }
+        Self { builtins, constants, namespace_stack }
     }
 
     fn current_namespace(&mut self) -> &mut Namespace {
@@ -145,30 +143,21 @@ impl RuntimeContext {
         }
     }
 
-    pub fn get_type(&self, name: &str) -> ObjectRef {
-        let class = self
-            .type_registry
-            .get(name)
-            .expect(format!("Type not registered: {name}").as_str());
-        class.clone()
-    }
-
-    fn add_native_types(&mut self) -> Result<(), RuntimeErr> {
-        for (name, class) in TYPES.iter() {
+    fn add_builtin_types(&mut self) -> Result<(), RuntimeErr> {
+        for (name, class) in BUILTIN_TYPES.iter() {
             self.declare_var(name)?;
-            self.assign_var(name, Rc::new(class.clone()))?;
-            self.type_registry.insert(name.to_string(), Rc::new(class.clone()));
+            self.assign_var(name, class.clone())?;
         }
         Ok(())
     }
 
-    fn add_native_func(
+    fn add_builtin_func(
         &mut self,
         name: &str,
-        func: NativeFn,
+        func: BuiltinFn,
         arity: Option<u8>,
     ) -> Result<(), RuntimeErr> {
-        let func = self.builtins.new_native_func(name, func, arity);
+        let func = self.builtins.new_builtin_func(name, func, arity);
         self.declare_var(name)?;
         self.assign_var(name, func)?;
         Ok(())
@@ -177,9 +166,8 @@ impl RuntimeContext {
 
 impl Default for RuntimeContext {
     fn default() -> Self {
-        use crate::native;
-
         let builtins = Builtins::new();
+        let builtins_ns = builtins.new_namespace();
 
         // Singletons
         let nil_obj = builtins.nil_obj.clone();
@@ -190,34 +178,43 @@ impl Default for RuntimeContext {
         let namespace_stack = vec![];
         let mut ctx = RuntimeContext::new(builtins, constants, namespace_stack);
 
-        // Add singleton constants
+        // Add singleton constants.
         ctx.add_const(nil_obj); // 0
         ctx.add_const(true_obj); // 1
         ctx.add_const(false_obj); // 2
 
-        ctx.enter_scope(); // global scope
+        // Enter the global scope.
+        // NOTE: This needs to be done before adding global vars.
+        ctx.enter_scope();
 
-        if let Err(err) = ctx.add_native_types() {
-            panic!("Could not add native types: {err}");
+        // Add builtin types to global scope
+        if let Err(err) = ctx.declare_var("builtins") {
+            panic!("Could not declare global builtins var: {err}");
+        }
+        if let Err(err) = ctx.assign_var("builtins", builtins_ns) {
+            panic!("Could not declare global builtins var: {err}");
+        }
+        if let Err(err) = ctx.add_builtin_types() {
+            panic!("Could not add builtin types: {err}");
         }
 
-        // Add native functions to global scope
+        // Add builtin functions to global scope
         {
-            use native::*;
+            use crate::builtin_funcs::*;
             let results = [
                 // File
-                ctx.add_native_func("read_file", read_file, Some(1)),
-                ctx.add_native_func("read_file_lines", read_file_lines, Some(1)),
+                ctx.add_builtin_func("read_file", read_file, Some(1)),
+                ctx.add_builtin_func("read_file_lines", read_file_lines, Some(1)),
                 // Print
-                ctx.add_native_func("print", print, None),
+                ctx.add_builtin_func("print", print, None),
                 // Type
-                ctx.add_native_func("type_of", type_of, None),
-                ctx.add_native_func("obj_id", obj_id, None),
+                ctx.add_builtin_func("type_of", type_of, None),
+                ctx.add_builtin_func("obj_id", obj_id, None),
             ];
             for result in results {
                 match result {
                     Ok(_) => (),
-                    Err(err) => panic!("Could not create native function: {err}"),
+                    Err(err) => panic!("Could not create builtin function: {err}"),
                 }
             }
         }

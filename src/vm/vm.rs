@@ -272,8 +272,7 @@ impl VM {
                             string.push_str(obj.to_string().as_str());
                         }
                         let string_obj = self.ctx.builtins.new_string(string);
-                        let string_i = self.ctx.add_const(string_obj);
-                        self.push(Constant(string_i));
+                        self.push(Temp(string_obj));
                     } else {
                         return self.err(NotEnoughValuesOnStack(format!(
                             "Format string: {n}"
@@ -287,8 +286,7 @@ impl VM {
                             items.push(obj.clone());
                         }
                         let tuple = self.ctx.builtins.new_tuple(items);
-                        let tuple_i = self.ctx.add_const(tuple);
-                        self.push(Constant(tuple_i));
+                        self.push(Temp(tuple));
                     } else {
                         return self.err(NotEnoughValuesOnStack(format!("Tuple: {n}")));
                     }
@@ -303,14 +301,14 @@ impl VM {
                                 args.push(objects.get(i).unwrap().clone());
                             }
                         }
-                        if let Some(native_func) = callable.as_native_func() {
-                            if let Some(arity) = native_func.arity {
+                        if let Some(builtin_func) = callable.as_builtin_func() {
+                            if let Some(arity) = builtin_func.arity {
                                 let num_args = args.len();
                                 if num_args != arity as usize {
                                     let ess = if arity == 1 { "" } else { "s" };
                                     return Err(RuntimeErr::new_type_err(format!(
                                         "{}() expected {arity} arg{ess}; got {num_args}",
-                                        native_func.name,
+                                        builtin_func.name,
                                     )));
                                 }
                             }

@@ -1,4 +1,4 @@
-//! Built in tuple type
+//! Tuple type
 use std::any::Any;
 use std::fmt;
 
@@ -7,10 +7,10 @@ use num_traits::ToPrimitive;
 
 use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeErr};
 
-use super::class::Type;
+use super::builtin_types::BUILTIN_TYPES;
+use super::class::TypeRef;
 use super::object::{Object, ObjectExt, ObjectRef};
 use super::result::GetAttributeResult;
-use super::types::TYPES;
 
 pub struct Tuple {
     items: Vec<ObjectRef>,
@@ -31,8 +31,8 @@ impl Tuple {
 }
 
 impl Object for Tuple {
-    fn class(&self) -> &Type {
-        TYPES.get("Tuple").unwrap()
+    fn class(&self) -> &TypeRef {
+        BUILTIN_TYPES.get("Tuple").unwrap()
     }
 
     fn as_any(&self) -> &dyn Any {

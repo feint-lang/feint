@@ -3,12 +3,15 @@
 //! latter is a Rust keyword.
 use std::any::Any;
 use std::fmt;
+use std::sync::Arc;
 
-use crate::vm::{RuntimeContext, RuntimeErr, RuntimeResult};
+use crate::vm::{RuntimeContext, RuntimeErr};
 
+use super::builtin_types::BUILTIN_TYPES;
 use super::object::Object;
 use super::result::GetAttributeResult;
-use super::types::TYPES;
+
+pub type TypeRef = Arc<Type>;
 
 /// Represents a type, whether builtin or user-defined.
 #[derive(Clone)]
@@ -26,12 +29,16 @@ impl Type {
         self as *const Self as usize
     }
 
-    pub fn module(&self) -> &str {
-        self.module.as_str()
+    pub fn module(&self) -> String {
+        self.module.clone()
     }
 
-    pub fn name(&self) -> &str {
-        self.name.as_str()
+    pub fn name(&self) -> String {
+        self.name.clone()
+    }
+
+    pub fn qualified_name(&self) -> String {
+        format!("{}.{}", self.module, self.name)
     }
 
     pub fn is(&self, other: &Self) -> bool {
@@ -40,8 +47,8 @@ impl Type {
 }
 
 impl Object for Type {
-    fn class(&self) -> &Type {
-        TYPES.get("Type").unwrap()
+    fn class(&self) -> &TypeRef {
+        BUILTIN_TYPES.get("Type").unwrap()
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -51,7 +58,7 @@ impl Object for Type {
     fn get_attribute(&self, name: &str, ctx: &RuntimeContext) -> GetAttributeResult {
         match name {
             "module" => Ok(ctx.builtins.new_string(self.module())),
-            "name" => Ok(ctx.builtins.new_string(self.name())),
+            "name" => Ok(ctx.builtins.new_string(self.type_name())),
             "id" => Ok(ctx.builtins.new_int(self.id())),
             _ => Err(RuntimeErr::new_attribute_does_not_exit(name)),
         }
@@ -66,7 +73,7 @@ impl PartialEq for Type {
 
 impl fmt::Display for Type {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "[Type: {}]", self.name())
+        write!(f, "[Type: {}]", self.qualified_name())
     }
 }
 

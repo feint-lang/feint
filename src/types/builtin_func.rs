@@ -1,31 +1,31 @@
-//! Built in native function type
+//! Builtin function type
 use std::any::Any;
 use std::fmt;
 
 use crate::vm::RuntimeContext;
 
-use super::class::Type;
+use super::builtin_types::BUILTIN_TYPES;
+use super::class::TypeRef;
 use super::object::{Object, ObjectRef};
 use super::result::CallResult;
-use super::types::TYPES;
 
-pub type NativeFn = fn(Vec<ObjectRef>, &RuntimeContext) -> CallResult;
+pub type BuiltinFn = fn(Vec<ObjectRef>, &RuntimeContext) -> CallResult;
 
-pub struct NativeFunc {
+pub struct BuiltinFunc {
     pub name: String,
-    func: NativeFn,
+    func: BuiltinFn,
     pub arity: Option<u8>,
 }
 
-impl NativeFunc {
-    pub fn new<S: Into<String>>(name: S, func: NativeFn, arity: Option<u8>) -> Self {
+impl BuiltinFunc {
+    pub fn new<S: Into<String>>(name: S, func: BuiltinFn, arity: Option<u8>) -> Self {
         Self { name: name.into(), func, arity }
     }
 }
 
-impl Object for NativeFunc {
-    fn class(&self) -> &Type {
-        TYPES.get("NativeFunc").unwrap()
+impl Object for BuiltinFunc {
+    fn class(&self) -> &TypeRef {
+        BUILTIN_TYPES.get("BuiltinFunc").unwrap()
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -39,7 +39,7 @@ impl Object for NativeFunc {
 
 // Display -------------------------------------------------------------
 
-impl fmt::Display for NativeFunc {
+impl fmt::Display for BuiltinFunc {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let num_args = match self.arity {
             Some(n) => n.to_string(),
@@ -49,7 +49,7 @@ impl fmt::Display for NativeFunc {
     }
 }
 
-impl fmt::Debug for NativeFunc {
+impl fmt::Debug for BuiltinFunc {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self)
     }

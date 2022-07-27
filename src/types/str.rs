@@ -1,12 +1,12 @@
-//! Built in string type
+//! String type
 use std::any::Any;
 use std::fmt;
 
 use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeErr, RuntimeResult};
 
-use super::class::Type;
+use super::builtin_types::BUILTIN_TYPES;
+use super::class::TypeRef;
 use super::object::{Object, ObjectExt, ObjectRef};
-use super::types::TYPES;
 
 pub struct Str {
     value: String,
@@ -23,8 +23,8 @@ impl Str {
 }
 
 impl Object for Str {
-    fn class(&self) -> &Type {
-        TYPES.get("Str").unwrap()
+    fn class(&self) -> &TypeRef {
+        BUILTIN_TYPES.get("Str").unwrap()
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -51,7 +51,7 @@ impl Object for Str {
         } else {
             Err(RuntimeErr::new_type_err(format!(
                 "Could not concatenate String with {}",
-                rhs.class().name()
+                rhs.type_name()
             )))
         }
     }
