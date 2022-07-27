@@ -37,10 +37,10 @@ fn exit(result: ExeResult) -> ExitResult {
         // TODO: Return error code depending on error type?
         Err(err) => {
             let message = match err.kind {
-                ExeErrKind::CouldNotReadSourceFileErr(message) => message,
-                _ => format!("{err:?}"),
+                ExeErrKind::CouldNotReadSourceFileErr(message) => Some(message),
+                _ => None,
             };
-            Err((1, Some(message)))
+            Err((1, message))
         }
     }
 }
