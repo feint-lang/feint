@@ -262,17 +262,18 @@ impl<'a> Executor<'a> {
     }
 
     fn handle_comp_err(&self, err: &CompErr) {
+        use CompErrKind::*;
         let message = match &err.kind {
-            CompErrKind::UnhandledExpr(start, end) => {
+            UnhandledExpr(start, end) => {
                 format!("Compilation error: unhandled expression at {start} -> {end}")
             }
-            CompErrKind::LabelNotFoundInScope(name) => {
+            LabelNotFoundInScope(name) => {
                 format!("Compilation error: label not found in scope: {name}")
             }
-            CompErrKind::DuplicateLabelInScope(name) => {
+            DuplicateLabelInScope(name) => {
                 format!("Compilation error: duplicate label in scope: {name}")
             }
-            CompErrKind::ExpectedIdent => {
+            ExpectedIdent => {
                 format!("Compilation error: expected identifier")
             }
         };
@@ -293,6 +294,9 @@ impl<'a> Executor<'a> {
         let message = match &err.kind {
             NameErr(message) => format!("Name error: {message}"),
             TypeErr(message) => format!("Type error: {message}"),
+            AttrDoesNotExist(type_name, name) => {
+                format!("Attribute does not exist on type {type_name}: {name}")
+            }
             NotCallable(obj) => format!("Object is not callable: {obj:?}"),
             kind => format!("Unhandled runtime error: {:?}", kind),
         };

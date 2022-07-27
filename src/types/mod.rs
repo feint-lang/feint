@@ -3,7 +3,8 @@ pub(crate) use builtin_types::BUILTIN_TYPES;
 pub(crate) use builtins::Builtins;
 pub(crate) use class::Type;
 pub(crate) use func::Func;
-pub(crate) use object::ObjectRef;
+pub(crate) use namespace::Namespace;
+pub(crate) use object::{ObjectExt, ObjectRef};
 pub(crate) use result::{Args, CallResult};
 
 mod bool;
@@ -24,6 +25,6 @@ mod tuple;
 mod util;
 
 #[cfg(test)]
-pub(crate) use object::{Object, ObjectExt};
+pub(crate) use object::Object;
 
 mod tests;

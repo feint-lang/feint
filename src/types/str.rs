@@ -2,11 +2,11 @@
 use std::any::Any;
 use std::fmt;
 
-use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeErr, RuntimeResult};
+use crate::vm::{RuntimeContext, RuntimeErr, RuntimeResult};
 
 use super::builtin_types::BUILTIN_TYPES;
 use super::class::TypeRef;
-use super::object::{Object, ObjectExt, ObjectRef};
+use super::object::{Object, ObjectExt};
 
 pub struct Str {
     value: String,
@@ -31,22 +31,22 @@ impl Object for Str {
         self
     }
 
-    fn is_equal(&self, rhs: &ObjectRef, _ctx: &RuntimeContext) -> RuntimeBoolResult {
+    fn is_equal(&self, rhs: &dyn Object, _ctx: &RuntimeContext) -> bool {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
-            Ok(self.is(rhs) || self.value() == rhs.value())
+            self.is(rhs) || self.value() == rhs.value()
         } else {
-            Ok(false)
+            false
         }
     }
 
-    fn add(&self, rhs: &ObjectRef, ctx: &RuntimeContext) -> RuntimeResult {
+    fn add(&self, rhs: &dyn Object, ctx: &RuntimeContext) -> RuntimeResult {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
             let a = self.value();
             let b = rhs.value();
             let mut value = String::with_capacity(a.len() + b.len());
             value.push_str(a);
             value.push_str(b);
-            let value = ctx.builtins.new_string(value);
+            let value = ctx.builtins.new_str(value);
             Ok(value)
         } else {
             Err(RuntimeErr::new_type_err(format!(

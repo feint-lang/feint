@@ -6,7 +6,7 @@ use std::fmt;
 
 use num_traits::ToPrimitive;
 
-use crate::types::ObjectRef;
+use crate::types::{ObjectExt, ObjectRef};
 use crate::util::{BinaryOperator, Stack, UnaryOperator};
 
 use super::context::RuntimeContext;
@@ -114,6 +114,7 @@ impl VM {
                 JumpIf(addr, scope_exit_count) => {
                     self.exit_scopes(*scope_exit_count);
                     if let Some(obj) = self.pop_obj()? {
+                        let obj = obj.lock().unwrap();
                         if obj.as_bool(&self.ctx)? {
                             if !dis {
                                 ip = *addr;
@@ -127,6 +128,7 @@ impl VM {
                 JumpIfNot(addr, scope_exit_count) => {
                     self.exit_scopes(*scope_exit_count);
                     if let Some(obj) = self.pop_obj()? {
+                        let obj = obj.lock().unwrap();
                         if !obj.as_bool(&self.ctx)? {
                             if !dis {
                                 ip = *addr;
@@ -140,6 +142,7 @@ impl VM {
                 JumpIfElse(if_addr, else_addr, scope_exit_count) => {
                     self.exit_scopes(*scope_exit_count);
                     let addr = if let Some(obj) = self.pop_obj()? {
+                        let obj = obj.lock().unwrap();
                         if obj.as_bool(&self.ctx)? {
                             *if_addr
                         } else {
@@ -166,13 +169,17 @@ impl VM {
                         Plus | Negate => {
                             let result = match op {
                                 Plus => a, // no-op
-                                Negate => a.negate(&self.ctx)?,
+                                Negate => {
+                                    let a = a.lock().unwrap();
+                                    a.negate(&self.ctx)?
+                                }
                                 _ => unreachable!(),
                             };
                             self.push(Temp(result));
                         }
                         // Operators that return bool
                         _ => {
+                            let a = a.lock().unwrap();
                             let result = match op {
                                 AsBool => a.as_bool(&self.ctx)?,
                                 Not => a.not(&self.ctx)?,
@@ -197,8 +204,10 @@ impl VM {
                     };
                     match op {
                         Dot => {
+                            let a = a.lock().unwrap();
+                            let b = b.lock().unwrap();
                             let result = if let Some(name) = b.str_val() {
-                                a.get_attribute(name.as_str(), &self.ctx)?
+                                a.get_attr(name.as_str(), &self.ctx)?
                             } else if let Some(int) = b.int_val() {
                                 a.get_item(&int, &self.ctx)?
                             } else {
@@ -211,9 +220,12 @@ impl VM {
                         // In-place update operators
                         AddEqual | SubEqual => {
                             if let Var(depth, index) = a_kind {
+                                let a = a.lock().unwrap();
+                                let b = b.lock().unwrap();
+                                let b_ref = &(*b);
                                 let result = match op {
-                                    AddEqual => a.add(&b, &self.ctx)?,
-                                    SubEqual => a.sub(&b, &self.ctx)?,
+                                    AddEqual => a.add(b_ref, &self.ctx)?,
+                                    SubEqual => a.sub(b_ref, &self.ctx)?,
                                     _ => unreachable!(),
                                 };
                                 self.ctx.assign_var_by_depth_and_index(
@@ -227,35 +239,41 @@ impl VM {
                         }
                         // Math operators
                         Pow | Mul | Div | FloorDiv | Mod | Add | Sub => {
+                            let a = a.lock().unwrap();
+                            let b = b.lock().unwrap();
+                            let b_ref = &(*b);
                             let result = match op {
-                                Pow => a.pow(&b, &self.ctx)?,
-                                Mul => a.mul(&b, &self.ctx)?,
-                                Div => a.div(&b, &self.ctx)?,
-                                FloorDiv => a.floor_div(&b, &self.ctx)?,
-                                Mod => a.modulo(&b, &self.ctx)?,
-                                Add => a.add(&b, &self.ctx)?,
-                                Sub => a.sub(&b, &self.ctx)?,
+                                Pow => a.pow(b_ref, &self.ctx)?,
+                                Mul => a.mul(b_ref, &self.ctx)?,
+                                Div => a.div(b_ref, &self.ctx)?,
+                                FloorDiv => a.floor_div(b_ref, &self.ctx)?,
+                                Mod => a.modulo(b_ref, &self.ctx)?,
+                                Add => a.add(b_ref, &self.ctx)?,
+                                Sub => a.sub(b_ref, &self.ctx)?,
                                 _ => unreachable!(),
                             };
                             self.push(Temp(result));
                         }
                         // Operators that return bool
                         _ => {
+                            let a = a.lock().unwrap();
+                            let b = b.lock().unwrap();
+                            let b_ref = &(*b);
                             let result = match op {
-                                IsEqual => a.is_equal(&b, &self.ctx)?,
-                                Is => a.class().is(&b.class()) && a.id() == b.id(),
-                                NotEqual => a.not_equal(&b, &self.ctx)?,
-                                And => a.and(&b, &self.ctx)?,
-                                Or => a.or(&b, &self.ctx)?,
-                                LessThan => a.less_than(&b, &self.ctx)?,
+                                IsEqual => a.is_equal(b_ref, &self.ctx),
+                                Is => a.is(b_ref),
+                                NotEqual => a.not_equal(b_ref, &self.ctx),
+                                And => a.and(b_ref, &self.ctx)?,
+                                Or => a.or(b_ref, &self.ctx)?,
+                                LessThan => a.less_than(b_ref, &self.ctx)?,
                                 LessThanOrEqual => {
-                                    a.less_than(&b, &self.ctx)?
-                                        || a.is_equal(&b, &self.ctx)?
+                                    a.less_than(b_ref, &self.ctx)?
+                                        || a.is_equal(b_ref, &self.ctx)
                                 }
-                                GreaterThan => a.greater_than(&b, &self.ctx)?,
+                                GreaterThan => a.greater_than(b_ref, &self.ctx)?,
                                 GreaterThanOrEqual => {
-                                    a.greater_than(&b, &self.ctx)?
-                                        || a.is_equal(&b, &self.ctx)?
+                                    a.greater_than(b_ref, &self.ctx)?
+                                        || a.is_equal(b_ref, &self.ctx)
                                 }
                                 _ => unreachable!(),
                             };
@@ -269,9 +287,10 @@ impl VM {
                     if let Some(objects) = self.pop_n_obj(*n)? {
                         let mut string = String::with_capacity(32);
                         for obj in objects {
+                            let obj = obj.lock().unwrap();
                             string.push_str(obj.to_string().as_str());
                         }
-                        let string_obj = self.ctx.builtins.new_string(string);
+                        let string_obj = self.ctx.builtins.new_str(string);
                         self.push(Temp(string_obj));
                     } else {
                         return self.err(NotEnoughValuesOnStack(format!(
@@ -294,14 +313,17 @@ impl VM {
                 // Functions
                 Call(n) => match self.pop_n_obj(*n + 1)? {
                     Some(objects) => {
-                        let callable = objects.get(0).unwrap();
+                        let obj = objects.get(0).unwrap();
+                        let callable = obj.lock().unwrap();
                         let mut args: Vec<ObjectRef> = vec![];
                         if objects.len() > 1 {
                             for i in 1..objects.len() {
                                 args.push(objects.get(i).unwrap().clone());
                             }
                         }
-                        if let Some(builtin_func) = callable.as_builtin_func() {
+                        let result = if let Some(builtin_func) =
+                            callable.as_builtin_func()
+                        {
                             if let Some(arity) = builtin_func.arity {
                                 let num_args = args.len();
                                 if num_args != arity as usize {
@@ -312,17 +334,18 @@ impl VM {
                                     )));
                                 }
                             }
-                            let result = callable.call(args, &self.ctx)?;
-                            let return_val = match result {
-                                Some(return_val) => return_val,
-                                None => self.ctx.builtins.nil_obj.clone(),
-                            };
-                            self.push(ReturnVal(return_val));
+                            callable.call(args, &self.ctx)?
                         } else if let Some(func) = callable.as_func() {
                             self.execute(&func.chunk, dis)?;
+                            self.pop_obj()?
                         } else {
-                            return self.err(NotCallable(callable.clone()));
+                            return self.err(NotCallable(obj.clone()));
                         };
+                        let return_val = match result {
+                            Some(return_val) => return_val,
+                            None => self.ctx.builtins.nil_obj.clone(),
+                        };
+                        self.push(ReturnVal(return_val));
                     }
                     None => {
                         return self
@@ -359,6 +382,7 @@ impl VM {
                 }
                 HaltTop => {
                     if let Some(obj) = self.pop_obj()? {
+                        let obj = obj.lock().unwrap();
                         let return_code = match obj.int_val() {
                             Some(int) => {
                                 self.halt();
@@ -484,7 +508,7 @@ impl VM {
     }
 
     /// Show the contents of the stack (top first).
-    pub fn display_stack(&mut self) {
+    pub fn display_stack(&self) {
         if self.value_stack.is_empty() {
             return eprintln!("[EMPTY]");
         }
@@ -497,6 +521,19 @@ impl VM {
                 Err(_) => eprintln!("{:0>4} [NOT AN OBJECT]", i),
             }
         }
+    }
+
+    /// Show constants.
+    pub fn display_constants(&self) {
+        for (index, obj) in self.ctx.iter_constants().enumerate() {
+            let obj = obj.lock().unwrap();
+            eprintln!("{index:0>8} {obj}");
+        }
+    }
+
+    /// Show vars.
+    pub fn display_vars(&self) {
+        // TODO:
     }
 
     // Disassembler ----------------------------------------------------

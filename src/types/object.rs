@@ -1,12 +1,12 @@
 use std::any::Any;
 use std::fmt;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use num_bigint::BigInt;
 
 use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeErr, RuntimeResult};
 
-use super::result::{CallResult, GetAttributeResult, SetAttributeResult};
+use super::result::{CallResult, GetAttrResult, SetAttrResult};
 
 use super::bool::Bool;
 use super::builtin_func::BuiltinFunc;
@@ -18,7 +18,7 @@ use super::nil::Nil;
 use super::str::Str;
 use super::tuple::Tuple;
 
-pub type ObjectRef = Arc<dyn Object>;
+pub type ObjectRef = Arc<Mutex<dyn Object>>;
 
 macro_rules! make_type_checker {
     ( $func:ident, $ty:ty) => {
@@ -70,7 +70,7 @@ macro_rules! make_unary_op {
 
 macro_rules! make_bin_op {
     ( $func:ident, $op:literal, $result:ty ) => {
-        fn $func(&self, _rhs: &ObjectRef, _ctx: &RuntimeContext) -> $result {
+        fn $func(&self, _rhs: &dyn Object, _ctx: &RuntimeContext) -> $result {
             Err(RuntimeErr::new_type_err(format!(
                 "Binary operator {} ({}) not implemented for type {}",
                 $op,
@@ -93,11 +93,13 @@ pub trait Object {
     }
 
     fn type_name(&self) -> String {
-        self.class().name()
+        let class = self.class().lock().unwrap();
+        class.name()
     }
 
     fn qualified_type_name(&self) -> String {
-        self.class().qualified_name()
+        let class = self.class().lock().unwrap();
+        class.qualified_name()
     }
 
     // Type checkers ---------------------------------------------------
@@ -141,14 +143,14 @@ pub trait Object {
 
     // Binary operations -----------------------------------------------
 
-    fn is_equal(&self, rhs: &ObjectRef, _ctx: &RuntimeContext) -> RuntimeBoolResult {
+    fn is_equal(&self, rhs: &dyn Object, _ctx: &RuntimeContext) -> bool {
         // This duplicates ObjectExt::is(), but that method can't be
         // used here.
-        Ok(self.class().is(&rhs.class()) && self.id() == rhs.id())
+        self.id() == rhs.id()
     }
 
-    fn not_equal(&self, rhs: &ObjectRef, ctx: &RuntimeContext) -> RuntimeBoolResult {
-        self.is_equal(rhs, ctx).map(|equal| !equal)
+    fn not_equal(&self, rhs: &dyn Object, ctx: &RuntimeContext) -> bool {
+        !self.is_equal(rhs, ctx)
     }
 
     make_bin_op!(less_than, "<", RuntimeBoolResult);
@@ -173,20 +175,33 @@ pub trait Object {
 
     // Attributes ------------------------------------------------------
 
-    fn get_attribute(&self, name: &str, _ctx: &RuntimeContext) -> GetAttributeResult {
-        Err(RuntimeErr::new_attribute_does_not_exit(name))
+    fn get_base_attr(&self, name: &str, ctx: &RuntimeContext) -> Option<ObjectRef> {
+        let attr = match name {
+            "id" => ctx.builtins.new_int(self.id()),
+            "type_name" => ctx.builtins.new_str(self.type_name()),
+            "qualified_type_name" => ctx.builtins.new_str(self.qualified_type_name()),
+            _ => return None,
+        };
+        Some(attr)
     }
 
-    fn set_attribute(
+    fn get_attr(&self, name: &str, _ctx: &RuntimeContext) -> GetAttrResult {
+        Err(RuntimeErr::new_attr_does_not_exist(
+            self.qualified_type_name().as_str(),
+            name,
+        ))
+    }
+
+    fn set_attr(
         &self,
         name: &str,
         _value: ObjectRef,
         _ctx: &RuntimeContext,
-    ) -> SetAttributeResult {
-        Err(RuntimeErr::new_attribute_cannot_be_set(name))
+    ) -> SetAttrResult {
+        Err(RuntimeErr::new_attr_cannot_be_set(name))
     }
 
-    fn get_item(&self, index: &BigInt, _ctx: &RuntimeContext) -> GetAttributeResult {
+    fn get_item(&self, index: &BigInt, _ctx: &RuntimeContext) -> GetAttrResult {
         Err(RuntimeErr::new_item_does_not_exit(index.to_string()))
     }
 
@@ -195,7 +210,7 @@ pub trait Object {
         index: &BigInt,
         _value: ObjectRef,
         _ctx: &RuntimeContext,
-    ) -> SetAttributeResult {
+    ) -> SetAttrResult {
         Err(RuntimeErr::new_item_cannot_be_set(index.to_string()))
     }
 }
@@ -205,7 +220,7 @@ pub trait Object {
 /// Methods that aren't "object safe"
 pub trait ObjectExt: Object {
     fn is(&self, other: &Self) -> bool {
-        self.class().is(&other.class()) && self.id() == other.id()
+        self.id() == other.id()
     }
 }
 
@@ -235,19 +250,20 @@ impl fmt::Display for dyn Object {
         write_instance!(
             f,
             self,
-            super::class::Type,
-            super::nil::Nil,
             super::bool::Bool,
-            super::int::Int,
-            super::float::Float,
-            super::str::Str,
-            super::tuple::Tuple,
-            super::func::Func,
             super::builtin_func::BuiltinFunc,
-            super::custom::Custom
+            super::class::Type,
+            super::custom::Custom,
+            super::float::Float,
+            super::func::Func,
+            super::int::Int,
+            super::namespace::Namespace,
+            super::nil::Nil,
+            super::str::Str,
+            super::tuple::Tuple
         );
         // Fallback
-        write!(f, "{}()", self.class())
+        write!(f, "{}()", self.class().lock().unwrap())
     }
 }
 
@@ -256,18 +272,25 @@ impl fmt::Debug for dyn Object {
         debug_instance!(
             f,
             self,
-            super::class::Type,
-            super::nil::Nil,
             super::bool::Bool,
-            super::int::Int,
-            super::float::Float,
-            super::str::Str,
-            super::tuple::Tuple,
-            super::func::Func,
             super::builtin_func::BuiltinFunc,
-            super::custom::Custom
+            super::class::Type,
+            super::custom::Custom,
+            super::float::Float,
+            super::func::Func,
+            super::int::Int,
+            super::namespace::Namespace,
+            super::nil::Nil,
+            super::str::Str,
+            super::tuple::Tuple
         );
         // Fallback
-        write!(f, "{} object @ {:?} -> {}", self.class(), self.id(), self)
+        write!(
+            f,
+            "{} object @ {:?} -> {}",
+            self.class().lock().unwrap(),
+            self.id(),
+            self
+        )
     }
 }

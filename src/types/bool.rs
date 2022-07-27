@@ -6,7 +6,7 @@ use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeErr};
 
 use super::builtin_types::BUILTIN_TYPES;
 use super::class::TypeRef;
-use super::object::{Object, ObjectExt, ObjectRef};
+use super::object::{Object, ObjectExt};
 
 pub struct Bool {
     value: bool,
@@ -39,15 +39,15 @@ impl Object for Bool {
 
     // Binary operations -----------------------------------------------
 
-    fn is_equal(&self, rhs: &ObjectRef, _ctx: &RuntimeContext) -> RuntimeBoolResult {
+    fn is_equal(&self, rhs: &dyn Object, _ctx: &RuntimeContext) -> bool {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
-            Ok(self.is(rhs) || self.value() == rhs.value())
+            self.is(rhs) || self.value() == rhs.value()
         } else {
-            Ok(false)
+            false
         }
     }
 
-    fn and(&self, rhs: &ObjectRef, _ctx: &RuntimeContext) -> RuntimeBoolResult {
+    fn and(&self, rhs: &dyn Object, _ctx: &RuntimeContext) -> RuntimeBoolResult {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
             Ok(*self.value() && *rhs.value())
         } else {
@@ -58,7 +58,7 @@ impl Object for Bool {
         }
     }
 
-    fn or(&self, rhs: &ObjectRef, _ctx: &RuntimeContext) -> RuntimeBoolResult {
+    fn or(&self, rhs: &dyn Object, _ctx: &RuntimeContext) -> RuntimeBoolResult {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
             Ok(*self.value() || *rhs.value())
         } else {

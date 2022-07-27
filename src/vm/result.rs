@@ -41,12 +41,12 @@ impl RuntimeErr {
         Self::new(RuntimeErrKind::TypeErr(message.into()))
     }
 
-    pub fn new_attribute_does_not_exit<S: Into<String>>(name: S) -> Self {
-        Self::new(RuntimeErrKind::AttributeDoesNotExist(name.into()))
+    pub fn new_attr_does_not_exist<S: Into<String>>(type_name: S, name: S) -> Self {
+        Self::new(RuntimeErrKind::AttrDoesNotExist(type_name.into(), name.into()))
     }
 
-    pub fn new_attribute_cannot_be_set<S: Into<String>>(name: S) -> Self {
-        Self::new(RuntimeErrKind::AttributeCannotBeSet(name.into()))
+    pub fn new_attr_cannot_be_set<S: Into<String>>(name: S) -> Self {
+        Self::new(RuntimeErrKind::AttrCannotBeSet(name.into()))
     }
 
     pub fn new_item_does_not_exit<S: Into<String>>(name: S) -> Self {
@@ -80,8 +80,8 @@ pub enum RuntimeErrKind {
     TypeErr(String),
     NameErr(String),
     StringFormatErr(String),
-    AttributeDoesNotExist(String),
-    AttributeCannotBeSet(String),
+    AttrDoesNotExist(String, String),
+    AttrCannotBeSet(String),
     ItemDoesNotExist(String),
     ItemCannotBeSet(String),
     IndexOutOfBounds(usize),

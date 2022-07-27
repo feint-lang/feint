@@ -1,28 +1,33 @@
 //! "Class" and "type" are used interchangeably and mean exactly the
 //! same thing. Lower case "class" is used instead of "type" because the
 //! latter is a Rust keyword.
+use crate::types::ObjectRef;
 use std::any::Any;
 use std::fmt;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use crate::vm::{RuntimeContext, RuntimeErr};
 
 use super::builtin_types::BUILTIN_TYPES;
 use super::object::Object;
-use super::result::GetAttributeResult;
+use super::result::GetAttrResult;
 
-pub type TypeRef = Arc<Type>;
+pub type TypeRef = Arc<Mutex<Type>>;
 
 /// Represents a type, whether builtin or user-defined.
 #[derive(Clone)]
 pub struct Type {
     module: String,
     name: String,
+    qualified_name: String,
 }
 
 impl Type {
     pub fn new<S: Into<String>>(module: S, name: S) -> Self {
-        Self { module: module.into(), name: name.into() }
+        let module = module.into();
+        let name = name.into();
+        let qualified_name = format!("{}.{}", module, name);
+        Self { module, name, qualified_name }
     }
 
     pub fn id(&self) -> usize {
@@ -38,11 +43,28 @@ impl Type {
     }
 
     pub fn qualified_name(&self) -> String {
-        format!("{}.{}", self.module, self.name)
+        self.qualified_name.clone()
     }
 
     pub fn is(&self, other: &Self) -> bool {
         self.id() == other.id()
+    }
+
+    // Attributes ------------------------------------------------------
+
+    fn get_tuple_attr(&self, name: &str, ctx: &RuntimeContext) -> Option<ObjectRef> {
+        let attr = match name {
+            "new" => ctx.builtins.new_tuple(vec![]),
+            _ => return None,
+        };
+        Some(attr)
+    }
+
+    fn attr_does_not_exist_err(&self, name: &str) -> RuntimeErr {
+        return RuntimeErr::new_attr_does_not_exist(
+            self.qualified_name().as_str(),
+            name,
+        );
     }
 }
 
@@ -55,13 +77,27 @@ impl Object for Type {
         self
     }
 
-    fn get_attribute(&self, name: &str, ctx: &RuntimeContext) -> GetAttributeResult {
-        match name {
-            "module" => Ok(ctx.builtins.new_string(self.module())),
-            "name" => Ok(ctx.builtins.new_string(self.type_name())),
-            "id" => Ok(ctx.builtins.new_int(self.id())),
-            _ => Err(RuntimeErr::new_attribute_does_not_exit(name)),
+    fn get_attr(&self, name: &str, ctx: &RuntimeContext) -> GetAttrResult {
+        if let Some(attr) = self.get_base_attr(name, ctx) {
+            return Ok(attr);
         }
+        let attr = match name {
+            "module" => ctx.builtins.new_str(self.module()),
+            "name" => ctx.builtins.new_str(self.name()),
+            "qualified_name" => ctx.builtins.new_str(self.qualified_name()),
+            _ => {
+                let attr = match self.qualified_name.as_str() {
+                    "builtins.Tuple" => self.get_tuple_attr(name, ctx),
+                    _ => return Err(self.attr_does_not_exist_err(name)),
+                };
+                if let Some(attr) = attr {
+                    attr
+                } else {
+                    return Err(self.attr_does_not_exist_err(name));
+                }
+            }
+        };
+        Ok(attr)
     }
 }
 

@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use num_bigint::BigInt;
 use num_traits::Num;
@@ -12,25 +12,25 @@ use super::object::ObjectRef;
 
 pub struct Builtins {
     // Singletons
-    pub nil_obj: Arc<super::nil::Nil>,
-    pub true_obj: Arc<super::bool::Bool>,
-    pub false_obj: Arc<super::bool::Bool>,
-    pub empty_tuple: Arc<super::tuple::Tuple>,
+    pub nil_obj: Arc<Mutex<super::nil::Nil>>,
+    pub true_obj: Arc<Mutex<super::bool::Bool>>,
+    pub false_obj: Arc<Mutex<super::bool::Bool>>,
+    pub empty_tuple: Arc<Mutex<super::tuple::Tuple>>,
 }
 
 impl Builtins {
     pub fn new() -> Self {
         // Singletons
-        let nil_obj = Arc::new(super::nil::Nil::new());
-        let true_obj = Arc::new(super::bool::Bool::new(true));
-        let false_obj = Arc::new(super::bool::Bool::new(false));
-        let empty_tuple = Arc::new(super::tuple::Tuple::new(vec![]));
+        let nil_obj = Arc::new(Mutex::new(super::nil::Nil::new()));
+        let true_obj = Arc::new(Mutex::new(super::bool::Bool::new(true)));
+        let false_obj = Arc::new(Mutex::new(super::bool::Bool::new(false)));
+        let empty_tuple = Arc::new(Mutex::new(super::tuple::Tuple::new(vec![])));
         Self { nil_obj, true_obj, false_obj, empty_tuple }
     }
 
     pub fn new_type(&self, module: &str, name: &str) -> TypeRef {
         let class = Type::new(module, name);
-        Arc::new(class)
+        Arc::new(Mutex::new(class))
     }
 
     // Builtin type constructors ---------------------------------------
@@ -41,12 +41,12 @@ impl Builtins {
         func: BuiltinFn,
         arity: Option<u8>,
     ) -> ObjectRef {
-        Arc::new(super::builtin_func::BuiltinFunc::new(name, func, arity))
+        Arc::new(Mutex::new(super::builtin_func::BuiltinFunc::new(name, func, arity)))
     }
 
     pub fn new_float<F: Into<f64>>(&self, value: F) -> ObjectRef {
         let value = value.into();
-        Arc::new(super::float::Float::new(value))
+        Arc::new(Mutex::new(super::float::Float::new(value)))
     }
 
     pub fn new_float_from_string<S: Into<String>>(&self, value: S) -> ObjectRef {
@@ -61,18 +61,18 @@ impl Builtins {
         params: Vec<String>,
         chunk: Chunk,
     ) -> ObjectRef {
-        Arc::new(super::func::Func::new(name, params, chunk))
+        Arc::new(Mutex::new(super::func::Func::new(name, params, chunk)))
     }
 
     pub fn new_int<I: Into<BigInt>>(&self, value: I) -> ObjectRef {
         let value = value.into();
-        Arc::new(super::int::Int::new(value))
+        Arc::new(Mutex::new(super::int::Int::new(value)))
     }
 
-    pub fn new_namespace(&self) -> ObjectRef {
-        let mut ns = super::namespace::Namespace::new();
+    pub fn new_namespace(&self, name: &str) -> ObjectRef {
+        let mut ns = super::namespace::Namespace::new(name);
         ns.add_obj(self.nil_obj.clone());
-        Arc::new(ns)
+        Arc::new(Mutex::new(ns))
     }
 
     pub fn new_int_from_string<S: Into<String>>(&self, value: S) -> ObjectRef {
@@ -81,22 +81,22 @@ impl Builtins {
         self.new_int(value)
     }
 
-    pub fn new_string<S: Into<String>>(&self, value: S) -> ObjectRef {
+    pub fn new_str<S: Into<String>>(&self, value: S) -> ObjectRef {
         let value = value.into();
-        Arc::new(super::str::Str::new(value))
+        Arc::new(Mutex::new(super::str::Str::new(value)))
     }
 
     pub fn new_tuple(&self, items: Vec<ObjectRef>) -> ObjectRef {
         if items.is_empty() {
             return self.empty_tuple.clone();
         }
-        Arc::new(super::tuple::Tuple::new(items))
+        Arc::new(Mutex::new(super::tuple::Tuple::new(items)))
     }
 
     // Custom type constructor -----------------------------------------
 
     pub fn new_custom_instance(&self, class: TypeRef) -> ObjectRef {
-        Arc::new(Custom::new(class))
+        Arc::new(Mutex::new(Custom::new(class)))
     }
 
     // Utilities -------------------------------------------------------

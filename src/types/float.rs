@@ -9,7 +9,7 @@ use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeErr, RuntimeResult};
 use super::builtin_types::BUILTIN_TYPES;
 use super::class::TypeRef;
 use super::int::Int;
-use super::object::{Object, ObjectExt, ObjectRef};
+use super::object::{Object, ObjectExt};
 use super::util::eq_int_float;
 
 pub struct Float {
@@ -28,7 +28,7 @@ impl Float {
 
 macro_rules! make_op {
     ( $meth:ident, $op:tt, $message:literal, $trunc:literal ) => {
-        fn $meth(&self, rhs: &ObjectRef, ctx: &RuntimeContext) -> RuntimeResult {
+        fn $meth(&self, rhs: &dyn Object, ctx: &RuntimeContext) -> RuntimeResult {
             let value = if let Some(rhs) = rhs.as_any().downcast_ref::<Float>() {
                 *rhs.value()
             } else if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
@@ -63,17 +63,18 @@ impl Object for Float {
         Ok(if *self.value() == 0.0 { false } else { true })
     }
 
-    fn is_equal(&self, rhs: &ObjectRef, _ctx: &RuntimeContext) -> RuntimeBoolResult {
+    fn is_equal(&self, rhs: &dyn Object, _ctx: &RuntimeContext) -> bool {
+        // let rhs = rhs.lock().unwrap();
         if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
-            Ok(self.is(rhs) || self.value() == rhs.value())
+            self.is(rhs) || self.value() == rhs.value()
         } else if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
-            Ok(eq_int_float(rhs, self))
+            eq_int_float(rhs, self)
         } else {
-            Ok(false)
+            false
         }
     }
 
-    fn pow(&self, rhs: &ObjectRef, ctx: &RuntimeContext) -> RuntimeResult {
+    fn pow(&self, rhs: &dyn Object, ctx: &RuntimeContext) -> RuntimeResult {
         let exp = if let Some(rhs) = rhs.as_any().downcast_ref::<Float>() {
             *rhs.value()
         } else if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {

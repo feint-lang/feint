@@ -122,7 +122,7 @@ impl<'a> Visitor<'a> {
             Kind::Bool(false) => self.push_const(2),
             Kind::Int(value) => self.add_const(self.ctx.builtins.new_int(value)),
             Kind::Float(value) => self.add_const(self.ctx.builtins.new_float(value)),
-            Kind::String(value) => self.add_const(self.ctx.builtins.new_string(value)),
+            Kind::String(value) => self.add_const(self.ctx.builtins.new_str(value)),
         }
         Ok(())
     }
@@ -152,11 +152,11 @@ impl<'a> Visitor<'a> {
         obj_expr: ast::Expr,
         name_expr: ast::Expr,
     ) -> VisitResult {
-        use ast::ExprKind;
-        use ast::{Ident, IdentKind};
-        self.visit_expr(obj_expr)?;
+        use ast::ExprKind::Ident as IdentExpr;
+        use ast::IdentKind::{Ident, TypeIdent};
         let kind = &name_expr.kind;
-        if let ExprKind::Ident(Ident { kind: IdentKind::Ident(name) }) = kind {
+        self.visit_expr(obj_expr)?;
+        if let IdentExpr(ast::Ident { kind: Ident(name) | TypeIdent(name) }) = kind {
             self.visit_literal(ast::Literal::new_string(name))?;
         } else {
             self.visit_expr(name_expr)?;

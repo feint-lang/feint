@@ -101,6 +101,7 @@ impl<'a> Repl<'a> {
                 eprintln!(".help  -> show help");
                 eprintln!(".exit  -> exit");
                 eprintln!(".stack -> show VM stack (top first)");
+                eprintln!(".constants -> show constants");
                 eprintln!(".emacs -> switch to emacs-style input (default)");
                 eprintln!(".vi    -> switch to vi-style input");
                 eprintln!("{:=>72}", "");
@@ -113,6 +114,14 @@ impl<'a> Repl<'a> {
             ".exit" | ".quit" => return Some(Ok(None)),
             ".stack" => {
                 self.executor.vm.display_stack();
+                return None;
+            }
+            ".constants" => {
+                self.executor.vm.display_constants();
+                return None;
+            }
+            ".vars" => {
+                self.executor.vm.display_vars();
                 return None;
             }
             ".emacs" => {
@@ -134,6 +143,7 @@ impl<'a> Repl<'a> {
                 Ok(Some(val)) => {
                     chunk.push(Inst::AssignVar(var.to_owned()));
                     // Print the result if it's not nil
+                    let val = val.lock().unwrap();
                     if !val.is_nil() {
                         chunk.push(Inst::LoadVar("print".to_owned()));
                         chunk.push(Inst::LoadVar("_".to_owned()));

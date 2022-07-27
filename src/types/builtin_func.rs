@@ -1,4 +1,5 @@
 //! Builtin function type
+use crate::types::Type;
 use std::any::Any;
 use std::fmt;
 

@@ -5,12 +5,12 @@ use std::fmt;
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 
-use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeErr};
+use crate::vm::{RuntimeContext, RuntimeErr};
 
 use super::builtin_types::BUILTIN_TYPES;
 use super::class::TypeRef;
 use super::object::{Object, ObjectExt, ObjectRef};
-use super::result::GetAttributeResult;
+use super::result::GetAttrResult;
 
 pub struct Tuple {
     items: Vec<ObjectRef>,
@@ -39,33 +39,44 @@ impl Object for Tuple {
         self
     }
 
-    fn is_equal(&self, rhs: &ObjectRef, ctx: &RuntimeContext) -> RuntimeBoolResult {
+    fn is_equal(&self, rhs: &dyn Object, _ctx: &RuntimeContext) -> bool {
+        // let rhs = rhs.lock().unwrap();
         if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
             if self.is(rhs) {
-                return Ok(true);
+                return true;
             }
             if self.len() != rhs.len() {
-                return Ok(false);
+                return false;
             }
             for (a, b) in self.items().iter().zip(rhs.items()) {
-                if !a.is_equal(b, ctx)? {
-                    return Ok(false);
+                let a = a.lock().unwrap();
+                if !a.is_equal(&(*b.lock().unwrap()), _ctx) {
+                    return false;
                 }
             }
-            return Ok(true);
+            return true;
         } else {
-            Ok(false)
+            false
         }
     }
 
-    fn get_attribute(&self, name: &str, ctx: &RuntimeContext) -> GetAttributeResult {
-        match name {
-            "length" => Ok(ctx.builtins.new_int(self.len())),
-            _ => Err(RuntimeErr::new_attribute_does_not_exit(name)),
+    fn get_attr(&self, name: &str, ctx: &RuntimeContext) -> GetAttrResult {
+        if let Some(attr) = self.get_base_attr(name, ctx) {
+            return Ok(attr);
         }
+        let attr = match name {
+            "length" => ctx.builtins.new_int(self.len()),
+            _ => {
+                return Err(RuntimeErr::new_attr_does_not_exist(
+                    self.qualified_type_name().as_str(),
+                    name,
+                ))
+            }
+        };
+        Ok(attr)
     }
 
-    fn get_item(&self, index: &BigInt, _ctx: &RuntimeContext) -> GetAttributeResult {
+    fn get_item(&self, index: &BigInt, _ctx: &RuntimeContext) -> GetAttrResult {
         let index = index.to_usize().unwrap();
         match self.items.get(index) {
             Some(obj) => Ok(obj.clone()),
@@ -79,8 +90,14 @@ impl Object for Tuple {
 impl fmt::Display for Tuple {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let num_items = self.items().len();
-        let items: Vec<String> =
-            self.items().iter().map(|item| format!("{item}")).collect();
+        let items: Vec<String> = self
+            .items()
+            .iter()
+            .map(|item| {
+                let item = item.lock().unwrap();
+                format!("{item}")
+            })
+            .collect();
         let trailing_comma = if num_items == 1 { "," } else { "" };
         write!(f, "({}{})", items.join(", "), trailing_comma)
     }

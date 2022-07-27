@@ -1,6 +1,7 @@
+use std::slice::Iter;
 use std::sync::{Arc, Mutex};
 
-use crate::types::{BuiltinFn, Builtins, ObjectRef, Type, BUILTIN_TYPES};
+use crate::types::{BuiltinFn, Builtins, ObjectRef, BUILTIN_TYPES};
 
 use super::namespace::Namespace;
 use super::objects::Objects;
@@ -21,10 +22,19 @@ impl RuntimeContext {
         Self { builtins, constants, namespace_stack }
     }
 
+    pub fn iter_constants(&self) -> Iter<'_, ObjectRef> {
+        self.constants.iter()
+    }
+
     fn current_namespace(&mut self) -> &mut Namespace {
         let index = self.depth();
         &mut self.namespace_stack[index]
     }
+
+    fn global_namespace(&mut self) -> &mut Namespace {
+        &mut self.namespace_stack[0]
+    }
+
     pub fn enter_scope(&mut self) {
         let mut namespace = Namespace::new();
         namespace.add_obj(self.builtins.nil_obj.clone());
@@ -167,7 +177,6 @@ impl RuntimeContext {
 impl Default for RuntimeContext {
     fn default() -> Self {
         let builtins = Builtins::new();
-        let builtins_ns = builtins.new_namespace();
 
         // Singletons
         let nil_obj = builtins.nil_obj.clone();
@@ -178,6 +187,18 @@ impl Default for RuntimeContext {
         let namespace_stack = vec![];
         let mut ctx = RuntimeContext::new(builtins, constants, namespace_stack);
 
+        // Add builtin types to builtins namespace.
+        let mut builtins_ns = crate::types::Namespace::new("builtins");
+        builtins_ns.add_obj(nil_obj.clone());
+        for (name, class) in BUILTIN_TYPES.iter() {
+            if builtins_ns.add_var(*name).is_none() {
+                panic!("Could not add {name} to {builtins_ns}");
+            }
+            if builtins_ns.set_var(name, class.clone()).is_none() {
+                panic!("Could not set {name} in {builtins_ns}");
+            }
+        }
+
         // Add singleton constants.
         ctx.add_const(nil_obj); // 0
         ctx.add_const(true_obj); // 1
@@ -187,15 +208,25 @@ impl Default for RuntimeContext {
         // NOTE: This needs to be done before adding global vars.
         ctx.enter_scope();
 
-        // Add builtin types to global scope
+        // Add builtins var to global scope.
+        // NOTE: This needs to be done after entering the global scope.
+        let builtins_ns_var = Arc::new(Mutex::new(builtins_ns));
         if let Err(err) = ctx.declare_var("builtins") {
             panic!("Could not declare global builtins var: {err}");
         }
-        if let Err(err) = ctx.assign_var("builtins", builtins_ns) {
+        if let Err(err) = ctx.assign_var("builtins", builtins_ns_var) {
             panic!("Could not declare global builtins var: {err}");
         }
-        if let Err(err) = ctx.add_builtin_types() {
-            panic!("Could not add builtin types: {err}");
+
+        // Add shorthand aliases for builtin types to the global
+        // namespace.
+        for (name, class) in BUILTIN_TYPES.iter() {
+            if let Err(err) = ctx.declare_var(name) {
+                panic!("Could not declare global var {name}: {err}");
+            }
+            if let Err(err) = ctx.assign_var(name, class.clone()) {
+                panic!("Could not assign global var {name}: {err}");
+            }
         }
 
         // Add builtin functions to global scope

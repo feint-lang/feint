@@ -5,24 +5,23 @@ use std::any::Any;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
-use std::sync::Arc;
 
-use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeErr, RuntimeErrKind};
+use crate::vm::{RuntimeContext, RuntimeErr};
 
 use super::class::TypeRef;
 use super::object::{Object, ObjectExt, ObjectRef};
-use super::result::{GetAttributeResult, SetAttributeResult};
+use super::result::{GetAttrResult, SetAttrResult};
 
-pub type Attributes = RefCell<HashMap<String, ObjectRef>>;
+pub type Attrs = RefCell<HashMap<String, ObjectRef>>;
 
 pub struct Custom {
     class: TypeRef,
-    attributes: Attributes,
+    attrs: Attrs,
 }
 
 impl Custom {
     pub fn new(class: TypeRef) -> Self {
-        Self { class, attributes: RefCell::new(HashMap::new()) }
+        Self { class, attrs: RefCell::new(HashMap::new()) }
     }
 }
 
@@ -35,30 +34,34 @@ impl Object for Custom {
         self
     }
 
-    fn is_equal(&self, rhs: &ObjectRef, ctx: &RuntimeContext) -> RuntimeBoolResult {
+    fn is_equal(&self, rhs: &dyn Object, _ctx: &RuntimeContext) -> bool {
+        // let rhs = rhs.lock().unwrap();
         if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
-            Ok(self.is(&rhs)
-                || (self.class() == rhs.class()
-                    && attributes_equal(&self.attributes, &rhs.attributes, ctx)?))
+            self.is(&rhs)
+                || (self.class().lock().unwrap().is(&rhs.class().lock().unwrap())
+                    && attrs_equal(&self.attrs, &rhs.attrs, _ctx))
         } else {
-            Ok(false)
+            false
         }
     }
 
-    fn get_attribute(&self, name: &str, _ctx: &RuntimeContext) -> GetAttributeResult {
-        if let Some(value) = self.attributes.borrow().get(name) {
+    fn get_attr(&self, name: &str, _ctx: &RuntimeContext) -> GetAttrResult {
+        if let Some(value) = self.attrs.borrow().get(name) {
             return Ok(value.clone());
         }
-        Err(RuntimeErr::new(RuntimeErrKind::AttributeDoesNotExist(name.to_owned())))
+        Err(RuntimeErr::new_attr_does_not_exist(
+            self.qualified_type_name().as_str(),
+            name,
+        ))
     }
 
-    fn set_attribute(
+    fn set_attr(
         &self,
         name: &str,
         value: ObjectRef,
         _ctx: &RuntimeContext,
-    ) -> SetAttributeResult {
-        self.attributes.borrow_mut().insert(name.to_owned(), value.clone());
+    ) -> SetAttrResult {
+        self.attrs.borrow_mut().insert(name.to_owned(), value.clone());
         Ok(())
     }
 }
@@ -69,22 +72,19 @@ impl Object for Custom {
 /// checked to see if they have the same number of entries. Then, the
 /// keys are checked to see if they're all the same. If they are, only
 /// then are the values checked for equality.
-fn attributes_equal(
-    lhs: &Attributes,
-    rhs: &Attributes,
-    ctx: &RuntimeContext,
-) -> RuntimeBoolResult {
+fn attrs_equal(lhs: &Attrs, rhs: &Attrs, ctx: &RuntimeContext) -> bool {
     let lhs = lhs.borrow();
     let rhs = rhs.borrow();
     if !(lhs.len() == rhs.len() && lhs.keys().all(|k| rhs.contains_key(k))) {
-        return Ok(false);
+        return false;
     }
     for (k, v) in lhs.iter() {
-        if !v.is_equal(&rhs[k], ctx)? {
-            return Ok(false);
+        let v = v.lock().unwrap();
+        if !v.is_equal(&(*rhs[k].lock().unwrap()), ctx) {
+            return false;
         }
     }
-    Ok(true)
+    true
 }
 
 // Display -------------------------------------------------------------
@@ -92,10 +92,10 @@ fn attributes_equal(
 impl fmt::Display for Custom {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let attrs: Vec<String> = self
-            .attributes
+            .attrs
             .borrow()
             .iter()
-            .map(|(n, v)| format!("{}={}", n, v))
+            .map(|(n, v)| format!("{}={}", n, v.lock().unwrap()))
             .collect();
         write!(f, "{}({})", self.type_name(), attrs.join(", "))
     }

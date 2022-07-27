@@ -1,5 +1,10 @@
 use std::any::Any;
 use std::collections::HashMap;
+use std::fmt;
+
+use crate::types::result::GetAttrResult;
+use crate::types::Type;
+use crate::vm::{RuntimeContext, RuntimeErr};
 
 use super::class::TypeRef;
 use super::object::Object;
@@ -8,13 +13,18 @@ use super::{ObjectRef, BUILTIN_TYPES};
 // Namespace -----------------------------------------------------------
 
 pub struct Namespace {
+    name: String,
     name_index: HashMap<String, usize>, // name => object index
     objects: Objects,
 }
 
 impl Namespace {
-    pub fn new() -> Self {
-        Namespace { name_index: HashMap::new(), objects: Objects::default() }
+    pub fn new<S: Into<String>>(name: S) -> Self {
+        Namespace {
+            name: name.into(),
+            name_index: HashMap::new(),
+            objects: Objects::default(),
+        }
     }
 
     pub fn clear(&mut self) {
@@ -67,7 +77,7 @@ impl Namespace {
     }
 
     /// Get a var.
-    pub fn get_var(&mut self, name: &str) -> Option<&ObjectRef> {
+    pub fn get_var(&self, name: &str) -> Option<&ObjectRef> {
         if let Some(index) = self.var_index(name) {
             self.get_obj(index)
         } else {
@@ -92,6 +102,37 @@ impl Object for Namespace {
 
     fn as_any(&self) -> &dyn Any {
         self
+    }
+
+    fn get_attr(&self, name: &str, ctx: &RuntimeContext) -> GetAttrResult {
+        if let Some(attr) = self.get_base_attr(name, ctx) {
+            return Ok(attr);
+        }
+        if let Some(obj) = self.get_var(name) {
+            Ok(obj.clone())
+        } else {
+            Err(RuntimeErr::new_attr_does_not_exist(
+                self.qualified_type_name().as_str(),
+                name,
+            ))
+        }
+    }
+}
+
+// Display -------------------------------------------------------------
+
+impl fmt::Display for Namespace {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = self.name.as_str();
+        let size = self.size();
+        let noun = if size == 1 { "entry" } else { "entries" };
+        write!(f, "Namespace: {} ({} {noun})", name, size)
+    }
+}
+
+impl fmt::Debug for Namespace {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self)
     }
 }
 
