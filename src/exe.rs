@@ -106,26 +106,35 @@ impl<'a> Executor<'a> {
     pub fn execute_chunk(&mut self, chunk: Vec<Inst>) -> ExeResult {
         let result = if cfg!(debug_assertions) {
             if self.dis {
-                eprintln!("{:=<72}", "INSTRUCTIONS ");
+                eprintln!("{:=<79}", "INSTRUCTIONS ");
             } else if self.debug {
-                eprintln!("{:=<72}", "OUTPUT ");
+                eprintln!("{:=<79}", "OUTPUT ");
             }
             self.vm.execute(&chunk, self.dis)
         } else if self.dis {
-            eprintln!("{:=<72}", "INSTRUCTIONS ");
+            eprintln!("{:=<79}", "INSTRUCTIONS ");
             let result = self.vm.dis_list(&chunk);
             eprintln!("NOTE: Full disassembly is only available in debug builds");
             result
         } else {
             if self.debug {
-                eprintln!("{:=<72}", "OUTPUT ");
+                eprintln!("{:=<79}", "OUTPUT ");
             }
             self.vm.execute(&chunk, false)
         };
+        let num_funcs = if self.dis {
+            eprintln!();
+            self.vm.dis_functions()
+        } else {
+            0
+        };
         if self.debug {
-            eprintln!("{:=<72}", "STACK ");
+            if !self.dis || num_funcs > 0 {
+                eprintln!();
+            }
+            eprintln!("{:=<79}", "STACK ");
             self.vm.display_stack();
-            eprintln!("{:=<72}", "VM STATE ");
+            eprintln!("\n{:=<79}", "VM STATE ");
             eprintln!("{:?}", result);
         }
         match result {

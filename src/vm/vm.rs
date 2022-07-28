@@ -519,6 +519,7 @@ impl VM {
             let obj = self.get_obj(kind.clone());
             match obj {
                 Ok(obj) => {
+                    let obj = obj.lock().unwrap();
                     eprintln!("{:0>8} {:?}", i, obj)
                 }
                 Err(_) => eprintln!("{:0>4} [NOT AN OBJECT]", i),
@@ -552,6 +553,30 @@ impl VM {
         Ok(VMState::Halted(0))
     }
 
+    /// Disassemble functions, returning the number of functions that
+    /// were disassembled.
+    pub fn dis_functions(&mut self) -> usize {
+        let mut funcs = vec![];
+        for obj_ref in self.ctx.iter_constants() {
+            let obj = obj_ref.lock().unwrap();
+            let is_func = obj.as_func().is_some();
+            if is_func {
+                funcs.push(obj_ref.clone());
+            }
+        }
+        let num_funcs = funcs.len();
+        for func_ref in funcs {
+            let func_obj = func_ref.lock().unwrap();
+            let func = func_obj.as_func().unwrap();
+            let func_str = format!("{} ", func);
+            eprintln!("{:=<79}", func_str);
+            if let Err(err) = self.dis_list(&func.chunk) {
+                eprintln!("Could not disassemble function {func}: {err}");
+            }
+        }
+        num_funcs
+    }
+
     /// Disassemble a single instruction. The `flag` arg is so that
     /// we don't have to wrap every call in `if dis { self.dis(...) }`.
     pub fn dis(&mut self, flag: bool, ip: usize, chunk: &Chunk) {
@@ -568,7 +593,12 @@ impl VM {
 
         let obj_str = |kind_opt: Option<&ValueStackKind>| match kind_opt {
             Some(kind) => match self.get_obj(kind.clone()) {
-                Ok(obj) => format!("{obj:?}").replace("\n", "\\n").replace("\r", "\\r"),
+                Ok(obj) => {
+                    let obj = obj.lock().unwrap();
+                    let type_name = obj.type_name();
+                    let str = format!("{type_name}({obj})");
+                    str.replace("\n", "\\n").replace("\r", "\\r")
+                }
                 Err(err) => format!("[ERROR: Could not get object: {err}]"),
             },
             None => format!("[Object not found]"),
@@ -598,11 +628,7 @@ impl VM {
                 self.format_aligned("JUMP_IF_NOT", format!("{addr}",))
             }
             JumpIfElse(if_addr, else_addr, _) => {
-                let obj_str = obj_str(self.peek());
-                self.format_aligned(
-                    "JUMP_IF_ELSE",
-                    format!("{obj_str} ? {if_addr} : {else_addr}"),
-                )
+                self.format_aligned("JUMP_IF_ELSE", format!("{if_addr} : {else_addr}"))
             }
             UnaryOp(operator) => self.format_aligned("UNARY_OP", operator),
             BinaryOp(operator) => self.format_aligned("BINARY_OP", operator),
