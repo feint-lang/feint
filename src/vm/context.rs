@@ -1,5 +1,5 @@
 use std::slice::Iter;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use crate::builtin_funcs::get_builtin_func_specs;
 use crate::types::{Builtins, Namespace, ObjectRef, BUILTIN_TYPES};
@@ -206,7 +206,7 @@ impl Default for RuntimeContext {
         }
 
         // Add builtins namespace to global scope.
-        let builtins_ns_var = Arc::new(Mutex::new(builtins_ns));
+        let builtins_ns_var = Arc::new(builtins_ns);
         if let Err(err) = ctx.declare_and_assign_var("builtins", builtins_ns_var) {
             panic!("Could not define global builtins var: {err}");
         }

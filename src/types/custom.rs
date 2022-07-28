@@ -35,10 +35,9 @@ impl Object for Custom {
     }
 
     fn is_equal(&self, rhs: &dyn Object, _ctx: &RuntimeContext) -> bool {
-        // let rhs = rhs.lock().unwrap();
         if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
             self.is(&rhs)
-                || (self.class().lock().unwrap().is(&rhs.class().lock().unwrap())
+                || (self.class().is(&rhs.class())
                     && attrs_equal(&self.attrs, &rhs.attrs, _ctx))
         } else {
             false
@@ -79,8 +78,7 @@ fn attrs_equal(lhs: &Attrs, rhs: &Attrs, ctx: &RuntimeContext) -> bool {
         return false;
     }
     for (k, v) in lhs.iter() {
-        let v = v.lock().unwrap();
-        if !v.is_equal(&(*rhs[k].lock().unwrap()), ctx) {
+        if !v.is_equal(&*rhs[k], ctx) {
             return false;
         }
     }
@@ -91,12 +89,8 @@ fn attrs_equal(lhs: &Attrs, rhs: &Attrs, ctx: &RuntimeContext) -> bool {
 
 impl fmt::Display for Custom {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let attrs: Vec<String> = self
-            .attrs
-            .borrow()
-            .iter()
-            .map(|(n, v)| format!("{}={}", n, v.lock().unwrap()))
-            .collect();
+        let attrs: Vec<String> =
+            self.attrs.borrow().iter().map(|(n, v)| format!("{}={}", n, v)).collect();
         write!(f, "{}({})", self.type_name(), attrs.join(", "))
     }
 }

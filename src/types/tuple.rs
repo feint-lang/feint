@@ -40,7 +40,6 @@ impl Object for Tuple {
     }
 
     fn is_equal(&self, rhs: &dyn Object, _ctx: &RuntimeContext) -> bool {
-        // let rhs = rhs.lock().unwrap();
         if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
             if self.is(rhs) {
                 return true;
@@ -49,8 +48,7 @@ impl Object for Tuple {
                 return false;
             }
             for (a, b) in self.items().iter().zip(rhs.items()) {
-                let a = a.lock().unwrap();
-                if !a.is_equal(&(*b.lock().unwrap()), _ctx) {
+                if !a.is_equal(&**b, _ctx) {
                     return false;
                 }
             }
@@ -90,14 +88,8 @@ impl Object for Tuple {
 impl fmt::Display for Tuple {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let num_items = self.items().len();
-        let items: Vec<String> = self
-            .items()
-            .iter()
-            .map(|item| {
-                let item = item.lock().unwrap();
-                format!("{item}")
-            })
-            .collect();
+        let items: Vec<String> =
+            self.items().iter().map(|item| format!("{item}")).collect();
         let trailing_comma = if num_items == 1 { "," } else { "" };
         write!(f, "({}{})", items.join(", "), trailing_comma)
     }

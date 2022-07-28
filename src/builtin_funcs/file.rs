@@ -8,7 +8,6 @@ use crate::vm::{RuntimeContext, RuntimeErr, RuntimeErrKind};
 /// Returns Str
 pub fn read_file(args: Args, ctx: &RuntimeContext) -> CallResult {
     let arg = args.get(0).unwrap();
-    let arg = arg.lock().unwrap();
     if let Some(file_name) = arg.str_val() {
         match read_to_string(file_name) {
             Ok(contents) => Ok(Some(ctx.builtins.new_str(contents))),
@@ -25,7 +24,6 @@ pub fn read_file(args: Args, ctx: &RuntimeContext) -> CallResult {
 /// Returns Tuple<Str>
 pub fn read_file_lines(args: Args, ctx: &RuntimeContext) -> CallResult {
     let arg = args.get(0).unwrap();
-    let arg = arg.lock().unwrap();
     if let Some(file_name) = arg.str_val() {
         let file = File::open(file_name).unwrap();
         let reader = BufReader::new(file);

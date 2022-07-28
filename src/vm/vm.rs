@@ -111,7 +111,6 @@ impl VM {
                 JumpIf(addr, scope_exit_count) => {
                     self.exit_scopes(*scope_exit_count);
                     let obj = self.pop_obj()?;
-                    let obj = obj.lock().unwrap();
                     if obj.as_bool(&self.ctx)? {
                         if !dis {
                             ip = *addr;
@@ -122,7 +121,6 @@ impl VM {
                 JumpIfNot(addr, scope_exit_count) => {
                     self.exit_scopes(*scope_exit_count);
                     let obj = self.pop_obj()?;
-                    let obj = obj.lock().unwrap();
                     if !obj.as_bool(&self.ctx)? {
                         if !dis {
                             ip = *addr;
@@ -133,7 +131,6 @@ impl VM {
                 JumpIfElse(if_addr, else_addr, scope_exit_count) => {
                     self.exit_scopes(*scope_exit_count);
                     let obj = self.pop_obj()?;
-                    let obj = obj.lock().unwrap();
                     let addr =
                         if obj.as_bool(&self.ctx)? { *if_addr } else { *else_addr };
                     if !dis {
@@ -149,17 +146,13 @@ impl VM {
                         Plus | Negate => {
                             let result = match op {
                                 Plus => a, // no-op
-                                Negate => {
-                                    let a = a.lock().unwrap();
-                                    a.negate(&self.ctx)?
-                                }
+                                Negate => a.negate(&self.ctx)?,
                                 _ => unreachable!(),
                             };
                             self.push(Temp(result));
                         }
                         // Operators that return bool
                         _ => {
-                            let a = a.lock().unwrap();
                             let result = match op {
                                 AsBool => a.as_bool(&self.ctx)?,
                                 Not => a.not(&self.ctx)?,
@@ -183,8 +176,6 @@ impl VM {
                     };
                     match op {
                         Dot => {
-                            let a = a.lock().unwrap();
-                            let b = b.lock().unwrap();
                             let result = if let Some(name) = b.str_val() {
                                 a.get_attr(name.as_str(), &self.ctx)?
                             } else if let Some(int) = b.int_val() {
@@ -199,12 +190,10 @@ impl VM {
                         // In-place update operators
                         AddEqual | SubEqual => {
                             if let Var(depth, name) = a_kind {
-                                let a = a.lock().unwrap();
-                                let b = b.lock().unwrap();
-                                let b_ref = &(*b);
+                                let b = &*b;
                                 let result = match op {
-                                    AddEqual => a.add(b_ref, &self.ctx)?,
-                                    SubEqual => a.sub(b_ref, &self.ctx)?,
+                                    AddEqual => a.add(b, &self.ctx)?,
+                                    SubEqual => a.sub(b, &self.ctx)?,
                                     _ => unreachable!(),
                                 };
                                 self.ctx.assign_var_at_depth(
@@ -220,41 +209,37 @@ impl VM {
                         }
                         // Math operators
                         Pow | Mul | Div | FloorDiv | Mod | Add | Sub => {
-                            let a = a.lock().unwrap();
-                            let b = b.lock().unwrap();
-                            let b_ref = &(*b);
+                            let b = &*b;
                             let result = match op {
-                                Pow => a.pow(b_ref, &self.ctx)?,
-                                Mul => a.mul(b_ref, &self.ctx)?,
-                                Div => a.div(b_ref, &self.ctx)?,
-                                FloorDiv => a.floor_div(b_ref, &self.ctx)?,
-                                Mod => a.modulo(b_ref, &self.ctx)?,
-                                Add => a.add(b_ref, &self.ctx)?,
-                                Sub => a.sub(b_ref, &self.ctx)?,
+                                Pow => a.pow(b, &self.ctx)?,
+                                Mul => a.mul(b, &self.ctx)?,
+                                Div => a.div(b, &self.ctx)?,
+                                FloorDiv => a.floor_div(b, &self.ctx)?,
+                                Mod => a.modulo(b, &self.ctx)?,
+                                Add => a.add(b, &self.ctx)?,
+                                Sub => a.sub(b, &self.ctx)?,
                                 _ => unreachable!(),
                             };
                             self.push(Temp(result));
                         }
                         // Operators that return bool
                         _ => {
-                            let a = a.lock().unwrap();
-                            let b = b.lock().unwrap();
-                            let b_ref = &(*b);
+                            let b = &*b;
                             let result = match op {
-                                IsEqual => a.is_equal(b_ref, &self.ctx),
-                                Is => a.is(b_ref),
-                                NotEqual => a.not_equal(b_ref, &self.ctx),
-                                And => a.and(b_ref, &self.ctx)?,
-                                Or => a.or(b_ref, &self.ctx)?,
-                                LessThan => a.less_than(b_ref, &self.ctx)?,
+                                IsEqual => a.is_equal(b, &self.ctx),
+                                Is => a.is(b),
+                                NotEqual => a.not_equal(b, &self.ctx),
+                                And => a.and(b, &self.ctx)?,
+                                Or => a.or(b, &self.ctx)?,
+                                LessThan => a.less_than(b, &self.ctx)?,
                                 LessThanOrEqual => {
-                                    a.less_than(b_ref, &self.ctx)?
-                                        || a.is_equal(b_ref, &self.ctx)
+                                    a.less_than(b, &self.ctx)?
+                                        || a.is_equal(b, &self.ctx)
                                 }
-                                GreaterThan => a.greater_than(b_ref, &self.ctx)?,
+                                GreaterThan => a.greater_than(b, &self.ctx)?,
                                 GreaterThanOrEqual => {
-                                    a.greater_than(b_ref, &self.ctx)?
-                                        || a.is_equal(b_ref, &self.ctx)
+                                    a.greater_than(b, &self.ctx)?
+                                        || a.is_equal(b, &self.ctx)
                                 }
                                 _ => unreachable!(),
                             };
@@ -268,7 +253,6 @@ impl VM {
                     let objects = self.pop_n_obj(*n)?;
                     let mut string = String::with_capacity(32);
                     for obj in objects {
-                        let obj = obj.lock().unwrap();
                         string.push_str(obj.to_string().as_str());
                     }
                     let string_obj = self.ctx.builtins.new_str(string);
@@ -286,8 +270,7 @@ impl VM {
                 // Functions
                 Call(n) => {
                     let objects = self.pop_n_obj(*n + 1)?;
-                    let obj = objects.get(0).unwrap();
-                    let callable = obj.lock().unwrap();
+                    let callable = objects.get(0).unwrap();
                     let mut args: Args = vec![];
                     if objects.len() > 1 {
                         for i in 1..objects.len() {
@@ -314,7 +297,7 @@ impl VM {
                     } else if let Some(func) = callable.as_func() {
                         self.execute(&func.chunk, false)?;
                     } else {
-                        return self.err(NotCallable(obj.clone()));
+                        return self.err(NotCallable(callable.clone()));
                     };
                 }
                 Return => {
@@ -348,7 +331,6 @@ impl VM {
                 }
                 HaltTop => {
                     let obj = self.pop_obj()?;
-                    let obj = obj.lock().unwrap();
                     let return_code = match obj.int_val() {
                         Some(int) => {
                             self.halt();
@@ -481,7 +463,6 @@ impl VM {
             let obj = self.get_obj(kind.clone());
             match obj {
                 Ok(obj) => {
-                    let obj = obj.lock().unwrap();
                     eprintln!("{:0>8} {:?}", i, obj)
                 }
                 Err(_) => eprintln!("{:0>4} [NOT AN OBJECT]", i),
@@ -492,7 +473,6 @@ impl VM {
     /// Show constants.
     pub fn display_constants(&self) {
         for (index, obj) in self.ctx.iter_constants().enumerate() {
-            let obj = obj.lock().unwrap();
             eprintln!("{index:0>8} {obj}");
         }
     }
@@ -519,16 +499,14 @@ impl VM {
     /// were disassembled.
     pub fn dis_functions(&mut self) -> usize {
         let mut funcs = vec![];
-        for obj_ref in self.ctx.iter_constants() {
-            let obj = obj_ref.lock().unwrap();
+        for obj in self.ctx.iter_constants() {
             let is_func = obj.as_func().is_some();
             if is_func {
-                funcs.push(obj_ref.clone());
+                funcs.push(obj.clone());
             }
         }
         let num_funcs = funcs.len();
-        for func_ref in funcs {
-            let func_obj = func_ref.lock().unwrap();
+        for func_obj in funcs {
             let func = func_obj.as_func().unwrap();
             let func_str = format!("{} ", func);
             eprintln!("{:=<79}", func_str);
@@ -556,7 +534,6 @@ impl VM {
         let obj_str = |kind_opt: Option<&ValueStackKind>| match kind_opt {
             Some(kind) => match self.get_obj(kind.clone()) {
                 Ok(obj) => {
-                    let obj = obj.lock().unwrap();
                     let type_name = obj.type_name();
                     let str = format!("{type_name}({obj})");
                     str.replace("\n", "\\n").replace("\r", "\\r")

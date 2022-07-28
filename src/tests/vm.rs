@@ -1,3 +1,4 @@
+use crate::types::ObjectExt;
 use crate::util::BinaryOperator;
 use crate::vm::*;
 
@@ -24,29 +25,8 @@ fn test_add_retrieve() {
     let int_copy = int.clone();
     let index = ctx.add_const(int.clone());
     let retrieved = ctx.get_const(index).unwrap();
-
-    let retrieved = retrieved.lock().unwrap();
-    // let int_copy
-
-    // assert!(retrieved.is_equal(&int_copy, &ctx).unwrap());
-
-    // let int_copy = int_copy.lock().unwrap();
-    // let int_class = int_copy.class().lock().unwrap();
-    // let retrieved_class = retrieved.class().lock().unwrap();
-
-    // assert!(retrieved_class.is(&int_class));
-    // assert_eq!(retrieved_class.id(), int_class.id());
-
-    // assert!(retrieved
-    //     .class()
-    //     .lock()
-    //     .unwrap()
-    //     .is_equal(&int_copy.lock().unwrap().class(), &ctx)
-    //     .unwrap());
-    //
-    // assert!(retrieved_class.is_equal(&int_copy_class, &ctx).unwrap());
-    //
-    // assert!(retrieved.is(&int_copy.lock().unwrap()));
-    // assert_eq!(retrieved.id(), int_copy.lock().unwrap().id());
-    // assert!(retrieved.is_equal(&int_copy, &ctx).unwrap());
+    assert!(retrieved.class().is(&int.class()));
+    assert!(retrieved.is(&*int_copy));
+    assert!(retrieved.is_equal(&*int_copy, &ctx));
+    assert_eq!(retrieved.id(), int_copy.id());
 }

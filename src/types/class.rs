@@ -4,7 +4,7 @@
 use crate::types::ObjectRef;
 use std::any::Any;
 use std::fmt;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use crate::vm::{RuntimeContext, RuntimeErr};
 
@@ -12,7 +12,7 @@ use super::builtin_types::BUILTIN_TYPES;
 use super::object::Object;
 use super::result::GetAttrResult;
 
-pub type TypeRef = Arc<Mutex<Type>>;
+pub type TypeRef = Arc<Type>;
 
 /// Represents a type, whether builtin or user-defined.
 #[derive(Clone)]

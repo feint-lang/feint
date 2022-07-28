@@ -1,6 +1,6 @@
 use std::any::Any;
 use std::fmt;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use num_bigint::BigInt;
 
@@ -18,7 +18,7 @@ use super::nil::Nil;
 use super::str::Str;
 use super::tuple::Tuple;
 
-pub type ObjectRef = Arc<Mutex<dyn Object>>;
+pub type ObjectRef = Arc<dyn Object>;
 
 macro_rules! make_type_checker {
     ( $func:ident, $ty:ty) => {
@@ -93,13 +93,11 @@ pub trait Object {
     }
 
     fn type_name(&self) -> String {
-        let class = self.class().lock().unwrap();
-        class.name()
+        self.class().name()
     }
 
     fn qualified_type_name(&self) -> String {
-        let class = self.class().lock().unwrap();
-        class.qualified_name()
+        self.class().qualified_name()
     }
 
     // Type checkers ---------------------------------------------------
@@ -263,7 +261,7 @@ impl fmt::Display for dyn Object {
             super::tuple::Tuple
         );
         // Fallback
-        write!(f, "{}()", self.class().lock().unwrap())
+        write!(f, "{}()", self.class())
     }
 }
 
@@ -285,12 +283,6 @@ impl fmt::Debug for dyn Object {
             super::tuple::Tuple
         );
         // Fallback
-        write!(
-            f,
-            "{} object @ {:?} -> {}",
-            self.class().lock().unwrap(),
-            self.id(),
-            self
-        )
+        write!(f, "{} object @ {:?} -> {}", self.class(), self.id(), self)
     }
 }
