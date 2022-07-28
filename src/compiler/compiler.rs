@@ -46,7 +46,15 @@ impl<'a> Visitor<'a> {
         self.fix_jumps()?;
         if self.has_main {
             self.push(Inst::LoadVar("$main".to_string()));
-            self.push(Inst::Call(0));
+
+            // This simulates passing command line args.
+            //
+            // TODO: Get the actual command line args. They will have to
+            //       be passed through from main/run somehow.
+            self.add_const(self.ctx.builtins.new_int(100));
+            self.add_const(self.ctx.builtins.new_int(10));
+
+            self.push(Inst::Call(2));
             self.push(Inst::Return);
             self.push(Inst::HaltTop);
         } else {

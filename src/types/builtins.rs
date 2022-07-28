@@ -9,6 +9,7 @@ use super::builtin_func::BuiltinFn;
 use super::class::{Type, TypeRef};
 use super::custom::Custom;
 use super::object::ObjectRef;
+use super::result::Params;
 
 pub struct Builtins {
     // Singletons
@@ -38,10 +39,11 @@ impl Builtins {
     pub fn new_builtin_func<S: Into<String>>(
         &self,
         name: S,
+        params: Option<Vec<S>>,
         func: BuiltinFn,
-        arity: Option<u8>,
     ) -> ObjectRef {
-        Arc::new(super::builtin_func::BuiltinFunc::new(name, func, arity))
+        let params = self.collect_params(params);
+        Arc::new(super::builtin_func::BuiltinFunc::new(name, params, func))
     }
 
     pub fn new_float<F: Into<f64>>(&self, value: F) -> ObjectRef {
@@ -58,9 +60,10 @@ impl Builtins {
     pub fn new_func<S: Into<String>>(
         &self,
         name: S,
-        params: Vec<String>,
+        params: Option<Vec<S>>,
         chunk: Chunk,
     ) -> ObjectRef {
+        let params = self.collect_params(params);
         Arc::new(super::func::Func::new(name, params, chunk))
     }
 
@@ -106,6 +109,19 @@ impl Builtins {
             self.true_obj.clone()
         } else {
             self.false_obj.clone()
+        }
+    }
+
+    /// Collect parameters for function types.
+    fn collect_params<S: Into<String>>(&self, params: Option<Vec<S>>) -> Params {
+        if let Some(names) = params {
+            let mut params = vec![];
+            for name in names {
+                params.push(name.into());
+            }
+            Some(params)
+        } else {
+            None
         }
     }
 }

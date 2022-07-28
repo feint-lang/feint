@@ -44,6 +44,7 @@ impl<T> Stack<T> {
         self.storage.len()
     }
 
+    #[cfg(test)]
     pub fn clear(&mut self) {
         self.storage.clear()
     }

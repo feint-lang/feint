@@ -47,8 +47,8 @@ pub enum Token {
     GreaterThanOrEqual, // >=
     LessThanOrEqual,    // <=
     LoopFeed,           // <-
-    Range,              // ..
-    RangeInclusive,     // ...
+    DotDot,             // ..
+    Ellipsis,           // ...
     BangBang,           // !! (the boolean evaluation of an object)
 
     // In-place operators

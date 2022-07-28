@@ -1,10 +1,18 @@
 use crate::types::{Args, CallResult};
-use crate::vm::RuntimeContext;
+use crate::vm::VM;
 
 /// Returns Nil
-pub fn print(args: Args, _ctx: &RuntimeContext) -> CallResult {
-    for arg in args {
-        print!("{arg}");
+pub fn print(args: Args, _vm: &mut VM) -> CallResult {
+    let num_args = args.len();
+    if num_args > 0 {
+        let last = num_args - 1;
+        let mut sep = " ";
+        for (i, arg) in args.iter().enumerate() {
+            if i == last {
+                sep = "";
+            }
+            print!("{arg}{sep}");
+        }
     }
     println!();
     Ok(None)

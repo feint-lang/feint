@@ -1,4 +1,4 @@
-fizz_buzz () ->
+fizz_buzz (end) ->
     "FizzBuzz
 
     Spec:
@@ -10,7 +10,7 @@ fizz_buzz () ->
 
     "
     i = 1
-    loop i <= 100 ->
+    loop i <= end ->
         result = if i % 15 == 0 -> "FizzBuzz"
         else if i % 3 == 0 -> "Fizz"
         else if i % 5 == 0 -> "Buzz"
@@ -19,6 +19,5 @@ fizz_buzz () ->
         i += 1
 
 
-$main () ->
-    fizz_buzz()
-    nil
+$main (...) ->
+    fizz_buzz($args.0)

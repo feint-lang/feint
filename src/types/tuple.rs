@@ -5,6 +5,7 @@ use std::fmt;
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 
+use crate::builtin_funcs::tuple;
 use crate::vm::{RuntimeContext, RuntimeErr};
 
 use super::builtin_types::BUILTIN_TYPES;
@@ -64,6 +65,11 @@ impl Object for Tuple {
         }
         let attr = match name {
             "length" => ctx.builtins.new_int(self.len()),
+            "map" => ctx.builtins.new_builtin_func(
+                "map",
+                Some(vec!["this", "map_fn"]),
+                tuple::map,
+            ),
             _ => {
                 return Err(self.attr_does_not_exist(name));
             }

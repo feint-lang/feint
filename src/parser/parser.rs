@@ -323,30 +323,46 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
 
     /// Handle `func () -> ...` (definition) and `func()` (call).
     fn func(&mut self, name: String, start: Location) -> ExprResult {
-        let expr = self.parenthesized(self.loc())?;
-        let call_end = expr.end;
-        let items = match expr.kind {
-            ast::ExprKind::Tuple(items) => items,
-            _ => vec![expr],
-        };
+        let (items, call_end) =
+            if self.next_tokens_are(vec![&Token::Ellipsis, &Token::RParen])? {
+                (None, self.loc())
+            } else {
+                let expr = self.parenthesized(self.loc())?;
+                let call_end = expr.end;
+                let items = match expr.kind {
+                    ast::ExprKind::Tuple(items) => items,
+                    _ => vec![expr],
+                };
+                (Some(items), call_end)
+            };
+
         if self.peek_token_is_scope_start()? {
             // Function definition
-            let mut params = vec![];
-            // Ensure all items are identifiers
-            for item in items.iter() {
-                match &item.kind {
-                    ast::ExprKind::Ident(ast::Ident {
-                        kind: ast::IdentKind::Ident(name),
-                    }) => params.push(name.clone()),
-                    _ => return Err(self.err(ParseErrKind::ExpectedIdent(item.start))),
+            let params = if let Some(items) = items {
+                let mut params = vec![];
+                // Ensure all items are identifiers
+                for item in items.iter() {
+                    match &item.kind {
+                        ast::ExprKind::Ident(ast::Ident {
+                            kind: ast::IdentKind::Ident(name),
+                        }) => params.push(name.clone()),
+                        _ => {
+                            return Err(
+                                self.err(ParseErrKind::ExpectedIdent(item.start))
+                            )
+                        }
+                    }
                 }
-            }
+                Some(params)
+            } else {
+                None
+            };
             let block = self.block()?;
             let def_end = block.end;
             Ok(ast::Expr::new_func(name.clone(), params, block, start, def_end))
         } else {
             // Function call
-            Ok(ast::Expr::new_call(name.clone(), items, start, call_end))
+            Ok(ast::Expr::new_call(name.clone(), items.unwrap(), start, call_end))
         }
     }
 

@@ -4,16 +4,18 @@ use std::sync::Arc;
 
 use num_bigint::BigInt;
 
-use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeErr, RuntimeResult};
+use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeErr, RuntimeResult, VM};
 
 use super::result::{Args, CallResult, GetAttrResult, SetAttrResult};
 
 use super::bool::Bool;
 use super::builtin_func::BuiltinFunc;
 use super::class::{Type, TypeRef};
+use super::custom::Custom;
 use super::float::Float;
 use super::func::Func;
 use super::int::Int;
+use super::namespace::Namespace;
 use super::nil::Nil;
 use super::str::Str;
 use super::tuple::Tuple;
@@ -118,6 +120,7 @@ pub trait Object {
     make_type_converter!(as_type, Type);
     make_type_converter!(as_func, Func);
     make_type_converter!(as_builtin_func, BuiltinFunc);
+    make_type_converter!(as_tuple, Tuple);
 
     // Value extractors ------------------------------------------------
     //
@@ -166,7 +169,7 @@ pub trait Object {
 
     // Call ------------------------------------------------------------
 
-    fn call(&self, _args: Args, _ctx: &RuntimeContext) -> CallResult {
+    fn call(&self, _args: Args, _vm: &mut VM) -> CallResult {
         let name = self.type_name();
         Err(RuntimeErr::new_type_err(format!("Call not implemented for type {name}")))
     }
@@ -269,17 +272,17 @@ impl fmt::Display for dyn Object {
         write_instance!(
             f,
             self,
-            super::bool::Bool,
-            super::builtin_func::BuiltinFunc,
-            super::class::Type,
-            super::custom::Custom,
-            super::float::Float,
-            super::func::Func,
-            super::int::Int,
-            super::namespace::Namespace,
-            super::nil::Nil,
-            super::str::Str,
-            super::tuple::Tuple
+            Bool,
+            BuiltinFunc,
+            Type,
+            Custom,
+            Float,
+            Func,
+            Int,
+            Namespace,
+            Nil,
+            Str,
+            Tuple
         );
         // Fallback
         write!(f, "{}()", self.class())
@@ -291,17 +294,17 @@ impl fmt::Debug for dyn Object {
         debug_instance!(
             f,
             self,
-            super::bool::Bool,
-            super::builtin_func::BuiltinFunc,
-            super::class::Type,
-            super::custom::Custom,
-            super::float::Float,
-            super::func::Func,
-            super::int::Int,
-            super::namespace::Namespace,
-            super::nil::Nil,
-            super::str::Str,
-            super::tuple::Tuple
+            Bool,
+            BuiltinFunc,
+            Type,
+            Custom,
+            Float,
+            Func,
+            Int,
+            Namespace,
+            Nil,
+            Str,
+            Tuple
         );
         // Fallback
         write!(f, "{} object @ {:?} -> {}", self.class(), self.id(), self)

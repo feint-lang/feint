@@ -6,7 +6,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
 
-use crate::vm::{RuntimeContext, RuntimeErr};
+use crate::vm::RuntimeContext;
 
 use super::class::TypeRef;
 use super::object::{Object, ObjectExt, ObjectRef};

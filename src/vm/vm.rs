@@ -10,13 +10,12 @@ use crate::types::{Args, ObjectExt, ObjectRef};
 use crate::util::{BinaryOperator, Stack, UnaryOperator};
 
 use super::context::RuntimeContext;
-use super::frame::Frame;
 use super::inst::{Chunk, Inst};
 use super::result::{ExeResult, RuntimeErr, RuntimeErrKind, VMState};
 use super::result::{PeekObjResult, PopNObjResult, PopObjResult};
 
 #[derive(Clone)]
-enum ValueStackKind {
+pub enum ValueStackKind {
     Constant(usize),
     Var(usize, String),
     Temp(ObjectRef),
@@ -27,13 +26,12 @@ pub struct VM {
     pub ctx: RuntimeContext,
     // The value stack contains "pointers" to the different value types:
     // constants, vars, temporaries, and return values.
-    value_stack: Stack<ValueStackKind>,
+    pub(crate) value_stack: Stack<ValueStackKind>,
     // The scope stack contains value stack sizes. Each size is the size
     // that the stack was just before a scope was entered. When a scope
     // is exited, these sizes are used to truncate the value stack back
     // to its previous size so that items can be freed.
-    scope_stack: Stack<usize>,
-    call_stack: Stack<Frame>,
+    pub(crate) scope_stack: Stack<usize>,
 }
 
 impl Default for VM {
@@ -44,12 +42,7 @@ impl Default for VM {
 
 impl VM {
     pub fn new(ctx: RuntimeContext) -> Self {
-        VM {
-            ctx,
-            value_stack: Stack::new(),
-            call_stack: Stack::new(),
-            scope_stack: Stack::new(),
-        }
+        VM { ctx, value_stack: Stack::new(), scope_stack: Stack::new() }
     }
 
     /// Execute the specified instructions and return the VM's state. If
@@ -272,30 +265,62 @@ impl VM {
                     let objects = self.pop_n_obj(*n + 1)?;
                     let callable = objects.get(0).unwrap();
                     let mut args: Args = vec![];
+
                     if objects.len() > 1 {
                         for i in 1..objects.len() {
                             args.push(objects.get(i).unwrap().clone());
                         }
                     }
+
+                    // TODO: Refactor this into a handler method to
+                    //       remove duplication.
                     if let Some(builtin_func) = callable.as_builtin_func() {
-                        if let Some(arity) = builtin_func.arity {
+                        if let Some(params) = &builtin_func.params {
+                            let arity = params.len();
                             let num_args = args.len();
-                            if num_args != arity as usize {
+                            if num_args != arity {
+                                let name = &builtin_func.name;
                                 let ess = if arity == 1 { "" } else { "s" };
                                 return Err(RuntimeErr::new_type_err(format!(
-                                    "{}() expected {arity} arg{ess}; got {num_args}",
-                                    builtin_func.name,
+                                    "{name}() expected {arity} arg{ess}; got {num_args}"
                                 )));
                             }
                         }
-                        let result = callable.call(args, &self.ctx)?;
+                        let result = callable.call(args, self)?;
                         let return_val = match result {
                             Some(return_val) => return_val,
                             None => self.ctx.builtins.nil_obj.clone(),
                         };
                         self.push(ReturnVal(return_val));
                     } else if let Some(func) = callable.as_func() {
+                        // Wrap the function call in a scope where the
+                        // function's locals are defined. After the
+                        // call, this scope will be cleared out.
+                        self.scope_stack.push(self.value_stack.size());
+                        self.ctx.enter_scope();
+
+                        if let Some(params) = &func.params {
+                            let arity = params.len();
+                            let num_args = args.len();
+                            if num_args != arity {
+                                let name = &func.name;
+                                let ess = if arity == 1 { "" } else { "s" };
+                                return Err(RuntimeErr::new_type_err(format!(
+                                    "{name}() expected {arity} arg{ess}; got {num_args}"
+                                )));
+                            }
+                            // Bind args
+                            for (name, arg) in params.iter().zip(args) {
+                                self.ctx.declare_and_assign_var(name, arg)?;
+                            }
+                        } else {
+                            let args = self.ctx.builtins.new_tuple(args);
+                            self.ctx.declare_and_assign_var("$args", args)?;
+                        }
+
                         self.execute(&func.chunk, false)?;
+
+                        self.ctx.exit_scopes(1);
                     } else {
                         return self.err(NotCallable(callable.clone()));
                     };
@@ -379,7 +404,7 @@ impl VM {
 
     // Const stack -----------------------------------------------------
 
-    fn push(&mut self, kind: ValueStackKind) {
+    pub(crate) fn push(&mut self, kind: ValueStackKind) {
         self.value_stack.push(kind);
     }
 
@@ -387,7 +412,7 @@ impl VM {
         self.value_stack.pop()
     }
 
-    fn pop_obj(&mut self) -> PopObjResult {
+    pub(crate) fn pop_obj(&mut self) -> PopObjResult {
         match self.pop() {
             Some(kind) => self.get_obj(kind),
             None => Err(RuntimeErr::new(RuntimeErrKind::EmptyStack)),
@@ -436,16 +461,6 @@ impl VM {
             Temp(obj) => Ok(obj.clone()),
             ReturnVal(obj) => Ok(obj.clone()),
         }
-    }
-
-    // Call stack ------------------------------------------------------
-
-    fn push_frame(&mut self, frame: Frame) {
-        self.call_stack.push(frame);
-    }
-
-    fn pop_frame(&mut self) -> Option<Frame> {
-        self.call_stack.pop()
     }
 
     // Utilities -------------------------------------------------------

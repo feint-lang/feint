@@ -2,7 +2,7 @@ use std::any::Any;
 use std::collections::HashMap;
 use std::fmt;
 
-use crate::vm::{RuntimeContext, RuntimeErr};
+use crate::vm::RuntimeContext;
 
 use super::builtin_types::BUILTIN_TYPES;
 use super::class::TypeRef;

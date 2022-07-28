@@ -161,9 +161,9 @@ impl<'a, T: BufRead> Scanner<'a, T> {
             Some(('!', Some('='), _)) => self.consume_char_and_return_token(NotEqual),
             Some(('!', _, _)) => self.handle_bang()?,
             Some(('.', Some('.'), Some('.'))) => {
-                self.consume_two_chars_and_return_token(RangeInclusive)
+                self.consume_two_chars_and_return_token(Ellipsis)
             }
-            Some(('.', Some('.'), _)) => self.consume_char_and_return_token(Range),
+            Some(('.', Some('.'), _)) => self.consume_char_and_return_token(DotDot),
             Some(('.', _, _)) => Dot,
             Some(('%', _, _)) => Percent,
             Some(('^', _, _)) => Caret,

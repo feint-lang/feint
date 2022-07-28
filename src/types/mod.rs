@@ -1,10 +1,9 @@
 pub(crate) use builtin_func::BuiltinFn;
 pub(crate) use builtin_types::BUILTIN_TYPES;
 pub(crate) use builtins::Builtins;
-pub(crate) use class::TypeRef;
 pub(crate) use namespace::Namespace;
 pub(crate) use object::{ObjectExt, ObjectRef};
-pub(crate) use result::{Args, CallResult};
+pub(crate) use result::{Args, CallResult, Params};
 
 mod bool;
 mod builtin_func;

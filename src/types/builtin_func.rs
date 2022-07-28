@@ -2,24 +2,26 @@
 use std::any::Any;
 use std::fmt;
 
-use crate::vm::RuntimeContext;
+use crate::vm::VM;
 
 use super::builtin_types::BUILTIN_TYPES;
 use super::class::TypeRef;
 use super::object::Object;
-use super::result::{Args, CallResult};
+use super::result::{Args, CallResult, Params};
 
-pub type BuiltinFn = fn(Args, &RuntimeContext) -> CallResult;
+pub type BuiltinFn = fn(Args, &mut VM) -> CallResult;
 
 pub struct BuiltinFunc {
     pub name: String,
-    func: BuiltinFn,
-    pub arity: Option<u8>,
+    pub params: Params,
+    pub arity: Option<usize>,
+    pub func: BuiltinFn,
 }
 
 impl BuiltinFunc {
-    pub fn new<S: Into<String>>(name: S, func: BuiltinFn, arity: Option<u8>) -> Self {
-        Self { name: name.into(), func, arity }
+    pub fn new<S: Into<String>>(name: S, params: Params, func: BuiltinFn) -> Self {
+        let arity = if let Some(params) = &params { Some(params.len()) } else { None };
+        Self { name: name.into(), params, arity, func }
     }
 }
 
@@ -32,8 +34,8 @@ impl Object for BuiltinFunc {
         self
     }
 
-    fn call(&self, args: Args, ctx: &RuntimeContext) -> CallResult {
-        (self.func)(args, ctx)
+    fn call(&self, args: Args, vm: &mut VM) -> CallResult {
+        (self.func)(args, vm)
     }
 }
 

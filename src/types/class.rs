@@ -1,15 +1,14 @@
 //! "Class" and "type" are used interchangeably and mean exactly the
 //! same thing. Lower case "class" is used instead of "type" because the
 //! latter is a Rust keyword.
-use crate::types::ObjectRef;
 use std::any::Any;
 use std::fmt;
 use std::sync::Arc;
 
-use crate::vm::{RuntimeContext, RuntimeErr};
+use crate::vm::RuntimeContext;
 
 use super::builtin_types::BUILTIN_TYPES;
-use super::object::Object;
+use super::object::{Object, ObjectRef};
 use super::result::GetAttrResult;
 
 pub type TypeRef = Arc<Type>;

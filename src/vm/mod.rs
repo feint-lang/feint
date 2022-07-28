@@ -5,7 +5,6 @@ pub(crate) use result::{RuntimeBoolResult, RuntimeErr, RuntimeErrKind, RuntimeRe
 pub(crate) use vm::VM;
 
 mod context;
-mod frame;
 mod inst;
 mod objects;
 mod result;

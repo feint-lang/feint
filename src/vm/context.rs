@@ -195,8 +195,8 @@ impl Default for RuntimeContext {
         // Add builtin functions to builtins namespace and add aliases
         // to global scope.
         for spec in get_builtin_func_specs() {
-            let (name, func, arity) = spec;
-            let func = ctx.builtins.new_builtin_func(name, func, arity);
+            let (name, params, func) = spec;
+            let func = ctx.builtins.new_builtin_func(name, params, func);
             if !builtins_ns.add_and_set_var(name, func.clone()) {
                 panic!("Could not add {name} to {builtins_ns}");
             }

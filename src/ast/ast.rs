@@ -3,6 +3,7 @@ use std::str::FromStr;
 
 use num_bigint::BigInt;
 
+use crate::types::Params;
 use crate::util::{BinaryOperator, Location, UnaryOperator};
 
 /// Program - a list of statements.
@@ -181,7 +182,7 @@ impl Expr {
 
     pub fn new_func(
         name: String,
-        params: Vec<String>,
+        params: Params,
         block: StatementBlock,
         start: Location,
         end: Location,
@@ -282,31 +283,19 @@ impl fmt::Debug for StatementBlock {
 #[derive(PartialEq)]
 pub struct Func {
     pub name: String,
-    pub params: Vec<String>,
+    pub params: Params,
     pub block: StatementBlock,
 }
 
 impl Func {
-    pub fn new(name: String, params: Vec<String>, block: StatementBlock) -> Self {
+    pub fn new(name: String, params: Params, block: StatementBlock) -> Self {
         Self { name, params, block }
     }
 }
 
 impl fmt::Debug for Func {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let items: Vec<String> = self
-            .block
-            .statements
-            .iter()
-            .map(|statement| format!("{:?}", statement))
-            .collect();
-        write!(
-            f,
-            "Func {} ({}) ->\n    {}",
-            self.name,
-            self.params.join(", "),
-            items.join("    \n    ")
-        )
+        write!(f, "Function {}", self.name)
     }
 }
 

@@ -5,17 +5,17 @@ use super::print::*;
 use super::types::*;
 
 /// Get the specs for all builtin functions. A spec comprises a name,
-/// function pointer, and arity. An arity of `None` means the function
-/// accepts a variable number of args.
-pub fn get_builtin_func_specs<'a>() -> Vec<(&'a str, BuiltinFn, Option<u8>)> {
+/// formal parameters, function pointer. If the parameters are `None`,
+/// that means the function accepts a variable number of args.
+pub fn get_builtin_func_specs<'a>() -> Vec<(&'a str, Option<Vec<&'a str>>, BuiltinFn)> {
     vec![
         // File
-        ("read_file", read_file, Some(1)),
-        ("read_file_lines", read_file_lines, Some(1)),
+        ("read_file", Some(vec!["file_name"]), read_file),
+        ("read_file_lines", Some(vec!["file_name"]), read_file_lines),
         // Print
-        ("print", print, None),
+        ("print", None, print),
         // Type
-        ("type_of", type_of, None),
-        ("obj_id", obj_id, None),
+        ("type_of", None, type_of),
+        ("obj_id", None, obj_id),
     ]
 }
