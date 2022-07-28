@@ -16,3 +16,6 @@ mod scanner;
 mod types;
 mod util;
 mod vm;
+
+#[cfg(test)]
+mod tests;

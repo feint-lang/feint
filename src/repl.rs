@@ -18,14 +18,14 @@ pub fn run(history_path: Option<&Path>, dis: bool, debug: bool) -> ExitResult {
     repl.run()
 }
 
-struct Repl<'a> {
+pub(crate) struct Repl<'a> {
     reader: rustyline::Editor<()>,
     history_path: Option<&'a Path>,
     executor: Executor<'a>,
 }
 
 impl<'a> Repl<'a> {
-    fn new(history_path: Option<&'a Path>, executor: Executor<'a>) -> Self {
+    pub(crate) fn new(history_path: Option<&'a Path>, executor: Executor<'a>) -> Self {
         let mut reader =
             rustyline::Editor::<()>::new().expect("Could initialize readline");
         reader.set_indent_size(4);
@@ -90,7 +90,7 @@ impl<'a> Repl<'a> {
     /// Evaluate text. Returns None to indicate to the main loop to
     /// continue reading and evaluating input. Returns some result to
     /// indicate to the main loop to exit.
-    fn eval(&mut self, text: &str, no_continue: bool) -> Option<ExitResult> {
+    pub(crate) fn eval(&mut self, text: &str, no_continue: bool) -> Option<ExitResult> {
         self.add_history_entry(text);
 
         let result = match text.trim() {
@@ -256,55 +256,6 @@ impl<'a> Repl<'a> {
                 }
             }
             None => (),
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn eval_empty() {
-        eval("");
-    }
-
-    #[test]
-    fn eval_arithmetic() {
-        eval("2 * (3 + 4)");
-    }
-
-    #[test]
-    fn eval_string() {
-        eval("\"abc\"");
-    }
-
-    #[test]
-    fn eval_multiline_string() {
-        eval("\"a \nb c\"");
-    }
-
-    // TODO: Figure out how to automatically send closing quote and
-    //       newline to stdin.
-    #[test]
-    fn eval_unterminated_string() {
-        eval("x = \"abc");
-    }
-
-    #[test]
-    fn eval_if_with_no_block() {
-        eval("if true ->");
-    }
-
-    // Utilities -----------------------------------------------------------
-    fn eval(input: &str) {
-        let mut vm = VM::default();
-        let executor = Executor::new(&mut vm, false, false, false);
-        let mut repl = Repl::new(None, executor);
-        match repl.eval(input, true) {
-            Some(Ok(_)) => assert!(false),
-            Some(Err(_)) => assert!(false),
-            None => assert!(true), // eval returns None on valid input
         }
     }
 }

@@ -4,8 +4,7 @@ use crate::ast;
 use crate::scanner::Scanner;
 use crate::util::{source_from_text, BinaryOperator, Location};
 
-use super::result::ParseResult;
-use super::*;
+use crate::parser::*;
 
 /// Scan the text into tokens, parse the tokens, and return the
 /// resulting AST or error.

@@ -633,24 +633,3 @@ impl VM {
         format!("{: <w$}{: <x$}", name, value, w = 16, x = 4)
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn execute_simple_program() {
-        let mut vm = VM::default();
-        let i = vm.ctx.add_const(vm.ctx.builtins.new_int(1));
-        let j = vm.ctx.add_const(vm.ctx.builtins.new_int(2));
-        let chunk: Chunk = vec![
-            Inst::LoadConst(i),
-            Inst::LoadConst(j),
-            Inst::BinaryOp(BinaryOperator::Add),
-            Inst::Halt(0),
-        ];
-        if let Ok(result) = vm.execute(&chunk, false) {
-            assert_eq!(result, VMState::Halted(0));
-        }
-    }
-}

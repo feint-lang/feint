@@ -22,8 +22,3 @@ mod result;
 mod str;
 mod tuple;
 mod util;
-
-#[cfg(test)]
-pub(crate) use object::Object;
-
-mod tests;

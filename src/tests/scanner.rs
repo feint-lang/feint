@@ -2,9 +2,7 @@ use num_bigint::BigInt;
 
 use crate::util::{source_from_text, Location};
 
-use super::result::*;
-use super::scanner::*;
-use super::token::*;
+use crate::scanner::*;
 
 /// Create a scanner from the specified text, scan the text, and return
 /// the resulting tokens or error.

@@ -1,7 +1,5 @@
 use crate::vm::RuntimeContext;
 
-use super::object::ObjectExt;
-
 #[test]
 fn test_float() {
     let ctx = RuntimeContext::default();
