@@ -294,8 +294,7 @@ impl VM {
                             args.push(objects.get(i).unwrap().clone());
                         }
                     }
-                    let result = if let Some(builtin_func) = callable.as_builtin_func()
-                    {
+                    if let Some(builtin_func) = callable.as_builtin_func() {
                         if let Some(arity) = builtin_func.arity {
                             let num_args = args.len();
                             if num_args != arity as usize {
@@ -306,21 +305,21 @@ impl VM {
                                 )));
                             }
                         }
-                        callable.call(args, &self.ctx)?
+                        let result = callable.call(args, &self.ctx)?;
+                        let return_val = match result {
+                            Some(return_val) => return_val,
+                            None => self.ctx.builtins.nil_obj.clone(),
+                        };
+                        self.push(ReturnVal(return_val));
                     } else if let Some(func) = callable.as_func() {
-                        self.execute(&func.chunk, dis)?;
-                        Some(self.pop_obj()?)
+                        self.execute(&func.chunk, false)?;
                     } else {
                         return self.err(NotCallable(obj.clone()));
                     };
-                    let return_val = match result {
-                        Some(return_val) => return_val,
-                        None => self.ctx.builtins.nil_obj.clone(),
-                    };
-                    self.push(ReturnVal(return_val));
                 }
                 Return => {
-                    // TODO:
+                    let return_val = self.pop_obj()?;
+                    self.push(ReturnVal(return_val));
                 }
                 // Placeholders
                 Placeholder(addr, inst, message) => {

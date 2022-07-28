@@ -320,9 +320,24 @@ impl<'a> Visitor<'a> {
         if name == "$main" && self.scope_tree.in_global_scope() {
             self.has_main = true;
         }
+        let return_nil = if let Some(last) = node.block.statements.last() {
+            if let ast::StatementKind::Expr(_) = last.kind {
+                false
+            } else {
+                true
+            }
+        } else {
+            true // XXX: This should never happen
+        };
+        func_visitor.push(Inst::ScopeStart);
         func_visitor.enter_scope(ScopeKind::Func);
         func_visitor.visit_statements(node.block.statements)?;
         func_visitor.fix_jumps()?;
+        if return_nil {
+            func_visitor.push(Inst::LoadConst(0));
+        }
+        func_visitor.push(Inst::Return);
+        func_visitor.push(Inst::ScopeEnd);
         func_visitor.exit_scope();
         assert_eq!(func_visitor.scope_tree.pointer(), 0);
         let chunk = func_visitor.chunk;
@@ -338,10 +353,7 @@ impl<'a> Visitor<'a> {
         let n_args = args.len();
         self.push(Inst::LoadVar(name));
         self.visit_exprs(args)?;
-        self.push(Inst::ScopeStart);
         self.push(Inst::Call(n_args));
-        self.push(Inst::ScopeEnd);
-        self.push(Inst::Return);
         Ok(())
     }
 
