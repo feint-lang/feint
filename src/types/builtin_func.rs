@@ -41,11 +41,14 @@ impl Object for BuiltinFunc {
 
 impl fmt::Display for BuiltinFunc {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = &self.name;
         let num_args = match self.arity {
+            Some(0) => "".to_string(),
             Some(n) => n.to_string(),
             None => "...".to_string(),
         };
-        write!(f, "{} ({}) ->", self.name, num_args)
+        let id = self.id();
+        write!(f, "Builtin function {name} ({num_args}) @ {id}")
     }
 }
 

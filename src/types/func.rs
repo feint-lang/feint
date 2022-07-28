@@ -34,7 +34,13 @@ impl Object for Func {
 
 impl fmt::Display for Func {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} ({}) -> ...", self.name, self.params.len())
+        let name = &self.name;
+        let num_args = match self.params.len() {
+            0 => "".to_string(),
+            n => n.to_string(),
+        };
+        let id = self.id();
+        write!(f, "Function {name} ({num_args}) @ {id}")
     }
 }
 
