@@ -13,7 +13,7 @@ use super::context::RuntimeContext;
 use super::frame::Frame;
 use super::inst::{Chunk, Inst};
 use super::result::{ExeResult, RuntimeErr, RuntimeErrKind, VMState};
-use super::result::{PopNResult, PopResult};
+use super::result::{PeekObjResult, PopNObjResult, PopObjResult};
 
 #[derive(Clone)]
 enum ValueStackKind {
@@ -92,12 +92,9 @@ impl VM {
                     }
                 }
                 AssignVar(name) => {
-                    if let Some(obj) = self.pop_obj()? {
-                        let depth = self.ctx.assign_var(name, obj)?;
-                        self.push(Var(depth, name.clone()));
-                    } else {
-                        return self.err(NotEnoughValuesOnStack(format!("Assignment")));
-                    }
+                    let obj = self.pop_obj()?;
+                    let depth = self.ctx.assign_var(name, obj)?;
+                    self.push(Var(depth, name.clone()));
                 }
                 LoadVar(name) => {
                     let depth = self.ctx.get_var_depth(name.as_str())?;
@@ -113,44 +110,32 @@ impl VM {
                 }
                 JumpIf(addr, scope_exit_count) => {
                     self.exit_scopes(*scope_exit_count);
-                    if let Some(obj) = self.pop_obj()? {
-                        let obj = obj.lock().unwrap();
-                        if obj.as_bool(&self.ctx)? {
-                            if !dis {
-                                ip = *addr;
-                                continue;
-                            }
+                    let obj = self.pop_obj()?;
+                    let obj = obj.lock().unwrap();
+                    if obj.as_bool(&self.ctx)? {
+                        if !dis {
+                            ip = *addr;
+                            continue;
                         }
-                    } else {
-                        return self.err(EmptyStack);
-                    };
+                    }
                 }
                 JumpIfNot(addr, scope_exit_count) => {
                     self.exit_scopes(*scope_exit_count);
-                    if let Some(obj) = self.pop_obj()? {
-                        let obj = obj.lock().unwrap();
-                        if !obj.as_bool(&self.ctx)? {
-                            if !dis {
-                                ip = *addr;
-                                continue;
-                            }
+                    let obj = self.pop_obj()?;
+                    let obj = obj.lock().unwrap();
+                    if !obj.as_bool(&self.ctx)? {
+                        if !dis {
+                            ip = *addr;
+                            continue;
                         }
-                    } else {
-                        return self.err(EmptyStack);
-                    };
+                    }
                 }
                 JumpIfElse(if_addr, else_addr, scope_exit_count) => {
                     self.exit_scopes(*scope_exit_count);
-                    let addr = if let Some(obj) = self.pop_obj()? {
-                        let obj = obj.lock().unwrap();
-                        if obj.as_bool(&self.ctx)? {
-                            *if_addr
-                        } else {
-                            *else_addr
-                        }
-                    } else {
-                        return self.err(EmptyStack);
-                    };
+                    let obj = self.pop_obj()?;
+                    let obj = obj.lock().unwrap();
+                    let addr =
+                        if obj.as_bool(&self.ctx)? { *if_addr } else { *else_addr };
                     if !dis {
                         ip = addr;
                         continue;
@@ -159,12 +144,7 @@ impl VM {
                 // Operations
                 UnaryOp(op) => {
                     use UnaryOperator::*;
-                    let a = if let Some(obj) = self.pop_obj()? {
-                        obj
-                    } else {
-                        return self
-                            .err(NotEnoughValuesOnStack(format!("Unary op: {}", op)));
-                    };
+                    let a = self.pop_obj()?;
                     match op {
                         Plus | Negate => {
                             let result = match op {
@@ -199,8 +179,7 @@ impl VM {
                         let b = self.get_obj(kinds[1].clone())?;
                         (a_kind, a, b)
                     } else {
-                        let message = format!("Binary op: {op}",);
-                        return self.err(NotEnoughValuesOnStack(message));
+                        return self.err(NotEnoughValuesOnStack(2));
                     };
                     match op {
                         Dot => {
@@ -286,74 +265,60 @@ impl VM {
                 }
                 // Object construction
                 MakeString(n) => {
-                    if let Some(objects) = self.pop_n_obj(*n)? {
-                        let mut string = String::with_capacity(32);
-                        for obj in objects {
-                            let obj = obj.lock().unwrap();
-                            string.push_str(obj.to_string().as_str());
-                        }
-                        let string_obj = self.ctx.builtins.new_str(string);
-                        self.push(Temp(string_obj));
-                    } else {
-                        return self.err(NotEnoughValuesOnStack(format!(
-                            "Format string: {n}"
-                        )));
+                    let objects = self.pop_n_obj(*n)?;
+                    let mut string = String::with_capacity(32);
+                    for obj in objects {
+                        let obj = obj.lock().unwrap();
+                        string.push_str(obj.to_string().as_str());
                     }
+                    let string_obj = self.ctx.builtins.new_str(string);
+                    self.push(Temp(string_obj));
                 }
                 MakeTuple(n) => {
-                    if let Some(objects) = self.pop_n_obj(*n)? {
-                        let mut items = vec![];
-                        for obj in objects {
-                            items.push(obj.clone());
-                        }
-                        let tuple = self.ctx.builtins.new_tuple(items);
-                        self.push(Temp(tuple));
-                    } else {
-                        return self.err(NotEnoughValuesOnStack(format!("Tuple: {n}")));
+                    let objects = self.pop_n_obj(*n)?;
+                    let mut items = vec![];
+                    for obj in objects {
+                        items.push(obj.clone());
                     }
+                    let tuple = self.ctx.builtins.new_tuple(items);
+                    self.push(Temp(tuple));
                 }
                 // Functions
-                Call(n) => match self.pop_n_obj(*n + 1)? {
-                    Some(objects) => {
-                        let obj = objects.get(0).unwrap();
-                        let callable = obj.lock().unwrap();
-                        let mut args: Args = vec![];
-                        if objects.len() > 1 {
-                            for i in 1..objects.len() {
-                                args.push(objects.get(i).unwrap().clone());
+                Call(n) => {
+                    let objects = self.pop_n_obj(*n + 1)?;
+                    let obj = objects.get(0).unwrap();
+                    let callable = obj.lock().unwrap();
+                    let mut args: Args = vec![];
+                    if objects.len() > 1 {
+                        for i in 1..objects.len() {
+                            args.push(objects.get(i).unwrap().clone());
+                        }
+                    }
+                    let result = if let Some(builtin_func) = callable.as_builtin_func()
+                    {
+                        if let Some(arity) = builtin_func.arity {
+                            let num_args = args.len();
+                            if num_args != arity as usize {
+                                let ess = if arity == 1 { "" } else { "s" };
+                                return Err(RuntimeErr::new_type_err(format!(
+                                    "{}() expected {arity} arg{ess}; got {num_args}",
+                                    builtin_func.name,
+                                )));
                             }
                         }
-                        let result = if let Some(builtin_func) =
-                            callable.as_builtin_func()
-                        {
-                            if let Some(arity) = builtin_func.arity {
-                                let num_args = args.len();
-                                if num_args != arity as usize {
-                                    let ess = if arity == 1 { "" } else { "s" };
-                                    return Err(RuntimeErr::new_type_err(format!(
-                                        "{}() expected {arity} arg{ess}; got {num_args}",
-                                        builtin_func.name,
-                                    )));
-                                }
-                            }
-                            callable.call(args, &self.ctx)?
-                        } else if let Some(func) = callable.as_func() {
-                            self.execute(&func.chunk, dis)?;
-                            self.pop_obj()?
-                        } else {
-                            return self.err(NotCallable(obj.clone()));
-                        };
-                        let return_val = match result {
-                            Some(return_val) => return_val,
-                            None => self.ctx.builtins.nil_obj.clone(),
-                        };
-                        self.push(ReturnVal(return_val));
-                    }
-                    None => {
-                        return self
-                            .err(NotEnoughValuesOnStack(format!("Call: {}", *n + 1)));
-                    }
-                },
+                        callable.call(args, &self.ctx)?
+                    } else if let Some(func) = callable.as_func() {
+                        self.execute(&func.chunk, dis)?;
+                        Some(self.pop_obj()?)
+                    } else {
+                        return self.err(NotCallable(obj.clone()));
+                    };
+                    let return_val = match result {
+                        Some(return_val) => return_val,
+                        None => self.ctx.builtins.nil_obj.clone(),
+                    };
+                    self.push(ReturnVal(return_val));
+                }
                 Return => {
                     // TODO:
                 }
@@ -383,21 +348,18 @@ impl VM {
                     break Ok(VMState::Halted(*code));
                 }
                 HaltTop => {
-                    if let Some(obj) = self.pop_obj()? {
-                        let obj = obj.lock().unwrap();
-                        let return_code = match obj.int_val() {
-                            Some(int) => {
-                                self.halt();
-                                #[cfg(debug_assertions)]
-                                self.dis(dis, ip, &chunk);
-                                int.to_u8().unwrap_or(255)
-                            }
-                            None => 0,
-                        };
-                        break Ok(VMState::Halted(return_code));
-                    } else {
-                        return self.err(EmptyStack);
-                    }
+                    let obj = self.pop_obj()?;
+                    let obj = obj.lock().unwrap();
+                    let return_code = match obj.int_val() {
+                        Some(int) => {
+                            self.halt();
+                            #[cfg(debug_assertions)]
+                            self.dis(dis, ip, &chunk);
+                            int.to_u8().unwrap_or(255)
+                        }
+                        None => 0,
+                    };
+                    break Ok(VMState::Halted(return_code));
                 }
             }
 
@@ -414,9 +376,9 @@ impl VM {
 
     /// When exiting a scope, we first save the top of the stack (which
     /// is the "return value" of the scope), remove all stack values
-    /// added in the scope, finally push the scope's "return value" back
-    /// onto the stack. After taking care of the VM stack, the scope's
-    /// namespace is then cleared and removed.
+    /// added in the scope, and finally push the scope's "return value"
+    /// back onto the stack. After taking care of the VM stack, the
+    /// scope's namespace is then cleared and removed.
     fn exit_scopes(&mut self, count: usize) {
         for _ in 0..count {
             let top = self.pop();
@@ -436,6 +398,52 @@ impl VM {
 
     // Const stack -----------------------------------------------------
 
+    fn push(&mut self, kind: ValueStackKind) {
+        self.value_stack.push(kind);
+    }
+
+    fn pop(&mut self) -> Option<ValueStackKind> {
+        self.value_stack.pop()
+    }
+
+    fn pop_obj(&mut self) -> PopObjResult {
+        match self.pop() {
+            Some(kind) => self.get_obj(kind),
+            None => Err(RuntimeErr::new(RuntimeErrKind::EmptyStack)),
+        }
+    }
+
+    fn pop_n(&mut self, n: usize) -> Option<Vec<ValueStackKind>> {
+        self.value_stack.pop_n(n)
+    }
+
+    fn pop_n_obj(&mut self, n: usize) -> PopNObjResult {
+        match self.pop_n(n) {
+            Some(kinds) => {
+                let mut objects = vec![];
+                for kind in kinds {
+                    objects.push(self.get_obj(kind)?);
+                }
+                Ok(objects)
+            }
+            None => Err(RuntimeErr::new(RuntimeErrKind::NotEnoughValuesOnStack(n))),
+        }
+    }
+
+    fn peek(&self) -> Option<&ValueStackKind> {
+        self.value_stack.peek()
+    }
+
+    pub fn peek_obj(&mut self) -> PeekObjResult {
+        match self.peek() {
+            Some(kind) => {
+                let obj = self.get_obj(kind.clone())?;
+                Ok(Some(obj))
+            }
+            None => Ok(None),
+        }
+    }
+
     fn get_obj(&self, kind: ValueStackKind) -> Result<ObjectRef, RuntimeErr> {
         use ValueStackKind::*;
         match kind {
@@ -447,51 +455,6 @@ impl VM {
             Temp(obj) => Ok(obj.clone()),
             ReturnVal(obj) => Ok(obj.clone()),
         }
-    }
-
-    fn push(&mut self, kind: ValueStackKind) {
-        self.value_stack.push(kind);
-    }
-
-    fn pop(&mut self) -> Option<ValueStackKind> {
-        self.value_stack.pop()
-    }
-
-    fn pop_obj(&mut self) -> PopResult {
-        let obj = match self.pop() {
-            Some(kind) => Some(self.get_obj(kind)?),
-            None => None,
-        };
-        Ok(obj)
-    }
-
-    fn pop_n(&mut self, n: usize) -> Option<Vec<ValueStackKind>> {
-        self.value_stack.pop_n(n)
-    }
-
-    fn pop_n_obj(&mut self, n: usize) -> PopNResult {
-        match self.pop_n(n) {
-            Some(kinds) => {
-                let mut objects = vec![];
-                for kind in kinds {
-                    objects.push(self.get_obj(kind)?);
-                }
-                Ok(Some(objects))
-            }
-            None => Ok(None),
-        }
-    }
-
-    fn peek(&self) -> Option<&ValueStackKind> {
-        self.value_stack.peek()
-    }
-
-    pub fn peek_obj(&mut self) -> PopResult {
-        let obj = match self.peek() {
-            Some(kind) => Some(self.get_obj(kind.clone())?),
-            None => None,
-        };
-        Ok(obj)
     }
 
     // Call stack ------------------------------------------------------

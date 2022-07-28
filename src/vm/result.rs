@@ -8,8 +8,9 @@ use crate::types::ObjectRef;
 pub type ExeResult = Result<VMState, RuntimeErr>;
 pub type RuntimeResult = Result<ObjectRef, RuntimeErr>;
 pub type RuntimeBoolResult = Result<bool, RuntimeErr>;
-pub type PopResult = Result<Option<ObjectRef>, RuntimeErr>;
-pub type PopNResult = Result<Option<Vec<ObjectRef>>, RuntimeErr>;
+pub type PopObjResult = Result<ObjectRef, RuntimeErr>;
+pub type PopNObjResult = Result<Vec<ObjectRef>, RuntimeErr>;
+pub type PeekObjResult = Result<Option<ObjectRef>, RuntimeErr>;
 
 #[derive(Debug, PartialEq)]
 pub enum VMState {
@@ -71,7 +72,7 @@ impl fmt::Display for RuntimeErr {
 #[derive(Clone, Debug)]
 pub enum RuntimeErrKind {
     EmptyStack,
-    NotEnoughValuesOnStack(String),
+    NotEnoughValuesOnStack(usize),
     ObjectNotFound(usize),
     ExpectedVar(String),
     ParseErr(ParseErr),
