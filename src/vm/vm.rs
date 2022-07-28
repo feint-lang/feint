@@ -6,7 +6,7 @@ use std::fmt;
 
 use num_traits::ToPrimitive;
 
-use crate::types::{ObjectExt, ObjectRef};
+use crate::types::{Args, ObjectExt, ObjectRef};
 use crate::util::{BinaryOperator, Stack, UnaryOperator};
 
 use super::context::RuntimeContext;
@@ -18,7 +18,7 @@ use super::result::{PopNResult, PopResult};
 #[derive(Clone)]
 enum ValueStackKind {
     Constant(usize),
-    Var(usize, usize),
+    Var(usize, String),
     Temp(ObjectRef),
     ReturnVal(ObjectRef),
 }
@@ -88,20 +88,20 @@ impl VM {
                 // Vars
                 DeclareVar(name) => {
                     if self.ctx.get_var_in_current_namespace(name).is_err() {
-                        self.ctx.declare_var(name.as_str())?;
+                        self.ctx.declare_var(name.as_str());
                     }
                 }
                 AssignVar(name) => {
                     if let Some(obj) = self.pop_obj()? {
-                        let (depth, index) = self.ctx.assign_var(name, obj)?;
-                        self.push(Var(depth, index));
+                        let depth = self.ctx.assign_var(name, obj)?;
+                        self.push(Var(depth, name.clone()));
                     } else {
                         return self.err(NotEnoughValuesOnStack(format!("Assignment")));
                     }
                 }
                 LoadVar(name) => {
-                    let (depth, index) = self.ctx.var_index(name.as_str())?;
-                    self.push(Var(depth, index));
+                    let depth = self.ctx.get_var_depth(name.as_str())?;
+                    self.push(Var(depth, name.clone()));
                 }
                 // Jumps
                 Jump(addr, scope_exit_count) => {
@@ -219,7 +219,7 @@ impl VM {
                         }
                         // In-place update operators
                         AddEqual | SubEqual => {
-                            if let Var(depth, index) = a_kind {
+                            if let Var(depth, name) = a_kind {
                                 let a = a.lock().unwrap();
                                 let b = b.lock().unwrap();
                                 let b_ref = &(*b);
@@ -228,10 +228,12 @@ impl VM {
                                     SubEqual => a.sub(b_ref, &self.ctx)?,
                                     _ => unreachable!(),
                                 };
-                                self.ctx.assign_var_by_depth_and_index(
-                                    depth, index, result,
+                                self.ctx.assign_var_at_depth(
+                                    depth,
+                                    name.as_str(),
+                                    result,
                                 )?;
-                                self.push(Var(depth, index));
+                                self.push(Var(depth, name));
                             } else {
                                 return self
                                     .err(ExpectedVar(format!("Binary op: {}", op)));
@@ -315,7 +317,7 @@ impl VM {
                     Some(objects) => {
                         let obj = objects.get(0).unwrap();
                         let callable = obj.lock().unwrap();
-                        let mut args: Vec<ObjectRef> = vec![];
+                        let mut args: Args = vec![];
                         if objects.len() > 1 {
                             for i in 1..objects.len() {
                                 args.push(objects.get(i).unwrap().clone());
@@ -438,8 +440,9 @@ impl VM {
         use ValueStackKind::*;
         match kind {
             Constant(index) => Ok(self.ctx.get_const(index)?.clone()),
-            Var(depth, index) => {
-                Ok(self.ctx.get_var_by_depth_and_index(depth, index)?.clone())
+            Var(depth, name) => {
+                let val = self.ctx.get_var_at_depth(depth, name.as_str())?;
+                Ok(val.clone())
             }
             Temp(obj) => Ok(obj.clone()),
             ReturnVal(obj) => Ok(obj.clone()),

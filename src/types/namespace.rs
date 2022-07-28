@@ -2,96 +2,58 @@ use std::any::Any;
 use std::collections::HashMap;
 use std::fmt;
 
-use crate::types::result::GetAttrResult;
-use crate::types::Type;
 use crate::vm::{RuntimeContext, RuntimeErr};
 
+use super::builtin_types::BUILTIN_TYPES;
 use super::class::TypeRef;
-use super::object::Object;
-use super::{ObjectRef, BUILTIN_TYPES};
+use super::object::{Object, ObjectRef};
+use super::result::GetAttrResult;
 
 // Namespace -----------------------------------------------------------
 
 pub struct Namespace {
     name: String,
-    name_index: HashMap<String, usize>, // name => object index
-    objects: Objects,
+    objects: HashMap<String, ObjectRef>,
+    nil_obj: ObjectRef,
 }
 
 impl Namespace {
-    pub fn new<S: Into<String>>(name: S) -> Self {
-        Namespace {
-            name: name.into(),
-            name_index: HashMap::new(),
-            objects: Objects::default(),
-        }
+    pub fn new<S: Into<String>>(name: S, nil: ObjectRef) -> Self {
+        Namespace { name: name.into(), objects: HashMap::new(), nil_obj: nil }
     }
 
     pub fn clear(&mut self) {
-        self.name_index.clear();
         self.objects.clear();
     }
 
-    // Objects ---------------------------------------------------------
-
     pub fn size(&self) -> usize {
-        self.objects.size()
+        self.objects.len()
     }
-
-    pub fn add_obj(&mut self, obj: ObjectRef) -> usize {
-        self.objects.add(obj)
-    }
-
-    pub fn set_obj(&mut self, index: usize, obj: ObjectRef) -> Option<usize> {
-        self.objects.replace(index, obj)
-    }
-
-    pub fn get_obj(&self, index: usize) -> Option<&ObjectRef> {
-        self.objects.get(index)
-    }
-
-    // Vars ------------------------------------------------------------
-    //
-    // Vars are named "pointers" to objects.
 
     /// Add a var, settings its initial value to nil.
-    pub fn add_var<S: Into<String>>(&mut self, name: S) -> Option<usize> {
-        let nil = self.get_obj(0).unwrap().clone();
-        let index = self.size();
-        self.name_index.insert(name.into(), index);
-        self.add_obj(nil);
-        Some(index)
+    pub fn add_var<S: Into<String>>(&mut self, name: S) {
+        self.objects.insert(name.into(), self.nil_obj.clone());
     }
 
     /// Set a var's value.
-    pub fn set_var(&mut self, name: &str, obj: ObjectRef) -> Option<usize> {
-        if let Some(index) = self.var_index(name) {
-            if let Some(index) = self.set_obj(index, obj) {
-                Some(index)
-            } else {
-                None
-            }
+    pub fn set_var(&mut self, name: &str, obj: ObjectRef) -> bool {
+        if self.objects.contains_key(name) {
+            self.objects.insert(name.to_owned(), obj);
+            true
         } else {
-            None
+            false
         }
+    }
+
+    /// Add and set a var in one step.
+    pub fn add_and_set_var(&mut self, name: &str, obj: ObjectRef) -> bool {
+        self.add_var(name);
+        self.set_var(name, obj)
     }
 
     /// Get a var.
     pub fn get_var(&self, name: &str) -> Option<&ObjectRef> {
-        if let Some(index) = self.var_index(name) {
-            self.get_obj(index)
-        } else {
-            None
-        }
-    }
-
-    /// Get the object index for a var.
-    pub fn var_index(&self, name: &str) -> Option<usize> {
-        if let Some(index) = self.name_index.get(name) {
-            Some(*index)
-        } else {
-            None
-        }
+        self.objects.get(name)
     }
 }
 
@@ -133,54 +95,5 @@ impl fmt::Display for Namespace {
 impl fmt::Debug for Namespace {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self)
-    }
-}
-
-// Object --------------------------------------------------------------
-
-pub struct Objects {
-    storage: Vec<ObjectRef>,
-}
-
-impl Objects {
-    pub fn new(storage: Vec<ObjectRef>) -> Self {
-        Self { storage }
-    }
-
-    pub fn clear(&mut self) {
-        self.storage.clear();
-    }
-
-    pub fn size(&self) -> usize {
-        self.storage.len()
-    }
-
-    pub fn add(&mut self, object: ObjectRef) -> usize {
-        let index = self.storage.len();
-        self.storage.push(object.clone());
-        index
-    }
-
-    pub fn replace(&mut self, index: usize, obj: ObjectRef) -> Option<usize> {
-        if let Some(_) = self.storage.get(index) {
-            self.storage[index] = obj;
-            Some(index)
-        } else {
-            None
-        }
-    }
-
-    pub fn get(&self, index: usize) -> Option<&ObjectRef> {
-        if let Some(obj) = self.storage.get(index) {
-            Some(obj)
-        } else {
-            None
-        }
-    }
-}
-
-impl Default for Objects {
-    fn default() -> Self {
-        Self::new(Vec::new())
     }
 }

@@ -7,7 +7,6 @@ pub(crate) use vm::VM;
 mod context;
 mod frame;
 mod inst;
-mod namespace;
 mod objects;
 mod result;
 mod vm;

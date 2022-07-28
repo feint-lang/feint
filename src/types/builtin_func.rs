@@ -1,5 +1,4 @@
 //! Builtin function type
-use crate::types::Type;
 use std::any::Any;
 use std::fmt;
 
@@ -7,10 +6,10 @@ use crate::vm::RuntimeContext;
 
 use super::builtin_types::BUILTIN_TYPES;
 use super::class::TypeRef;
-use super::object::{Object, ObjectRef};
-use super::result::CallResult;
+use super::object::Object;
+use super::result::{Args, CallResult};
 
-pub type BuiltinFn = fn(Vec<ObjectRef>, &RuntimeContext) -> CallResult;
+pub type BuiltinFn = fn(Args, &RuntimeContext) -> CallResult;
 
 pub struct BuiltinFunc {
     pub name: String,
@@ -33,7 +32,7 @@ impl Object for BuiltinFunc {
         self
     }
 
-    fn call(&self, args: Vec<ObjectRef>, ctx: &RuntimeContext) -> CallResult {
+    fn call(&self, args: Args, ctx: &RuntimeContext) -> CallResult {
         (self.func)(args, ctx)
     }
 }

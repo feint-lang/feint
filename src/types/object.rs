@@ -6,7 +6,7 @@ use num_bigint::BigInt;
 
 use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeErr, RuntimeResult};
 
-use super::result::{CallResult, GetAttrResult, SetAttrResult};
+use super::result::{Args, CallResult, GetAttrResult, SetAttrResult};
 
 use super::bool::Bool;
 use super::builtin_func::BuiltinFunc;
@@ -168,7 +168,7 @@ pub trait Object {
 
     // Call ------------------------------------------------------------
 
-    fn call(&self, _args: Vec<ObjectRef>, _ctx: &RuntimeContext) -> CallResult {
+    fn call(&self, _args: Args, _ctx: &RuntimeContext) -> CallResult {
         let name = self.type_name();
         Err(RuntimeErr::new_type_err(format!("Call not implemented for type {name}")))
     }

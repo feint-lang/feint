@@ -70,8 +70,7 @@ impl Builtins {
     }
 
     pub fn new_namespace(&self, name: &str) -> ObjectRef {
-        let mut ns = super::namespace::Namespace::new(name);
-        ns.add_obj(self.nil_obj.clone());
+        let ns = super::namespace::Namespace::new(name, self.nil_obj.clone());
         Arc::new(Mutex::new(ns))
     }
 
