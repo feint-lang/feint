@@ -250,7 +250,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
         };
         let start = statements[0].start;
         let end = statements[statements.len() - 1].end;
-        Ok(ast::Block::new(statements, start, end))
+        Ok(ast::StatementBlock::new(statements, start, end))
     }
 
     /// Handle `if <expr> -> ...`.

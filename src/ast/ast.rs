@@ -98,9 +98,9 @@ pub enum ExprKind {
     Literal(Literal),
     FormatString(Vec<Expr>),
     Ident(Ident),
-    Block(Block),
-    Conditional(Vec<(Expr, Block)>, Option<Block>),
-    Loop(Box<Expr>, Block),
+    Block(StatementBlock),
+    Conditional(Vec<(Expr, StatementBlock)>, Option<StatementBlock>),
+    Loop(Box<Expr>, StatementBlock),
     Break(Box<Expr>),
     Func(Func),
     Call(Call),
@@ -149,20 +149,25 @@ impl Expr {
         Self::new(ExprKind::FormatString(items), start, end)
     }
 
-    pub fn new_block(block: Block, start: Location, end: Location) -> Self {
+    pub fn new_block(block: StatementBlock, start: Location, end: Location) -> Self {
         Self::new(ExprKind::Block(block), start, end)
     }
 
     pub fn new_conditional(
-        branches: Vec<(Expr, Block)>,
-        default: Option<Block>,
+        branches: Vec<(Expr, StatementBlock)>,
+        default: Option<StatementBlock>,
         start: Location,
         end: Location,
     ) -> Self {
         Self::new(ExprKind::Conditional(branches, default), start, end)
     }
 
-    pub fn new_loop(expr: Expr, block: Block, start: Location, end: Location) -> Self {
+    pub fn new_loop(
+        expr: Expr,
+        block: StatementBlock,
+        start: Location,
+        end: Location,
+    ) -> Self {
         Self::new(ExprKind::Loop(Box::new(expr), block), start, end)
     }
 
@@ -177,7 +182,7 @@ impl Expr {
     pub fn new_func(
         name: String,
         params: Vec<String>,
-        block: Block,
+        block: StatementBlock,
         start: Location,
         end: Location,
     ) -> Self {
@@ -250,19 +255,19 @@ impl fmt::Debug for ExprKind {
 
 /// Block - a list of statements in a new scope.
 #[derive(PartialEq)]
-pub struct Block {
+pub struct StatementBlock {
     pub statements: Vec<Statement>,
     pub start: Location,
     pub end: Location,
 }
 
-impl Block {
+impl StatementBlock {
     pub fn new(statements: Vec<Statement>, start: Location, end: Location) -> Self {
         Self { statements, start, end }
     }
 }
 
-impl fmt::Debug for Block {
+impl fmt::Debug for StatementBlock {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let items: Vec<String> = self
             .statements
@@ -278,11 +283,11 @@ impl fmt::Debug for Block {
 pub struct Func {
     pub name: String,
     pub params: Vec<String>,
-    pub block: Block,
+    pub block: StatementBlock,
 }
 
 impl Func {
-    pub fn new(name: String, params: Vec<String>, block: Block) -> Self {
+    pub fn new(name: String, params: Vec<String>, block: StatementBlock) -> Self {
         Self { name, params, block }
     }
 }

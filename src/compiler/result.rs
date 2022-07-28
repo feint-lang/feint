@@ -21,6 +21,10 @@ impl CompErr {
         Self { kind: CompErrKind::LabelNotFoundInScope(name) }
     }
 
+    pub fn new_cannot_jump_out_of_func(name: String) -> Self {
+        Self { kind: CompErrKind::CannotJumpOutOfFunc(name) }
+    }
+
     pub fn new_duplicate_label_in_scope(name: String) -> Self {
         Self { kind: CompErrKind::DuplicateLabelInScope(name) }
     }
@@ -34,6 +38,7 @@ impl CompErr {
 pub enum CompErrKind {
     UnhandledExpr(Location, Location),
     LabelNotFoundInScope(String),
+    CannotJumpOutOfFunc(String),
     DuplicateLabelInScope(String),
     ExpectedIdent,
 }

@@ -67,7 +67,7 @@ fn parse_inline_block() {
     eprintln!("{}:{}", parsed.start, parsed.end);
     let expected = ast::Statement {
         kind: ast::StatementKind::Expr(ast::Expr {
-            kind: ast::ExprKind::Block(ast::Block {
+            kind: ast::ExprKind::Block(ast::StatementBlock {
                 statements: vec![ast::Statement {
                     kind: ast::StatementKind::Expr(ast::Expr {
                         kind: ast::ExprKind::Literal(ast::Literal {
@@ -102,7 +102,7 @@ fn parse_inline_block_in_parens() {
     eprintln!("{}:{}", parsed.start, parsed.end);
     let expected = ast::Statement {
         kind: ast::StatementKind::Expr(ast::Expr {
-            kind: ast::ExprKind::Block(ast::Block {
+            kind: ast::ExprKind::Block(ast::StatementBlock {
                 statements: vec![ast::Statement {
                     kind: ast::StatementKind::Expr(ast::Expr {
                         kind: ast::ExprKind::Literal(ast::Literal {

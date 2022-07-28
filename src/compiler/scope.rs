@@ -78,9 +78,9 @@ impl ScopeTree {
         &self.storage[index]
     }
 
-    fn scope_depth(&self, index: usize) -> usize {
+    pub fn scope_depth(&self, scope: &Scope) -> usize {
         let mut depth = 0;
-        let mut scope = self.get(index);
+        let mut scope = self.get(scope.index);
         while let Some(parent_index) = scope.parent {
             depth += 1;
             scope = self.get(parent_index);
@@ -95,7 +95,7 @@ impl ScopeTree {
     /// will be passed the current scope and its depth.
     pub fn walk_up(&self, mut visit: impl FnMut(&Scope, usize) -> bool) {
         for scope in self.storage.iter().filter(|n| n.is_leaf()) {
-            let depth = self.scope_depth(scope.index);
+            let depth = self.scope_depth(&scope);
             if visit(scope, depth) {
                 match scope.parent {
                     Some(parent_index) => {
@@ -115,7 +115,7 @@ impl ScopeTree {
 
 #[derive(Debug)]
 pub struct Scope {
-    kind: ScopeKind,
+    pub(crate) kind: ScopeKind,
     index: usize,
     parent: Option<usize>,
     children: Vec<usize>,
@@ -175,13 +175,8 @@ impl Scope {
 
         if let Some(label_addr) = self.labels.get(name) {
             if label_addr > jump_addr {
-                return Some((*label_addr, tree.scope_depth(self.index)));
+                return Some((*label_addr, tree.scope_depth(&self)));
             }
-        }
-
-        // Disallow jump out of function
-        if let ScopeKind::Func = self.kind {
-            return None;
         }
 
         match self.parent {

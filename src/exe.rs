@@ -265,19 +265,22 @@ impl<'a> Executor<'a> {
         use CompErrKind::*;
         let message = match &err.kind {
             UnhandledExpr(start, end) => {
-                format!("Compilation error: unhandled expression at {start} -> {end}")
+                format!("unhandled expression at {start} -> {end}")
             }
             LabelNotFoundInScope(name) => {
-                format!("Compilation error: label not found in scope: {name}")
+                format!("label not found in scope: {name}")
+            }
+            CannotJumpOutOfFunc(name) => {
+                format!("Cannot jump out of function: label {name} not found or defined in outer scope")
             }
             DuplicateLabelInScope(name) => {
-                format!("Compilation error: duplicate label in scope: {name}")
+                format!("duplicate label in scope: {name}")
             }
             ExpectedIdent => {
-                format!("Compilation error: expected identifier")
+                format!("expected identifier")
             }
         };
-        eprintln!("    |\n\n  {}", message);
+        eprintln!("    |\n\n  Compilation error: {}", message);
     }
 
     fn ignore_comp_err(&self, err: &CompErr) -> bool {

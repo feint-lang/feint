@@ -41,9 +41,7 @@ impl<'a> Visitor<'a> {
     // Visitors --------------------------------------------------------
 
     fn visit_program(&mut self, node: ast::Program) -> VisitResult {
-        for statement in node.statements {
-            self.visit_statement(statement)?;
-        }
+        self.visit_statements(node.statements)?;
         assert_eq!(self.scope_tree.pointer(), 0);
         self.fix_jumps()?;
         if self.has_main {
@@ -53,6 +51,13 @@ impl<'a> Visitor<'a> {
             self.push(Inst::HaltTop);
         } else {
             self.push(Inst::Halt(0));
+        }
+        Ok(())
+    }
+
+    fn visit_statements(&mut self, statements: Vec<ast::Statement>) -> VisitResult {
+        for statement in statements {
+            self.visit_statement(statement)?;
         }
         Ok(())
     }
@@ -82,6 +87,13 @@ impl<'a> Visitor<'a> {
         Ok(())
     }
 
+    fn visit_exprs(&mut self, exprs: Vec<ast::Expr>) -> VisitResult {
+        for expr in exprs {
+            self.visit_expr(expr)?;
+        }
+        Ok(())
+    }
+
     fn visit_expr(&mut self, node: ast::Expr) -> VisitResult {
         type Kind = ast::ExprKind;
         match node.kind {
@@ -89,13 +101,11 @@ impl<'a> Visitor<'a> {
             Kind::Literal(literal) => self.visit_literal(literal)?,
             Kind::FormatString(items) => self.visit_format_string(items)?,
             Kind::Ident(ident) => self.visit_ident(ident)?,
-            Kind::Block(block) => self.visit_block(block, ScopeKind::Block)?,
+            Kind::Block(block) => self.visit_block(block)?,
             Kind::Conditional(branches, default) => {
-                self.visit_conditional(branches, default, ScopeKind::Block)?
+                self.visit_conditional(branches, default)?
             }
-            Kind::Loop(expr, block) => {
-                self.visit_loop(*expr, block, ScopeKind::Block)?
-            }
+            Kind::Loop(expr, block) => self.visit_loop(*expr, block)?,
             Kind::Break(expr) => self.visit_break(*expr)?,
             Kind::Func(func) => self.visit_func(func)?,
             Kind::Call(call) => self.visit_call(call)?,
@@ -107,9 +117,7 @@ impl<'a> Visitor<'a> {
 
     fn visit_tuple(&mut self, items: Vec<ast::Expr>) -> VisitResult {
         let num_items = items.len();
-        for item in items {
-            self.visit_expr(item)?;
-        }
+        self.visit_exprs(items)?;
         self.push(Inst::MakeTuple(num_items));
         Ok(())
     }
@@ -129,9 +137,7 @@ impl<'a> Visitor<'a> {
 
     fn visit_format_string(&mut self, items: Vec<ast::Expr>) -> VisitResult {
         let num_items = items.len();
-        for item in items {
-            self.visit_expr(item)?;
-        }
+        self.visit_exprs(items)?;
         self.push(Inst::MakeString(num_items));
         Ok(())
     }
@@ -183,12 +189,10 @@ impl<'a> Visitor<'a> {
         Ok(())
     }
 
-    fn visit_block(&mut self, node: ast::Block, scope_kind: ScopeKind) -> VisitResult {
+    fn visit_block(&mut self, node: ast::StatementBlock) -> VisitResult {
         self.push(Inst::ScopeStart);
-        self.enter_scope(scope_kind);
-        for statement in node.statements {
-            self.visit_statement(statement)?;
-        }
+        self.enter_scope(ScopeKind::Block);
+        self.visit_statements(node.statements)?;
         self.push(Inst::ScopeEnd);
         self.exit_scope();
         Ok(())
@@ -196,9 +200,8 @@ impl<'a> Visitor<'a> {
 
     fn visit_conditional(
         &mut self,
-        branches: Vec<(ast::Expr, ast::Block)>,
-        default: Option<ast::Block>,
-        scope_kind: ScopeKind,
+        branches: Vec<(ast::Expr, ast::StatementBlock)>,
+        default: Option<ast::StatementBlock>,
     ) -> VisitResult {
         assert!(branches.len() > 0, "At least one branch required for conditional");
 
@@ -222,7 +225,7 @@ impl<'a> Visitor<'a> {
             // Start of branch block (jump target if branch condition is
             // true).
             let block_addr = jump_index + 1;
-            self.visit_block(block, scope_kind)?;
+            self.visit_block(block)?;
 
             // Placeholder for jump out of conditional suite if this
             // branch is selected.
@@ -242,7 +245,7 @@ impl<'a> Visitor<'a> {
 
         // Default block (if present).
         if let Some(default_block) = default {
-            self.visit_block(default_block, scope_kind)?;
+            self.visit_block(default_block)?;
         } else {
             self.push(Inst::LoadConst(0));
         }
@@ -261,8 +264,7 @@ impl<'a> Visitor<'a> {
     fn visit_loop(
         &mut self,
         expr: ast::Expr,
-        block: ast::Block,
-        scope_kind: ScopeKind,
+        block: ast::StatementBlock,
     ) -> VisitResult {
         let loop_scope_depth = self.scope_depth;
         let loop_addr = self.chunk.len();
@@ -276,7 +278,7 @@ impl<'a> Visitor<'a> {
             "Jump-out for loop not set".to_owned(),
         ));
         // Run the loop body if result is true.
-        self.visit_block(block, scope_kind)?;
+        self.visit_block(block)?;
         // Jump to top of loop to re-check expression.
         self.push(Inst::Jump(loop_addr, 0));
         // Jump-out address.
@@ -315,11 +317,14 @@ impl<'a> Visitor<'a> {
         let mut func_visitor = Visitor::new(&mut self.ctx);
         let name = node.name;
         let params = node.params;
-        let func_program = ast::Program::new(node.block.statements);
         if name == "$main" && self.scope_tree.in_global_scope() {
             self.has_main = true;
         }
-        func_visitor.visit_program(func_program)?;
+        func_visitor.enter_scope(ScopeKind::Func);
+        func_visitor.visit_statements(node.block.statements)?;
+        func_visitor.fix_jumps()?;
+        func_visitor.exit_scope();
+        assert_eq!(func_visitor.scope_tree.pointer(), 0);
         let chunk = func_visitor.chunk;
         self.push(Inst::DeclareVar(name.clone()));
         self.add_const(self.ctx.builtins.new_func(name.clone(), params, chunk));
@@ -332,9 +337,7 @@ impl<'a> Visitor<'a> {
         let args = node.args;
         let n_args = args.len();
         self.push(Inst::LoadVar(name));
-        for arg in args {
-            self.visit_expr(arg)?;
-        }
+        self.visit_exprs(args)?;
         self.push(Inst::ScopeStart);
         self.push(Inst::Call(n_args));
         self.push(Inst::ScopeEnd);
@@ -400,6 +403,7 @@ impl<'a> Visitor<'a> {
         let chunk = &mut self.chunk;
         let scope_tree = &self.scope_tree;
         let mut not_found: Option<String> = None;
+        let mut jump_out_of_func: Option<String> = None;
         scope_tree.walk_up(&mut |scope: &Scope, jump_depth: usize| {
             for (name, jump_addr) in scope.jumps().iter() {
                 let result = scope.find_label(scope_tree, name, None);
@@ -407,13 +411,19 @@ impl<'a> Visitor<'a> {
                     let depth = jump_depth - label_depth;
                     chunk[*jump_addr] = Inst::Jump(label_addr, depth);
                 } else {
-                    not_found = Some(name.clone());
+                    if scope.kind == ScopeKind::Func {
+                        jump_out_of_func = Some(name.clone());
+                    } else {
+                        not_found = Some(name.clone());
+                    }
                     return false;
                 }
             }
             true
         });
-        if let Some(name) = not_found {
+        if let Some(name) = jump_out_of_func {
+            return Err(CompErr::new_cannot_jump_out_of_func(name));
+        } else if let Some(name) = not_found {
             return Err(CompErr::new_label_not_found_in_scope(name));
         }
         Ok(())
