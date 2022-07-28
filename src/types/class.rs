@@ -59,13 +59,6 @@ impl Type {
         };
         Some(attr)
     }
-
-    fn attr_does_not_exist_err(&self, name: &str) -> RuntimeErr {
-        return RuntimeErr::new_attr_does_not_exist(
-            self.qualified_name().as_str(),
-            name,
-        );
-    }
 }
 
 impl Object for Type {
@@ -88,12 +81,12 @@ impl Object for Type {
             _ => {
                 let attr = match self.qualified_name.as_str() {
                     "builtins.Tuple" => self.get_tuple_attr(name, ctx),
-                    _ => return Err(self.attr_does_not_exist_err(name)),
+                    _ => return Err(self.attr_does_not_exist(name)),
                 };
                 if let Some(attr) = attr {
                     attr
                 } else {
-                    return Err(self.attr_does_not_exist_err(name));
+                    return Err(self.attr_does_not_exist(name));
                 }
             }
         };

@@ -65,10 +65,7 @@ impl Object for Tuple {
         let attr = match name {
             "length" => ctx.builtins.new_int(self.len()),
             _ => {
-                return Err(RuntimeErr::new_attr_does_not_exist(
-                    self.qualified_type_name().as_str(),
-                    name,
-                ))
+                return Err(self.attr_does_not_exist(name));
             }
         };
         Ok(attr)

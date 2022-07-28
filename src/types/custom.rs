@@ -48,10 +48,7 @@ impl Object for Custom {
         if let Some(value) = self.attrs.borrow().get(name) {
             return Ok(value.clone());
         }
-        Err(RuntimeErr::new_attr_does_not_exist(
-            self.qualified_type_name().as_str(),
-            name,
-        ))
+        Err(self.attr_does_not_exist(name))
     }
 
     fn set_attr(

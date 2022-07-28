@@ -1,3 +1,4 @@
+use num_bigint::BigInt;
 use std::fmt;
 use std::fmt::Formatter;
 
@@ -46,16 +47,22 @@ impl RuntimeErr {
         Self::new(RuntimeErrKind::AttrDoesNotExist(type_name.into(), name.into()))
     }
 
-    pub fn new_attr_cannot_be_set<S: Into<String>>(name: S) -> Self {
-        Self::new(RuntimeErrKind::AttrCannotBeSet(name.into()))
+    pub fn new_attr_cannot_be_set<S: Into<String>>(type_name: S, name: S) -> Self {
+        Self::new(RuntimeErrKind::AttrCannotBeSet(type_name.into(), name.into()))
     }
 
-    pub fn new_item_does_not_exit<S: Into<String>>(name: S) -> Self {
-        Self::new(RuntimeErrKind::ItemDoesNotExist(name.into()))
+    pub fn new_item_does_not_exist<S: Into<String>>(
+        type_name: S,
+        index: BigInt,
+    ) -> Self {
+        Self::new(RuntimeErrKind::ItemDoesNotExist(type_name.into(), index))
     }
 
-    pub fn new_item_cannot_be_set<S: Into<String>>(name: S) -> Self {
-        Self::new(RuntimeErrKind::ItemCannotBeSet(name.into()))
+    pub fn new_item_cannot_be_set<S: Into<String>>(
+        type_name: S,
+        index: BigInt,
+    ) -> Self {
+        Self::new(RuntimeErrKind::ItemCannotBeSet(type_name.into(), index))
     }
 
     pub fn new_index_out_of_bounds(index: usize) -> Self {
@@ -82,9 +89,9 @@ pub enum RuntimeErrKind {
     NameErr(String),
     StringFormatErr(String),
     AttrDoesNotExist(String, String),
-    AttrCannotBeSet(String),
-    ItemDoesNotExist(String),
-    ItemCannotBeSet(String),
+    AttrCannotBeSet(String, String),
+    ItemDoesNotExist(String, BigInt),
+    ItemCannotBeSet(String, BigInt),
     IndexOutOfBounds(usize),
     NotCallable(ObjectRef),
 
