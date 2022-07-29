@@ -101,12 +101,13 @@ impl PartialEq for Type {
 
 impl fmt::Display for Type {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "[Type: {}]", self.qualified_name())
+        write!(f, "<{}>", self.qualified_name())
     }
 }
 
 impl fmt::Debug for Type {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self)
+        let id = self.id();
+        write!(f, "{self} @ {id}")
     }
 }

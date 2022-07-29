@@ -12,14 +12,13 @@ use super::result::GetAttrResult;
 // Namespace -----------------------------------------------------------
 
 pub struct Namespace {
-    name: String,
     objects: HashMap<String, ObjectRef>,
     nil_obj: ObjectRef,
 }
 
 impl Namespace {
-    pub fn new<S: Into<String>>(name: S, nil: ObjectRef) -> Self {
-        Namespace { name: name.into(), objects: HashMap::new(), nil_obj: nil }
+    pub fn new(nil: ObjectRef) -> Self {
+        Namespace { objects: HashMap::new(), nil_obj: nil }
     }
 
     pub fn clear(&mut self) {
@@ -82,10 +81,9 @@ impl Object for Namespace {
 
 impl fmt::Display for Namespace {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let name = self.name.as_str();
-        let size = self.size();
-        let noun = if size == 1 { "entry" } else { "entries" };
-        write!(f, "Namespace: {} ({} {noun})", name, size)
+        let class = self.class();
+        let id = self.id();
+        write!(f, "{class} @ {id}")
     }
 }
 

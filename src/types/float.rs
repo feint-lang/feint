@@ -4,7 +4,7 @@ use std::fmt;
 
 use num_traits::ToPrimitive;
 
-use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeErr, RuntimeResult};
+use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeErr, RuntimeObjResult};
 
 use super::builtin_types::BUILTIN_TYPES;
 use super::class::TypeRef;
@@ -28,7 +28,7 @@ impl Float {
 
 macro_rules! make_op {
     ( $meth:ident, $op:tt, $message:literal, $trunc:literal ) => {
-        fn $meth(&self, rhs: &dyn Object, ctx: &RuntimeContext) -> RuntimeResult {
+        fn $meth(&self, rhs: &dyn Object, ctx: &RuntimeContext) -> RuntimeObjResult {
             let value = if let Some(rhs) = rhs.as_any().downcast_ref::<Float>() {
                 *rhs.value()
             } else if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
@@ -55,7 +55,7 @@ impl Object for Float {
         self
     }
 
-    fn negate(&self, ctx: &RuntimeContext) -> RuntimeResult {
+    fn negate(&self, ctx: &RuntimeContext) -> RuntimeObjResult {
         Ok(ctx.builtins.new_float(-self.value()))
     }
 
@@ -74,7 +74,7 @@ impl Object for Float {
         }
     }
 
-    fn pow(&self, rhs: &dyn Object, ctx: &RuntimeContext) -> RuntimeResult {
+    fn pow(&self, rhs: &dyn Object, ctx: &RuntimeContext) -> RuntimeObjResult {
         let exp = if let Some(rhs) = rhs.as_any().downcast_ref::<Float>() {
             *rhs.value()
         } else if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
@@ -112,6 +112,6 @@ impl fmt::Display for Float {
 
 impl fmt::Debug for Float {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self)
+        write!(f, "{self}")
     }
 }

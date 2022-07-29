@@ -8,6 +8,7 @@ pub type StatementResult = Result<ast::Statement, ParseErr>;
 pub type StatementsResult = Result<Vec<ast::Statement>, ParseErr>;
 pub type BlockResult = Result<ast::StatementBlock, ParseErr>;
 pub type ExprResult = Result<ast::Expr, ParseErr>;
+pub type MaybeExprResult = Result<(bool, ast::Expr), ParseErr>;
 pub type NextTokenResult = Result<Option<TokenWithLocation>, ParseErr>;
 pub type NextInfixResult = Result<Option<(TokenWithLocation, u8)>, ParseErr>;
 pub type PeekTokenResult<'a> = Result<Option<&'a TokenWithLocation>, ParseErr>;

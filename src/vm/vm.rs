@@ -6,13 +6,15 @@ use std::fmt;
 
 use num_traits::ToPrimitive;
 
-use crate::types::{Args, ObjectExt, ObjectRef};
+use crate::types::{Args, ObjectExt, ObjectRef, Params};
 use crate::util::{BinaryOperator, Stack, UnaryOperator};
 
 use super::context::RuntimeContext;
 use super::inst::{Chunk, Inst};
-use super::result::{ExeResult, RuntimeErr, RuntimeErrKind, VMState};
-use super::result::{PeekObjResult, PopNObjResult, PopObjResult};
+use super::result::{
+    ExeResult, PeekObjResult, PopNObjResult, PopObjResult, RuntimeErr, RuntimeErrKind,
+    RuntimeResult, VMState,
+};
 
 #[derive(Clone)]
 pub enum ValueStackKind {
@@ -262,68 +264,7 @@ impl VM {
                 }
                 // Functions
                 Call(n) => {
-                    let objects = self.pop_n_obj(*n + 1)?;
-                    let callable = objects.get(0).unwrap();
-                    let mut args: Args = vec![];
-
-                    if objects.len() > 1 {
-                        for i in 1..objects.len() {
-                            args.push(objects.get(i).unwrap().clone());
-                        }
-                    }
-
-                    // TODO: Refactor this into a handler method to
-                    //       remove duplication.
-                    if let Some(builtin_func) = callable.as_builtin_func() {
-                        if let Some(params) = &builtin_func.params {
-                            let arity = params.len();
-                            let num_args = args.len();
-                            if num_args != arity {
-                                let name = &builtin_func.name;
-                                let ess = if arity == 1 { "" } else { "s" };
-                                return Err(RuntimeErr::new_type_err(format!(
-                                    "{name}() expected {arity} arg{ess}; got {num_args}"
-                                )));
-                            }
-                        }
-                        let result = callable.call(args, self)?;
-                        let return_val = match result {
-                            Some(return_val) => return_val,
-                            None => self.ctx.builtins.nil_obj.clone(),
-                        };
-                        self.push(ReturnVal(return_val));
-                    } else if let Some(func) = callable.as_func() {
-                        // Wrap the function call in a scope where the
-                        // function's locals are defined. After the
-                        // call, this scope will be cleared out.
-                        self.scope_stack.push(self.value_stack.size());
-                        self.ctx.enter_scope();
-
-                        if let Some(params) = &func.params {
-                            let arity = params.len();
-                            let num_args = args.len();
-                            if num_args != arity {
-                                let name = &func.name;
-                                let ess = if arity == 1 { "" } else { "s" };
-                                return Err(RuntimeErr::new_type_err(format!(
-                                    "{name}() expected {arity} arg{ess}; got {num_args}"
-                                )));
-                            }
-                            // Bind args
-                            for (name, arg) in params.iter().zip(args) {
-                                self.ctx.declare_and_assign_var(name, arg)?;
-                            }
-                        } else {
-                            let args = self.ctx.builtins.new_tuple(args);
-                            self.ctx.declare_and_assign_var("$args", args)?;
-                        }
-
-                        self.execute(&func.chunk, false)?;
-
-                        self.ctx.exit_scopes(1);
-                    } else {
-                        return self.err(NotCallable(callable.clone()));
-                    };
+                    self.handle_call(*n)?;
                 }
                 Return => {
                     let return_val = self.pop_obj()?;
@@ -378,6 +319,75 @@ impl VM {
                 break Ok(VMState::Idle);
             }
         }
+    }
+
+    // Handlers --------------------------------------------------------
+
+    fn handle_call(&mut self, n: usize) -> RuntimeResult {
+        use ValueStackKind::ReturnVal;
+        let objects = self.pop_n_obj(n + 1)?;
+        let callable = objects.get(0).unwrap();
+        let mut args: Args = vec![];
+        if objects.len() > 1 {
+            for i in 1..objects.len() {
+                args.push(objects.get(i).unwrap().clone());
+            }
+        }
+        if let Some(func) = callable.as_builtin_func() {
+            self.check_call_args(&func.name, &func.params, &args, false)?;
+            let result = callable.call(args, self)?;
+            let return_val = match result {
+                Some(return_val) => return_val,
+                None => self.ctx.builtins.nil_obj.clone(),
+            };
+            // For builtin functions, the return value isn't on the
+            // stack, so we have to put it there.
+            self.push(ReturnVal(return_val));
+        } else if let Some(func) = callable.as_func() {
+            // Wrap the function call in a scope where the
+            // function's locals are defined. After the
+            // call, this scope will be cleared out.
+            self.scope_stack.push(self.value_stack.size());
+            self.ctx.enter_scope();
+            self.check_call_args(&func.name, &func.params, &args, true)?;
+            self.execute(&func.chunk, false)?;
+            self.ctx.exit_scopes(1);
+        } else {
+            return Err(RuntimeErr::new_not_callable(callable.clone()));
+        }
+        Ok(())
+    }
+
+    /// Check call args to ensure they're valid. If they are, bind them
+    /// to names in the call scope (if `bind` is specified).
+    fn check_call_args(
+        &mut self,
+        name: &str,
+        params: &Params,
+        args: &Args,
+        bind: bool,
+    ) -> RuntimeResult {
+        if let Some(params) = &params {
+            let arity = params.len();
+            let num_args = args.len();
+            if num_args != arity {
+                let ess = if arity == 1 { "" } else { "s" };
+                return Err(RuntimeErr::new_type_err(format!(
+                    "{name}() expected {arity} arg{ess}; got {num_args}"
+                )));
+            }
+            if bind {
+                for (name, arg) in params.iter().zip(args) {
+                    self.ctx.declare_and_assign_var(name, arg.clone())?;
+                }
+            }
+        } else {
+            if bind {
+                let args = self.ctx.builtins.new_tuple(args.clone());
+                self.ctx.declare_and_assign_var("$args", args)?;
+            }
+        }
+        Ok(())
     }
 
     /// When exiting a scope, we first save the top of the stack (which
@@ -521,12 +531,15 @@ impl VM {
             }
         }
         let num_funcs = funcs.len();
-        for func_obj in funcs {
+        for (i, func_obj) in funcs.iter().enumerate() {
             let func = func_obj.as_func().unwrap();
-            let func_str = format!("{} ", func);
-            eprintln!("{:=<79}", func_str);
+            let heading = format!("{func:?} ");
+            eprintln!("{:=<79}", heading);
             if let Err(err) = self.dis_list(&func.chunk) {
                 eprintln!("Could not disassemble function {func}: {err}");
+            }
+            if num_funcs > 1 && i < (num_funcs - 1) {
+                eprintln!();
             }
         }
         num_funcs
@@ -550,7 +563,7 @@ impl VM {
             Some(kind) => match self.get_obj(kind.clone()) {
                 Ok(obj) => {
                     let type_name = obj.type_name();
-                    let str = format!("{type_name}({obj})");
+                    let str = format!("{obj:?} <{type_name}>");
                     str.replace("\n", "\\n").replace("\r", "\\r")
                 }
                 Err(err) => format!("[ERROR: Could not get object: {err}]"),
@@ -563,7 +576,7 @@ impl VM {
             Truncate(size) => self.format_aligned("TRUNCATE", format!("{size}")),
             LoadConst(index) => {
                 let obj_str = obj_str(Some(&Constant(*index)));
-                self.format_aligned("LOAD_CONST", format!("{obj_str}"))
+                self.format_aligned("LOAD_CONST", format!("{index} : {obj_str}"))
             }
             ScopeStart => format!("SCOPE_START"),
             ScopeEnd => format!("SCOPE_END"),

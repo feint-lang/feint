@@ -4,7 +4,7 @@ use std::fmt;
 use std::str;
 
 /// Unary operators
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum UnaryOperator {
     Plus,
     Negate,
@@ -48,7 +48,7 @@ impl fmt::Debug for UnaryOperator {
 }
 
 /// Binary operators
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum BinaryOperator {
     Pow,
     Mul,

@@ -90,19 +90,19 @@ impl<'a> Visitor<'a> {
                 }
             }
             Kind::Continue => self.visit_continue()?,
-            Kind::Expr(expr) => self.visit_expr(expr)?,
+            Kind::Expr(expr) => self.visit_expr(expr, None)?,
         }
         Ok(())
     }
 
     fn visit_exprs(&mut self, exprs: Vec<ast::Expr>) -> VisitResult {
         for expr in exprs {
-            self.visit_expr(expr)?;
+            self.visit_expr(expr, None)?;
         }
         Ok(())
     }
 
-    fn visit_expr(&mut self, node: ast::Expr) -> VisitResult {
+    fn visit_expr(&mut self, node: ast::Expr, name: Option<String>) -> VisitResult {
         type Kind = ast::ExprKind;
         match node.kind {
             Kind::Tuple(items) => self.visit_tuple(items)?,
@@ -115,7 +115,16 @@ impl<'a> Visitor<'a> {
             }
             Kind::Loop(expr, block) => self.visit_loop(*expr, block)?,
             Kind::Break(expr) => self.visit_break(*expr)?,
-            Kind::Func(func) => self.visit_func(func)?,
+            Kind::Func(func) => self.visit_func(func, name)?,
+            Kind::NamedFunc(name_expr, func_expr) => {
+                let name = self.get_ident_name(*name_expr.clone())?;
+                self.push(Inst::DeclareVar(name.clone()));
+                self.visit_func(func_expr, Some(name.clone()))?;
+                self.push(Inst::AssignVar(name));
+                if let ast::ExprKind::Ident(ident) = (*name_expr).kind {
+                    self.visit_ident(ident)?;
+                }
+            }
             Kind::Call(call) => self.visit_call(call)?,
             Kind::UnaryOp(op, b) => self.visit_unary_op(op, *b)?,
             Kind::BinaryOp(a, op, b) => self.visit_binary_op(*a, op, *b)?,
@@ -136,9 +145,17 @@ impl<'a> Visitor<'a> {
             Kind::Nil => self.push_const(0),
             Kind::Bool(true) => self.push_const(1),
             Kind::Bool(false) => self.push_const(2),
-            Kind::Int(value) => self.add_const(self.ctx.builtins.new_int(value)),
-            Kind::Float(value) => self.add_const(self.ctx.builtins.new_float(value)),
-            Kind::String(value) => self.add_const(self.ctx.builtins.new_str(value)),
+            // TODO: ???
+            Kind::Ellipsis => (),
+            Kind::Int(value) => {
+                self.add_const(self.ctx.builtins.new_int(value));
+            }
+            Kind::Float(value) => {
+                self.add_const(self.ctx.builtins.new_float(value));
+            }
+            Kind::String(value) => {
+                self.add_const(self.ctx.builtins.new_str(value));
+            }
         }
         Ok(())
     }
@@ -156,6 +173,7 @@ impl<'a> Visitor<'a> {
         type Kind = ast::IdentKind;
         match node.kind {
             Kind::Ident(name) => self.push(Inst::LoadVar(name)),
+            Kind::SpecialIdent(name) => self.push(Inst::LoadVar(name)),
             Kind::TypeIdent(name) => self.push(Inst::LoadVar(name)),
         }
         Ok(())
@@ -166,14 +184,13 @@ impl<'a> Visitor<'a> {
         obj_expr: ast::Expr,
         name_expr: ast::Expr,
     ) -> VisitResult {
-        use ast::ExprKind::Ident as IdentExpr;
-        use ast::IdentKind::{Ident, TypeIdent};
-        let kind = &name_expr.kind;
-        self.visit_expr(obj_expr)?;
-        if let IdentExpr(ast::Ident { kind: Ident(name) | TypeIdent(name) }) = kind {
+        self.visit_expr(obj_expr, None)?;
+        if let Some(name) = name_expr.is_ident() {
+            self.visit_literal(ast::Literal::new_string(name))?;
+        } else if let Some(name) = name_expr.is_type_ident() {
             self.visit_literal(ast::Literal::new_string(name))?;
         } else {
-            self.visit_expr(name_expr)?;
+            self.visit_expr(name_expr, None)?;
         }
         self.push(Inst::BinaryOp(BinaryOperator::Dot));
         Ok(())
@@ -184,16 +201,10 @@ impl<'a> Visitor<'a> {
         name_expr: ast::Expr,
         value_expr: ast::Expr,
     ) -> VisitResult {
-        use ast::ExprKind;
-        use ast::{Ident, IdentKind};
-        let kind = name_expr.kind;
-        if let ExprKind::Ident(Ident { kind: IdentKind::Ident(name) }) = kind {
-            self.push(Inst::DeclareVar(name.clone()));
-            self.visit_expr(value_expr)?;
-            self.push(Inst::AssignVar(name));
-        } else {
-            return Err(CompErr::new_expected_ident());
-        }
+        let name = self.get_ident_name(name_expr)?;
+        self.push(Inst::DeclareVar(name.clone()));
+        self.visit_expr(value_expr, Some(name.clone()))?;
+        self.push(Inst::AssignVar(name));
         Ok(())
     }
 
@@ -220,7 +231,7 @@ impl<'a> Visitor<'a> {
 
         for (expr, block) in branches {
             // Evaluate branch expression.
-            self.visit_expr(expr)?;
+            self.visit_expr(expr, None)?;
 
             // Placeholder for jump depending on result of branch expr.
             let jump_index = self.chunk.len();
@@ -277,7 +288,7 @@ impl<'a> Visitor<'a> {
         let loop_scope_depth = self.scope_depth;
         let loop_addr = self.chunk.len();
         // Evaluate loop expression on every iteration.
-        self.visit_expr(expr)?;
+        self.visit_expr(expr, None)?;
         // Placeholder for jump-out if result is false.
         let jump_out_index = self.chunk.len();
         self.push(Inst::Placeholder(
@@ -311,7 +322,7 @@ impl<'a> Visitor<'a> {
     }
 
     fn visit_break(&mut self, expr: ast::Expr) -> VisitResult {
-        self.visit_expr(expr)?;
+        self.visit_expr(expr, None)?;
         self.chunk.push(Inst::BreakPlaceholder(self.chunk.len(), self.scope_depth));
         Ok(())
     }
@@ -321,13 +332,16 @@ impl<'a> Visitor<'a> {
         Ok(())
     }
 
-    fn visit_func(&mut self, node: ast::Func) -> VisitResult {
+    fn visit_func(&mut self, node: ast::Func, name: Option<String>) -> VisitResult {
         let mut func_visitor = Visitor::new(&mut self.ctx);
-        let name = node.name;
+        let name = if name.is_some() {
+            let name = name.unwrap();
+            self.has_main = name == "$main" && self.scope_tree.in_global_scope();
+            name
+        } else {
+            "<anonymous>".to_owned()
+        };
         let params = node.params;
-        if name == "$main" && self.scope_tree.in_global_scope() {
-            self.has_main = true;
-        }
         let return_nil = if let Some(last) = node.block.statements.last() {
             if let ast::StatementKind::Expr(_) = last.kind {
                 false
@@ -349,24 +363,23 @@ impl<'a> Visitor<'a> {
         func_visitor.exit_scope();
         assert_eq!(func_visitor.scope_tree.pointer(), 0);
         let chunk = func_visitor.chunk;
-        self.push(Inst::DeclareVar(name.clone()));
-        self.add_const(self.ctx.builtins.new_func(name.clone(), params, chunk));
-        self.push(Inst::AssignVar(name));
+        let func = self.ctx.builtins.new_func(name, params, chunk);
+        self.add_const(func);
         Ok(())
     }
 
     fn visit_call(&mut self, node: ast::Call) -> VisitResult {
-        let name = node.name;
+        let callable = node.callable;
         let args = node.args;
         let n_args = args.len();
-        self.push(Inst::LoadVar(name));
+        self.visit_expr(*callable, None)?;
         self.visit_exprs(args)?;
         self.push(Inst::Call(n_args));
         Ok(())
     }
 
     fn visit_unary_op(&mut self, op: UnaryOperator, expr: ast::Expr) -> VisitResult {
-        self.visit_expr(expr)?;
+        self.visit_expr(expr, None)?;
         self.push(Inst::UnaryOp(op));
         Ok(())
     }
@@ -382,8 +395,8 @@ impl<'a> Visitor<'a> {
             Dot => self.visit_get_attr(expr_a, expr_b),
             Assign => self.visit_assignment(expr_a, expr_b),
             _ => {
-                self.visit_expr(expr_a)?;
-                self.visit_expr(expr_b)?;
+                self.visit_expr(expr_a, None)?;
+                self.visit_expr(expr_b, None)?;
                 self.push(Inst::BinaryOp(op));
                 Ok(())
             }
@@ -400,9 +413,10 @@ impl<'a> Visitor<'a> {
         self.push(Inst::LoadConst(index));
     }
 
-    fn add_const(&mut self, val: ObjectRef) {
+    fn add_const(&mut self, val: ObjectRef) -> usize {
         let index = self.ctx.add_const(val);
         self.push_const(index);
+        index
     }
 
     /// Add nested scope to current scope then make the new scope the
@@ -416,6 +430,19 @@ impl<'a> Visitor<'a> {
     fn exit_scope(&mut self) {
         self.scope_tree.move_up();
         self.scope_depth -= 1;
+    }
+
+    /// Get the identifier name for an expression, if it's an ident
+    /// expression.
+    fn get_ident_name(&self, name_expr: ast::Expr) -> Result<String, CompErr> {
+        let name = if let Some(name) = name_expr.is_ident() {
+            name
+        } else if let Some(name) = name_expr.is_special_ident() {
+            name
+        } else {
+            return Err(CompErr::new_expected_ident());
+        };
+        Ok(name)
     }
 
     /// Update jump instructions with their target label addresses.

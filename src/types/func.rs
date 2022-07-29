@@ -82,17 +82,16 @@ impl fmt::Display for Func {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let name = &self.name;
         let num_args = match self.arity {
-            Some(0) => "".to_string(),
             Some(n) => n.to_string(),
             None => "...".to_string(),
         };
-        let id = self.id();
-        write!(f, "Function {name} ({num_args}) @ {id}")
+        write!(f, "function {name}/{num_args}")
     }
 }
 
 impl fmt::Debug for Func {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self)
+        let id = self.id();
+        write!(f, "{self} @ {id}")
     }
 }

@@ -30,14 +30,14 @@ impl fmt::Debug for Program {
 }
 
 /// Statement - a logical chunk of code.
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct Statement {
     pub kind: StatementKind,
     pub start: Location,
     pub end: Location,
 }
 
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum StatementKind {
     Jump(String),
     Label(String),
@@ -86,14 +86,14 @@ impl fmt::Debug for StatementKind {
 }
 
 /// Expression - a statement that returns a value.
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct Expr {
     pub kind: ExprKind,
     pub start: Location,
     pub end: Location,
 }
 
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum ExprKind {
     Tuple(Vec<Expr>),
     Literal(Literal),
@@ -104,6 +104,7 @@ pub enum ExprKind {
     Loop(Box<Expr>, StatementBlock),
     Break(Box<Expr>),
     Func(Func),
+    NamedFunc(Box<Expr>, Func),
     Call(Call),
     UnaryOp(UnaryOperator, Box<Expr>),
     BinaryOp(Box<Expr>, BinaryOperator, Box<Expr>),
@@ -132,6 +133,10 @@ impl Expr {
 
     pub fn new_false(start: Location, end: Location) -> Self {
         Self::new_literal(Literal::new_bool(false), start, end)
+    }
+
+    pub fn new_ellipsis(start: Location, end: Location) -> Self {
+        Self::new_literal(Literal::new_ellipsis(), start, end)
     }
 
     pub fn new_int(value: BigInt, start: Location, end: Location) -> Self {
@@ -181,22 +186,32 @@ impl Expr {
     }
 
     pub fn new_func(
-        name: String,
         params: Params,
         block: StatementBlock,
         start: Location,
         end: Location,
     ) -> Self {
-        Self::new(ExprKind::Func(Func::new(name, params, block)), start, end)
+        Self::new(ExprKind::Func(Func::new(params, block)), start, end)
+    }
+
+    pub fn new_named_func(
+        name: Expr,
+        params: Params,
+        block: StatementBlock,
+        start: Location,
+        end: Location,
+    ) -> Self {
+        let name = Box::new(name);
+        Self::new(ExprKind::NamedFunc(name, Func::new(params, block)), start, end)
     }
 
     pub fn new_call(
-        name: String,
+        callable: Expr,
         args: Vec<Expr>,
         start: Location,
         end: Location,
     ) -> Self {
-        Self::new(ExprKind::Call(Call::new(name, args)), start, end)
+        Self::new(ExprKind::Call(Call::new(callable, args)), start, end)
     }
 
     pub fn new_unary_op(
@@ -225,6 +240,46 @@ impl Expr {
         };
         Self::new(ExprKind::BinaryOp(Box::new(a), operator, Box::new(b)), start, end)
     }
+
+    /// Check if expression is ellipsis.
+    pub fn is_ellipsis(&self) -> bool {
+        match &self.kind {
+            ExprKind::Literal(Literal { kind: LiteralKind::Ellipsis }) => true,
+            _ => false,
+        }
+    }
+
+    /// Check if expression is an identifier. If so, return its name.
+    pub fn is_ident(&self) -> Option<String> {
+        if let ExprKind::Ident(Ident { kind: IdentKind::Ident(name) }) = &self.kind {
+            Some(name.clone())
+        } else {
+            None
+        }
+    }
+
+    /// Check if expression is a special identifier. If so, return its
+    /// name.
+    pub fn is_special_ident(&self) -> Option<String> {
+        if let ExprKind::Ident(Ident { kind: IdentKind::SpecialIdent(name) }) =
+            &self.kind
+        {
+            Some(name.clone())
+        } else {
+            None
+        }
+    }
+
+    /// Check if expression is a type identifier. If so, return its
+    /// name.
+    pub fn is_type_ident(&self) -> Option<String> {
+        if let ExprKind::Ident(Ident { kind: IdentKind::TypeIdent(name) }) = &self.kind
+        {
+            Some(name.clone())
+        } else {
+            None
+        }
+    }
 }
 
 impl fmt::Debug for Expr {
@@ -247,6 +302,7 @@ impl fmt::Debug for ExprKind {
             Self::Loop(expr, block) => write!(f, "loop {expr:?}\n{block:?}"),
             Self::Break(expr) => write!(f, "break {expr:?}"),
             Self::Func(func) => write!(f, "{:?}", func),
+            Self::NamedFunc(name, func) => write!(f, "{name:?} {:?}", func),
             Self::Call(func) => write!(f, "{:?}", func),
             Self::UnaryOp(op, b) => write!(f, "({:?}{:?})", op, b),
             Self::BinaryOp(a, op, b) => write!(f, "({:?} {:?} {:?})", a, op, b),
@@ -255,7 +311,7 @@ impl fmt::Debug for ExprKind {
 }
 
 /// Block - a list of statements in a new scope.
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct StatementBlock {
     pub statements: Vec<Statement>,
     pub start: Location,
@@ -280,55 +336,55 @@ impl fmt::Debug for StatementBlock {
 }
 
 /// Function
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct Func {
-    pub name: String,
     pub params: Params,
     pub block: StatementBlock,
 }
 
 impl Func {
-    pub fn new(name: String, params: Params, block: StatementBlock) -> Self {
-        Self { name, params, block }
+    pub fn new(params: Params, block: StatementBlock) -> Self {
+        Self { params, block }
     }
 }
 
 impl fmt::Debug for Func {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Function {}", self.name)
+        write!(f, "Function")
     }
 }
 
 /// Call
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct Call {
-    pub name: String,
+    pub callable: Box<Expr>,
     pub args: Vec<Expr>,
 }
 
 impl Call {
-    pub fn new(name: String, args: Vec<Expr>) -> Self {
-        Self { name, args }
+    pub fn new(callable: Expr, args: Vec<Expr>) -> Self {
+        Self { callable: Box::new(callable), args }
     }
 }
 
 impl fmt::Debug for Call {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Call {} ({})", self.name, self.args.len())
+        write!(f, "Call ({})", self.args.len())
     }
 }
 
 /// Literal - a literal value written in the source code, such as 123,
 /// 1.23, or "123".
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct Literal {
     pub kind: LiteralKind,
 }
 
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum LiteralKind {
     Nil,
     Bool(bool),
+    Ellipsis,
     Float(f64),
     Int(BigInt),
     String(String),
@@ -345,6 +401,10 @@ impl Literal {
 
     pub fn new_bool(value: bool) -> Self {
         Self::new(LiteralKind::Bool(value))
+    }
+
+    pub fn new_ellipsis() -> Self {
+        Self::new(LiteralKind::Ellipsis)
     }
 
     pub fn new_int(value: BigInt) -> Self {
@@ -371,6 +431,7 @@ impl fmt::Debug for LiteralKind {
         let string = match self {
             Self::Nil => "nil".to_string(),
             Self::Bool(value) => value.to_string(),
+            Self::Ellipsis => "...".to_string(),
             Self::Int(value) => value.to_string(),
             Self::Float(value) => value.to_string(),
             Self::String(value) => value.clone(),
@@ -380,14 +441,15 @@ impl fmt::Debug for LiteralKind {
 }
 
 /// Identifiers - names for variables, functions, and types
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct Ident {
     pub kind: IdentKind,
 }
 
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum IdentKind {
     Ident(String),
+    SpecialIdent(String),
     TypeIdent(String),
 }
 
@@ -398,6 +460,10 @@ impl Ident {
 
     pub fn new_ident(name: String) -> Self {
         Self::new(IdentKind::Ident(name))
+    }
+
+    pub fn new_special_ident(name: String) -> Self {
+        Self::new(IdentKind::SpecialIdent(name))
     }
 
     pub fn new_type_ident(name: String) -> Self {
@@ -415,6 +481,7 @@ impl fmt::Debug for IdentKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let name = match self {
             Self::Ident(name) => name,
+            Self::SpecialIdent(name) => name,
             Self::TypeIdent(name) => name,
         };
         write!(f, "{}", name)

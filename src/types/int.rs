@@ -5,7 +5,7 @@ use std::fmt;
 use num_bigint::BigInt;
 use num_traits::{FromPrimitive, ToPrimitive, Zero};
 
-use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeErr, RuntimeResult};
+use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeErr, RuntimeObjResult};
 
 use super::builtin_types::BUILTIN_TYPES;
 use super::class::TypeRef;
@@ -45,7 +45,7 @@ impl Int {
 
 macro_rules! make_op {
     ( $meth:ident, $op:tt, $message:literal ) => {
-        fn $meth(&self, rhs: &dyn Object, ctx: &RuntimeContext) -> RuntimeResult {
+        fn $meth(&self, rhs: &dyn Object, ctx: &RuntimeContext) -> RuntimeObjResult {
             if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
                 // XXX: Return Int
                 let value = self.value() $op rhs.value();
@@ -72,7 +72,7 @@ impl Object for Int {
         self
     }
 
-    fn negate(&self, ctx: &RuntimeContext) -> RuntimeResult {
+    fn negate(&self, ctx: &RuntimeContext) -> RuntimeObjResult {
         Ok(ctx.builtins.new_int(-self.value()))
     }
 
@@ -119,7 +119,7 @@ impl Object for Int {
             )))
         }
     }
-    fn pow(&self, rhs: &dyn Object, ctx: &RuntimeContext) -> RuntimeResult {
+    fn pow(&self, rhs: &dyn Object, ctx: &RuntimeContext) -> RuntimeObjResult {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
             // XXX: Return Int
             let base = self.value();
@@ -148,14 +148,14 @@ impl Object for Int {
     make_op!(sub, -, "Could not subtract {} from Int");
 
     // Int division *always* returns a Float
-    fn div(&self, rhs: &dyn Object, ctx: &RuntimeContext) -> RuntimeResult {
+    fn div(&self, rhs: &dyn Object, ctx: &RuntimeContext) -> RuntimeObjResult {
         let value = self.div_f64(rhs)?;
         let value = ctx.builtins.new_float(value);
         Ok(value)
     }
 
     // Int *floor* division *always* returns an Int
-    fn floor_div(&self, rhs: &dyn Object, ctx: &RuntimeContext) -> RuntimeResult {
+    fn floor_div(&self, rhs: &dyn Object, ctx: &RuntimeContext) -> RuntimeObjResult {
         let value = self.div_f64(rhs)?;
         let value = BigInt::from_f64(value).unwrap();
         let value = ctx.builtins.new_int(value);

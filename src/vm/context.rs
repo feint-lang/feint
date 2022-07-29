@@ -5,7 +5,7 @@ use crate::builtin_funcs::get_builtin_func_specs;
 use crate::types::{Builtins, Namespace, ObjectRef, BUILTIN_TYPES};
 
 use super::objects::Objects;
-use super::result::RuntimeErr;
+use super::result::{RuntimeErr, RuntimeResult};
 
 pub struct RuntimeContext {
     pub builtins: Builtins,
@@ -32,8 +32,7 @@ impl RuntimeContext {
     }
 
     pub fn enter_scope(&mut self) {
-        let name = format!("scope:{}", self.namespace_stack.len());
-        let namespace = Namespace::new(name, self.builtins.nil_obj.clone());
+        let namespace = Namespace::new(self.builtins.nil_obj.clone());
         self.namespace_stack.push(namespace);
     }
 
@@ -112,7 +111,7 @@ impl RuntimeContext {
         depth: usize,
         name: &str,
         obj: ObjectRef,
-    ) -> Result<(), RuntimeErr> {
+    ) -> RuntimeResult {
         if self.namespace_stack[depth].set_var(name, obj) {
             Ok(())
         } else {
@@ -182,7 +181,7 @@ impl Default for RuntimeContext {
         // Add builtin types to builtins namespace and add aliases to
         // global scope.
         let mut builtins_ns =
-            crate::types::Namespace::new("builtins", ctx.builtins.nil_obj.clone());
+            crate::types::Namespace::new(ctx.builtins.nil_obj.clone());
         for (name, class) in BUILTIN_TYPES.iter() {
             if !builtins_ns.add_and_set_var(*name, class.clone()) {
                 panic!("Could not add {name} to {builtins_ns}");

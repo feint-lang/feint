@@ -42,6 +42,6 @@ impl fmt::Display for Nil {
 
 impl fmt::Debug for Nil {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self)
+        write!(f, "{self}")
     }
 }

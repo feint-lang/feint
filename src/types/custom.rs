@@ -86,14 +86,15 @@ fn attrs_equal(lhs: &Attrs, rhs: &Attrs, ctx: &RuntimeContext) -> bool {
 
 impl fmt::Display for Custom {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let attrs: Vec<String> =
-            self.attrs.borrow().iter().map(|(n, v)| format!("{}={}", n, v)).collect();
-        write!(f, "{}({})", self.type_name(), attrs.join(", "))
+        // TODO: Check for $string attr and use that value if present
+        let class = self.class();
+        let id = self.id();
+        write!(f, "{class} object @ {id}")
     }
 }
 
 impl fmt::Debug for Custom {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Object {} @ {}", self, self.id())
+        write!(f, "{self}")
     }
 }

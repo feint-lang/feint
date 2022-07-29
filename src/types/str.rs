@@ -2,7 +2,7 @@
 use std::any::Any;
 use std::fmt;
 
-use crate::vm::{RuntimeContext, RuntimeErr, RuntimeResult};
+use crate::vm::{RuntimeContext, RuntimeErr, RuntimeObjResult};
 
 use super::builtin_types::BUILTIN_TYPES;
 use super::class::TypeRef;
@@ -39,7 +39,7 @@ impl Object for Str {
         }
     }
 
-    fn add(&self, rhs: &dyn Object, ctx: &RuntimeContext) -> RuntimeResult {
+    fn add(&self, rhs: &dyn Object, ctx: &RuntimeContext) -> RuntimeObjResult {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
             let a = self.value();
             let b = rhs.value();

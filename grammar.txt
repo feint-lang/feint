@@ -16,14 +16,14 @@ statement_type :
     | expr
 
 import :
-    | "import" IMPORT_PATH IMPORT_IDENTIFIER
-    | "import" "from" IMPORT_PATH ":" IMPORT_IDENTIFIER ("," IMPORT_IDENTIFIER)*
+    | "import" IMPORT_PATH IMPORT_IDENT
+    | "import" "from" IMPORT_PATH ":" IMPORT_IDENT ("," IMPORT_IDENT)*
 
 jump :
-    | "jump" IDENTIFIER
+    | "jump" IDENT
 
 label :
-    | IDENTIFIER ":"
+    | IDENT ":"
 
 # Expressions ----------------------------------------------------------
 
@@ -82,7 +82,7 @@ power :
     | expr
 
 assignment :
-    | IDENTIFIER "=" expr
+    | IDENT "=" expr
 
 # Simple Expressions ---------------------------------------------------
 #
@@ -152,12 +152,12 @@ inline_else :
 loop :
     | "loop" "->" suite
     | "loop" cond "->" suite
-    | "loop" IDENTIFIER "<-" expr "->" suite
+    | "loop" IDENT "<-" expr "->" suite
 
 inline_loop :
     | "loop" "->" expr
-    | "loop" expr "->" expr
-    | "loop" IDENTIFIER "<-" expr "->" expr
+    | "loop" cond "->" expr
+    | "loop" IDENT "<-" expr "->" expr
 
 cond :
     | basic_expr
@@ -165,25 +165,26 @@ cond :
     | inline_block
 
 func :
-    | [IDENTIFIER] "(" [params] ")" "->" suite
+    | [IDENT] "(" [params] ")" "->" suite
 
 inline_func :
-    | [IDENTIFIER] "(" [params] ")" "->" expr
+    | [IDENT] "(" [params] ")" "->" expr
 
 params :
-    | IDENTIFIER ("," IDENTIFIER)* [","]
+    | IDENT ("," IDENT)* [","]
 
 call :
-    | IDENTIFIER "(" [args] ")"
+    | ( IDENT | expr ) "(" [args] ")"
 
 args :
     | tuple_expr ("," tuple_expr)* [","]
 
 type :
-    | TYPE_IDENTIFIER params "->" suite
+    | [TYPE_IDENT] "(" params ")" "=>" suite
+    | "(" params ")" "=>" suite
 
 inline_type :
-    | TYPE_IDENTIFIER params "->" expr
+    | [TYPE_IDENT] "(" params ")" "->" expr
 
 # Comments -------------------------------------------------------------
 
@@ -197,22 +198,22 @@ COMMENT_CHAR : "[^\n]*"
 QUOTE : "[\"']"
 
 NAME:
-    | IDENTIFIER
-    | SPECIAL_IDENTIFIER
-    | TYPE_IDENTIFIER
-    | TYPE_FUNC_IDENTIFIER
+    | IDENT
+    | SPECIAL_IDENT
+    | TYPE_IDENT
+    | TYPE_FUNC_IDENT
 
 # Identifiers
-IDENTIFIER           : "[a-z]|[a-z][a-z0-9_]*[a-z0-9]"
-SPECIAL_IDENTIFIER   : "$" IDENTIFIER
-TYPE_IDENTIFIER      : "[A-Z]|[A-Z][A-Za-z0-9]*[A-Za-z0-9]"
-TYPE_FUNC_IDENTIFIER : "@" IDENTIFIER
+IDENT           : "[a-z]|[a-z][a-z0-9_]*[a-z0-9]"
+SPECIAL_IDENT   : "$" IDENT
+TYPE_IDENT      : "[A-Z]|[A-Z][A-Za-z0-9]*[A-Za-z0-9]"
+TYPE_FUNC_IDENT : "@" IDENT
 
 # Imports
 IMPORT_PATH :
-    | IDENTIFIER ("." IDENTIFIER)*
-IMPORT_IDENTIFIER :
-    | IDENTIFIER ["as" IDENTIFIER]
+    | IDENT ("." IDENT)*
+IMPORT_IDENT :
+    | IDENT ["as" IDENT]
 
 # Numeric character sets allowing for underscores between digits
 ZERO    : "0(_?0+)*"

@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use num_bigint::BigInt;
 
-use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeErr, RuntimeResult, VM};
+use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeErr, RuntimeObjResult, VM};
 
 use super::result::{Args, CallResult, GetAttrResult, SetAttrResult};
 
@@ -131,7 +131,7 @@ pub trait Object {
 
     // Unary operations ------------------------------------------------
 
-    make_unary_op!(negate, "-", RuntimeResult);
+    make_unary_op!(negate, "-", RuntimeObjResult);
     make_unary_op!(as_bool, "!!", RuntimeBoolResult);
 
     fn not(&self, ctx: &RuntimeContext) -> RuntimeBoolResult {
@@ -157,13 +157,13 @@ pub trait Object {
     make_bin_op!(less_than, "<", RuntimeBoolResult);
     make_bin_op!(greater_than, ">", RuntimeBoolResult);
 
-    make_bin_op!(pow, "^", RuntimeResult);
-    make_bin_op!(modulo, "%", RuntimeResult);
-    make_bin_op!(mul, "*", RuntimeResult);
-    make_bin_op!(div, "/", RuntimeResult);
-    make_bin_op!(floor_div, "//", RuntimeResult);
-    make_bin_op!(add, "+", RuntimeResult);
-    make_bin_op!(sub, "-", RuntimeResult);
+    make_bin_op!(pow, "^", RuntimeObjResult);
+    make_bin_op!(modulo, "%", RuntimeObjResult);
+    make_bin_op!(mul, "*", RuntimeObjResult);
+    make_bin_op!(div, "/", RuntimeObjResult);
+    make_bin_op!(floor_div, "//", RuntimeObjResult);
+    make_bin_op!(add, "+", RuntimeObjResult);
+    make_bin_op!(sub, "-", RuntimeObjResult);
     make_bin_op!(and, "&&", RuntimeBoolResult);
     make_bin_op!(or, "||", RuntimeBoolResult);
 
@@ -285,7 +285,9 @@ impl fmt::Display for dyn Object {
             Tuple
         );
         // Fallback
-        write!(f, "{}()", self.class())
+        let class = self.class();
+        let id = self.id();
+        write!(f, "{class} object @ {id}")
     }
 }
 
@@ -307,6 +309,6 @@ impl fmt::Debug for dyn Object {
             Tuple
         );
         // Fallback
-        write!(f, "{} object @ {:?} -> {}", self.class(), self.id(), self)
+        write!(f, "{self}")
     }
 }

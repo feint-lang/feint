@@ -239,10 +239,13 @@ fn parse_precedence() {
 #[test]
 fn parse_func() {
     let source = "\
-add (x, y, z) -> 
+add = (x, y, z) -> 
     x + y + z
 
 add(1, 2, 3)
+
+sub (x, y, z) -> x - 1
+sub(1, 2, 3)
 ";
     if let Err(err) = parse_text(source) {
         assert!(false, "Function def failed to parse: {:?}", err);

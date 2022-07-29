@@ -57,7 +57,7 @@ print(s)
 - Upper camel case names only
 
 ```
-MyType () ->
+MyType () =>
 
     # @ indicates class method
     @new (value) ->
@@ -149,6 +149,7 @@ loop cond ->
 - Forward jumps support the jump-to-exit pattern
 - Backward jumps are disallowed (so no looping via goto)
 - Labels can't be redefined in a scope
+- Can't jump out of functions
 
 ```
 my_func (x) ->

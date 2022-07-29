@@ -4,7 +4,7 @@ use std::iter::{Iterator, Peekable};
 
 use crate::ast;
 use crate::format::FormatStrToken;
-use crate::parser::result::StatementResult;
+use crate::parser::result::{MaybeExprResult, StatementResult};
 use crate::scanner::{ScanErr, ScanTokenResult, Token, TokenWithLocation};
 use crate::util::Location;
 
@@ -71,7 +71,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
     /// certain cases, multiple statements may be returned (e.g.,
     /// loops).
     fn statement(&mut self) -> StatementResult {
-        use Token::*;
+        use Token::{Continue, EndOfStatement, Jump, Label};
         let token = self.expect_next_token()?;
         let start = token.start;
         let statement = match token.token {
@@ -87,6 +87,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
             _ => {
                 self.lookahead_queue.push_front(token);
                 let expr = self.expr(0)?;
+                let expr = self.maybe_func_maybe_call(expr)?.1;
                 let end = expr.end;
                 ast::Statement::new_expr(expr, start, end)
             }
@@ -116,10 +117,11 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
         let start = token.start;
         let end = token.end; // Default end location for simple expressions
         let expr = match token.token {
-            LParen => self.parenthesized(start)?,
+            LParen => self.parenthesized(start, None)?,
             Nil => ast::Expr::new_nil(start, end),
             True => ast::Expr::new_true(start, end),
             False => ast::Expr::new_false(start, end),
+            Ellipsis => ast::Expr::new_ellipsis(start, end),
             Int(value) => ast::Expr::new_int(value, start, end),
             Float(value) => ast::Expr::new_float(value, start, end),
             Str(string) => ast::Expr::new_string(string, start, end),
@@ -132,24 +134,22 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
             If => self.conditional(start)?,
             Loop => self.loop_(start)?,
             Break => self.break_(start)?,
-            Ident(name) => match self.next_token_is(&LParen)? {
-                true => self.func(name, start)?,
-                false => ast::Expr::new_ident(ast::Ident::new_ident(name), start, end),
-            },
-            // TODO: Check special funcs for validity
-            SpecialFuncIdent(name) => match self.next_token_is(&LParen)? {
-                true => self.func(name, start)?,
-                false => ast::Expr::new_ident(ast::Ident::new_ident(name), start, end),
-            },
+            Ident(name) => {
+                ast::Expr::new_ident(ast::Ident::new_ident(name), start, end)
+            }
+            // TODO: Check special names for validity
+            SpecialIdent(name) => {
+                ast::Expr::new_ident(ast::Ident::new_special_ident(name), start, end)
+            }
             // TODO: Handle type & instance creation
-            TypeIdent(name) => match self.next_token_is(&LParen)? {
-                true => self.func(name, start)?,
-                false => {
-                    ast::Expr::new_ident(ast::Ident::new_type_ident(name), start, end)
-                }
-            },
+            TypeIdent(name) => {
+                ast::Expr::new_ident(ast::Ident::new_type_ident(name), start, end)
+            }
             _ => self.expect_unary_expr(&token)?,
         };
+        // If the expression is a function definition or call, it will
+        // be parsed as such. Otherwise, it will be returned as is.
+        let expr = self.maybe_func_maybe_call(expr)?.1;
         // If the expression is followed by a binary operator, a binary
         // expression will be parsed and returned. Otherwise, the
         // expression will be returned as is.
@@ -161,37 +161,44 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
     ///
     /// 1. A grouped expression such as `(1)` or `(1 + 2)`
     /// 2. A tuple such as `(1,)` or `(1, 2)`
-    fn parenthesized(&mut self, start: Location) -> ExprResult {
+    fn parenthesized(
+        &mut self,
+        start: Location,
+        name: Option<ast::Expr>,
+    ) -> ExprResult {
         use Token::{Comma, RParen};
-        let expr = match self.next_token_is(&RParen)? {
-            true => {
-                // () is parsed as a tuple with 0 items
-                ast::Expr::new_tuple(vec![], start, self.loc())
-            }
-            false => {
-                let first_item = self.expr(0)?;
-                if self.peek_token_is(&Comma)? {
-                    let mut items = vec![];
-                    items.push(first_item);
-                    loop {
-                        if self.next_token_is(&RParen)? {
-                            break;
-                        }
-                        self.expect_token(&Comma)?;
-                        if self.next_token_is(&RParen)? {
-                            break;
-                        }
-                        let item = self.expr(0)?;
-                        items.push(item);
+        let expr = if self.next_token_is(&RParen)? {
+            // () is parsed as a tuple with 0 items
+            ast::Expr::new_tuple(vec![], start, self.loc())
+        } else {
+            let first_item = self.expr(0)?;
+            let first_item = self.maybe_func_maybe_call(first_item)?.1;
+            if self.peek_token_is(&Comma)? {
+                let mut items = vec![];
+                items.push(first_item);
+                loop {
+                    if self.next_token_is(&RParen)? {
+                        break;
                     }
-                    ast::Expr::new_tuple(items, start, self.loc())
-                } else {
-                    self.expect_token(&RParen)?;
-                    first_item
+                    self.expect_token(&Comma)?;
+                    if self.next_token_is(&RParen)? {
+                        break;
+                    }
+                    let item = self.expr(0)?;
+                    let item = self.maybe_func_maybe_call(item)?.1;
+                    items.push(item);
                 }
+                ast::Expr::new_tuple(items, start, self.loc())
+            } else {
+                self.expect_token(&RParen)?;
+                first_item
             }
         };
-        Ok(expr)
+        if self.peek_token_is_scope_start()? {
+            self.func(expr, start, name)
+        } else {
+            Ok(expr)
+        }
     }
 
     /// Handle format strings (AKA $ strings).
@@ -321,48 +328,122 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
         Ok(ast::Statement::new_continue(start, end))
     }
 
-    /// Handle `func () -> ...` (definition) and `func()` (call).
-    fn func(&mut self, name: String, start: Location) -> ExprResult {
-        let (items, call_end) =
-            if self.next_tokens_are(vec![&Token::Ellipsis, &Token::RParen])? {
-                (None, self.loc())
-            } else {
-                let expr = self.parenthesized(self.loc())?;
-                let call_end = expr.end;
-                let items = match expr.kind {
-                    ast::ExprKind::Tuple(items) => items,
-                    _ => vec![expr],
-                };
-                (Some(items), call_end)
-            };
+    fn maybe_func_maybe_call(&mut self, expr: ast::Expr) -> MaybeExprResult {
+        let (is_func, expr) = self.maybe_func(expr)?;
+        let (is_call, expr) =
+            if is_func { (false, expr) } else { self.maybe_call(expr)? };
+        Ok(((is_func || is_call), expr))
+    }
 
-        if self.peek_token_is_scope_start()? {
-            // Function definition
-            let params = if let Some(items) = items {
-                let mut params = vec![];
-                // Ensure all items are identifiers
-                for item in items.iter() {
-                    match &item.kind {
-                        ast::ExprKind::Ident(ast::Ident {
-                            kind: ast::IdentKind::Ident(name),
-                        }) => params.push(name.clone()),
-                        _ => {
-                            return Err(
-                                self.err(ParseErrKind::ExpectedIdent(item.start))
-                            )
-                        }
+    /// Handle function definition.
+    fn func(
+        &mut self,
+        params_expr: ast::Expr,
+        start: Location,
+        name: Option<ast::Expr>,
+    ) -> ExprResult {
+        let params_opt = match params_expr.kind {
+            ast::ExprKind::Tuple(items) => Some(items),
+            _ => match params_expr.is_ellipsis() {
+                true => None,
+                false => Some(vec![params_expr]),
+            },
+        };
+        let params = if let Some(items) = params_opt {
+            let mut params = vec![];
+            // Ensure all items are identifiers
+            for item in items.iter() {
+                match item.is_ident() {
+                    Some(name) => params.push(name),
+                    None => {
+                        return Err(self.err(ParseErrKind::ExpectedIdent(item.start)))
                     }
                 }
-                Some(params)
-            } else {
-                None
-            };
-            let block = self.block()?;
-            let def_end = block.end;
-            Ok(ast::Expr::new_func(name.clone(), params, block, start, def_end))
+            }
+            Some(params)
         } else {
-            // Function call
-            Ok(ast::Expr::new_call(name.clone(), items.unwrap(), start, call_end))
+            None
+        };
+        let block = self.block()?;
+        let def_end = block.end;
+        if let Some(name) = name {
+            Ok(ast::Expr::new_named_func(name, params, block, start, def_end))
+        } else {
+            Ok(ast::Expr::new_func(params, block, start, def_end))
+        }
+    }
+
+    /// This is used to parse functions defined using the `f () -> nil`
+    /// syntax as opposed to standard assignment syntax.
+    fn maybe_func(&mut self, expr: ast::Expr) -> MaybeExprResult {
+        if let Some(_) = expr.is_ident() {
+            if self.func_lookahead()? {
+                self.next_token()?;
+                let func_expr = self.parenthesized(expr.start, Some(expr))?;
+                return Ok((true, func_expr));
+            }
+        }
+        Ok((false, expr))
+    }
+
+    /// Look ahead starting from left paren to figure out if a function
+    /// is being defined.
+    fn func_lookahead(&mut self) -> Result<bool, ParseErr> {
+        use ParseErrKind::MismatchedBracket;
+        use Token::{LBracket, LParen, RBracket, RParen};
+        if !self.peek_token_is(&LParen)? {
+            return Ok(false);
+        }
+        let mut collector = vec![];
+        let mut stack = vec![];
+        while let Some(t) = self.next_token()? {
+            let token = &t.token;
+            match token {
+                LParen => stack.push('('),
+                LBracket => stack.push('['),
+                RParen => {
+                    if stack.pop() != Some('(') {
+                        return Err(self.err(MismatchedBracket(self.loc())));
+                    }
+                }
+                RBracket => {
+                    if stack.pop() != Some('[') {
+                        return Err(self.err(MismatchedBracket(self.loc())));
+                    }
+                }
+                _ => (),
+            }
+            let is_rparen = token == &RParen;
+            collector.push(t);
+            if is_rparen && stack.is_empty() {
+                let is_scope_start = self.peek_token_is_scope_start()?;
+                self.lookahead_queue.extend(collector);
+                return Ok(is_scope_start);
+            }
+        }
+        self.lookahead_queue.extend(collector);
+        Ok(false)
+    }
+
+    /// Handle function call.
+    fn call(&mut self, callable: ast::Expr, args: ast::Expr) -> ExprResult {
+        let start = callable.start;
+        let end = args.end;
+        let args = match args.kind {
+            ast::ExprKind::Tuple(items) => items,
+            _ => vec![args],
+        };
+        Ok(ast::Expr::new_call(callable, args, start, end))
+    }
+
+    /// Handle function call if indicated by next token.
+    fn maybe_call(&mut self, expr: ast::Expr) -> MaybeExprResult {
+        if self.next_token_is(&Token::LParen)? {
+            let args = self.parenthesized(expr.start, None)?;
+            let call_expr = self.call(expr, args)?;
+            Ok((true, call_expr))
+        } else {
+            Ok((false, expr))
         }
     }
 
@@ -377,6 +458,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
             return Err(self.err(ParseErrKind::ExpectedOperand(op_token.end)));
         }
         let rhs = self.expr(prec)?;
+        let rhs = self.maybe_func_maybe_call(rhs)?.1;
         let op = op_token.as_str();
         let (start, end) = (op_token.start, rhs.end);
         Ok(ast::Expr::new_unary_op(op, rhs, start, end))
@@ -385,8 +467,8 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
     /// See if the expr is followed by an infix operator. If so, get the
     /// RHS expression and return a binary expression. If not, just
     /// return the original expr.
-    fn maybe_binary_expr(&mut self, prec: u8, mut expr: ast::Expr) -> ExprResult {
-        let start = expr.start;
+    fn maybe_binary_expr(&mut self, prec: u8, mut lhs: ast::Expr) -> ExprResult {
+        let start = lhs.start;
         loop {
             let next = self.next_infix_token(prec)?;
             if let Some((infix_token, mut infix_prec)) = next {
@@ -400,12 +482,14 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
                 if is_right_associative(&infix_token.token) {
                     infix_prec -= 1;
                 }
-                let rhs = self.expr(infix_prec)?;
+                lhs = self.maybe_func_maybe_call(lhs)?.1;
                 let op = infix_token.as_str();
+                let rhs = self.expr(infix_prec)?;
+                let rhs = self.maybe_func_maybe_call(rhs)?.1;
                 let end = rhs.end;
-                expr = ast::Expr::new_binary_op(expr, op, rhs, start, end);
+                lhs = ast::Expr::new_binary_op(lhs, op, rhs, start, end);
             } else {
-                break Ok(expr);
+                break Ok(lhs);
             }
         }
     }

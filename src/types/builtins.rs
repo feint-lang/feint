@@ -72,8 +72,8 @@ impl Builtins {
         Arc::new(super::int::Int::new(value))
     }
 
-    pub fn new_namespace(&self, name: &str) -> ObjectRef {
-        let ns = super::namespace::Namespace::new(name, self.nil_obj.clone());
+    pub fn new_namespace(&self) -> ObjectRef {
+        let ns = super::namespace::Namespace::new(self.nil_obj.clone());
         Arc::new(ns)
     }
 

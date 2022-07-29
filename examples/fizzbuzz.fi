@@ -1,4 +1,4 @@
-fizz_buzz (end) ->
+fizz_buzz = (end) ->
     "FizzBuzz
 
     Spec:
@@ -19,5 +19,5 @@ fizz_buzz (end) ->
         i += 1
 
 
-$main (...) ->
+$main = (...) ->
     fizz_buzz($args.0)

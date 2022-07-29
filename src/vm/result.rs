@@ -7,7 +7,8 @@ use crate::parser::ParseErr;
 use crate::types::ObjectRef;
 
 pub type ExeResult = Result<VMState, RuntimeErr>;
-pub type RuntimeResult = Result<ObjectRef, RuntimeErr>;
+pub type RuntimeResult = Result<(), RuntimeErr>;
+pub type RuntimeObjResult = Result<ObjectRef, RuntimeErr>;
 pub type RuntimeBoolResult = Result<bool, RuntimeErr>;
 pub type PopObjResult = Result<ObjectRef, RuntimeErr>;
 pub type PopNObjResult = Result<Vec<ObjectRef>, RuntimeErr>;
@@ -67,6 +68,10 @@ impl RuntimeErr {
 
     pub fn new_index_out_of_bounds(index: usize) -> Self {
         Self::new(RuntimeErrKind::IndexOutOfBounds(index))
+    }
+
+    pub fn new_not_callable(obj: ObjectRef) -> Self {
+        Self::new(RuntimeErrKind::NotCallable(obj))
     }
 }
 
