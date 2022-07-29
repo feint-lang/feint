@@ -103,6 +103,7 @@ impl<'a> Visitor<'a> {
     }
 
     fn visit_continue(&mut self) -> VisitResult {
+        self.chunk.push(Inst::LoadConst(0));
         self.chunk.push(Inst::ContinuePlaceholder(self.chunk.len(), self.scope_depth));
         Ok(())
     }
