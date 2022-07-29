@@ -345,7 +345,7 @@ impl VM {
             self.ctx.enter_scope();
             self.check_call_args(&func.name, &func.params, &args, true)?;
             self.execute(&func.chunk, false)?;
-            self.ctx.exit_scopes(1);
+            self.exit_scopes(1);
         } else {
             return Err(RuntimeErr::new_not_callable(callable.clone()));
         }
