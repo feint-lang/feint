@@ -61,10 +61,10 @@ macro_rules! make_unary_op {
     ( $meth:ident, $op:literal, $result:ty ) => {
         fn $meth(&self, _ctx: &RuntimeContext) -> $result {
             Err(RuntimeErr::new_type_err(format!(
-                "Unary operator {} ({}) not implemented for type {}",
+                "Unary operator {} ({}) not implemented for {}",
                 $op,
                 stringify!($meth),
-                self.type_name()
+                self.class()
             )))
         }
     };
@@ -74,10 +74,10 @@ macro_rules! make_bin_op {
     ( $func:ident, $op:literal, $result:ty ) => {
         fn $func(&self, _rhs: &dyn Object, _ctx: &RuntimeContext) -> $result {
             Err(RuntimeErr::new_type_err(format!(
-                "Binary operator {} ({}) not implemented for type {}",
+                "Binary operator {} ({}) not implemented for {}",
                 $op,
                 stringify!($func),
-                self.type_name()
+                self.class()
             )))
         }
     };
@@ -170,8 +170,8 @@ pub trait Object {
     // Call ------------------------------------------------------------
 
     fn call(&self, _args: Args, _vm: &mut VM) -> CallResult {
-        let name = self.type_name();
-        Err(RuntimeErr::new_type_err(format!("Call not implemented for type {name}")))
+        let class = self.class();
+        Err(RuntimeErr::new_type_err(format!("Call not implemented for type {class}")))
     }
 
     // Attributes (accessed by name) -----------------------------------

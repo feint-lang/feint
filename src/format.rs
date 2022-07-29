@@ -65,11 +65,11 @@ pub fn scan_format_string(string: &str) -> Result<Vec<FormatStrToken>, FormatStr
                         let result: ScanTokensResult = scanner.collect();
                         match result {
                             Ok(expr_tokens) => tokens.push(Expr(expr_tokens)),
-                            Err(_) => return Err(ScanErr(i, pos)),
+                            Err(_) => return Err(ScanErr(i + 2, pos + 2)),
                         }
                     }
                 } else {
-                    return Err(UnmatchedClosingBracket(pos));
+                    return Err(UnmatchedClosingBracket(pos + 2));
                 }
             }
             _ => {
@@ -82,7 +82,7 @@ pub fn scan_format_string(string: &str) -> Result<Vec<FormatStrToken>, FormatStr
     }
 
     if stack.len() > 0 {
-        return Err(UnmatchedOpeningBracket(stack.pop().unwrap()));
+        return Err(UnmatchedOpeningBracket(stack.pop().unwrap() + 2));
     }
 
     if str.len() > 0 {

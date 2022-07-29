@@ -3,7 +3,7 @@ use std::any::Any;
 use std::fmt;
 
 use crate::types::{Args, CallResult, Params};
-use crate::vm::{Chunk, RuntimeErr, VM};
+use crate::vm::{Chunk, VM};
 
 use super::builtin_types::BUILTIN_TYPES;
 use super::class::TypeRef;
@@ -34,43 +34,16 @@ impl Object for Func {
 
     /// This provides a way to call user functions from builtin
     /// functions. Perhaps there's a better way to do this?
-    ///
-    /// TODO: This duplicates the VM's handling of calls. The only
-    ///       difference is that it returns the result rather than
-    ///       pushing it back onto the stack as a return value.
     fn call(&self, args: Args, vm: &mut VM) -> CallResult {
-        // Wrap the function call in a scope where the
-        // function's locals are defined. After the
-        // call, this scope will be cleared out.
         vm.scope_stack.push(vm.value_stack.size());
         vm.ctx.enter_scope();
-
-        if let Some(params) = &self.params {
-            let arity = params.len();
-            let num_args = args.len();
-            if num_args != arity {
-                let name = &self.name;
-                let ess = if arity == 1 { "" } else { "s" };
-                return Err(RuntimeErr::new_type_err(format!(
-                    "{name}() expected {arity} arg{ess}; got {num_args}"
-                )));
-            }
-            // Bind args
-            for (name, arg) in params.iter().zip(args) {
-                vm.ctx.declare_and_assign_var(name, arg)?;
-            }
-        } else {
-            let args = vm.ctx.builtins.new_tuple(args);
-            vm.ctx.declare_and_assign_var("$args", args)?;
-        }
-
+        vm.check_call_args(self.name.as_str(), &self.params, &args, true)?;
         let result = if let Err(err) = vm.execute(&self.chunk, false) {
             Err(err)
         } else {
             let result = vm.pop_obj()?;
             Ok(Some(result))
         };
-
         vm.ctx.exit_scopes(1);
         result
     }

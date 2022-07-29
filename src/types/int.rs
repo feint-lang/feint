@@ -29,7 +29,7 @@ impl Int {
     // Cast both LHS and RHS to f64 and divide them
     fn div_f64(&self, rhs: &dyn Object) -> Result<f64, RuntimeErr> {
         let lhs_val = self.value().to_f64().unwrap();
-        let rhs_val = if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
+        let rhs_val = if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
             rhs.value().to_f64().unwrap()
         } else if let Some(rhs) = rhs.as_any().downcast_ref::<Float>() {
             *rhs.value()
@@ -46,7 +46,7 @@ impl Int {
 macro_rules! make_op {
     ( $meth:ident, $op:tt, $message:literal ) => {
         fn $meth(&self, rhs: &dyn Object, ctx: &RuntimeContext) -> RuntimeObjResult {
-            if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
+            if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
                 // XXX: Return Int
                 let value = self.value() $op rhs.value();
                 let value = ctx.builtins.new_int(value);
@@ -81,8 +81,7 @@ impl Object for Int {
     }
 
     fn is_equal(&self, rhs: &dyn Object, _ctx: &RuntimeContext) -> bool {
-        // let rhs = rhs.lock().unwrap();
-        if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
+        if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
             self.is(rhs) || self.value() == rhs.value()
         } else if let Some(rhs) = rhs.as_any().downcast_ref::<Float>() {
             eq_int_float(self, rhs)
@@ -92,35 +91,39 @@ impl Object for Int {
     }
 
     fn less_than(&self, rhs: &dyn Object, _ctx: &RuntimeContext) -> RuntimeBoolResult {
-        if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
-            Ok(self.is(rhs) || self.value() < rhs.value())
+        if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
+            Ok(self.value() < rhs.value())
         } else if let Some(rhs) = rhs.as_any().downcast_ref::<Float>() {
             Ok(lt_int_float(self, rhs))
         } else {
             Err(RuntimeErr::new_type_err(format!(
-                "Could not compare Int to {} for less than",
-                rhs.type_name()
+                "Could not compare {} to {}: >",
+                rhs.class(),
+                self.class(),
             )))
         }
     }
+
     fn greater_than(
         &self,
         rhs: &dyn Object,
         _ctx: &RuntimeContext,
     ) -> RuntimeBoolResult {
-        if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
-            Ok(self.is(rhs) || self.value() > rhs.value())
+        if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
+            Ok(self.value() > rhs.value())
         } else if let Some(rhs) = rhs.as_any().downcast_ref::<Float>() {
             Ok(gt_int_float(self, rhs))
         } else {
             Err(RuntimeErr::new_type_err(format!(
-                "Could not compare Int to {} for greater than",
-                rhs.type_name()
+                "Could not compare {} to {}: >",
+                self.class(),
+                rhs.class()
             )))
         }
     }
+
     fn pow(&self, rhs: &dyn Object, ctx: &RuntimeContext) -> RuntimeObjResult {
-        if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
+        if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
             // XXX: Return Int
             let base = self.value();
             let exp = rhs.value().to_u32().unwrap();
@@ -136,8 +139,9 @@ impl Object for Int {
             Ok(value)
         } else {
             Err(RuntimeErr::new_type_err(format!(
-                "Could not raise Int by {}",
-                rhs.type_name()
+                "Could not raise {} by {}",
+                self.class(),
+                rhs.class()
             )))
         }
     }

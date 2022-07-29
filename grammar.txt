@@ -165,10 +165,10 @@ cond :
     | inline_block
 
 func :
-    | [IDENT] "(" [params] ")" "->" suite
+    | "(" [params] ")" "->" suite
 
 inline_func :
-    | [IDENT] "(" [params] ")" "->" expr
+    | "(" [params] ")" "->" expr
 
 params :
     | IDENT ("," IDENT)* [","]
@@ -180,11 +180,10 @@ args :
     | tuple_expr ("," tuple_expr)* [","]
 
 type :
-    | [TYPE_IDENT] "(" params ")" "=>" suite
     | "(" params ")" "=>" suite
 
 inline_type :
-    | [TYPE_IDENT] "(" params ")" "->" expr
+    | "(" params ")" "=>" expr
 
 # Comments -------------------------------------------------------------
 

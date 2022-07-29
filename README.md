@@ -14,6 +14,7 @@ MIT. See the LICENSE file.
 ## Ideas
 
 - Everything is an object of some type
+- Strong typing
 - Lexical scoping
 - Almost everything is an expression
 - Significant whitespace (by default, but maybe consider `{...}` blocks
@@ -31,14 +32,35 @@ MIT. See the LICENSE file.
 
 - Nil
 - Bool (`true` and `false` keywords, not ints)
-- Float (64-bit)
 - Int (BigInt)
+- Float (64-bit)
 - Str (can use `"` or `'`, multiline)
 - Tuple
 - List
-- Option
+- BuiltinFunc (e.g., `print()`)
 - Func
-- Range (`0..10` and `1...10`)
+- Module
+- Namespace
+
+## Vars
+
+Variables are defined without the use of any keywords, like Python or
+Ruby.
+
+```
+a = true
+b = nil
+
+a = true
+block ->
+    print(a)  # outer a
+    
+a = true
+block ->
+    a = false
+    print(a)  # block a
+print(a) # outer a
+```
 
 ## Format Strings
 
@@ -52,72 +74,53 @@ print(s)
 # -> 1
 ```
 
-## Custom Types
-
-- Upper camel case names only
-
-```
-MyType () =>
-
-    # @ indicates class method
-    @new (value) ->
-        this.value = value
-
-    # add operation
-    + (other) ->
-        MyType(this.value + other.value)
-
-    # $ indicates a special method
-    # $bool must return the bool value of the object
-    $bool ->
-        this.value > 10
-
-    # $string must return the string representation of the object
-    $string ->
-        $"{this.value}"
-
-obj1 = MyType.new(1)
-obj2 = MyType.new(2)
-obj1 + obj2
-# -> 3
-```
-
 ## Blocks
 
 Blocks create a new scope and return the value of the last expression.
 
 ```
 # Expression value is 4
-block ->
+block_val = block ->
     x = 2
     y = 2
     x + y
+
+block_val == 4
 ```
 
-## Functions
+## Scopes
 
-- Lower snake case names only
-- Value of last evaluated expression is returned
+In addition to blocks created with `block`, *all* blocks create a new
+scope.
+
+Blocks are denoted by `->` and always return (so to speak) a value,
+which may be `nil` (with the exception of a couple buggy cases with
+`jump`, labels, and `continue`)
+
+## Conditionals
+
+NOTE: Only `nil`, booleans, and numbers can be used in boolean contexts.
 
 ```
-# Named function
-<name> ([params]) ->
-    <block>
+# Block style
+if true ->
+    true
+else if 0 ->
+    0
+else ->
+    false
 
-<name> ([params]) -> <expression>
+# Inline style
+if true -> true
+else if 0 -> 0
+else -> false
 
-# Anonymous function assigned to a var
-<name> = ([params]) ->
-    <body>
+# Ternary style
+x = if true -> true else -> false
 
-<name> = ([params]) -> <expression>
-
-# Immediate invocation of anonymous function
-(([params]) -> <expression>)([arguments])
-
-my_func (func) -> func()
-my_func(() -> nil)
-# -> nil
+# The else block is optional; nil is returned by default
+if true -> true    # result is true
+if false -> false  # result is nil
 ```
 
 ## Loops
@@ -160,4 +163,64 @@ my_func (x) ->
 
     exit:
     # clean up and return
+```
+
+## Functions
+
+- Lower snake case names only
+- Value of last evaluated expression is returned
+-
+
+```
+# Named function
+<name> = ([params]) ->
+    <block>
+
+<name> = ([params]) -> <expression>
+
+# Anonymous function assigned to a var
+<name> = ([params]) ->
+    <body>
+
+<name> = ([params]) -> <expression>
+
+# Immediate invocation of anonymous function
+(([params]) -> <expression>)([arguments])
+
+my_func = (func) -> func()
+my_func(() -> nil)
+# -> nil
+```
+
+## Custom Types
+
+- Upper camel case names only
+- Still working out some details
+- Idea: If a method doesn't take any args, allow it to be called with
+  or without call syntax?
+
+```
+MyType = () =>
+
+    # @ indicates class method
+    @new = (value) ->
+        this.value = value
+
+    # add operation
+    + = (other) ->
+        MyType(this.value + other.value)
+
+    # $ indicates a special method
+    # $bool must return the bool value of the object
+    $bool = () ->
+        this.value > 10
+
+    # $string must return the string representation of the object
+    $string = () ->
+        $"{this.value}"
+
+obj1 = MyType.new(1)
+obj2 = MyType.new(2)
+obj1 + obj2
+# -> 3
 ```

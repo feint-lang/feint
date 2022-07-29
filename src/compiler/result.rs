@@ -32,6 +32,10 @@ impl CompErr {
     pub fn new_expected_ident() -> Self {
         Self { kind: CompErrKind::ExpectedIdent }
     }
+
+    pub fn new_cannot_assign_special_ident(name: String) -> Self {
+        Self { kind: CompErrKind::CannotAssignSpecialIdent(name) }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -41,4 +45,5 @@ pub enum CompErrKind {
     CannotJumpOutOfFunc(String),
     DuplicateLabelInScope(String),
     ExpectedIdent,
+    CannotAssignSpecialIdent(String),
 }

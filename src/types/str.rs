@@ -2,7 +2,7 @@
 use std::any::Any;
 use std::fmt;
 
-use crate::vm::{RuntimeContext, RuntimeErr, RuntimeObjResult};
+use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeErr, RuntimeObjResult};
 
 use super::builtin_types::BUILTIN_TYPES;
 use super::class::TypeRef;
@@ -50,8 +50,37 @@ impl Object for Str {
             Ok(value)
         } else {
             Err(RuntimeErr::new_type_err(format!(
-                "Could not concatenate String with {}",
-                rhs.type_name()
+                "Cannot concatenate {} to {}",
+                rhs.class(),
+                self.class(),
+            )))
+        }
+    }
+
+    fn less_than(&self, rhs: &dyn Object, _ctx: &RuntimeContext) -> RuntimeBoolResult {
+        if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
+            Ok(self.value() < rhs.value())
+        } else {
+            Err(RuntimeErr::new_type_err(format!(
+                "Cannot compare {} to {}: <",
+                rhs.class(),
+                self.class(),
+            )))
+        }
+    }
+
+    fn greater_than(
+        &self,
+        rhs: &dyn Object,
+        _ctx: &RuntimeContext,
+    ) -> RuntimeBoolResult {
+        if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
+            Ok(self.value() > rhs.value())
+        } else {
+            Err(RuntimeErr::new_type_err(format!(
+                "Cannot compare {} to {}: >",
+                rhs.class(),
+                self.class(),
             )))
         }
     }

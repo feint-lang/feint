@@ -74,6 +74,7 @@ fn scan_two_expr() {
             Location::new(1, 4),
         ),
     ]);
+    assert_eq!(token, &expected);
 
     token = tokens.get(4).unwrap();
     let expected = Str("c".to_owned());
@@ -82,15 +83,12 @@ fn scan_two_expr() {
 
 #[test]
 fn scan_complex() {
-    let tokens = scan_ok("aaa{1 + 1}bbb{2 + 2}ccc{$'{3 + 3}xxx{4 + 4}'}ddd", 7);
-    // TODO: Check tokens
+    scan_ok("aaa{1 + 1}bbb{2 + 2}ccc{$'{3 + 3}xxx{4 + 4}'}ddd", 7);
 }
 
 #[test]
 fn scan_with_tuple() {
-    let tokens = scan_ok("{(1, 2, 3, 'a', 'b', 'c')}", 1);
-    let token = tokens.last().unwrap();
-    // TODO: Check tokens
+    scan_ok("{(1, 2, 3, 'a', 'b', 'c')}", 1);
 }
 
 #[test]
@@ -118,15 +116,15 @@ fn scan_empty_expr() {
 #[test]
 fn scan_unmatched_opening_bracket() {
     let result = scan_format_string("{1");
-    assert_eq!(result, Err(UnmatchedOpeningBracket(0)));
+    assert_eq!(result, Err(UnmatchedOpeningBracket(2)));
     let result = scan_format_string("a{1");
-    assert_eq!(result, Err(UnmatchedOpeningBracket(1)));
+    assert_eq!(result, Err(UnmatchedOpeningBracket(3)));
 }
 
 #[test]
 fn scan_unmatched_closing_bracket() {
     let result = scan_format_string("1}");
-    assert_eq!(result, Err(UnmatchedClosingBracket(1)));
+    assert_eq!(result, Err(UnmatchedClosingBracket(3)));
     let result = scan_format_string("a1}");
-    assert_eq!(result, Err(UnmatchedClosingBracket(2)));
+    assert_eq!(result, Err(UnmatchedClosingBracket(4)));
 }

@@ -87,7 +87,6 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
             _ => {
                 self.lookahead_queue.push_front(token);
                 let expr = self.expr(0)?;
-                let expr = self.maybe_func_maybe_call(expr)?.1;
                 let end = expr.end;
                 ast::Statement::new_expr(expr, start, end)
             }
@@ -117,7 +116,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
         let start = token.start;
         let end = token.end; // Default end location for simple expressions
         let expr = match token.token {
-            LParen => self.parenthesized(start, None)?,
+            LParen => self.parenthesized(start)?,
             Nil => ast::Expr::new_nil(start, end),
             True => ast::Expr::new_true(start, end),
             False => ast::Expr::new_false(start, end),
@@ -125,7 +124,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
             Int(value) => ast::Expr::new_int(value, start, end),
             Float(value) => ast::Expr::new_float(value, start, end),
             Str(string) => ast::Expr::new_string(string, start, end),
-            FormatStr(tokens) => self.format_string(tokens)?,
+            FormatStr(tokens) => self.format_string(tokens, start, end)?,
             Block => {
                 let block = self.block()?;
                 let end = block.end;
@@ -137,11 +136,9 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
             Ident(name) => {
                 ast::Expr::new_ident(ast::Ident::new_ident(name), start, end)
             }
-            // TODO: Check special names for validity
             SpecialIdent(name) => {
                 ast::Expr::new_ident(ast::Ident::new_special_ident(name), start, end)
             }
-            // TODO: Handle type & instance creation
             TypeIdent(name) => {
                 ast::Expr::new_ident(ast::Ident::new_type_ident(name), start, end)
             }
@@ -149,7 +146,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
         };
         // If the expression is a function definition or call, it will
         // be parsed as such. Otherwise, it will be returned as is.
-        let expr = self.maybe_func_maybe_call(expr)?.1;
+        let expr = self.maybe_call(expr)?.1;
         // If the expression is followed by a binary operator, a binary
         // expression will be parsed and returned. Otherwise, the
         // expression will be returned as is.
@@ -161,18 +158,13 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
     ///
     /// 1. A grouped expression such as `(1)` or `(1 + 2)`
     /// 2. A tuple such as `(1,)` or `(1, 2)`
-    fn parenthesized(
-        &mut self,
-        start: Location,
-        name: Option<ast::Expr>,
-    ) -> ExprResult {
+    fn parenthesized(&mut self, start: Location) -> ExprResult {
         use Token::{Comma, RParen};
         let expr = if self.next_token_is(&RParen)? {
             // () is parsed as a tuple with 0 items
             ast::Expr::new_tuple(vec![], start, self.loc())
         } else {
             let first_item = self.expr(0)?;
-            let first_item = self.maybe_func_maybe_call(first_item)?.1;
             if self.peek_token_is(&Comma)? {
                 let mut items = vec![];
                 items.push(first_item);
@@ -185,7 +177,6 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
                         break;
                     }
                     let item = self.expr(0)?;
-                    let item = self.maybe_func_maybe_call(item)?.1;
                     items.push(item);
                 }
                 ast::Expr::new_tuple(items, start, self.loc())
@@ -195,7 +186,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
             }
         };
         if self.peek_token_is_scope_start()? {
-            self.func(expr, start, name)
+            self.func(expr, start)
         } else {
             Ok(expr)
         }
@@ -205,29 +196,35 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
     fn format_string(
         &mut self,
         format_string_tokens: Vec<FormatStrToken>,
+        start: Location,
+        end: Location,
     ) -> ExprResult {
-        let start = self.loc();
         let mut items = vec![];
         for format_string_token in format_string_tokens {
             match format_string_token {
                 FormatStrToken::Str(value) => {
-                    // TODO: Fix location
-                    items.push(ast::Expr::new_string(
-                        value,
-                        Location::new(1, 1),
-                        Location::new(1, 1),
-                    ));
+                    // NOTE: Locations aren't correct, but it shouldn't
+                    //       matter for string parts.
+                    items.push(ast::Expr::new_string(value, start, end));
                 }
                 FormatStrToken::Expr(tokens) => {
-                    // TODO: Make location more precise
-                    let loc = self.current_token.as_ref().unwrap().start;
-                    let program = parse_tokens(tokens)?;
+                    let mut adjusted_tokens = vec![];
+                    for t in tokens.iter() {
+                        let (s, e) = (t.start, t.end);
+                        adjusted_tokens.push(TokenWithLocation::new(
+                            t.token.clone(),
+                            Location::new(start.line + s.line, start.col + s.col),
+                            Location::new(end.line + s.line, end.col + e.col),
+                        ));
+                    }
+                    let program = parse_tokens(adjusted_tokens)?;
                     for statement in program.statements {
-                        match statement.kind {
-                            ast::StatementKind::Expr(expr) => items.push(expr),
-                            _ => {
-                                return Err(self.err(ParseErrKind::ExpectedExpr(loc)));
-                            }
+                        if let ast::StatementKind::Expr(expr) = statement.kind {
+                            items.push(expr)
+                        } else {
+                            return Err(
+                                self.err(ParseErrKind::ExpectedExpr(statement.start))
+                            );
                         }
                     }
                 }
@@ -328,20 +325,8 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
         Ok(ast::Statement::new_continue(start, end))
     }
 
-    fn maybe_func_maybe_call(&mut self, expr: ast::Expr) -> MaybeExprResult {
-        let (is_func, expr) = self.maybe_func(expr)?;
-        let (is_call, expr) =
-            if is_func { (false, expr) } else { self.maybe_call(expr)? };
-        Ok(((is_func || is_call), expr))
-    }
-
     /// Handle function definition.
-    fn func(
-        &mut self,
-        params_expr: ast::Expr,
-        start: Location,
-        name: Option<ast::Expr>,
-    ) -> ExprResult {
+    fn func(&mut self, params_expr: ast::Expr, start: Location) -> ExprResult {
         let params_opt = match params_expr.kind {
             ast::ExprKind::Tuple(items) => Some(items),
             _ => match params_expr.is_ellipsis() {
@@ -366,63 +351,11 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
         };
         let block = self.block()?;
         let def_end = block.end;
-        if let Some(name) = name {
-            Ok(ast::Expr::new_named_func(name, params, block, start, def_end))
-        } else {
-            Ok(ast::Expr::new_func(params, block, start, def_end))
-        }
-    }
-
-    /// This is used to parse functions defined using the `f () -> nil`
-    /// syntax as opposed to standard assignment syntax.
-    fn maybe_func(&mut self, expr: ast::Expr) -> MaybeExprResult {
-        if let Some(_) = expr.is_ident() {
-            if self.func_lookahead()? {
-                self.next_token()?;
-                let func_expr = self.parenthesized(expr.start, Some(expr))?;
-                return Ok((true, func_expr));
-            }
-        }
-        Ok((false, expr))
-    }
-
-    /// Look ahead starting from left paren to figure out if a function
-    /// is being defined.
-    fn func_lookahead(&mut self) -> Result<bool, ParseErr> {
-        use ParseErrKind::MismatchedBracket;
-        use Token::{LBracket, LParen, RBracket, RParen};
-        if !self.peek_token_is(&LParen)? {
-            return Ok(false);
-        }
-        let mut collector = vec![];
-        let mut stack = vec![];
-        while let Some(t) = self.next_token()? {
-            let token = &t.token;
-            match token {
-                LParen => stack.push('('),
-                LBracket => stack.push('['),
-                RParen => {
-                    if stack.pop() != Some('(') {
-                        return Err(self.err(MismatchedBracket(self.loc())));
-                    }
-                }
-                RBracket => {
-                    if stack.pop() != Some('[') {
-                        return Err(self.err(MismatchedBracket(self.loc())));
-                    }
-                }
-                _ => (),
-            }
-            let is_rparen = token == &RParen;
-            collector.push(t);
-            if is_rparen && stack.is_empty() {
-                let is_scope_start = self.peek_token_is_scope_start()?;
-                self.lookahead_queue.extend(collector);
-                return Ok(is_scope_start);
-            }
-        }
-        self.lookahead_queue.extend(collector);
-        Ok(false)
+        // NOTE: The name for a func will be set later if the function
+        //       is assigned to a var. Since this is done at compile
+        //       time, the function will retain its initial name even
+        //       if reassigned.
+        Ok(ast::Expr::new_func(params, block, start, def_end))
     }
 
     /// Handle function call.
@@ -436,12 +369,15 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
         Ok(ast::Expr::new_call(callable, args, start, end))
     }
 
-    /// Handle function call if indicated by next token.
+    /// Handle function calls. This checks for a left paren after an
+    /// expression and, if one is present, assumes a call is intended.
+    /// Call expressions are chained together as well to allow for
+    /// `f()()()` syntax.
     fn maybe_call(&mut self, expr: ast::Expr) -> MaybeExprResult {
         if self.next_token_is(&Token::LParen)? {
-            let args = self.parenthesized(expr.start, None)?;
+            let args = self.parenthesized(expr.start)?;
             let call_expr = self.call(expr, args)?;
-            Ok((true, call_expr))
+            self.maybe_call(call_expr)
         } else {
             Ok((false, expr))
         }
@@ -458,7 +394,6 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
             return Err(self.err(ParseErrKind::ExpectedOperand(op_token.end)));
         }
         let rhs = self.expr(prec)?;
-        let rhs = self.maybe_func_maybe_call(rhs)?.1;
         let op = op_token.as_str();
         let (start, end) = (op_token.start, rhs.end);
         Ok(ast::Expr::new_unary_op(op, rhs, start, end))
@@ -482,10 +417,8 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
                 if is_right_associative(&infix_token.token) {
                     infix_prec -= 1;
                 }
-                lhs = self.maybe_func_maybe_call(lhs)?.1;
                 let op = infix_token.as_str();
                 let rhs = self.expr(infix_prec)?;
-                let rhs = self.maybe_func_maybe_call(rhs)?.1;
                 let end = rhs.end;
                 lhs = ast::Expr::new_binary_op(lhs, op, rhs, start, end);
             } else {

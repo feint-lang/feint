@@ -17,6 +17,7 @@ fizz_buzz = (end) ->
         else -> i
         print(result)
         i += 1
+    nil
 
 
 $main = (...) ->

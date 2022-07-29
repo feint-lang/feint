@@ -104,7 +104,6 @@ pub enum ExprKind {
     Loop(Box<Expr>, StatementBlock),
     Break(Box<Expr>),
     Func(Func),
-    NamedFunc(Box<Expr>, Func),
     Call(Call),
     UnaryOp(UnaryOperator, Box<Expr>),
     BinaryOp(Box<Expr>, BinaryOperator, Box<Expr>),
@@ -192,17 +191,6 @@ impl Expr {
         end: Location,
     ) -> Self {
         Self::new(ExprKind::Func(Func::new(params, block)), start, end)
-    }
-
-    pub fn new_named_func(
-        name: Expr,
-        params: Params,
-        block: StatementBlock,
-        start: Location,
-        end: Location,
-    ) -> Self {
-        let name = Box::new(name);
-        Self::new(ExprKind::NamedFunc(name, Func::new(params, block)), start, end)
     }
 
     pub fn new_call(
@@ -302,7 +290,6 @@ impl fmt::Debug for ExprKind {
             Self::Loop(expr, block) => write!(f, "loop {expr:?}\n{block:?}"),
             Self::Break(expr) => write!(f, "break {expr:?}"),
             Self::Func(func) => write!(f, "{:?}", func),
-            Self::NamedFunc(name, func) => write!(f, "{name:?} {:?}", func),
             Self::Call(func) => write!(f, "{:?}", func),
             Self::UnaryOp(op, b) => write!(f, "({:?}{:?})", op, b),
             Self::BinaryOp(a, op, b) => write!(f, "({:?} {:?} {:?})", a, op, b),

@@ -360,7 +360,7 @@ impl VM {
 
     /// Check call args to ensure they're valid. If they are, bind them
     /// to names in the call scope (if `bind` is specified).
-    fn check_call_args(
+    pub fn check_call_args(
         &mut self,
         name: &str,
         params: &Params,
@@ -397,12 +397,15 @@ impl VM {
     /// scope's namespace is then cleared and removed.
     fn exit_scopes(&mut self, count: usize) {
         for _ in 0..count {
-            let top = self.pop();
+            let return_val = self.pop_obj();
             let size = self.scope_stack.pop().unwrap();
             self.value_stack.truncate(size);
-            match top {
-                Some(obj) => self.push(obj),
-                None => (),
+            match return_val {
+                Ok(obj) => self.push(ValueStackKind::Temp(obj)),
+                Err(_) => {
+                    // Should be unreachable.
+                    panic!("Stack unexpectedly empty when exiting scope(s): {count}");
+                }
             }
         }
         self.ctx.exit_scopes(count);

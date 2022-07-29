@@ -14,7 +14,9 @@
 - [x] Implement `jump` (jump *forward* to label)
   - Allow multiple `jump`s to the same label in a given scope
 - [x] Implement conditionals
-- [ ] Implement ternary operator
+- [ ] Implement ternary operator (can use inline
+      `x = if <cond> -> <expr> else -> <expr>` for this so maybe an op
+      isn't necessary)
 - [ ] Implement `match`?
 - [ ] Implement range
 - [ ] Implement `loop`
@@ -22,10 +24,12 @@
   - [ ] Implement for loops
   - [x] Fix `break` (works for simple cases but is wonky)
   - [x] Implement `continue`
-- [ ] Implement function calls
+- [x] Implement function calls
+  - [ ] Verify implementation
 - [x] Implement native functions
-- [x] Implement `print` function (`print` is currently implemented as a statement and has limited functionality)
+  - [x] Implement `print` function (`print` is currently implemented as a statement and has limited functionality)
 - [ ] Check tuple items / args and throw error when invalid items are included (e.g., `break` isn't allowed)
+- [ ] Implement modules (add `Module` type)
 - [ ] Implement custom classes
 - [ ] Implement `import`
   - [ ] `import <name>`
@@ -34,4 +38,6 @@
 - [ ] Improve error handling/reporting
   - [ ] Make source location available in AST (started)
   - [ ] Fix locations in format strings
-  - [ ] Make source location available in VM
+  - [ ] Make source locations available in VM
+- [ ] Add a lot more tests
+- [ ] Benchmark

@@ -14,6 +14,8 @@ b
 c
 "
 
+print($"{multiline_string}")
+
 s =  " a
 b
 
@@ -22,36 +24,51 @@ c
 
   "
 
+print($"{s}")
+
+# TODO:
+# print($"{s.trim()}")
+
 x != y
 x == y
-list = [1, 2, 3]
 
-.3  # Syntax error (leading 0 required)
-3.  # Syntax error (decimal part required)
+# TODO:
+# list = [1, 2, 3]
 
+# .3  # Syntax error (leading 0 required)
+# 3.  # Syntax error (decimal part required)
+
+# TODO:
 # Print `n` three times
-3.times_do((n) -> print(n))
+# 3.times_do((n) -> print(n))
 
 # Anonymous block (new scope)
-block ->
+block_return_val = block ->
     x = 2
 
-Type () ->
-    @new () ->
-        print("Create new instance Type")
+print(block_return_val)
 
-    !! () ->
-        true && false
+# TODO:
+# Type = () =>
+#     @new = () ->
+#         print("Create new instance Type")
+#
+#     !! = () ->
+#         true && false
 
-hello () ->
+hello = () ->
     "Python-style docstring for hello function"
     print("hello")
     print("\"hello\"")
 
-func_with_return_type (): String ->
+hello()
+
+func_with_return_type = () ->
     "abc"
 
-loops () ->
+print(func_with_return_type())
+
+loops = () ->
     i = 0
 
     loop ->
@@ -60,17 +77,24 @@ loops () ->
         if i == 10 -> break
 
     j = 0
-    go = true
-    loop go ->
-        print(i)
+    loop j < 10 ->
         j += 1
-        go = j == 10
 
-loop_over_range () ->
-    # Prints 0, 1, 2, 3, 4
-    loop i <- 0..5 ->
-        print(i)
+loops()
 
-    # Prints 1, 2, 3, 4, 5
-    loop i <- 1...5 ->
-        print(i)
+jump_out = () ->
+    loop ->
+        jump exit
+    exit: print("exit")
+
+jump_out()
+
+# TODO:
+# loop_over_range = () ->
+#     # Prints 0, 1, 2, 3, 4
+#     loop i <- 0..5 ->
+#         print(i)
+#
+#     # Prints 1, 2, 3, 4, 5
+#     loop i <- 1...5 ->
+#         print(i)

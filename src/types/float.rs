@@ -10,7 +10,7 @@ use super::builtin_types::BUILTIN_TYPES;
 use super::class::TypeRef;
 use super::int::Int;
 use super::object::{Object, ObjectExt};
-use super::util::eq_int_float;
+use super::util::{eq_int_float, gt_int_float, lt_int_float};
 
 pub struct Float {
     value: f64,
@@ -64,7 +64,6 @@ impl Object for Float {
     }
 
     fn is_equal(&self, rhs: &dyn Object, _ctx: &RuntimeContext) -> bool {
-        // let rhs = rhs.lock().unwrap();
         if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
             self.is(rhs) || self.value() == rhs.value()
         } else if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
@@ -74,15 +73,48 @@ impl Object for Float {
         }
     }
 
+    fn less_than(&self, rhs: &dyn Object, _ctx: &RuntimeContext) -> RuntimeBoolResult {
+        if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
+            Ok(self.value() < rhs.value())
+        } else if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
+            Ok(lt_int_float(rhs, self))
+        } else {
+            Err(RuntimeErr::new_type_err(format!(
+                "Could not compare {} to {}: <",
+                self.class(),
+                rhs.class()
+            )))
+        }
+    }
+
+    fn greater_than(
+        &self,
+        rhs: &dyn Object,
+        _ctx: &RuntimeContext,
+    ) -> RuntimeBoolResult {
+        if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
+            Ok(self.value() > rhs.value())
+        } else if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
+            Ok(gt_int_float(rhs, self))
+        } else {
+            Err(RuntimeErr::new_type_err(format!(
+                "Could not compare {} to {}: >",
+                self.class(),
+                rhs.class()
+            )))
+        }
+    }
+
     fn pow(&self, rhs: &dyn Object, ctx: &RuntimeContext) -> RuntimeObjResult {
-        let exp = if let Some(rhs) = rhs.as_any().downcast_ref::<Float>() {
+        let exp = if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
             *rhs.value()
         } else if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
             rhs.value().to_f64().unwrap()
         } else {
             return Err(RuntimeErr::new_type_err(format!(
-                "Could not raise Float by {}",
-                rhs.type_name()
+                "Could not raise {} by {}",
+                self.class(),
+                rhs.class()
             )));
         };
         let value = self.value().powf(exp);

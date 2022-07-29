@@ -102,6 +102,8 @@ impl<'a> Visitor<'a> {
         Ok(())
     }
 
+    /// Visit an expression. The `name` argument is currently only
+    /// used to assign names to functions.
     fn visit_expr(&mut self, node: ast::Expr, name: Option<String>) -> VisitResult {
         type Kind = ast::ExprKind;
         match node.kind {
@@ -116,15 +118,6 @@ impl<'a> Visitor<'a> {
             Kind::Loop(expr, block) => self.visit_loop(*expr, block)?,
             Kind::Break(expr) => self.visit_break(*expr)?,
             Kind::Func(func) => self.visit_func(func, name)?,
-            Kind::NamedFunc(name_expr, func_expr) => {
-                let name = self.get_ident_name(*name_expr.clone())?;
-                self.push(Inst::DeclareVar(name.clone()));
-                self.visit_func(func_expr, Some(name.clone()))?;
-                self.push(Inst::AssignVar(name));
-                if let ast::ExprKind::Ident(ident) = (*name_expr).kind {
-                    self.visit_ident(ident)?;
-                }
-            }
             Kind::Call(call) => self.visit_call(call)?,
             Kind::UnaryOp(op, b) => self.visit_unary_op(op, *b)?,
             Kind::BinaryOp(a, op, b) => self.visit_binary_op(*a, op, *b)?,
@@ -167,8 +160,8 @@ impl<'a> Visitor<'a> {
         Ok(())
     }
 
-    // Visit identifier as expression (i.e., not as part of an
-    // assignment).
+    /// Visit identifier as expression (i.e., not as part of an
+    /// assignment).
     fn visit_ident(&mut self, node: ast::Ident) -> VisitResult {
         type Kind = ast::IdentKind;
         match node.kind {
@@ -201,7 +194,18 @@ impl<'a> Visitor<'a> {
         name_expr: ast::Expr,
         value_expr: ast::Expr,
     ) -> VisitResult {
-        let name = self.get_ident_name(name_expr)?;
+        let name = if let Some(name) = name_expr.is_ident() {
+            name
+        } else if let Some(name) = name_expr.is_special_ident() {
+            // TODO: Add more name validation.
+            if name == "$main" && self.scope_tree.in_global_scope() {
+                name
+            } else {
+                return Err(CompErr::new_cannot_assign_special_ident(name));
+            }
+        } else {
+            return Err(CompErr::new_expected_ident());
+        };
         self.push(Inst::DeclareVar(name.clone()));
         self.visit_expr(value_expr, Some(name.clone()))?;
         self.push(Inst::AssignVar(name));
@@ -430,19 +434,6 @@ impl<'a> Visitor<'a> {
     fn exit_scope(&mut self) {
         self.scope_tree.move_up();
         self.scope_depth -= 1;
-    }
-
-    /// Get the identifier name for an expression, if it's an ident
-    /// expression.
-    fn get_ident_name(&self, name_expr: ast::Expr) -> Result<String, CompErr> {
-        let name = if let Some(name) = name_expr.is_ident() {
-            name
-        } else if let Some(name) = name_expr.is_special_ident() {
-            name
-        } else {
-            return Err(CompErr::new_expected_ident());
-        };
-        Ok(name)
     }
 
     /// Update jump instructions with their target label addresses.

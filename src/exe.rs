@@ -4,7 +4,7 @@ use std::io::BufRead;
 use crate::compiler::{compile, CompErr, CompErrKind};
 use crate::parser::{ParseErr, ParseErrKind, Parser};
 use crate::result::{ExeErr, ExeErrKind, ExeResult};
-use crate::scanner::{ScanErr, ScanErrKind, Scanner};
+use crate::scanner::{ScanErr, ScanErrKind, Scanner, Token};
 use crate::util::{
     source_from_file, source_from_stdin, source_from_text, Location, Source,
 };
@@ -205,11 +205,20 @@ impl<'a> Executor<'a> {
                 use crate::format::FormatStrErr::*;
                 match err {
                     EmptyExpr(pos) => {
-                        loc = Location::new(loc.line, loc.col + 2 + pos);
-                        format!("Syntax error: expected expression")
+                        loc = Location::new(loc.line, loc.col + pos);
+                        format!("Syntax error in format string: expected expression")
                     }
-                    _ => {
-                        format!("Unhandled format string error at {loc}")
+                    UnmatchedOpeningBracket(pos) => {
+                        loc = Location::new(loc.line, loc.col + pos);
+                        format!("Unmatched opening bracket in format string")
+                    }
+                    UnmatchedClosingBracket(pos) => {
+                        loc = Location::new(loc.line, loc.col + pos);
+                        format!("Unmatched closing bracket in format string")
+                    }
+                    ScanErr(_, pos) => {
+                        loc = Location::new(loc.line, loc.col + *pos);
+                        format!("Error while scanning format string")
                     }
                 }
             }
@@ -238,7 +247,11 @@ impl<'a> Executor<'a> {
             UnexpectedToken(token) => {
                 let loc = token.start;
                 let token = &token.token;
-                (loc, format!("Parse error: unexpected token at {loc}: {token:?}"))
+                if token == &Token::EndOfStatement {
+                    (loc, format!("Syntax error at {loc}"))
+                } else {
+                    (loc, format!("Parse error: unexpected token at {loc}: {token:?}"))
+                }
             }
             ExpectedBlock(loc) => {
                 (loc.clone(), format!("Parse error: expected indented block at {loc}"))
@@ -287,6 +300,9 @@ impl<'a> Executor<'a> {
             }
             ExpectedIdent => {
                 format!("expected identifier")
+            }
+            CannotAssignSpecialIdent(name) => {
+                format!("cannot assign to special name: {name}")
             }
         };
         eprintln!("    |\n\n  Compilation error: {}", message);

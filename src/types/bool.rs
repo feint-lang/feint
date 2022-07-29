@@ -52,8 +52,9 @@ impl Object for Bool {
             Ok(*self.value() && *rhs.value())
         } else {
             Err(RuntimeErr::new_type_err(format!(
-                "Bool && {} not implemented",
-                rhs.type_name()
+                "{} && {} not implemented",
+                self.class(),
+                rhs.class()
             )))
         }
     }
@@ -63,8 +64,9 @@ impl Object for Bool {
             Ok(*self.value() || *rhs.value())
         } else {
             Err(RuntimeErr::new_type_err(format!(
-                "Bool || {} not implemented",
-                rhs.type_name()
+                "{} || {} not implemented",
+                self.class(),
+                rhs.class()
             )))
         }
     }
