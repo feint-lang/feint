@@ -81,14 +81,14 @@ impl Object for Namespace {
 
 impl fmt::Display for Namespace {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let class = self.class();
+        let type_name = self.class().qualified_name();
         let id = self.id();
-        write!(f, "{class} @ {id}")
+        write!(f, "<{type_name}> @ {id}")
     }
 }
 
 impl fmt::Debug for Namespace {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self)
+        write!(f, "{self}")
     }
 }

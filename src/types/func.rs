@@ -58,13 +58,13 @@ impl fmt::Display for Func {
             Some(n) => n.to_string(),
             None => "...".to_string(),
         };
-        write!(f, "function {name}/{num_args}")
+        let id = self.id();
+        write!(f, "function {name}/{num_args} @ {id}")
     }
 }
 
 impl fmt::Debug for Func {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let id = self.id();
-        write!(f, "{self} @ {id}")
+        write!(f, "{self}")
     }
 }

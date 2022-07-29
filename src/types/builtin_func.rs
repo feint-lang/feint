@@ -48,13 +48,13 @@ impl fmt::Display for BuiltinFunc {
             Some(n) => n.to_string(),
             None => "...".to_string(),
         };
-        write!(f, "builtin function {name}/{num_args}")
+        let id = self.id();
+        write!(f, "builtin function {name}/{num_args} @ {id}")
     }
 }
 
 impl fmt::Debug for BuiltinFunc {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let id = self.id();
-        write!(f, "{self} @ {id}")
+        write!(f, "{self}")
     }
 }

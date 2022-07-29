@@ -285,9 +285,9 @@ impl fmt::Display for dyn Object {
             Tuple
         );
         // Fallback
-        let class = self.class();
+        let type_name = self.class().qualified_name();
         let id = self.id();
-        write!(f, "{class} object @ {id}")
+        write!(f, "<{type_name}> object @ {id}")
     }
 }
 
