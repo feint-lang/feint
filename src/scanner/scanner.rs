@@ -264,7 +264,9 @@ impl<'a, T: BufRead> Scanner<'a, T> {
     }
 
     fn handle_ident(&mut self, first_char: char, start: Location) -> AddTokenResult {
-        use Token::{Else, EndOfStatement, Ident, If, Label, ScopeStart};
+        use Token::{
+            Else, EndOfStatement, Ident, If, InlineScopeStart, Label, ScopeStart,
+        };
         // Special case for underscore placeholder vars.
         if first_char == '_' {
             let count = self.consume_contiguous('_') + 1;
@@ -276,7 +278,7 @@ impl<'a, T: BufRead> Scanner<'a, T> {
         }
         let ident = self.read_ident(first_char);
         // Label
-        if let EndOfStatement | ScopeStart = self.last_token() {
+        if let EndOfStatement | ScopeStart | InlineScopeStart = self.last_token() {
             if let Some(':') = self.source.peek() {
                 self.source.next();
                 return Ok(Label(ident));

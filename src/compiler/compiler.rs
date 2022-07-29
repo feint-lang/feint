@@ -82,9 +82,9 @@ impl<'a> Visitor<'a> {
                 ));
                 self.scope_tree.add_jump(name.as_str(), jump_addr);
             }
-            Kind::Label(name) => {
-                self.push(Inst::NoOp);
-                let addr = self.chunk.len() - 1;
+            Kind::Label(name, expr) => {
+                let addr = self.chunk.len();
+                self.visit_expr(expr, None)?;
                 if self.scope_tree.add_label(name.as_str(), addr).is_some() {
                     return Err(CompErr::new_duplicate_label_in_scope(name));
                 }

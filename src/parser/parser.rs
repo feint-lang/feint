@@ -76,13 +76,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
         let start = token.start;
         let statement = match token.token {
             Jump => self.jump(start)?,
-            Label(name) => {
-                let label = ast::Statement::new_label(name, start, token.end);
-                if !self.peek_token_is(&EndOfStatement)? {
-                    return Ok(label);
-                }
-                label
-            }
+            Label(name) => self.label(name, start)?,
             Break => self.break_(start)?,
             Continue => self.continue_(start, token.end)?,
             _ => {
@@ -107,6 +101,18 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
         } else {
             return Err(self.err(ParseErrKind::ExpectedIdent(self.next_loc())));
         }
+    }
+
+    /// Handle label statement.
+    fn label(&mut self, name: String, start: Location) -> StatementResult {
+        let expr = match self.peek_token()? {
+            Some(TokenWithLocation { token: Token::EndOfStatement, .. }) | None => {
+                ast::Expr::new_nil(start, start)
+            }
+            _ => self.expr(0)?,
+        };
+        let end = expr.end;
+        Ok(ast::Statement::new_label(name, expr, start, end))
     }
 
     /// Handle `break`, ensuring it's contained in a `loop`.
@@ -177,10 +183,12 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
         Ok(expr)
     }
 
-    /// Handle parenthesized expressions. There are two cases:
+    /// Handle parenthesized expressions. Cases:
     ///
-    /// 1. A grouped expression such as `(1)` or `(1 + 2)`
-    /// 2. A tuple such as `(1,)` or `(1, 2)`
+    /// 1. A grouped expression such as `(1)` or `(1 + 2)`.
+    /// 2. A tuple such as `(1,)` or `(1, 2)`.
+    /// 3. One of the above followed by `->`, indicating that the
+    ///    parenthesized expression is a function parameter list.
     fn parenthesized(&mut self, start: Location) -> ExprResult {
         use Token::{Comma, RParen};
         let expr = if self.next_token_is(&RParen)? {

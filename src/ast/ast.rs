@@ -40,7 +40,7 @@ pub struct Statement {
 #[derive(Clone, PartialEq)]
 pub enum StatementKind {
     Jump(String),
-    Label(String),
+    Label(String, Expr),
     Break(Expr),
     Continue,
     Expr(Expr),
@@ -56,8 +56,8 @@ impl Statement {
         Self::new(StatementKind::Jump(name), start, end)
     }
 
-    pub fn new_label(name: String, start: Location, end: Location) -> Self {
-        Self::new(StatementKind::Label(name), start, end)
+    pub fn new_label(name: String, expr: Expr, start: Location, end: Location) -> Self {
+        Self::new(StatementKind::Label(name, expr), start, end)
     }
 
     pub fn new_break(expr: Expr, start: Location, end: Location) -> Self {
@@ -83,7 +83,9 @@ impl fmt::Debug for StatementKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Expr(expr) => write!(f, "Expr({:?})", expr),
-            Self::Label(label_index) => write!(f, "Label: {}", label_index),
+            Self::Label(label_index, expr) => {
+                write!(f, "Label: {} {expr:?}", label_index)
+            }
             Self::Jump(label_index) => write!(f, "Jump: {}", label_index),
             Self::Break(expr) => write!(f, "break {expr:?}"),
             Self::Continue => write!(f, "Continue"),
