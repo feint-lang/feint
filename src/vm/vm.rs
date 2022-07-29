@@ -59,7 +59,8 @@ impl VM {
         use ValueStackKind::*;
 
         let mut ip: usize = 0;
-        let mut jump_ip: Option<usize> = None;
+        let mut jump_ip = 0;
+        let mut is_jump = false;
 
         loop {
             match &chunk[ip] {
@@ -99,20 +100,23 @@ impl VM {
                 // Jumps
                 Jump(addr, scope_exit_count) => {
                     self.exit_scopes(*scope_exit_count);
-                    jump_ip = Some(*addr);
+                    jump_ip = *addr;
+                    is_jump = true;
                 }
                 JumpIf(addr, scope_exit_count) => {
                     self.exit_scopes(*scope_exit_count);
                     let obj = self.pop_obj()?;
                     if obj.as_bool(&self.ctx)? {
-                        jump_ip = Some(*addr);
+                        jump_ip = *addr;
+                        is_jump = true;
                     }
                 }
                 JumpIfNot(addr, scope_exit_count) => {
                     self.exit_scopes(*scope_exit_count);
                     let obj = self.pop_obj()?;
                     if !obj.as_bool(&self.ctx)? {
-                        jump_ip = Some(*addr);
+                        jump_ip = *addr;
+                        is_jump = true;
                     }
                 }
                 JumpIfElse(if_addr, else_addr, scope_exit_count) => {
@@ -120,7 +124,8 @@ impl VM {
                     let obj = self.pop_obj()?;
                     let addr =
                         if obj.as_bool(&self.ctx)? { *if_addr } else { *else_addr };
-                    jump_ip = Some(addr);
+                    jump_ip = addr;
+                    is_jump = true;
                 }
                 // Operations
                 UnaryOp(op) => {
@@ -256,8 +261,7 @@ impl VM {
                     self.handle_call(*n)?;
                 }
                 Return => {
-                    let return_val = self.pop_obj()?;
-                    self.push(ReturnVal(return_val));
+                    // Return is a no-op
                 }
                 // Placeholders
                 Placeholder(addr, inst, message) => {
@@ -302,9 +306,10 @@ impl VM {
             #[cfg(debug_assertions)]
             self.dis(dis, ip, &chunk);
 
-            if let Some(continue_ip) = jump_ip {
-                ip = continue_ip;
-                jump_ip = None;
+            if is_jump {
+                ip = jump_ip;
+                jump_ip = 0;
+                is_jump = false;
             } else {
                 ip += 1;
             }
@@ -390,18 +395,24 @@ impl VM {
     /// back onto the stack. After taking care of the VM stack, the
     /// scope's namespace is then cleared and removed.
     fn exit_scopes(&mut self, count: usize) {
-        for _ in 0..count {
-            let return_val = self.pop_obj();
-            if let Some(size) = self.scope_stack.pop() {
-                self.value_stack.truncate(size);
-            } else {
-                panic!("Scope stack unexpectedly empty when exiting scope(s): {count}");
-            };
-            if let Ok(obj) = return_val {
-                self.push(ValueStackKind::Temp(obj));
-            } else {
-                panic!("Stack unexpectedly empty when exiting scope(s): {count}");
-            }
+        if count == 0 {
+            return;
+        }
+        if count > 1 {
+            let drop_count = count - 1;
+            self.scope_stack.truncate(self.scope_stack.size() - drop_count);
+            self.value_stack.truncate(self.value_stack.size() - drop_count);
+        }
+        let return_val = self.pop_obj();
+        if let Some(size) = self.scope_stack.pop() {
+            self.value_stack.truncate(size);
+        } else {
+            panic!("Scope stack unexpectedly empty when exiting scope(s): {count}");
+        };
+        if let Ok(obj) = return_val {
+            self.push(ValueStackKind::Temp(obj));
+        } else {
+            panic!("Stack unexpectedly empty when exiting scope(s): {count}");
         }
         self.ctx.exit_scopes(count);
     }
