@@ -59,6 +59,7 @@ impl VM {
         use ValueStackKind::*;
 
         let mut ip: usize = 0;
+        let mut jump_ip: Option<usize> = None;
 
         loop {
             match &chunk[ip] {
@@ -98,29 +99,20 @@ impl VM {
                 // Jumps
                 Jump(addr, scope_exit_count) => {
                     self.exit_scopes(*scope_exit_count);
-                    if !dis {
-                        ip = *addr;
-                        continue;
-                    }
+                    jump_ip = Some(*addr);
                 }
                 JumpIf(addr, scope_exit_count) => {
                     self.exit_scopes(*scope_exit_count);
                     let obj = self.pop_obj()?;
                     if obj.as_bool(&self.ctx)? {
-                        if !dis {
-                            ip = *addr;
-                            continue;
-                        }
+                        jump_ip = Some(*addr);
                     }
                 }
                 JumpIfNot(addr, scope_exit_count) => {
                     self.exit_scopes(*scope_exit_count);
                     let obj = self.pop_obj()?;
                     if !obj.as_bool(&self.ctx)? {
-                        if !dis {
-                            ip = *addr;
-                            continue;
-                        }
+                        jump_ip = Some(*addr);
                     }
                 }
                 JumpIfElse(if_addr, else_addr, scope_exit_count) => {
@@ -128,10 +120,7 @@ impl VM {
                     let obj = self.pop_obj()?;
                     let addr =
                         if obj.as_bool(&self.ctx)? { *if_addr } else { *else_addr };
-                    if !dis {
-                        ip = addr;
-                        continue;
-                    }
+                    jump_ip = Some(addr);
                 }
                 // Operations
                 UnaryOp(op) => {
@@ -313,7 +302,12 @@ impl VM {
             #[cfg(debug_assertions)]
             self.dis(dis, ip, &chunk);
 
-            ip += 1;
+            if let Some(continue_ip) = jump_ip {
+                ip = continue_ip;
+                jump_ip = None;
+            } else {
+                ip += 1;
+            }
 
             if ip == chunk.len() {
                 break Ok(VMState::Idle);
@@ -398,14 +392,15 @@ impl VM {
     fn exit_scopes(&mut self, count: usize) {
         for _ in 0..count {
             let return_val = self.pop_obj();
-            let size = self.scope_stack.pop().unwrap();
-            self.value_stack.truncate(size);
-            match return_val {
-                Ok(obj) => self.push(ValueStackKind::Temp(obj)),
-                Err(_) => {
-                    // Should be unreachable.
-                    panic!("Stack unexpectedly empty when exiting scope(s): {count}");
-                }
+            if let Some(size) = self.scope_stack.pop() {
+                self.value_stack.truncate(size);
+            } else {
+                panic!("Scope stack unexpectedly empty when exiting scope(s): {count}");
+            };
+            if let Ok(obj) = return_val {
+                self.push(ValueStackKind::Temp(obj));
+            } else {
+                panic!("Stack unexpectedly empty when exiting scope(s): {count}");
             }
         }
         self.ctx.exit_scopes(count);
