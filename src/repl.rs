@@ -144,10 +144,7 @@ impl<'a> Repl<'a> {
                     chunk.push(Inst::AssignVar(var.to_owned()));
                     // Print the result if it's not nil
                     if !val.is_nil() {
-                        chunk.push(Inst::LoadVar("print".to_owned()));
-                        chunk.push(Inst::LoadVar("_".to_owned()));
-                        chunk.push(Inst::Call(1));
-                        chunk.push(Inst::Return);
+                        eprintln!("{val:?}");
                     }
                 }
                 Ok(None) => {
