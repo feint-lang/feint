@@ -89,9 +89,21 @@ impl<'a> Visitor<'a> {
                     return Err(CompErr::new_duplicate_label_in_scope(name));
                 }
             }
+            Kind::Break(expr) => self.visit_break(expr)?,
             Kind::Continue => self.visit_continue()?,
             Kind::Expr(expr) => self.visit_expr(expr, None)?,
         }
+        Ok(())
+    }
+
+    fn visit_break(&mut self, expr: ast::Expr) -> VisitResult {
+        self.visit_expr(expr, None)?;
+        self.chunk.push(Inst::BreakPlaceholder(self.chunk.len(), self.scope_depth));
+        Ok(())
+    }
+
+    fn visit_continue(&mut self) -> VisitResult {
+        self.chunk.push(Inst::ContinuePlaceholder(self.chunk.len(), self.scope_depth));
         Ok(())
     }
 
@@ -116,7 +128,6 @@ impl<'a> Visitor<'a> {
                 self.visit_conditional(branches, default)?
             }
             Kind::Loop(expr, block) => self.visit_loop(*expr, block)?,
-            Kind::Break(expr) => self.visit_break(*expr)?,
             Kind::Func(func) => self.visit_func(func, name)?,
             Kind::Call(call) => self.visit_call(call)?,
             Kind::UnaryOp(op, b) => self.visit_unary_op(op, *b)?,
@@ -322,17 +333,6 @@ impl<'a> Visitor<'a> {
                 _ => (),
             }
         }
-        Ok(())
-    }
-
-    fn visit_break(&mut self, expr: ast::Expr) -> VisitResult {
-        self.visit_expr(expr, None)?;
-        self.chunk.push(Inst::BreakPlaceholder(self.chunk.len(), self.scope_depth));
-        Ok(())
-    }
-
-    fn visit_continue(&mut self) -> VisitResult {
-        self.chunk.push(Inst::ContinuePlaceholder(self.chunk.len(), self.scope_depth));
         Ok(())
     }
 

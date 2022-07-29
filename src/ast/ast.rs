@@ -41,6 +41,7 @@ pub struct Statement {
 pub enum StatementKind {
     Jump(String),
     Label(String),
+    Break(Expr),
     Continue,
     Expr(Expr),
 }
@@ -57,6 +58,10 @@ impl Statement {
 
     pub fn new_label(name: String, start: Location, end: Location) -> Self {
         Self::new(StatementKind::Label(name), start, end)
+    }
+
+    pub fn new_break(expr: Expr, start: Location, end: Location) -> Self {
+        Self::new(StatementKind::Break(expr), start, end)
     }
 
     pub fn new_continue(start: Location, end: Location) -> Self {
@@ -80,6 +85,7 @@ impl fmt::Debug for StatementKind {
             Self::Expr(expr) => write!(f, "Expr({:?})", expr),
             Self::Label(label_index) => write!(f, "Label: {}", label_index),
             Self::Jump(label_index) => write!(f, "Jump: {}", label_index),
+            Self::Break(expr) => write!(f, "break {expr:?}"),
             Self::Continue => write!(f, "Continue"),
         }
     }
@@ -102,7 +108,6 @@ pub enum ExprKind {
     Block(StatementBlock),
     Conditional(Vec<(Expr, StatementBlock)>, Option<StatementBlock>),
     Loop(Box<Expr>, StatementBlock),
-    Break(Box<Expr>),
     Func(Func),
     Call(Call),
     UnaryOp(UnaryOperator, Box<Expr>),
@@ -174,10 +179,6 @@ impl Expr {
         end: Location,
     ) -> Self {
         Self::new(ExprKind::Loop(Box::new(expr), block), start, end)
-    }
-
-    pub fn new_break(expr: Expr, start: Location, end: Location) -> Self {
-        Self::new(ExprKind::Break(Box::new(expr)), start, end)
     }
 
     pub fn new_ident(ident: Ident, start: Location, end: Location) -> Self {
@@ -288,7 +289,6 @@ impl fmt::Debug for ExprKind {
                 write!(f, "{branches:?} {default:?}")
             }
             Self::Loop(expr, block) => write!(f, "loop {expr:?}\n{block:?}"),
-            Self::Break(expr) => write!(f, "break {expr:?}"),
             Self::Func(func) => write!(f, "{:?}", func),
             Self::Call(func) => write!(f, "{:?}", func),
             Self::UnaryOp(op, b) => write!(f, "({:?}{:?})", op, b),

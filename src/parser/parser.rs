@@ -71,7 +71,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
     /// certain cases, multiple statements may be returned (e.g.,
     /// loops).
     fn statement(&mut self) -> StatementResult {
-        use Token::{Continue, EndOfStatement, Jump, Label};
+        use Token::{Break, Continue, EndOfStatement, Jump, Label};
         let token = self.expect_next_token()?;
         let start = token.start;
         let statement = match token.token {
@@ -83,6 +83,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
                 }
                 label
             }
+            Break => self.break_(start)?,
             Continue => self.continue_(start, token.end)?,
             _ => {
                 self.lookahead_queue.push_front(token);
@@ -106,6 +107,29 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
         } else {
             return Err(self.err(ParseErrKind::ExpectedIdent(self.next_loc())));
         }
+    }
+
+    /// Handle `break`, ensuring it's contained in a `loop`.
+    fn break_(&mut self, start: Location) -> StatementResult {
+        if self.loop_level == 0 {
+            return Err(self.err(ParseErrKind::UnexpectedBreak(start)));
+        }
+        let expr = match self.peek_token()? {
+            Some(TokenWithLocation { token: Token::EndOfStatement, .. }) | None => {
+                ast::Expr::new_nil(start, start)
+            }
+            _ => self.expr(0)?,
+        };
+        let end = expr.end;
+        Ok(ast::Statement::new_break(expr, start, end))
+    }
+
+    /// Handle `continue`, ensuring it's contained in a `loop`.
+    fn continue_(&mut self, start: Location, end: Location) -> StatementResult {
+        if self.loop_level == 0 {
+            return Err(self.err(ParseErrKind::UnexpectedContinue(start)));
+        }
+        Ok(ast::Statement::new_continue(start, end))
     }
 
     /// Get the next expression, possibly recurring to handle nested
@@ -132,7 +156,6 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
             }
             If => self.conditional(start)?,
             Loop => self.loop_(start)?,
-            Break => self.break_(start)?,
             Ident(name) => {
                 ast::Expr::new_ident(ast::Ident::new_ident(name), start, end)
             }
@@ -300,29 +323,6 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
         let end = block.end;
         self.loop_level -= 1;
         Ok(ast::Expr::new_loop(cond, block, start, end))
-    }
-
-    /// Handle `break`, ensuring it's contained in a `loop`.
-    fn break_(&mut self, start: Location) -> ExprResult {
-        if self.loop_level == 0 {
-            return Err(self.err(ParseErrKind::UnexpectedBreak(start)));
-        }
-        let expr = match self.peek_token()? {
-            Some(TokenWithLocation { token: Token::EndOfStatement, .. }) | None => {
-                ast::Expr::new_nil(start, start)
-            }
-            _ => self.expr(0)?,
-        };
-        let end = expr.end;
-        Ok(ast::Expr::new_break(expr, start, end))
-    }
-
-    /// Handle `continue`, ensuring it's contained in a `loop`.
-    fn continue_(&mut self, start: Location, end: Location) -> StatementResult {
-        if self.loop_level == 0 {
-            return Err(self.err(ParseErrKind::UnexpectedContinue(start)));
-        }
-        Ok(ast::Statement::new_continue(start, end))
     }
 
     /// Handle function definition.
