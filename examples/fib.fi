@@ -1,0 +1,16 @@
+fib = (n) ->
+    if n == 0 -> 0
+    else if n == 1 -> 1
+    else -> fib(n - 1) + fib(n - 2)
+
+# TODO: Implement match
+# fib_match = (n) ->
+#     match n ->
+#         0 -> 0
+#         1 -> 1
+#         : -> fib(n - 1) + fib(n - 2)
+
+$main = (...) ->
+#     i = 0
+#     loop i < 20 -> print($"fib {i} -> {fib(i += 1)}")
+    print(fib(10))
