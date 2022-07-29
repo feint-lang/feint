@@ -240,6 +240,20 @@ impl Expr {
         }
     }
 
+    // Expression type checkers ----------------------------------------
+
+    /// Check if expression is `true` literal or `1`.
+    pub fn is_true(&self) -> bool {
+        use LiteralKind::{Bool, Int};
+        if let ExprKind::Literal(Literal { kind: Bool(val) }) = &self.kind {
+            *val
+        } else if let ExprKind::Literal(Literal { kind: Int(val) }) = &self.kind {
+            *val == BigInt::from(1)
+        } else {
+            false
+        }
+    }
+
     /// Check if expression is an identifier. If so, return its name.
     pub fn is_ident(&self) -> Option<String> {
         if let ExprKind::Ident(Ident { kind: IdentKind::Ident(name) }) = &self.kind {

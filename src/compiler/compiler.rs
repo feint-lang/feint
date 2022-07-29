@@ -303,23 +303,34 @@ impl<'a> Visitor<'a> {
     ) -> VisitResult {
         let loop_scope_depth = self.scope_depth;
         let loop_addr = self.chunk.len();
-        // Evaluate loop expression on every iteration.
-        self.visit_expr(expr, None)?;
-        // Placeholder for jump-out if result is false.
-        let jump_out_index = self.chunk.len();
-        self.push(Inst::Placeholder(
-            jump_out_index,
-            Box::new(Inst::JumpIfNot(0, 0)),
-            "Jump-out for loop not set".to_owned(),
-        ));
-        // Run the loop body if result is true.
+        let true_cond = expr.is_true();
+        let jump_out_index = if true_cond {
+            // Skip evaluation since we know it will always succeed.
+            self.push(Inst::NoOp);
+            0
+        } else {
+            // Evaluate loop expression on every iteration.
+            self.visit_expr(expr, None)?;
+            // Placeholder for jump-out if result is false.
+            let jump_out_index = self.chunk.len();
+            self.push(Inst::Placeholder(
+                jump_out_index,
+                Box::new(Inst::JumpIfNot(0, 0)),
+                "Jump-out for loop not set".to_owned(),
+            ));
+            jump_out_index
+        };
+        // Run the loop body.
         self.visit_block(block)?;
-        // Jump to top of loop to re-check expression.
+        // Jump to top of loop.
         self.push(Inst::Jump(loop_addr, 0));
         // Jump-out address.
         let after_addr = self.chunk.len();
-        // Set address of jump-out placeholder.
-        self.chunk[jump_out_index] = Inst::JumpIfNot(after_addr, 0);
+        // Set address of jump-out placeholder (not needed if loop
+        // expression is always true).
+        if !true_cond {
+            self.chunk[jump_out_index] = Inst::JumpIfNot(after_addr, 0);
+        }
         // Set address of breaks and continues.
         for addr in loop_addr..after_addr {
             match self.chunk[addr] {
