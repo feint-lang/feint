@@ -1,8 +1,20 @@
 # build
 alias b="cargo build"
+
 # test
 alias t='cargo test'
+
 # run
 alias r="cargo run --"
 alias c="cargo run -- -c"
 alias d="cargo run -- --dis --debug"
+
+# run all examples and show exit code
+function e
+    cargo build
+    for f in examples/*.fi
+        echo -n "> $f";
+        feint "$f" 1>/dev/null
+        echo -- " -> $status"
+    end
+end
