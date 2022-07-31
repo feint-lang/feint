@@ -336,9 +336,15 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
     /// Handle function definition.
     fn func(&mut self, params_expr: ast::Expr, start: Location) -> ExprResult {
         let params_opt = match params_expr.kind {
+            // Function has multiple parameters.
             ast::ExprKind::Tuple(items) => Some(items),
+            // Function has a single parameter.
             _ => match params_expr.is_ellipsis() {
+                // The arg is an ellipsis, indicating variadic args. In
+                // this case, the ellipsis is consumed here and won't be
+                // compiled.
                 true => None,
+                // The arg is a regular arg.
                 false => Some(vec![params_expr]),
             },
         };

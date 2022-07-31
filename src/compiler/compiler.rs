@@ -156,8 +156,7 @@ impl<'a> Visitor<'a> {
             Kind::Nil => self.push_const(0),
             Kind::Bool(true) => self.push_const(1),
             Kind::Bool(false) => self.push_const(2),
-            // TODO: ???
-            Kind::Ellipsis => (),
+            Kind::Ellipsis => self.push_const(0),
             Kind::Int(value) => {
                 self.add_const(self.ctx.builtins.new_int(value));
             }
