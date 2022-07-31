@@ -11,6 +11,7 @@ pub struct RuntimeContext {
     pub builtins: Builtins,
     constants: Objects,
     namespace_stack: Vec<Namespace>,
+    pub argv: Vec<String>,
 }
 
 impl RuntimeContext {
@@ -18,8 +19,19 @@ impl RuntimeContext {
         builtins: Builtins,
         constants: Objects,
         namespace_stack: Vec<Namespace>,
+        argv: Vec<String>,
     ) -> Self {
-        Self { builtins, constants, namespace_stack }
+        Self { builtins, constants, namespace_stack, argv }
+    }
+
+    pub fn with_argv(argv: Vec<&str>) -> Self {
+        let mut ctx = Self::default();
+        let mut owned_argv: Vec<String> = vec![];
+        for arg in argv.iter() {
+            owned_argv.push(arg.to_string());
+        }
+        ctx.argv = owned_argv;
+        ctx
     }
 
     pub fn iter_constants(&self) -> Iter<'_, ObjectRef> {
@@ -169,7 +181,8 @@ impl RuntimeContext {
 
 impl Default for RuntimeContext {
     fn default() -> Self {
-        let mut ctx = RuntimeContext::new(Builtins::new(), Objects::default(), vec![]);
+        let mut ctx =
+            RuntimeContext::new(Builtins::new(), Objects::default(), vec![], vec![]);
 
         // Add singleton constants.
         ctx.add_const(ctx.builtins.nil_obj.clone()); // 0

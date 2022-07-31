@@ -4,8 +4,13 @@ use crate::result::{ExeErrKind, ExeResult, ExitResult};
 use crate::vm::{VMState, VM};
 
 /// Run source from file.
-pub fn run_file(file_path: &str, dis: bool, debug: bool) -> ExitResult {
-    let mut vm = VM::default();
+pub fn run_file(
+    file_path: &str,
+    argv: Vec<&str>,
+    dis: bool,
+    debug: bool,
+) -> ExitResult {
+    let mut vm = VM::with_argv(argv);
     let mut executor = Executor::new(&mut vm, false, dis, debug);
     let result = executor.execute_file(file_path);
     exit(result)

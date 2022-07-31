@@ -48,16 +48,13 @@ impl<'a> Visitor<'a> {
         assert_eq!(self.scope_tree.pointer(), 0);
         self.fix_jumps()?;
         if self.has_main {
+            let argv = self.ctx.argv.clone();
+            let argc = argv.len();
             self.push(Inst::LoadVar("$main".to_string()));
-
-            // This simulates passing command line args.
-            //
-            // TODO: Get the actual command line args. They will have to
-            //       be passed through from main/run somehow.
-            self.add_const(self.ctx.builtins.new_int(100));
-            self.add_const(self.ctx.builtins.new_int(10));
-
-            self.push(Inst::Call(2));
+            for arg in argv.iter() {
+                self.add_const(self.ctx.builtins.new_str(arg));
+            }
+            self.push(Inst::Call(argc));
             self.push(Inst::Return);
             self.push(Inst::HaltTop);
         } else {

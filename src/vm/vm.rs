@@ -50,6 +50,10 @@ impl VM {
         VM { ctx, value_stack: Stack::new(), scope_stack: Stack::new() }
     }
 
+    pub fn with_argv(argv: Vec<&str>) -> Self {
+        VM::new(RuntimeContext::with_argv(argv))
+    }
+
     /// Execute the specified instructions and return the VM's state. If
     /// a HALT instruction isn't encountered, the VM will go "idle"; it
     /// will maintain its internal state and await further instructions.

@@ -10,6 +10,7 @@ use feint::run;
 fn main() -> ExitCode {
     let app = Command::new("FeInt")
         .version("0.0.0")
+        .trailing_var_arg(true)
         .arg(
             Arg::new("FILE_NAME")
                 .index(1)
@@ -55,7 +56,8 @@ fn main() -> ExitCode {
                 .required(false)
                 .takes_value(false)
                 .help("Enable debug mode?"),
-        );
+        )
+        .arg(Arg::new("argv").index(2).multiple(true));
 
     let matches = app.get_matches();
     let file_name = matches.value_of("FILE_NAME");
@@ -65,13 +67,18 @@ fn main() -> ExitCode {
     let dis = matches.is_present("dis");
     let debug = matches.is_present("debug");
 
+    let argv: Vec<&str> = match matches.values_of("argv") {
+        Some(values) => values.collect(),
+        None => vec![],
+    };
+
     let result = if let Some(code) = code {
         run::run_text(code, dis, debug)
     } else if let Some(file_name) = file_name {
         if file_name == "-" {
             run::run_stdin(dis, debug)
         } else {
-            run::run_file(file_name, dis, debug)
+            run::run_file(file_name, argv, dis, debug)
         }
     } else {
         match save_repl_history {
