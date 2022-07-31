@@ -77,7 +77,7 @@ impl Object for Int {
     }
 
     fn as_bool(&self, _ctx: &RuntimeContext) -> RuntimeBoolResult {
-        Ok(self.value().is_zero())
+        Ok(!self.value().is_zero())
     }
 
     fn is_equal(&self, rhs: &dyn Object, _ctx: &RuntimeContext) -> bool {

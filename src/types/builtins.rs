@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use num_bigint::BigInt;
-use num_traits::Num;
+use num_traits::{FromPrimitive, Num};
 
 use crate::vm::Chunk;
 
@@ -78,8 +78,13 @@ impl Builtins {
 
     pub fn new_int_from_string<S: Into<String>>(&self, value: S) -> ObjectRef {
         let value = value.into();
-        let value = BigInt::from_str_radix(value.as_ref(), 10).unwrap();
-        self.new_int(value)
+        if let Ok(value) = BigInt::from_str_radix(value.as_ref(), 10) {
+            self.new_int(value)
+        } else {
+            let value = value.parse::<f64>().unwrap();
+            let value = BigInt::from_f64(value).unwrap();
+            self.new_int(value)
+        }
     }
 
     pub fn new_str<S: Into<String>>(&self, value: S) -> ObjectRef {

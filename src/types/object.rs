@@ -188,6 +188,7 @@ pub trait Object {
     //
     // These extract the inner value from an object.
 
+    make_value_extractor!(float_val, Float, f64, clone);
     make_value_extractor!(int_val, Int, BigInt, clone);
     make_value_extractor!(str_val, Str, String, to_owned);
 

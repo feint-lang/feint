@@ -9,6 +9,9 @@ fizz_buzz = (end) ->
         multiples of both three and five print 'FizzBuzz'.
 
     "
+    if end < 1 ->
+        print($"Expected end to be greater than 0; got {end}")
+        nil
     i = 1
     loop i <= end ->
         result = if i % 15 == 0 -> "FizzBuzz"
@@ -21,4 +24,6 @@ fizz_buzz = (end) ->
 
 
 $main = (...) ->
-    fizz_buzz($args.0)
+    end = if $args.length -> Int.new($args.0) else -> 100
+    print($"Running FizzBuzz on numbers from 1 to {end}:")
+    fizz_buzz(end)

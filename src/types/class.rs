@@ -5,7 +5,10 @@ use std::any::Any;
 use std::fmt;
 use std::sync::Arc;
 
-use crate::vm::RuntimeContext;
+use crate::builtin_funcs::float;
+use crate::builtin_funcs::int;
+
+use crate::vm::{RuntimeContext, RuntimeErr};
 
 use super::builtin_types::BUILTIN_TYPES;
 use super::object::{Object, ObjectRef};
@@ -77,6 +80,20 @@ impl Object for Type {
             "module" => ctx.builtins.new_str(self.module()),
             "name" => ctx.builtins.new_str(self.name()),
             "qualified_name" => ctx.builtins.new_str(self.qualified_name()),
+            "new" => match self.name.as_str() {
+                "Float" => ctx.builtins.new_builtin_func(
+                    "new",
+                    Some(vec!["value"]),
+                    float::new,
+                ),
+                "Int" => {
+                    ctx.builtins.new_builtin_func("new", Some(vec!["value"]), int::new)
+                }
+                _ => {
+                    let message = format!("new not implemented for type {self}");
+                    return Err(RuntimeErr::new_type_err(message));
+                }
+            },
             _ => {
                 let attr = match self.qualified_name.as_str() {
                     "builtins.Tuple" => self.get_tuple_attr(name, ctx),
@@ -102,8 +119,7 @@ impl PartialEq for Type {
 impl fmt::Display for Type {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let name = self.qualified_name();
-        let id = self.id();
-        write!(f, "<{name}> @ {id}")
+        write!(f, "<{name}>")
     }
 }
 
