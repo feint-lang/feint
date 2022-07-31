@@ -6,6 +6,7 @@ use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 
 use crate::builtin_funcs::tuple;
+
 use crate::vm::{RuntimeContext, RuntimeErr};
 
 use super::builtin_types::BUILTIN_TYPES;
@@ -40,25 +41,6 @@ impl Object for Tuple {
         self
     }
 
-    fn is_equal(&self, rhs: &dyn Object, _ctx: &RuntimeContext) -> bool {
-        if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
-            if self.is(rhs) {
-                return true;
-            }
-            if self.len() != rhs.len() {
-                return false;
-            }
-            for (a, b) in self.items().iter().zip(rhs.items()) {
-                if !a.is_equal(&**b, _ctx) {
-                    return false;
-                }
-            }
-            return true;
-        } else {
-            false
-        }
-    }
-
     fn get_attr(&self, name: &str, ctx: &RuntimeContext) -> GetAttrResult {
         if let Some(attr) = self.get_base_attr(name, ctx) {
             return Ok(attr);
@@ -82,6 +64,25 @@ impl Object for Tuple {
         match self.items.get(index) {
             Some(obj) => Ok(obj.clone()),
             None => return Err(RuntimeErr::new_index_out_of_bounds(index)),
+        }
+    }
+
+    fn is_equal(&self, rhs: &dyn Object, _ctx: &RuntimeContext) -> bool {
+        if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
+            if self.is(rhs) {
+                return true;
+            }
+            if self.len() != rhs.len() {
+                return false;
+            }
+            for (a, b) in self.items().iter().zip(rhs.items()) {
+                if !a.is_equal(&**b, _ctx) {
+                    return false;
+                }
+            }
+            return true;
+        } else {
+            false
         }
     }
 }

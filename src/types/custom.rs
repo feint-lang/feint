@@ -32,6 +32,23 @@ impl Object for Custom {
         self
     }
 
+    fn get_attr(&self, name: &str, _ctx: &RuntimeContext) -> GetAttrResult {
+        if let Some(value) = self.attrs.borrow().get_var(name) {
+            return Ok(value.clone());
+        }
+        Err(self.attr_does_not_exist(name))
+    }
+
+    fn set_attr(
+        &self,
+        name: &str,
+        value: ObjectRef,
+        _ctx: &RuntimeContext,
+    ) -> SetAttrResult {
+        self.attrs.borrow_mut().add_var(name, value);
+        Ok(())
+    }
+
     fn is_equal(&self, rhs: &dyn Object, ctx: &RuntimeContext) -> bool {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
             if self.is(&rhs) {
@@ -50,23 +67,6 @@ impl Object for Custom {
         } else {
             false
         }
-    }
-
-    fn get_attr(&self, name: &str, _ctx: &RuntimeContext) -> GetAttrResult {
-        if let Some(value) = self.attrs.borrow().get_var(name) {
-            return Ok(value.clone());
-        }
-        Err(self.attr_does_not_exist(name))
-    }
-
-    fn set_attr(
-        &self,
-        name: &str,
-        value: ObjectRef,
-        _ctx: &RuntimeContext,
-    ) -> SetAttrResult {
-        self.attrs.borrow_mut().add_var(name, value);
-        Ok(())
     }
 }
 

@@ -60,6 +60,17 @@ impl Object for Namespace {
         self
     }
 
+    fn get_attr(&self, name: &str, ctx: &RuntimeContext) -> GetAttrResult {
+        if let Some(attr) = self.get_base_attr(name, ctx) {
+            return Ok(attr);
+        }
+        if let Some(obj) = self.get_var(name) {
+            Ok(obj.clone())
+        } else {
+            Err(self.attr_does_not_exist(name))
+        }
+    }
+
     fn is_equal(&self, rhs: &dyn Object, ctx: &RuntimeContext) -> bool {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
             if self.is(&rhs) {
@@ -88,17 +99,6 @@ impl Object for Namespace {
             }
         } else {
             false
-        }
-    }
-
-    fn get_attr(&self, name: &str, ctx: &RuntimeContext) -> GetAttrResult {
-        if let Some(attr) = self.get_base_attr(name, ctx) {
-            return Ok(attr);
-        }
-        if let Some(obj) = self.get_var(name) {
-            Ok(obj.clone())
-        } else {
-            Err(self.attr_does_not_exist(name))
         }
     }
 }

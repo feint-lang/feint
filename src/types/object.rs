@@ -102,6 +102,68 @@ pub trait Object {
         self.class().qualified_name()
     }
 
+    // Attributes (accessed by name) -----------------------------------
+
+    /// Attributes that all objects have. This should NOT be overridden.
+    fn get_base_attr(&self, name: &str, ctx: &RuntimeContext) -> Option<ObjectRef> {
+        let attr = match name {
+            "$id" => ctx.builtins.new_int(self.id()),
+            "$type_name" => ctx.builtins.new_str(self.type_name()),
+            "$qualified_type_name" => ctx.builtins.new_str(self.qualified_type_name()),
+            _ => return None,
+        };
+        Some(attr)
+    }
+
+    fn get_attr(&self, name: &str, ctx: &RuntimeContext) -> GetAttrResult {
+        if let Some(attr) = self.get_base_attr(name, ctx) {
+            Ok(attr)
+        } else {
+            Err(self.attr_does_not_exist(name))
+        }
+    }
+
+    fn set_attr(
+        &self,
+        name: &str,
+        _value: ObjectRef,
+        _ctx: &RuntimeContext,
+    ) -> SetAttrResult {
+        Err(RuntimeErr::new_attr_cannot_be_set(
+            self.qualified_type_name().as_str(),
+            name,
+        ))
+    }
+
+    fn attr_does_not_exist(&self, name: &str) -> RuntimeErr {
+        RuntimeErr::new_attr_does_not_exist(self.qualified_type_name().as_str(), name)
+    }
+
+    // Items (accessed by index) ---------------------------------------
+
+    fn get_item(&self, index: &BigInt, _ctx: &RuntimeContext) -> GetAttrResult {
+        Err(self.item_does_not_exist(index))
+    }
+
+    fn set_item(
+        &self,
+        index: &BigInt,
+        _value: ObjectRef,
+        _ctx: &RuntimeContext,
+    ) -> SetAttrResult {
+        Err(RuntimeErr::new_item_cannot_be_set(
+            self.qualified_type_name(),
+            index.clone(),
+        ))
+    }
+
+    fn item_does_not_exist(&self, index: &BigInt) -> RuntimeErr {
+        RuntimeErr::new_item_does_not_exist(
+            self.qualified_type_name().as_str(),
+            index.clone(),
+        )
+    }
+
     // Type checkers ---------------------------------------------------
 
     make_type_checker!(is_nil, Nil);
@@ -172,68 +234,6 @@ pub trait Object {
     fn call(&self, _args: Args, _vm: &mut VM) -> CallResult {
         let class = self.class();
         Err(RuntimeErr::new_type_err(format!("Call not implemented for type {class}")))
-    }
-
-    // Attributes (accessed by name) -----------------------------------
-
-    /// Attributes that all objects have. This should NOT be overridden.
-    fn get_base_attr(&self, name: &str, ctx: &RuntimeContext) -> Option<ObjectRef> {
-        let attr = match name {
-            "$id" => ctx.builtins.new_int(self.id()),
-            "$type_name" => ctx.builtins.new_str(self.type_name()),
-            "$qualified_type_name" => ctx.builtins.new_str(self.qualified_type_name()),
-            _ => return None,
-        };
-        Some(attr)
-    }
-
-    fn get_attr(&self, name: &str, ctx: &RuntimeContext) -> GetAttrResult {
-        if let Some(attr) = self.get_base_attr(name, ctx) {
-            Ok(attr)
-        } else {
-            Err(self.attr_does_not_exist(name))
-        }
-    }
-
-    fn set_attr(
-        &self,
-        name: &str,
-        _value: ObjectRef,
-        _ctx: &RuntimeContext,
-    ) -> SetAttrResult {
-        Err(RuntimeErr::new_attr_cannot_be_set(
-            self.qualified_type_name().as_str(),
-            name,
-        ))
-    }
-
-    fn attr_does_not_exist(&self, name: &str) -> RuntimeErr {
-        RuntimeErr::new_attr_does_not_exist(self.qualified_type_name().as_str(), name)
-    }
-
-    // Items (accessed by index) ---------------------------------------
-
-    fn get_item(&self, index: &BigInt, _ctx: &RuntimeContext) -> GetAttrResult {
-        Err(self.item_does_not_exist(index))
-    }
-
-    fn set_item(
-        &self,
-        index: &BigInt,
-        _value: ObjectRef,
-        _ctx: &RuntimeContext,
-    ) -> SetAttrResult {
-        Err(RuntimeErr::new_item_cannot_be_set(
-            self.qualified_type_name(),
-            index.clone(),
-        ))
-    }
-
-    fn item_does_not_exist(&self, index: &BigInt) -> RuntimeErr {
-        RuntimeErr::new_item_does_not_exist(
-            self.qualified_type_name().as_str(),
-            index.clone(),
-        )
     }
 }
 
