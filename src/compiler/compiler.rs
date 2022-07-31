@@ -194,6 +194,8 @@ impl<'a> Visitor<'a> {
         self.visit_expr(obj_expr, None)?;
         if let Some(name) = name_expr.is_ident() {
             self.visit_literal(ast::Literal::new_string(name))?;
+        } else if let Some(name) = name_expr.is_special_ident() {
+            self.visit_literal(ast::Literal::new_string(name))?;
         } else if let Some(name) = name_expr.is_type_ident() {
             self.visit_literal(ast::Literal::new_string(name))?;
         } else {

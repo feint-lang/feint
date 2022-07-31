@@ -108,8 +108,7 @@ pub trait Object {
     fn get_base_attr(&self, name: &str, ctx: &RuntimeContext) -> Option<ObjectRef> {
         let attr = match name {
             "$id" => ctx.builtins.new_int(self.id()),
-            "$type_name" => ctx.builtins.new_str(self.type_name()),
-            "$qualified_type_name" => ctx.builtins.new_str(self.qualified_type_name()),
+            "$type" => self.class().clone(),
             _ => return None,
         };
         Some(attr)

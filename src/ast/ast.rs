@@ -289,11 +289,22 @@ impl Expr {
         }
     }
 
+    /// Check if expression is a special identifier. If so, return its
+    /// name.
+    pub fn is_special_ident(&self) -> Option<String> {
+        use IdentKind::SpecialIdent;
+        if let ExprKind::Ident(Ident { kind: SpecialIdent(name) }) = &self.kind {
+            Some(name.clone())
+        } else {
+            None
+        }
+    }
+
     /// Check if expression is a type identifier. If so, return its
     /// name.
     pub fn is_type_ident(&self) -> Option<String> {
-        if let ExprKind::Ident(Ident { kind: IdentKind::TypeIdent(name) }) = &self.kind
-        {
+        use IdentKind::TypeIdent;
+        if let ExprKind::Ident(Ident { kind: TypeIdent(name) }) = &self.kind {
             Some(name.clone())
         } else {
             None

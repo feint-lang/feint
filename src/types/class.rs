@@ -77,9 +77,9 @@ impl Object for Type {
             return Ok(attr);
         }
         let attr = match name {
-            "module" => ctx.builtins.new_str(self.module()),
-            "name" => ctx.builtins.new_str(self.name()),
-            "qualified_name" => ctx.builtins.new_str(self.qualified_name()),
+            "$module" => ctx.builtins.new_str(self.module()),
+            "$name" => ctx.builtins.new_str(self.name()),
+            "$qualified_name" => ctx.builtins.new_str(self.qualified_name()),
             "new" => match self.name.as_str() {
                 "Float" => ctx.builtins.new_builtin_func(
                     "new",
