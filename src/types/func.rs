@@ -2,7 +2,7 @@
 use std::any::Any;
 use std::fmt;
 
-use crate::types::{Args, CallResult, Params};
+use crate::types::{Args, CallResult, ObjectRef, Params};
 use crate::vm::{Chunk, VM};
 
 use super::builtin_types::BUILTIN_TYPES;
@@ -14,12 +14,18 @@ pub struct Func {
     pub params: Params,
     pub arity: Option<usize>,
     pub chunk: Chunk,
+    pub this: Option<ObjectRef>,
 }
 
 impl Func {
-    pub fn new<S: Into<String>>(name: S, params: Params, chunk: Chunk) -> Self {
+    pub fn new<S: Into<String>>(
+        name: S,
+        params: Params,
+        chunk: Chunk,
+        this: Option<ObjectRef>,
+    ) -> Self {
         let arity = if let Some(params) = &params { Some(params.len()) } else { None };
-        Self { name: name.into(), params, arity, chunk }
+        Self { name: name.into(), params, arity, chunk, this }
     }
 }
 

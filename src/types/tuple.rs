@@ -54,7 +54,7 @@ impl Object for Tuple {
             "length" => ctx.builtins.new_int(self.len()),
             "map" => ctx.builtins.new_builtin_func(
                 "map",
-                Some(vec!["map_fn"]),
+                Some(vec!["this", "map_fn"]),
                 tuple::map,
                 Some(this),
             ),

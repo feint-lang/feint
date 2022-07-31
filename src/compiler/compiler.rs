@@ -360,7 +360,7 @@ impl<'a> Visitor<'a> {
         func_visitor.exit_scope();
         assert_eq!(func_visitor.scope_tree.pointer(), 0);
         let chunk = func_visitor.chunk;
-        let func = self.ctx.builtins.new_func(name, params, chunk);
+        let func = self.ctx.builtins.new_func(name, params, chunk, None);
         self.add_const(func);
         Ok(())
     }

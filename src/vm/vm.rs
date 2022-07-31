@@ -362,10 +362,10 @@ impl VM {
             }
         }
         if let Some(func) = callable.as_builtin_func() {
-            self.check_call_args(&func.name, &func.params, &args, false)?;
             if let Some(this) = &func.this {
                 args.insert(0, this.clone());
             }
+            self.check_call_args(&func.name, &func.params, &args, false)?;
             let result = callable.call(args, self)?;
             let return_val = match result {
                 Some(return_val) => return_val,
@@ -380,6 +380,9 @@ impl VM {
             // call, this scope will be cleared out.
             self.scope_stack.push(self.value_stack.size());
             self.ctx.enter_scope();
+            if let Some(this) = &func.this {
+                args.insert(0, this.clone());
+            }
             self.check_call_args(&func.name, &func.params, &args, true)?;
             self.execute(&func.chunk, false)?;
             self.exit_scopes(1);

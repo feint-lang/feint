@@ -63,9 +63,10 @@ impl Builtins {
         name: S,
         params: Option<Vec<S>>,
         chunk: Chunk,
+        this: Option<ObjectRef>,
     ) -> ObjectRef {
         let params = self.collect_params(params);
-        Arc::new(super::func::Func::new(name, params, chunk))
+        Arc::new(super::func::Func::new(name, params, chunk, this))
     }
 
     pub fn new_int<I: Into<BigInt>>(&self, value: I) -> ObjectRef {
