@@ -126,6 +126,7 @@ impl<'a> Visitor<'a> {
             Kind::Literal(literal) => self.visit_literal(literal)?,
             Kind::FormatString(items) => self.visit_format_string(items)?,
             Kind::Ident(ident) => self.visit_ident(ident)?,
+            Kind::Assignment(ident, expr) => self.visit_assignment(ident, *expr)?,
             Kind::Block(block) => self.visit_block(block)?,
             Kind::Conditional(branches, default) => {
                 self.visit_conditional(branches, default)?
@@ -401,7 +402,6 @@ impl<'a> Visitor<'a> {
         use BinaryOperator::*;
         match op {
             Dot => self.visit_get_attr(expr_a, expr_b),
-            Assign => self.visit_assignment(expr_a, expr_b),
             _ => {
                 self.visit_expr(expr_a, None)?;
                 self.visit_expr(expr_b, None)?;
@@ -413,20 +413,20 @@ impl<'a> Visitor<'a> {
 
     fn visit_assignment(
         &mut self,
-        name_expr: ast::Expr,
+        ident: ast::Ident,
         value_expr: ast::Expr,
     ) -> VisitResult {
-        let name = if let Some(name) = name_expr.is_ident() {
-            name
-        } else if let Some(name) = name_expr.is_special_ident() {
-            // TODO: Add more name validation.
-            if name == "$main" && self.scope_tree.in_global_scope() {
-                name
-            } else {
-                return Err(CompErr::new_cannot_assign_special_ident(name));
+        use ast::IdentKind::{Ident, SpecialIdent};
+        let name = match ident.kind {
+            Ident(name) => name,
+            SpecialIdent(name) => {
+                if name == "$main" && self.scope_tree.in_global_scope() {
+                    name
+                } else {
+                    return Err(CompErr::new_cannot_assign_special_ident(name));
+                }
             }
-        } else {
-            return Err(CompErr::new_expected_ident());
+            _ => return Err(CompErr::new_expected_ident()),
         };
         self.push(Inst::DeclareVar(name.clone()));
         self.visit_expr(value_expr, Some(name.clone()))?;

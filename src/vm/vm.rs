@@ -290,8 +290,6 @@ impl VM {
                     return Err(RuntimeErr::new_type_err(message));
                 }
             }
-            // Assignment is handled separately.
-            Assign => unreachable!(),
         };
         self.push(ValueStackKind::Temp(result));
         Ok(())

@@ -428,7 +428,16 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
                 let op_token = &infix_token.token;
                 let rhs = self.expr(infix_prec)?;
                 let end = rhs.end;
-                lhs = ast::Expr::new_binary_op(lhs, op_token, rhs, start, end);
+                lhs = match op_token {
+                    &Token::Equal => {
+                        if let ast::ExprKind::Ident(ident) = lhs.kind {
+                            ast::Expr::new_assignement(ident, rhs, start, end)
+                        } else {
+                            return Err(self.err(ParseErrKind::ExpectedIdent(start)));
+                        }
+                    }
+                    _ => ast::Expr::new_binary_op(lhs, op_token, rhs, start, end),
+                }
             } else {
                 break Ok(lhs);
             }

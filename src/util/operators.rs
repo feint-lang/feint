@@ -83,7 +83,6 @@ pub enum BinaryOperator {
     Mod,
     Add,
     Sub,
-    Assign,
     Dot,
 }
 
@@ -97,7 +96,6 @@ impl BinaryOperator {
             Token::Percent => Self::Mod,
             Token::Plus => Self::Add,
             Token::Minus => Self::Sub,
-            Token::Equal => Self::Assign,
             Token::Dot => Self::Dot,
             _ => return Err(format!("Unknown binary operator: {token}")),
         };
@@ -115,7 +113,6 @@ impl fmt::Display for BinaryOperator {
             Self::Mod => "%",
             Self::Add => "+",
             Self::Sub => "-",
-            Self::Assign => "=",
             Self::Dot => ".",
         };
         write!(f, "{string}")

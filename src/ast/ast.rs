@@ -115,6 +115,7 @@ pub enum ExprKind {
     Loop(Box<Expr>, StatementBlock),
     Func(Func),
     Call(Call),
+    Assignment(Ident, Box<Expr>),
     UnaryOp(UnaryOperator, Box<Expr>),
     UnaryCompareOp(UnaryCompareOperator, Box<Expr>),
     BinaryOp(Box<Expr>, BinaryOperator, Box<Expr>),
@@ -191,6 +192,15 @@ impl Expr {
 
     pub fn new_ident(ident: Ident, start: Location, end: Location) -> Self {
         Self::new(ExprKind::Ident(ident), start, end)
+    }
+
+    pub fn new_assignement(
+        ident: Ident,
+        expr: Expr,
+        start: Location,
+        end: Location,
+    ) -> Self {
+        Self::new(ExprKind::Assignment(ident, Box::new(expr)), start, end)
     }
 
     pub fn new_func(
@@ -279,18 +289,6 @@ impl Expr {
         }
     }
 
-    /// Check if expression is a special identifier. If so, return its
-    /// name.
-    pub fn is_special_ident(&self) -> Option<String> {
-        if let ExprKind::Ident(Ident { kind: IdentKind::SpecialIdent(name) }) =
-            &self.kind
-        {
-            Some(name.clone())
-        } else {
-            None
-        }
-    }
-
     /// Check if expression is a type identifier. If so, return its
     /// name.
     pub fn is_type_ident(&self) -> Option<String> {
@@ -312,22 +310,23 @@ impl fmt::Debug for Expr {
 impl fmt::Debug for ExprKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Tuple(items) => write!(f, "{:?}", items),
-            Self::Literal(literal) => write!(f, "{:?}", literal),
-            Self::FormatString(items) => write!(f, "{:?}", items),
-            Self::Ident(ident) => write!(f, "{:?}", ident),
-            Self::Block(block) => write!(f, "{:?}", block),
+            Self::Tuple(items) => write!(f, "{items:?}"),
+            Self::Literal(literal) => write!(f, "{literal:?}"),
+            Self::FormatString(items) => write!(f, "{items:?}"),
+            Self::Ident(ident) => write!(f, "{ident:?}"),
+            Self::Assignment(ident, expr) => write!(f, "{ident:?} = {expr:?}"),
+            Self::Block(block) => write!(f, "{block:?}"),
             Self::Conditional(branches, default) => {
                 write!(f, "{branches:?} {default:?}")
             }
             Self::Loop(expr, block) => write!(f, "loop {expr:?}\n{block:?}"),
-            Self::Func(func) => write!(f, "{:?}", func),
-            Self::Call(func) => write!(f, "{:?}", func),
-            Self::UnaryOp(op, b) => write!(f, "({:?}{:?})", op, b),
-            Self::UnaryCompareOp(op, b) => write!(f, "({:?}{:?})", op, b),
-            Self::BinaryOp(a, op, b) => write!(f, "({:?} {:?} {:?})", a, op, b),
-            Self::CompareOp(a, op, b) => write!(f, "({:?} {:?} {:?})", a, op, b),
-            Self::InplaceOp(a, op, b) => write!(f, "({:?} {:?} {:?})", a, op, b),
+            Self::Func(func) => write!(f, "{func:?}"),
+            Self::Call(func) => write!(f, "{func:?}"),
+            Self::UnaryOp(op, a) => write!(f, "({op:?}{a:?})"),
+            Self::UnaryCompareOp(op, a) => write!(f, "({op:?}{a:?})"),
+            Self::BinaryOp(a, op, b) => write!(f, "({a:?} {op:?} {b:?})"),
+            Self::CompareOp(a, op, b) => write!(f, "({a:?} {op:?} {b:?})"),
+            Self::InplaceOp(a, op, b) => write!(f, "({a:?} {op:?} {b:?})"),
         }
     }
 }
