@@ -103,6 +103,12 @@ impl VM {
                     jump_ip = *addr;
                     is_jump = true;
                 }
+                JumpPushNil(addr, scope_exit_count) => {
+                    self.push(Constant(0));
+                    self.exit_scopes(*scope_exit_count);
+                    jump_ip = *addr;
+                    is_jump = true;
+                }
                 JumpIf(addr, scope_exit_count) => {
                     self.exit_scopes(*scope_exit_count);
                     let obj = self.pop_obj()?;
@@ -599,6 +605,9 @@ impl VM {
                 self.format_aligned("LOAD_VAR", format!("{name} = {obj_str}"))
             }
             Jump(addr, _) => self.format_aligned("JUMP", format!("{addr}",)),
+            JumpPushNil(addr, _) => {
+                self.format_aligned("JUMP_PUSH_NIL", format!("{addr}",))
+            }
             JumpIf(addr, _) => self.format_aligned("JUMP_IF", format!("{addr}",)),
             JumpIfNot(addr, _) => {
                 self.format_aligned("JUMP_IF_NOT", format!("{addr}",))

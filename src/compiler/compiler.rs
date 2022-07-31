@@ -103,7 +103,6 @@ impl<'a> Visitor<'a> {
     }
 
     fn visit_continue(&mut self) -> VisitResult {
-        self.chunk.push(Inst::LoadConst(0));
         self.chunk.push(Inst::ContinuePlaceholder(self.chunk.len(), self.scope_depth));
         Ok(())
     }
@@ -340,7 +339,7 @@ impl<'a> Visitor<'a> {
                 }
                 Inst::ContinuePlaceholder(continue_addr, depth) => {
                     self.chunk[continue_addr] =
-                        Inst::Jump(loop_addr, depth - loop_scope_depth);
+                        Inst::JumpPushNil(loop_addr, depth - loop_scope_depth);
                 }
                 _ => (),
             }
@@ -459,7 +458,7 @@ impl<'a> Visitor<'a> {
                 let result = scope.find_label(scope_tree, name, None);
                 if let Some((label_addr, label_depth)) = result {
                     let depth = jump_depth - label_depth;
-                    chunk[*jump_addr] = Inst::Jump(label_addr, depth);
+                    chunk[*jump_addr] = Inst::JumpPushNil(label_addr, depth);
                 } else {
                     if scope.kind == ScopeKind::Func {
                         jump_out_of_func = Some(name.clone());

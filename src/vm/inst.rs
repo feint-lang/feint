@@ -27,6 +27,9 @@ pub enum Inst {
     // Jump unconditionally
     Jump(usize, usize), // address
 
+    // Jump unconditionally and push nil onto stack
+    JumpPushNil(usize, usize), // address
+
     // If top of stack is true, jump to address. Otherwise, continue.
     JumpIf(usize, usize),
 
