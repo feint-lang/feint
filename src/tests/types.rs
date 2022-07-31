@@ -1,4 +1,4 @@
-use crate::types::ObjectExt;
+use crate::types::{ObjectExt, ObjectRef};
 use crate::vm::RuntimeContext;
 
 #[test]
@@ -40,6 +40,11 @@ fn test_custom() {
     let t1_obj1 = ctx.builtins.new_custom_instance(t1.clone());
     let t1_obj2 = ctx.builtins.new_custom_instance(t1.clone());
     let t1_obj3 = ctx.builtins.new_custom_instance(t1.clone());
+
+    assert!((t1.clone() as ObjectRef).get_attr("$id", &ctx, t1.clone()).is_ok());
+    assert!((t1.clone() as ObjectRef).get_attr("$type", &ctx, t1.clone()).is_ok());
+    assert!(t1_obj1.get_attr("$id", &ctx, t1_obj1.clone()).is_ok());
+    assert!(t1_obj1.get_attr("$type", &ctx, t1_obj1.clone()).is_ok());
 
     t1_obj3
         .set_attr("value", ctx.builtins.new_int(1), &ctx)

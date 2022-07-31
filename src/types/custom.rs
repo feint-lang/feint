@@ -35,9 +35,12 @@ impl Object for Custom {
     fn get_attr(
         &self,
         name: &str,
-        _ctx: &RuntimeContext,
+        ctx: &RuntimeContext,
         _this: ObjectRef,
     ) -> GetAttrResult {
+        if let Some(attr) = self.get_base_attr(name, ctx) {
+            return Ok(attr);
+        }
         if let Some(value) = self.attrs.borrow().get_var(name) {
             return Ok(value.clone());
         }
