@@ -4,7 +4,10 @@ use std::str::FromStr;
 use num_bigint::BigInt;
 
 use crate::types::Params;
-use crate::util::{BinaryOperator, Location, UnaryOperator};
+use crate::util::{
+    BinaryOperator, CompareOperator, InplaceOperator, Location, UnaryCompareOperator,
+    UnaryOperator,
+};
 
 /// Program - a list of statements.
 #[derive(PartialEq)]
@@ -113,7 +116,10 @@ pub enum ExprKind {
     Func(Func),
     Call(Call),
     UnaryOp(UnaryOperator, Box<Expr>),
+    UnaryCompareOp(UnaryCompareOperator, Box<Expr>),
     BinaryOp(Box<Expr>, BinaryOperator, Box<Expr>),
+    CompareOp(Box<Expr>, CompareOperator, Box<Expr>),
+    InplaceOp(Box<Expr>, InplaceOperator, Box<Expr>),
 }
 
 impl Expr {
@@ -205,31 +211,52 @@ impl Expr {
         Self::new(ExprKind::Call(Call::new(callable, args)), start, end)
     }
 
-    pub fn new_unary_op(
-        operator: &str,
-        a: Expr,
-        start: Location,
-        end: Location,
-    ) -> Self {
-        let operator = match UnaryOperator::from_str(operator) {
-            Ok(op) => op,
-            Err(err) => panic!("{}", err),
+    pub fn new_unary_op(op: &str, a: Expr, start: Location, end: Location) -> Self {
+        // TODO: This is pretty gnarly.
+        use ExprKind::{UnaryCompareOp, UnaryOp};
+        let kind = match op {
+            "+" | "-" => match UnaryOperator::from_str(op) {
+                Ok(op) => UnaryOp(op, Box::new(a)),
+                Err(err) => panic!("{err}"),
+            },
+            "!" | "!!" => match UnaryCompareOperator::from_str(op) {
+                Ok(op) => UnaryCompareOp(op, Box::new(a)),
+                Err(err) => panic!("{err}"),
+            },
+            _ => unreachable!("Unknown unary operator: {op}"),
         };
-        Self::new(ExprKind::UnaryOp(operator, Box::new(a)), start, end)
+        Self::new(kind, start, end)
     }
 
     pub fn new_binary_op(
         a: Expr,
-        operator: &str,
+        op: &str,
         b: Expr,
         start: Location,
         end: Location,
     ) -> Self {
-        let operator = match BinaryOperator::from_str(operator) {
-            Ok(op) => op,
-            Err(err) => panic!("{}", err),
+        // TODO: This is pretty gnarly.
+        use ExprKind::{BinaryOp, CompareOp, InplaceOp};
+        let kind = match op {
+            "^" | "*" | "/" | "//" | "%" | "+" | "-" | "=" | "," | "." => {
+                match BinaryOperator::from_str(op) {
+                    Ok(op) => BinaryOp(Box::new(a), op, Box::new(b)),
+                    Err(err) => panic!("{err}"),
+                }
+            }
+            "===" | "==" | "!=" | "<" | "<=" | ">" | ">=" | "&&" | "||" => {
+                match CompareOperator::from_str(op) {
+                    Ok(op) => CompareOp(Box::new(a), op, Box::new(b)),
+                    Err(err) => panic!("{err}"),
+                }
+            }
+            "+=" | "-=" => match InplaceOperator::from_str(op) {
+                Ok(op) => InplaceOp(Box::new(a), op, Box::new(b)),
+                Err(err) => panic!("{err}"),
+            },
+            _ => unreachable!("Unknown binary operator: {op}"),
         };
-        Self::new(ExprKind::BinaryOp(Box::new(a), operator, Box::new(b)), start, end)
+        Self::new(kind, start, end)
     }
 
     /// Check if expression is ellipsis.
@@ -308,7 +335,10 @@ impl fmt::Debug for ExprKind {
             Self::Func(func) => write!(f, "{:?}", func),
             Self::Call(func) => write!(f, "{:?}", func),
             Self::UnaryOp(op, b) => write!(f, "({:?}{:?})", op, b),
+            Self::UnaryCompareOp(op, b) => write!(f, "({:?}{:?})", op, b),
             Self::BinaryOp(a, op, b) => write!(f, "({:?} {:?} {:?})", a, op, b),
+            Self::CompareOp(a, op, b) => write!(f, "({:?} {:?} {:?})", a, op, b),
+            Self::InplaceOp(a, op, b) => write!(f, "({:?} {:?} {:?})", a, op, b),
         }
     }
 }

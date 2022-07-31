@@ -7,7 +7,10 @@ use std::fmt;
 use num_traits::ToPrimitive;
 
 use crate::types::{Args, ObjectExt, ObjectRef, Params};
-use crate::util::{BinaryOperator, Stack, UnaryOperator};
+use crate::util::{
+    BinaryOperator, CompareOperator, InplaceOperator, Stack, UnaryCompareOperator,
+    UnaryOperator,
+};
 
 use super::context::RuntimeContext;
 use super::inst::{Chunk, Inst};
@@ -55,7 +58,6 @@ impl VM {
     /// execute.
     pub fn execute(&mut self, chunk: &Chunk, dis: bool) -> ExeResult {
         use Inst::*;
-        use RuntimeErrKind::*;
         use ValueStackKind::*;
 
         let mut ip: usize = 0;
@@ -135,113 +137,19 @@ impl VM {
                 }
                 // Operations
                 UnaryOp(op) => {
-                    use UnaryOperator::*;
-                    let a = self.pop_obj()?;
-                    match op {
-                        Plus | Negate => {
-                            let result = match op {
-                                Plus => a, // no-op
-                                Negate => a.negate(&self.ctx)?,
-                                _ => unreachable!(),
-                            };
-                            self.push(Temp(result));
-                        }
-                        // Operators that return bool
-                        _ => {
-                            let result = match op {
-                                AsBool => a.as_bool(&self.ctx)?,
-                                Not => a.not(&self.ctx)?,
-                                _ => unreachable!(),
-                            };
-                            let obj = self.ctx.builtins.bool_obj_from_bool(result);
-                            self.push(Temp(obj));
-                        }
-                    };
+                    self.handle_unary_op(op)?;
+                }
+                UnaryCompareOp(op) => {
+                    self.handle_unary_compare_op(op)?;
                 }
                 BinaryOp(op) => {
-                    use BinaryOperator::*;
-                    // Operands for the binary operation.
-                    let (a_kind, a, b) = if let Some(kinds) = self.pop_n(2) {
-                        let a_kind = kinds[0].clone();
-                        let a = self.get_obj(kinds[0].clone())?;
-                        let b = self.get_obj(kinds[1].clone())?;
-                        (a_kind, a, b)
-                    } else {
-                        return self.err(NotEnoughValuesOnStack(2));
-                    };
-                    match op {
-                        Dot => {
-                            let result = if let Some(name) = b.str_val() {
-                                a.get_attr(name.as_str(), &self.ctx)?
-                            } else if let Some(int) = b.int_val() {
-                                a.get_item(&int, &self.ctx)?
-                            } else {
-                                let message =
-                                    format!("Not an attribute name or index: {b:?}");
-                                return Err(RuntimeErr::new_type_err(message));
-                            };
-                            self.push(Temp(result));
-                        }
-                        // In-place update operators
-                        AddEqual | SubEqual => {
-                            if let Var(depth, name) = a_kind {
-                                let b = &*b;
-                                let result = match op {
-                                    AddEqual => a.add(b, &self.ctx)?,
-                                    SubEqual => a.sub(b, &self.ctx)?,
-                                    _ => unreachable!(),
-                                };
-                                self.ctx.assign_var_at_depth(
-                                    depth,
-                                    name.as_str(),
-                                    result,
-                                )?;
-                                self.push(Var(depth, name));
-                            } else {
-                                return self
-                                    .err(ExpectedVar(format!("Binary op: {}", op)));
-                            }
-                        }
-                        // Math operators
-                        Pow | Mul | Div | FloorDiv | Mod | Add | Sub => {
-                            let b = &*b;
-                            let result = match op {
-                                Pow => a.pow(b, &self.ctx)?,
-                                Mul => a.mul(b, &self.ctx)?,
-                                Div => a.div(b, &self.ctx)?,
-                                FloorDiv => a.floor_div(b, &self.ctx)?,
-                                Mod => a.modulo(b, &self.ctx)?,
-                                Add => a.add(b, &self.ctx)?,
-                                Sub => a.sub(b, &self.ctx)?,
-                                _ => unreachable!(),
-                            };
-                            self.push(Temp(result));
-                        }
-                        // Operators that return bool
-                        _ => {
-                            let b = &*b;
-                            let result = match op {
-                                IsEqual => a.is_equal(b, &self.ctx),
-                                Is => a.is(b),
-                                NotEqual => a.not_equal(b, &self.ctx),
-                                And => a.and(b, &self.ctx)?,
-                                Or => a.or(b, &self.ctx)?,
-                                LessThan => a.less_than(b, &self.ctx)?,
-                                LessThanOrEqual => {
-                                    a.less_than(b, &self.ctx)?
-                                        || a.is_equal(b, &self.ctx)
-                                }
-                                GreaterThan => a.greater_than(b, &self.ctx)?,
-                                GreaterThanOrEqual => {
-                                    a.greater_than(b, &self.ctx)?
-                                        || a.is_equal(b, &self.ctx)
-                                }
-                                _ => unreachable!(),
-                            };
-                            let obj = self.ctx.builtins.bool_obj_from_bool(result);
-                            self.push(Temp(obj));
-                        }
-                    }
+                    self.handle_binary_op(op)?;
+                }
+                CompareOp(op) => {
+                    self.handle_compare_op(op)?;
+                }
+                InplaceOp(op) => {
+                    self.handle_inplace_op(op)?;
                 }
                 // Object construction
                 MakeString(n) => {
@@ -327,6 +235,119 @@ impl VM {
     }
 
     // Handlers --------------------------------------------------------
+
+    fn handle_unary_op(&mut self, op: &UnaryOperator) -> RuntimeResult {
+        use UnaryOperator::*;
+        let a = self.pop_obj()?;
+        let result = match op {
+            Plus => a, // no-op
+            Negate => a.negate(&self.ctx)?,
+        };
+        self.push(ValueStackKind::Temp(result));
+        Ok(())
+    }
+
+    fn handle_unary_compare_op(&mut self, op: &UnaryCompareOperator) -> RuntimeResult {
+        use UnaryCompareOperator::*;
+        let a = self.pop_obj()?;
+        let result = match op {
+            AsBool => a.as_bool(&self.ctx)?,
+            Not => a.not(&self.ctx)?,
+        };
+        let obj = self.ctx.builtins.bool_obj_from_bool(result);
+        self.push(ValueStackKind::Temp(obj));
+        Ok(())
+    }
+
+    fn get_binary_operands(&mut self) -> Result<(ObjectRef, ObjectRef), RuntimeErr> {
+        let operands = self.pop_n_obj(2)?;
+        let a = operands.get(0).unwrap().clone();
+        let b = operands.get(1).unwrap().clone();
+        Ok((a, b))
+    }
+
+    /// Pop top two operands from stack, apply operation, and push temp
+    /// result value onto stack.
+    fn handle_binary_op(&mut self, op: &BinaryOperator) -> RuntimeResult {
+        use BinaryOperator::*;
+        let (a, b) = self.get_binary_operands()?;
+        let b = &*b;
+        let result = match op {
+            Pow => a.pow(b, &self.ctx)?,
+            Mul => a.mul(b, &self.ctx)?,
+            Div => a.div(b, &self.ctx)?,
+            FloorDiv => a.floor_div(b, &self.ctx)?,
+            Mod => a.modulo(b, &self.ctx)?,
+            Add => a.add(b, &self.ctx)?,
+            Sub => a.sub(b, &self.ctx)?,
+            Dot => {
+                if let Some(name) = b.str_val() {
+                    a.get_attr(name.as_str(), &self.ctx)?
+                } else if let Some(int) = b.int_val() {
+                    a.get_item(&int, &self.ctx)?
+                } else {
+                    let message = format!("Not an attribute name or index: {b:?}");
+                    return Err(RuntimeErr::new_type_err(message));
+                }
+            }
+            Assign => unreachable!(),
+            Comma => unreachable!(),
+        };
+        self.push(ValueStackKind::Temp(result));
+        Ok(())
+    }
+
+    /// Pop top two operands from stack, compare them, and push bool
+    /// temp value onto stack.
+    fn handle_compare_op(&mut self, op: &CompareOperator) -> RuntimeResult {
+        use CompareOperator::*;
+        let (a, b) = self.get_binary_operands()?;
+        let b = &*b;
+        let result = match op {
+            Is => a.is(b),
+            IsEqual => a.is_equal(b, &self.ctx),
+            NotEqual => a.not_equal(b, &self.ctx),
+            And => a.and(b, &self.ctx)?,
+            Or => a.or(b, &self.ctx)?,
+            LessThan => a.less_than(b, &self.ctx)?,
+            LessThanOrEqual => a.less_than(b, &self.ctx)? || a.is_equal(b, &self.ctx),
+            GreaterThan => a.greater_than(b, &self.ctx)?,
+            GreaterThanOrEqual => {
+                a.greater_than(b, &self.ctx)? || a.is_equal(b, &self.ctx)
+            }
+        };
+        let obj = self.ctx.builtins.bool_obj_from_bool(result);
+        self.push(ValueStackKind::Temp(obj));
+        Ok(())
+    }
+
+    /// Pop top two operands from stack, apply operation, assign result,
+    /// and push temp result value onto stack. The first operand *must*
+    /// be a variable.
+    fn handle_inplace_op(&mut self, op: &InplaceOperator) -> RuntimeResult {
+        use InplaceOperator::*;
+        let (a_kind, a, b) = if let Some(kinds) = self.pop_n(2) {
+            let a_kind = kinds[0].clone();
+            let a = self.get_obj(kinds[0].clone())?;
+            let b = self.get_obj(kinds[1].clone())?;
+            (a_kind, a, b)
+        } else {
+            return Err(RuntimeErr::new(RuntimeErrKind::NotEnoughValuesOnStack(2)));
+        };
+        if let ValueStackKind::Var(depth, name) = a_kind {
+            let b = &*b;
+            let result = match op {
+                AddEqual => a.add(b, &self.ctx)?,
+                SubEqual => a.sub(b, &self.ctx)?,
+            };
+            self.ctx.assign_var_at_depth(depth, name.as_str(), result)?;
+            self.push(ValueStackKind::Var(depth, name));
+        } else {
+            let message = format!("Binary op: {}", op);
+            return Err(RuntimeErr::new(RuntimeErrKind::ExpectedVar(message)));
+        }
+        Ok(())
+    }
 
     fn handle_call(&mut self, n: usize) -> RuntimeResult {
         use ValueStackKind::ReturnVal;
@@ -490,10 +511,6 @@ impl VM {
 
     // Utilities -------------------------------------------------------
 
-    fn err(&self, kind: RuntimeErrKind) -> ExeResult {
-        Err(RuntimeErr::new(kind))
-    }
-
     /// Show the contents of the stack (top first).
     pub fn display_stack(&self) {
         if self.value_stack.is_empty() {
@@ -616,7 +633,12 @@ impl VM {
                 self.format_aligned("JUMP_IF_ELSE", format!("{if_addr} : {else_addr}"))
             }
             UnaryOp(operator) => self.format_aligned("UNARY_OP", operator),
+            UnaryCompareOp(operator) => {
+                self.format_aligned("UNARY_COMPARE_OP", operator)
+            }
             BinaryOp(operator) => self.format_aligned("BINARY_OP", operator),
+            CompareOp(operator) => self.format_aligned("COMPARE_OP", operator),
+            InplaceOp(operator) => self.format_aligned("INPLACE_OP", operator),
             MakeString(n) => self.format_aligned("MAKE_STRING", n),
             MakeTuple(n) => self.format_aligned("MAKE_TUPLE", n),
             Call(n) => self.format_aligned("CALL", n),

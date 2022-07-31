@@ -1,6 +1,9 @@
 use crate::ast;
 use crate::types::ObjectRef;
-use crate::util::{BinaryOperator, UnaryOperator};
+use crate::util::{
+    BinaryOperator, CompareOperator, InplaceOperator, UnaryCompareOperator,
+    UnaryOperator,
+};
 use crate::vm::{Chunk, Inst, RuntimeContext, VM};
 
 use super::result::{CompErr, CompResult};
@@ -131,7 +134,10 @@ impl<'a> Visitor<'a> {
             Kind::Func(func) => self.visit_func(func, name)?,
             Kind::Call(call) => self.visit_call(call)?,
             Kind::UnaryOp(op, b) => self.visit_unary_op(op, *b)?,
+            Kind::UnaryCompareOp(op, b) => self.visit_unary_compare_op(op, *b)?,
             Kind::BinaryOp(a, op, b) => self.visit_binary_op(*a, op, *b)?,
+            Kind::CompareOp(a, op, b) => self.visit_compare_op(*a, op, *b)?,
+            Kind::InplaceOp(a, op, b) => self.visit_inplace_op(*a, op, *b)?,
         }
         Ok(())
     }
@@ -197,29 +203,6 @@ impl<'a> Visitor<'a> {
             self.visit_expr(name_expr, None)?;
         }
         self.push(Inst::BinaryOp(BinaryOperator::Dot));
-        Ok(())
-    }
-
-    fn visit_assignment(
-        &mut self,
-        name_expr: ast::Expr,
-        value_expr: ast::Expr,
-    ) -> VisitResult {
-        let name = if let Some(name) = name_expr.is_ident() {
-            name
-        } else if let Some(name) = name_expr.is_special_ident() {
-            // TODO: Add more name validation.
-            if name == "$main" && self.scope_tree.in_global_scope() {
-                name
-            } else {
-                return Err(CompErr::new_cannot_assign_special_ident(name));
-            }
-        } else {
-            return Err(CompErr::new_expected_ident());
-        };
-        self.push(Inst::DeclareVar(name.clone()));
-        self.visit_expr(value_expr, Some(name.clone()))?;
-        self.push(Inst::AssignVar(name));
         Ok(())
     }
 
@@ -399,6 +382,16 @@ impl<'a> Visitor<'a> {
         Ok(())
     }
 
+    fn visit_unary_compare_op(
+        &mut self,
+        op: UnaryCompareOperator,
+        expr: ast::Expr,
+    ) -> VisitResult {
+        self.visit_expr(expr, None)?;
+        self.push(Inst::UnaryCompareOp(op));
+        Ok(())
+    }
+
     fn visit_binary_op(
         &mut self,
         expr_a: ast::Expr,
@@ -416,6 +409,56 @@ impl<'a> Visitor<'a> {
                 Ok(())
             }
         }
+    }
+
+    fn visit_assignment(
+        &mut self,
+        name_expr: ast::Expr,
+        value_expr: ast::Expr,
+    ) -> VisitResult {
+        let name = if let Some(name) = name_expr.is_ident() {
+            name
+        } else if let Some(name) = name_expr.is_special_ident() {
+            // TODO: Add more name validation.
+            if name == "$main" && self.scope_tree.in_global_scope() {
+                name
+            } else {
+                return Err(CompErr::new_cannot_assign_special_ident(name));
+            }
+        } else {
+            return Err(CompErr::new_expected_ident());
+        };
+        self.push(Inst::DeclareVar(name.clone()));
+        self.visit_expr(value_expr, Some(name.clone()))?;
+        self.push(Inst::AssignVar(name));
+        Ok(())
+    }
+
+    fn visit_compare_op(
+        &mut self,
+        expr_a: ast::Expr,
+        op: CompareOperator,
+        expr_b: ast::Expr,
+    ) -> VisitResult {
+        self.visit_expr(expr_a, None)?;
+        self.visit_expr(expr_b, None)?;
+        self.push(Inst::CompareOp(op));
+        Ok(())
+    }
+
+    fn visit_inplace_op(
+        &mut self,
+        expr_a: ast::Expr,
+        op: InplaceOperator,
+        expr_b: ast::Expr,
+    ) -> VisitResult {
+        if expr_a.is_ident().is_none() {
+            return Err(CompErr::new_expected_ident());
+        }
+        self.visit_expr(expr_a, None)?;
+        self.visit_expr(expr_b, None)?;
+        self.push(Inst::InplaceOp(op));
+        Ok(())
     }
 
     // Utilities -------------------------------------------------------

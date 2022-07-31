@@ -1,4 +1,7 @@
-use crate::util::{BinaryOperator, UnaryOperator};
+use crate::util::{
+    BinaryOperator, CompareOperator, InplaceOperator, UnaryCompareOperator,
+    UnaryOperator,
+};
 
 pub type Chunk = Vec<Inst>;
 
@@ -41,7 +44,11 @@ pub enum Inst {
     JumpIfElse(usize, usize, usize),
 
     UnaryOp(UnaryOperator),
+    UnaryCompareOp(UnaryCompareOperator),
+
     BinaryOp(BinaryOperator),
+    CompareOp(CompareOperator),
+    InplaceOp(InplaceOperator),
 
     Call(usize), // Call function with N values from top of stack
     Return,
