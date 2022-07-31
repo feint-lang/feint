@@ -1,6 +1,7 @@
 use num_bigint::BigInt;
 
 use crate::ast::*;
+use crate::scanner::Token;
 use crate::util::Location;
 
 #[test]
@@ -15,7 +16,7 @@ fn create_ast() {
                     Location::new(1, 1),
                     Location::new(1, 1),
                 ),
-                "+",
+                &Token::Plus,
                 Expr::new_int(
                     BigInt::from(2),
                     Location::new(1, 5),
@@ -35,7 +36,7 @@ fn create_ast() {
                     Location::new(2, 1),
                     Location::new(2, 1),
                 ),
-                "-",
+                &Token::Minus,
                 Expr::new_int(
                     BigInt::from(1),
                     Location::new(2, 1),

@@ -393,42 +393,42 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
 
     /// The current token should represent a unary operator and should
     /// be followed by an expression.
-    fn expect_unary_expr(&mut self, op_token: &TokenWithLocation) -> ExprResult {
-        let prec = get_unary_precedence(&op_token.token);
+    fn expect_unary_expr(&mut self, prefix_token: &TokenWithLocation) -> ExprResult {
+        use ParseErrKind::{ExpectedOperand, UnexpectedToken};
+        let prec = get_unary_precedence(&prefix_token.token);
         if prec == 0 {
-            return Err(self.err(ParseErrKind::UnexpectedToken(op_token.clone())));
+            return Err(self.err(UnexpectedToken(prefix_token.clone())));
         }
         if !self.has_tokens()? {
-            return Err(self.err(ParseErrKind::ExpectedOperand(op_token.end)));
+            return Err(self.err(ExpectedOperand(prefix_token.end)));
         }
+        let op_token = &prefix_token.token;
         let rhs = self.expr(prec)?;
-        let op = op_token.as_str();
-        let (start, end) = (op_token.start, rhs.end);
-        Ok(ast::Expr::new_unary_op(op, rhs, start, end))
+        let (start, end) = (prefix_token.start, rhs.end);
+        Ok(ast::Expr::new_unary_op(&op_token, rhs, start, end))
     }
 
     /// See if the expr is followed by an infix operator. If so, get the
     /// RHS expression and return a binary expression. If not, just
     /// return the original expr.
     fn maybe_binary_expr(&mut self, prec: u8, mut lhs: ast::Expr) -> ExprResult {
+        use ParseErrKind::ExpectedOperand;
         let start = lhs.start;
         loop {
             let next = self.next_infix_token(prec)?;
             if let Some((infix_token, mut infix_prec)) = next {
                 if !self.has_tokens()? {
-                    return Err(
-                        self.err(ParseErrKind::ExpectedOperand(infix_token.end))
-                    );
+                    return Err(self.err(ExpectedOperand(infix_token.end)));
                 }
                 // Lower precedence of right-associative operator when
                 // fetching its RHS expr.
                 if is_right_associative(&infix_token.token) {
                     infix_prec -= 1;
                 }
-                let op = infix_token.as_str();
+                let op_token = &infix_token.token;
                 let rhs = self.expr(infix_prec)?;
                 let end = rhs.end;
-                lhs = ast::Expr::new_binary_op(lhs, op, rhs, start, end);
+                lhs = ast::Expr::new_binary_op(lhs, op_token, rhs, start, end);
             } else {
                 break Ok(lhs);
             }

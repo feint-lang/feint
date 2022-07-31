@@ -1,8 +1,8 @@
 use std::fmt;
-use std::str::FromStr;
 
 use num_bigint::BigInt;
 
+use crate::scanner::Token;
 use crate::types::Params;
 use crate::util::{
     BinaryOperator, CompareOperator, InplaceOperator, Location, UnaryCompareOperator,
@@ -211,50 +211,39 @@ impl Expr {
         Self::new(ExprKind::Call(Call::new(callable, args)), start, end)
     }
 
-    pub fn new_unary_op(op: &str, a: Expr, start: Location, end: Location) -> Self {
-        // TODO: This is pretty gnarly.
+    pub fn new_unary_op(
+        op_token: &Token,
+        a: Expr,
+        start: Location,
+        end: Location,
+    ) -> Self {
         use ExprKind::{UnaryCompareOp, UnaryOp};
-        let kind = match op {
-            "+" | "-" => match UnaryOperator::from_str(op) {
-                Ok(op) => UnaryOp(op, Box::new(a)),
-                Err(err) => panic!("{err}"),
-            },
-            "!" | "!!" => match UnaryCompareOperator::from_str(op) {
-                Ok(op) => UnaryCompareOp(op, Box::new(a)),
-                Err(err) => panic!("{err}"),
-            },
-            _ => unreachable!("Unknown unary operator: {op}"),
+        let kind = if let Ok(op) = UnaryOperator::from_token(op_token) {
+            UnaryOp(op, Box::new(a))
+        } else if let Ok(op) = UnaryCompareOperator::from_token(op_token) {
+            UnaryCompareOp(op, Box::new(a))
+        } else {
+            panic!("Unknown unary operator: {op_token}");
         };
         Self::new(kind, start, end)
     }
 
     pub fn new_binary_op(
         a: Expr,
-        op: &str,
+        op_token: &Token,
         b: Expr,
         start: Location,
         end: Location,
     ) -> Self {
-        // TODO: This is pretty gnarly.
         use ExprKind::{BinaryOp, CompareOp, InplaceOp};
-        let kind = match op {
-            "^" | "*" | "/" | "//" | "%" | "+" | "-" | "=" | "," | "." => {
-                match BinaryOperator::from_str(op) {
-                    Ok(op) => BinaryOp(Box::new(a), op, Box::new(b)),
-                    Err(err) => panic!("{err}"),
-                }
-            }
-            "===" | "==" | "!=" | "<" | "<=" | ">" | ">=" | "&&" | "||" => {
-                match CompareOperator::from_str(op) {
-                    Ok(op) => CompareOp(Box::new(a), op, Box::new(b)),
-                    Err(err) => panic!("{err}"),
-                }
-            }
-            "+=" | "-=" => match InplaceOperator::from_str(op) {
-                Ok(op) => InplaceOp(Box::new(a), op, Box::new(b)),
-                Err(err) => panic!("{err}"),
-            },
-            _ => unreachable!("Unknown binary operator: {op}"),
+        let kind = if let Ok(op) = BinaryOperator::from_token(op_token) {
+            BinaryOp(Box::new(a), op, Box::new(b))
+        } else if let Ok(op) = CompareOperator::from_token(op_token) {
+            CompareOp(Box::new(a), op, Box::new(b))
+        } else if let Ok(op) = InplaceOperator::from_token(op_token) {
+            InplaceOp(Box::new(a), op, Box::new(b))
+        } else {
+            panic!("Unknown binary operator: {op_token}");
         };
         Self::new(kind, start, end)
     }

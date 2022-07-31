@@ -1,9 +1,9 @@
 //! Unary and binary operators used in the parser and VM. The operators
 //! are split out based on operation and/or return type, which makes it
 //! easier to handle different types of operations in the VM.
-
 use std::fmt;
-use std::str;
+
+use crate::scanner::Token;
 
 /// Unary operators.
 #[derive(Clone, PartialEq)]
@@ -12,16 +12,12 @@ pub enum UnaryOperator {
     Negate,
 }
 
-impl str::FromStr for UnaryOperator {
-    type Err = String;
-
-    fn from_str(op: &str) -> Result<Self, Self::Err> {
-        let op = match op {
-            "+" => Self::Plus,
-            "-" => Self::Negate,
-            _ => {
-                return Err(format!("Unknown unary operator: \"{}\"", op));
-            }
+impl UnaryOperator {
+    pub fn from_token(token: &Token) -> Result<Self, String> {
+        let op = match token {
+            Token::Plus => Self::Plus,
+            Token::Minus => Self::Negate,
+            _ => return Err(format!("Unknown unary operator: {token}")),
         };
         Ok(op)
     }
@@ -50,16 +46,12 @@ pub enum UnaryCompareOperator {
     AsBool,
 }
 
-impl str::FromStr for UnaryCompareOperator {
-    type Err = String;
-
-    fn from_str(op: &str) -> Result<Self, Self::Err> {
-        let op = match op {
-            "!" => Self::Not,
-            "!!" => Self::AsBool,
-            _ => {
-                return Err(format!("Unknown unary comparison operator: \"{}\"", op));
-            }
+impl UnaryCompareOperator {
+    pub fn from_token(token: &Token) -> Result<Self, String> {
+        let op = match token {
+            Token::Bang => Self::Not,
+            Token::BangBang => Self::AsBool,
+            _ => return Err(format!("Unknown unary comparison operator: {token}")),
         };
         Ok(op)
     }
@@ -71,13 +63,13 @@ impl fmt::Display for UnaryCompareOperator {
             Self::Not => "!",
             Self::AsBool => "!!",
         };
-        write!(f, "{}", string)
+        write!(f, "{string}")
     }
 }
 
 impl fmt::Debug for UnaryCompareOperator {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.to_string())
+        write!(f, "{self}")
     }
 }
 
@@ -95,23 +87,19 @@ pub enum BinaryOperator {
     Dot,
 }
 
-impl str::FromStr for BinaryOperator {
-    type Err = String;
-
-    fn from_str(op: &str) -> Result<Self, Self::Err> {
-        let op = match op {
-            "^" => Self::Pow,
-            "*" => Self::Mul,
-            "/" => Self::Div,
-            "//" => Self::FloorDiv,
-            "%" => Self::Mod,
-            "+" => Self::Add,
-            "-" => Self::Sub,
-            "=" => Self::Assign,
-            "." => Self::Dot,
-            _ => {
-                return Err(format!("Unknown binary operator: {}", op));
-            }
+impl BinaryOperator {
+    pub fn from_token(token: &Token) -> Result<Self, String> {
+        let op = match token {
+            Token::Caret => Self::Pow,
+            Token::Star => Self::Mul,
+            Token::Slash => Self::Div,
+            Token::DoubleSlash => Self::FloorDiv,
+            Token::Percent => Self::Mod,
+            Token::Plus => Self::Add,
+            Token::Minus => Self::Sub,
+            Token::Equal => Self::Assign,
+            Token::Dot => Self::Dot,
+            _ => return Err(format!("Unknown binary operator: {token}")),
         };
         Ok(op)
     }
@@ -130,13 +118,13 @@ impl fmt::Display for BinaryOperator {
             Self::Assign => "=",
             Self::Dot => ".",
         };
-        write!(f, "{}", string)
+        write!(f, "{string}")
     }
 }
 
 impl fmt::Debug for BinaryOperator {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self)
+        write!(f, "{self}")
     }
 }
 
@@ -154,23 +142,19 @@ pub enum CompareOperator {
     Or,
 }
 
-impl str::FromStr for CompareOperator {
-    type Err = String;
-
-    fn from_str(op: &str) -> Result<Self, Self::Err> {
-        let op = match op {
-            "===" => Self::Is,
-            "==" => Self::IsEqual,
-            "!=" => Self::NotEqual,
-            "<" => Self::LessThan,
-            "<=" => Self::LessThanOrEqual,
-            ">" => Self::GreaterThan,
-            ">=" => Self::GreaterThanOrEqual,
-            "&&" => Self::And,
-            "||" => Self::Or,
-            _ => {
-                return Err(format!("Unknown comparison operator: {}", op));
-            }
+impl CompareOperator {
+    pub fn from_token(token: &Token) -> Result<Self, String> {
+        let op = match token {
+            Token::EqualEqualEqual => Self::Is,
+            Token::EqualEqual => Self::IsEqual,
+            Token::NotEqual => Self::NotEqual,
+            Token::LessThan => Self::LessThan,
+            Token::LessThanOrEqual => Self::LessThanOrEqual,
+            Token::GreaterThan => Self::GreaterThan,
+            Token::GreaterThanOrEqual => Self::GreaterThanOrEqual,
+            Token::And => Self::And,
+            Token::Or => Self::Or,
+            _ => return Err(format!("Unknown comparison operator: {token}")),
         };
         Ok(op)
     }
@@ -189,13 +173,13 @@ impl fmt::Display for CompareOperator {
             Self::And => "&&",
             Self::Or => "||",
         };
-        write!(f, "{}", string)
+        write!(f, "{string}")
     }
 }
 
 impl fmt::Debug for CompareOperator {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self)
+        write!(f, "{self}")
     }
 }
 
@@ -206,16 +190,12 @@ pub enum InplaceOperator {
     SubEqual,
 }
 
-impl str::FromStr for InplaceOperator {
-    type Err = String;
-
-    fn from_str(op: &str) -> Result<Self, Self::Err> {
-        let op = match op {
-            "+=" => Self::AddEqual,
-            "-=" => Self::SubEqual,
-            _ => {
-                return Err(format!("Unknown inplace operator: {}", op));
-            }
+impl InplaceOperator {
+    pub fn from_token(token: &Token) -> Result<Self, String> {
+        let op = match token {
+            Token::PlusEqual => Self::AddEqual,
+            Token::MinusEqual => Self::SubEqual,
+            _ => return Err(format!("Unknown inplace operator: {token}")),
         };
         Ok(op)
     }
@@ -227,12 +207,12 @@ impl fmt::Display for InplaceOperator {
             Self::AddEqual => "+=",
             Self::SubEqual => "-=",
         };
-        write!(f, "{}", string)
+        write!(f, "{string}")
     }
 }
 
 impl fmt::Debug for InplaceOperator {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self)
+        write!(f, "{self}")
     }
 }
