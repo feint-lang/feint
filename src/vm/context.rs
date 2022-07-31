@@ -32,7 +32,7 @@ impl RuntimeContext {
     }
 
     pub fn enter_scope(&mut self) {
-        let namespace = Namespace::new(self.builtins.nil_obj.clone());
+        let namespace = Namespace::new();
         self.namespace_stack.push(namespace);
     }
 
@@ -51,7 +51,7 @@ impl RuntimeContext {
         }
     }
 
-    pub fn depth(&self) -> usize {
+    fn depth(&self) -> usize {
         self.namespace_stack.len() - 1
     }
 
@@ -74,8 +74,9 @@ impl RuntimeContext {
     /// the var in the current namespace and sets its initial value to
     /// nil.
     pub fn declare_var(&mut self, name: &str) {
+        let initial = self.builtins.nil_obj.clone();
         let namespace = self.current_namespace();
-        namespace.add_var(name);
+        namespace.add_var(name, initial);
     }
 
     /// Assign value to var. This looks up the var by name in the
@@ -180,12 +181,9 @@ impl Default for RuntimeContext {
 
         // Add builtin types to builtins namespace and add aliases to
         // global scope.
-        let mut builtins_ns =
-            crate::types::Namespace::new(ctx.builtins.nil_obj.clone());
+        let mut builtins_ns = Namespace::new();
         for (name, class) in BUILTIN_TYPES.iter() {
-            if !builtins_ns.add_and_set_var(*name, class.clone()) {
-                panic!("Could not add {name} to {builtins_ns}");
-            }
+            builtins_ns.add_var(*name, class.clone());
             if let Err(err) = ctx.declare_and_assign_var(name, class.clone()) {
                 panic!("Could not define builtin type {name}: {err}");
             }
@@ -196,9 +194,7 @@ impl Default for RuntimeContext {
         for spec in get_builtin_func_specs() {
             let (name, params, func) = spec;
             let func = ctx.builtins.new_builtin_func(name, params, func);
-            if !builtins_ns.add_and_set_var(name, func.clone()) {
-                panic!("Could not add {name} to {builtins_ns}");
-            }
+            builtins_ns.add_var(name, func.clone());
             if let Err(err) = ctx.declare_and_assign_var(name, func.clone()) {
                 panic!("Could not define builtin func: {err}");
             }

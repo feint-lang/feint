@@ -6,19 +6,18 @@ use crate::vm::RuntimeContext;
 
 use super::builtin_types::BUILTIN_TYPES;
 use super::class::TypeRef;
-use super::object::{Object, ObjectRef};
+use super::object::{Object, ObjectExt, ObjectRef};
 use super::result::GetAttrResult;
 
 // Namespace -----------------------------------------------------------
 
 pub struct Namespace {
     objects: HashMap<String, ObjectRef>,
-    nil_obj: ObjectRef,
 }
 
 impl Namespace {
-    pub fn new(nil: ObjectRef) -> Self {
-        Namespace { objects: HashMap::new(), nil_obj: nil }
+    pub fn new() -> Self {
+        Namespace { objects: HashMap::new() }
     }
 
     pub fn clear(&mut self) {
@@ -29,12 +28,14 @@ impl Namespace {
         self.objects.len()
     }
 
-    /// Add a var, settings its initial value to nil.
-    pub fn add_var<S: Into<String>>(&mut self, name: S) {
-        self.objects.insert(name.into(), self.nil_obj.clone());
+    /// Add a var, settings its initial value as specified (usually
+    /// nil).
+    pub fn add_var<S: Into<String>>(&mut self, name: S, initial: ObjectRef) {
+        self.objects.insert(name.into(), initial);
     }
 
-    /// Set a var's value.
+    /// Set a var's value. This will only succeed if the var already
+    /// exists.
     pub fn set_var(&mut self, name: &str, obj: ObjectRef) -> bool {
         if self.objects.contains_key(name) {
             self.objects.insert(name.to_owned(), obj);
@@ -42,12 +43,6 @@ impl Namespace {
         } else {
             false
         }
-    }
-
-    /// Add and set a var in one step.
-    pub fn add_and_set_var(&mut self, name: &str, obj: ObjectRef) -> bool {
-        self.add_var(name);
-        self.set_var(name, obj)
     }
 
     /// Get a var.
@@ -63,6 +58,37 @@ impl Object for Namespace {
 
     fn as_any(&self) -> &dyn Any {
         self
+    }
+
+    fn is_equal(&self, rhs: &dyn Object, ctx: &RuntimeContext) -> bool {
+        if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
+            if self.is(&rhs) {
+                true
+            } else {
+                let lhs_objects = &self.objects;
+                let rhs_objects = &rhs.objects;
+                if lhs_objects.len() != rhs_objects.len() {
+                    // Namespaces have a different number of entries, so
+                    // they can't be equal.
+                    false
+                } else if !lhs_objects.keys().all(|k| rhs_objects.contains_key(k)) {
+                    // Namespaces have differing keys, so they can't be
+                    // equal.
+                    false
+                } else {
+                    // Otherwise, compare all entries for equality.
+                    for (name, lhs_val) in lhs_objects.iter() {
+                        let rhs_val = &rhs_objects[name];
+                        if !lhs_val.is_equal(&**rhs_val, ctx) {
+                            return false;
+                        }
+                    }
+                    true
+                }
+            }
+        } else {
+            false
+        }
     }
 
     fn get_attr(&self, name: &str, ctx: &RuntimeContext) -> GetAttrResult {

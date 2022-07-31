@@ -3,25 +3,23 @@
 //! `Bool` and `Float` that wrap Rust primitives.
 use std::any::Any;
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::fmt;
 
 use crate::vm::RuntimeContext;
 
 use super::class::TypeRef;
+use super::namespace::Namespace;
 use super::object::{Object, ObjectExt, ObjectRef};
 use super::result::{GetAttrResult, SetAttrResult};
 
-pub type Attrs = RefCell<HashMap<String, ObjectRef>>;
-
 pub struct Custom {
     class: TypeRef,
-    attrs: Attrs,
+    attrs: RefCell<Namespace>,
 }
 
 impl Custom {
     pub fn new(class: TypeRef) -> Self {
-        Self { class, attrs: RefCell::new(HashMap::new()) }
+        Self { class, attrs: RefCell::new(Namespace::new()) }
     }
 }
 
@@ -34,18 +32,28 @@ impl Object for Custom {
         self
     }
 
-    fn is_equal(&self, rhs: &dyn Object, _ctx: &RuntimeContext) -> bool {
+    fn is_equal(&self, rhs: &dyn Object, ctx: &RuntimeContext) -> bool {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
-            self.is(&rhs)
-                || (self.class().is(&rhs.class())
-                    && attrs_equal(&self.attrs, &rhs.attrs, _ctx))
+            if self.is(&rhs) {
+                // Object is equal to itself.
+                true
+            } else if !self.class().is(&rhs.class()) {
+                // Objects are not the same type so they can't be equal.
+                false
+            } else {
+                // Otherwise, objects are the same type, so check their
+                // attribute namespaces for equality.
+                let lhs_attrs = self.attrs.borrow();
+                let rhs_attrs = &*rhs.attrs.borrow();
+                lhs_attrs.is_equal(rhs_attrs, ctx)
+            }
         } else {
             false
         }
     }
 
     fn get_attr(&self, name: &str, _ctx: &RuntimeContext) -> GetAttrResult {
-        if let Some(value) = self.attrs.borrow().get(name) {
+        if let Some(value) = self.attrs.borrow().get_var(name) {
             return Ok(value.clone());
         }
         Err(self.attr_does_not_exist(name))
@@ -57,29 +65,9 @@ impl Object for Custom {
         value: ObjectRef,
         _ctx: &RuntimeContext,
     ) -> SetAttrResult {
-        self.attrs.borrow_mut().insert(name.to_owned(), value.clone());
+        self.attrs.borrow_mut().add_var(name, value);
         Ok(())
     }
-}
-
-// Util ----------------------------------------------------------------
-
-/// Compare attributes for equality. The attribute maps are first
-/// checked to see if they have the same number of entries. Then, the
-/// keys are checked to see if they're all the same. If they are, only
-/// then are the values checked for equality.
-fn attrs_equal(lhs: &Attrs, rhs: &Attrs, ctx: &RuntimeContext) -> bool {
-    let lhs = lhs.borrow();
-    let rhs = rhs.borrow();
-    if !(lhs.len() == rhs.len() && lhs.keys().all(|k| rhs.contains_key(k))) {
-        return false;
-    }
-    for (k, v) in lhs.iter() {
-        if !v.is_equal(&*rhs[k], ctx) {
-            return false;
-        }
-    }
-    true
 }
 
 // Display -------------------------------------------------------------
