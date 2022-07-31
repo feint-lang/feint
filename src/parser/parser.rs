@@ -4,7 +4,7 @@ use std::iter::{Iterator, Peekable};
 
 use crate::ast;
 use crate::format::FormatStrToken;
-use crate::parser::result::{MaybeExprResult, StatementResult};
+use crate::parser::result::StatementResult;
 use crate::scanner::{ScanErr, ScanTokenResult, Token, TokenWithLocation};
 use crate::util::Location;
 
@@ -173,9 +173,6 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
             }
             _ => self.expect_unary_expr(&token)?,
         };
-        // If the expression is a function definition or call, it will
-        // be parsed as such. Otherwise, it will be returned as is.
-        let expr = self.maybe_call(expr)?.1;
         // If the expression is followed by a binary operator, a binary
         // expression will be parsed and returned. Otherwise, the
         // expression will be returned as is.
@@ -373,7 +370,8 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
     }
 
     /// Handle function call.
-    fn call(&mut self, callable: ast::Expr, args: ast::Expr) -> ExprResult {
+    fn call(&mut self, callable: ast::Expr, args_start: Location) -> ExprResult {
+        let args = self.parenthesized(args_start)?;
         let start = callable.start;
         let end = args.end;
         let args = match args.kind {
@@ -381,20 +379,6 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
             _ => vec![args],
         };
         Ok(ast::Expr::new_call(callable, args, start, end))
-    }
-
-    /// Handle function calls. This checks for a left paren after an
-    /// expression and, if one is present, assumes a call is intended.
-    /// Call expressions are chained together as well to allow for
-    /// `f()()()` syntax.
-    fn maybe_call(&mut self, expr: ast::Expr) -> MaybeExprResult {
-        if self.next_token_is(&Token::LParen)? {
-            let args = self.parenthesized(expr.start)?;
-            let call_expr = self.call(expr, args)?;
-            self.maybe_call(call_expr)
-        } else {
-            Ok((false, expr))
-        }
     }
 
     /// The current token should represent a unary operator and should
@@ -432,17 +416,25 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
                     infix_prec -= 1;
                 }
                 let op_token = &infix_token.token;
-                let rhs = self.expr(infix_prec)?;
-                let end = rhs.end;
                 lhs = match op_token {
+                    // Assignment
                     &Token::Equal => {
                         if let ast::ExprKind::Ident(ident) = lhs.kind {
-                            ast::Expr::new_assignement(ident, rhs, start, end)
+                            let value = self.expr(infix_prec)?;
+                            let end = value.end;
+                            ast::Expr::new_assignement(ident, value, start, end)
                         } else {
                             return Err(self.err(ParseErrKind::ExpectedIdent(start)));
                         }
                     }
-                    _ => ast::Expr::new_binary_op(lhs, op_token, rhs, start, end),
+                    // Call
+                    &Token::LParen => self.call(lhs, infix_token.start)?,
+                    // Binary operation
+                    _ => {
+                        let rhs = self.expr(infix_prec)?;
+                        let end = rhs.end;
+                        ast::Expr::new_binary_op(lhs, op_token, rhs, start, end)
+                    }
                 }
             } else {
                 break Ok(lhs);

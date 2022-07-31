@@ -36,8 +36,8 @@ pub fn get_operator_precedence(token: &Token) -> (u8, u8) {
         | MinusEqual                     // a -= b
         | PlusEqual          => (0, 1),  // a += b
         
-        | Or                 => (0, 3),  // a || b
-        | And                => (0, 4),  // a && b
+        | Or                 => (0, 2),  // a || b
+        | And                => (0, 3),  // a && b
 
         | EqualEqualEqual                // a === b
         | EqualEqual                     // a == b
@@ -45,21 +45,22 @@ pub fn get_operator_precedence(token: &Token) -> (u8, u8) {
         | LessThan                       // a < b
         | LessThanOrEqual                // a <= b
         | GreaterThan                    // a > b
-        | GreaterThanOrEqual => (0, 5),  // a >= b
+        | GreaterThanOrEqual => (0, 4),  // a >= b
         
         | Plus                           // +a, a + b
-        | Minus              => (9, 6),  // -a, a - b
+        | Minus              => (8, 5),  // -a, a - b
         
         | Star                           // a * b
         | Slash                          // a / b       (floating point div)
         | DoubleSlash                    // a // b      (floor div)
-        | Percent            => (0, 7),  // a % b
+        | Percent            => (0, 6),  // a % b
        
-        | Caret              => (0, 8),  // a ^ b       (exponentiation)
+        | Caret              => (0, 7),  // a ^ b       (exponentiation)
 
         | BangBang                       // !!a         (as bool)
-        | Bang               => (9, 0),  // !a          (logical not)
+        | Bang               => (8, 0),  // !a          (logical not)
 
+        | LParen             => (0, 9),  // x(...)      (call)
         | Dot                => (0, 10), // x.y
         
         _                    => (0, 0),  // not an operator
