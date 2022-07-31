@@ -290,8 +290,8 @@ impl VM {
                     return Err(RuntimeErr::new_type_err(message));
                 }
             }
+            // Assignment is handled separately.
             Assign => unreachable!(),
-            Comma => unreachable!(),
         };
         self.push(ValueStackKind::Temp(result));
         Ok(())
@@ -644,6 +644,20 @@ impl VM {
             Call(n) => self.format_aligned("CALL", n),
             Return => format!("RETURN"),
             Halt(code) => self.format_aligned("HALT", code),
+            HaltTop => {
+                if let Ok(peek) = self.peek_obj() {
+                    if let Some(code) = peek {
+                        self.format_aligned("HALT_TOP", code.to_string())
+                    } else {
+                        self.format_aligned("HALT_TOP", "[ERROR: stack empty]")
+                    }
+                } else {
+                    self.format_aligned(
+                        "HALT_TOP",
+                        "[ERROR: could not get top of stack]",
+                    )
+                }
+            }
             Placeholder(addr, inst, message) => {
                 let formatted_inst = self.format_instruction(chunk, inst);
                 self.format_aligned(
@@ -657,7 +671,6 @@ impl VM {
             ContinuePlaceholder(addr, _) => {
                 self.format_aligned("PLACEHOLDER", format!("CONTINUE @ {addr}"))
             }
-            other => format!("{:?}", other),
         }
     }
 
