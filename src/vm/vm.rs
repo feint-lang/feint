@@ -286,7 +286,7 @@ impl VM {
             Sub => a.sub(b, &self.ctx)?,
             Dot => {
                 if let Some(name) = b.str_val() {
-                    a.get_attr(name.as_str(), &self.ctx)?
+                    a.get_attr(name.as_str(), &self.ctx, a.clone())?
                 } else if let Some(int) = b.int_val() {
                     a.get_item(&int, &self.ctx)?
                 } else {
@@ -363,6 +363,9 @@ impl VM {
         }
         if let Some(func) = callable.as_builtin_func() {
             self.check_call_args(&func.name, &func.params, &args, false)?;
+            if let Some(this) = &func.this {
+                args.insert(0, this.clone());
+            }
             let result = callable.call(args, self)?;
             let return_val = match result {
                 Some(return_val) => return_val,

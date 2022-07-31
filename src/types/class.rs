@@ -72,7 +72,12 @@ impl Object for Type {
         self
     }
 
-    fn get_attr(&self, name: &str, ctx: &RuntimeContext) -> GetAttrResult {
+    fn get_attr(
+        &self,
+        name: &str,
+        ctx: &RuntimeContext,
+        _this: ObjectRef,
+    ) -> GetAttrResult {
         if let Some(attr) = self.get_base_attr(name, ctx) {
             return Ok(attr);
         }
@@ -85,10 +90,14 @@ impl Object for Type {
                     "new",
                     Some(vec!["value"]),
                     float::new,
+                    None,
                 ),
-                "Int" => {
-                    ctx.builtins.new_builtin_func("new", Some(vec!["value"]), int::new)
-                }
+                "Int" => ctx.builtins.new_builtin_func(
+                    "new",
+                    Some(vec!["value"]),
+                    int::new,
+                    None,
+                ),
                 _ => {
                     let message = format!("new not implemented for type {self}");
                     return Err(RuntimeErr::new_type_err(message));

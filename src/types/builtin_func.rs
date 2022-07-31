@@ -6,7 +6,7 @@ use crate::vm::VM;
 
 use super::builtin_types::BUILTIN_TYPES;
 use super::class::TypeRef;
-use super::object::Object;
+use super::object::{Object, ObjectRef};
 use super::result::{Args, CallResult, Params};
 
 pub type BuiltinFn = fn(Args, &mut VM) -> CallResult;
@@ -16,12 +16,18 @@ pub struct BuiltinFunc {
     pub params: Params,
     pub arity: Option<usize>,
     pub func: BuiltinFn,
+    pub this: Option<ObjectRef>,
 }
 
 impl BuiltinFunc {
-    pub fn new<S: Into<String>>(name: S, params: Params, func: BuiltinFn) -> Self {
+    pub fn new<S: Into<String>>(
+        name: S,
+        params: Params,
+        func: BuiltinFn,
+        this: Option<ObjectRef>,
+    ) -> Self {
         let arity = if let Some(params) = &params { Some(params.len()) } else { None };
-        Self { name: name.into(), params, arity, func }
+        Self { name: name.into(), params, arity, func, this }
     }
 }
 

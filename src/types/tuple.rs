@@ -41,7 +41,12 @@ impl Object for Tuple {
         self
     }
 
-    fn get_attr(&self, name: &str, ctx: &RuntimeContext) -> GetAttrResult {
+    fn get_attr(
+        &self,
+        name: &str,
+        ctx: &RuntimeContext,
+        this: ObjectRef,
+    ) -> GetAttrResult {
         if let Some(attr) = self.get_base_attr(name, ctx) {
             return Ok(attr);
         }
@@ -49,8 +54,9 @@ impl Object for Tuple {
             "length" => ctx.builtins.new_int(self.len()),
             "map" => ctx.builtins.new_builtin_func(
                 "map",
-                Some(vec!["this", "map_fn"]),
+                Some(vec!["map_fn"]),
                 tuple::map,
+                Some(this),
             ),
             _ => {
                 return Err(self.attr_does_not_exist(name));

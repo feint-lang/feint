@@ -114,7 +114,12 @@ pub trait Object {
         Some(attr)
     }
 
-    fn get_attr(&self, name: &str, ctx: &RuntimeContext) -> GetAttrResult {
+    fn get_attr(
+        &self,
+        name: &str,
+        ctx: &RuntimeContext,
+        _this: ObjectRef,
+    ) -> GetAttrResult {
         if let Some(attr) = self.get_base_attr(name, ctx) {
             Ok(attr)
         } else {

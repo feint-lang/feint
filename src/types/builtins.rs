@@ -41,9 +41,10 @@ impl Builtins {
         name: S,
         params: Option<Vec<S>>,
         func: BuiltinFn,
+        this: Option<ObjectRef>,
     ) -> ObjectRef {
         let params = self.collect_params(params);
-        Arc::new(super::builtin_func::BuiltinFunc::new(name, params, func))
+        Arc::new(super::builtin_func::BuiltinFunc::new(name, params, func, this))
     }
 
     pub fn new_float<F: Into<f64>>(&self, value: F) -> ObjectRef {

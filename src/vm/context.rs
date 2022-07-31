@@ -206,7 +206,7 @@ impl Default for RuntimeContext {
         // to global scope.
         for spec in get_builtin_func_specs() {
             let (name, params, func) = spec;
-            let func = ctx.builtins.new_builtin_func(name, params, func);
+            let func = ctx.builtins.new_builtin_func(name, params, func, None);
             builtins_ns.add_var(name, func.clone());
             if let Err(err) = ctx.declare_and_assign_var(name, func.clone()) {
                 panic!("Could not define builtin func: {err}");
