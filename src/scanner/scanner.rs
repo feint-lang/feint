@@ -138,7 +138,6 @@ impl<'a, T: BufRead> Scanner<'a, T> {
             Some(('&', _, _)) => self.consume_char_and_return_token(Ampersand),
             Some(('|', Some('|'), _)) => self.consume_char_and_return_token(Or),
             Some(('|', _, _)) => self.consume_char_and_return_token(Pipe),
-            Some(('*', Some('*'), _)) => self.consume_char_and_return_token(DoubleStar),
             Some(('*', Some('='), _)) => self.consume_char_and_return_token(MulEqual),
             Some(('*', _, _)) => Star,
             Some(('/', Some('='), _)) => self.consume_char_and_return_token(DivEqual),

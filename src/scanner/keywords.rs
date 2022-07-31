@@ -15,7 +15,6 @@ lazy_static! {
         ("from", From),
         ("package", Package),
         ("as", As),
-        ("let", Let),
         ("block", Block),
         ("if", If),
         ("else", Else),
