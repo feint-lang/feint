@@ -5,15 +5,25 @@ use std::sync::Arc;
 
 use once_cell::sync::Lazy;
 
-use super::base::{ObjectRef, ObjectTrait, TypeTrait};
-use super::class::TYPE;
+use crate::type_system::bool::Bool;
+use crate::type_system::class::Type;
+use crate::type_system::int::Int;
+use crate::type_system::module::Module;
+use crate::type_system::nil::Nil;
+use crate::type_system::str::Str;
+
+use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
+use super::builtins::BUILTINS;
+use super::class::TYPE_TYPE;
+
 use super::create;
 
 pub type NamespaceObjects = HashMap<String, ObjectRef>;
 
 // NS Type -------------------------------------------------------------
 
-static NS_TYPE: Lazy<Arc<NamespaceType>> = Lazy::new(|| Arc::new(NamespaceType::new()));
+pub static NS_TYPE: Lazy<Arc<NamespaceType>> =
+    Lazy::new(|| Arc::new(NamespaceType::new()));
 
 pub struct NamespaceType {
     namespace: Arc<Namespace>,
@@ -22,7 +32,6 @@ pub struct NamespaceType {
 impl NamespaceType {
     pub fn new() -> Self {
         let mut ns = Namespace::new();
-        ns.add_obj("$module", create::new_str("builtins"));
         ns.add_obj("$name", create::new_str("Namespace"));
         ns.add_obj("$full_name", create::new_str("builtins.Namespace"));
         Self { namespace: Arc::new(ns) }
@@ -40,6 +49,10 @@ impl TypeTrait for NamespaceType {
     fn full_name(&self) -> &str {
         "builtins.Namespace"
     }
+
+    fn namespace(&self) -> ObjectRef {
+        self.namespace.clone()
+    }
 }
 
 impl ObjectTrait for NamespaceType {
@@ -47,8 +60,12 @@ impl ObjectTrait for NamespaceType {
         self
     }
 
+    fn metaclass(&self) -> TypeRef {
+        TYPE_TYPE.clone()
+    }
+
     fn class(&self) -> ObjectRef {
-        TYPE.clone()
+        TYPE_TYPE.clone()
     }
 
     fn namespace(&self) -> ObjectRef {
@@ -88,30 +105,26 @@ impl ObjectTrait for Namespace {
         self
     }
 
+    fn metaclass(&self) -> TypeRef {
+        NS_TYPE.clone()
+    }
+
     fn class(&self) -> ObjectRef {
         NS_TYPE.clone()
     }
 
-    // XXX: This is a bit of hack due to avoid a circularity. The return
-    //      value should NOT be used.
+    // XXX: This is a bit of a hack due to avoid a circularity. The
+    //      return value should NOT be used.
     fn namespace(&self) -> ObjectRef {
         create::new_namespace()
     }
+
+    // fn get_attr(&self, _name: &str) -> Option<ObjectRef> {
+    //     panic!("Don't use Namespace::get_attr()");
+    // }
 }
 
 // Display -------------------------------------------------------------
-
-impl fmt::Display for NamespaceType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "<{}.{}>", self.module(), self.name())
-    }
-}
-
-impl fmt::Debug for NamespaceType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{self}")
-    }
-}
 
 impl fmt::Display for Namespace {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -138,10 +151,13 @@ mod tests {
         assert!(class.is(&*NS_TYPE.clone()));
 
         let class_type = class.get_attr("$type").unwrap();
-        assert!(class_type.is(&*TYPE.clone()));
+        assert!(class_type.is(&*TYPE_TYPE.clone()));
 
         let class_type_type = class_type.get_attr("$type").unwrap();
-        assert!(class_type_type.is(&*TYPE.clone()));
+        assert!(class_type_type.is(&*TYPE_TYPE.clone()));
+
+        let module = ns.get_attr("$module").unwrap();
+        assert_eq!(module.to_module().unwrap().name(), "builtins");
 
         let name = ns.get_attr("$name").unwrap();
         assert_eq!(name.to_str().unwrap().value(), "Namespace");

@@ -2,9 +2,6 @@ use std::any::Any;
 use std::fmt;
 use std::sync::Arc;
 
-use num_bigint::BigInt;
-use num_traits::FromPrimitive;
-
 use once_cell::sync::Lazy;
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
@@ -14,33 +11,34 @@ use super::ns::Namespace;
 
 use super::create;
 
-// Int Type ------------------------------------------------------------
+// Module Type ---------------------------------------------------------
 
-pub static INT_TYPE: Lazy<Arc<IntType>> = Lazy::new(|| Arc::new(IntType::new()));
+pub static MODULE_TYPE: Lazy<Arc<ModuleType>> =
+    Lazy::new(|| Arc::new(ModuleType::new()));
 
-pub struct IntType {
+pub struct ModuleType {
     namespace: Arc<Namespace>,
 }
 
-unsafe impl Send for IntType {}
-unsafe impl Sync for IntType {}
+unsafe impl Send for ModuleType {}
+unsafe impl Sync for ModuleType {}
 
-impl IntType {
+impl ModuleType {
     pub fn new() -> Self {
         let mut ns = Namespace::new();
-        ns.add_obj("$name", create::new_str("Int"));
-        ns.add_obj("$full_name", create::new_str("builtins.Int"));
+        ns.add_obj("$name", create::new_str("Module"));
+        ns.add_obj("$full_name", create::new_str("builtins.Module"));
         Self { namespace: Arc::new(ns) }
     }
 }
 
-impl TypeTrait for IntType {
+impl TypeTrait for ModuleType {
     fn name(&self) -> &str {
-        "Int"
+        "Module"
     }
 
     fn full_name(&self) -> &str {
-        "builtins.Int"
+        "builtins.Module"
     }
 
     fn namespace(&self) -> ObjectRef {
@@ -48,7 +46,7 @@ impl TypeTrait for IntType {
     }
 }
 
-impl ObjectTrait for IntType {
+impl ObjectTrait for ModuleType {
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -66,41 +64,37 @@ impl ObjectTrait for IntType {
     }
 }
 
-// Int Object ----------------------------------------------------------
+// Module Object ----------------------------------------------------------
 
-pub struct Int {
+pub struct Module {
+    name: String,
     namespace: Arc<Namespace>,
-    value: BigInt,
 }
 
-unsafe impl Send for Int {}
-unsafe impl Sync for Int {}
+unsafe impl Send for Module {}
+unsafe impl Sync for Module {}
 
-impl Int {
-    pub fn new(value: BigInt) -> Self {
-        Self { namespace: Arc::new(Namespace::new()), value }
+impl Module {
+    pub fn new<S: Into<String>>(name: S, namespace: Arc<Namespace>) -> Self {
+        Self { namespace, name: name.into() }
     }
 
-    pub fn from_usize(value: usize) -> Self {
-        Self::new(BigInt::from_usize(value).unwrap())
-    }
-
-    pub fn value(&self) -> &BigInt {
-        &self.value
+    pub fn name(&self) -> &str {
+        self.name.as_str()
     }
 }
 
-impl ObjectTrait for Int {
+impl ObjectTrait for Module {
     fn as_any(&self) -> &dyn Any {
         self
     }
 
     fn metaclass(&self) -> TypeRef {
-        INT_TYPE.clone()
+        MODULE_TYPE.clone()
     }
 
     fn class(&self) -> ObjectRef {
-        INT_TYPE.clone()
+        MODULE_TYPE.clone()
     }
 
     fn namespace(&self) -> ObjectRef {
@@ -110,13 +104,13 @@ impl ObjectTrait for Int {
 
 // Display -------------------------------------------------------------
 
-impl fmt::Display for Int {
+impl fmt::Display for Module {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.value)
+        write!(f, "<module {}>", self.name())
     }
 }
 
-impl fmt::Debug for Int {
+impl fmt::Debug for Module {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{self}")
     }

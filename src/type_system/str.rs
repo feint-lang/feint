@@ -4,14 +4,16 @@ use std::sync::Arc;
 
 use once_cell::sync::Lazy;
 
-use super::base::{ObjectRef, ObjectTrait, TypeTrait};
-use super::class::TYPE;
-use super::create;
+use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
+use super::builtins::BUILTINS;
+use super::class::TYPE_TYPE;
 use super::ns::Namespace;
+
+use super::create;
 
 // Str Type ------------------------------------------------------------
 
-static STR_TYPE: Lazy<Arc<StrType>> = Lazy::new(|| Arc::new(StrType::new()));
+pub static STR_TYPE: Lazy<Arc<StrType>> = Lazy::new(|| Arc::new(StrType::new()));
 
 pub struct StrType {
     namespace: Arc<Namespace>,
@@ -20,7 +22,6 @@ pub struct StrType {
 impl StrType {
     pub fn new() -> Self {
         let mut ns = Namespace::new();
-        ns.add_obj("$module", create::new_str("builtins"));
         ns.add_obj("$name", create::new_str("Str"));
         ns.add_obj("$full_name", create::new_str("builtins.Str"));
         Self { namespace: Arc::new(ns) }
@@ -38,6 +39,10 @@ impl TypeTrait for StrType {
     fn full_name(&self) -> &str {
         "builtins.Str"
     }
+
+    fn namespace(&self) -> ObjectRef {
+        self.namespace.clone()
+    }
 }
 
 impl ObjectTrait for StrType {
@@ -45,8 +50,12 @@ impl ObjectTrait for StrType {
         self
     }
 
+    fn metaclass(&self) -> TypeRef {
+        TYPE_TYPE.clone()
+    }
+
     fn class(&self) -> ObjectRef {
-        TYPE.clone()
+        TYPE_TYPE.clone()
     }
 
     fn namespace(&self) -> ObjectRef {
@@ -76,6 +85,10 @@ impl ObjectTrait for Str {
         self
     }
 
+    fn metaclass(&self) -> TypeRef {
+        STR_TYPE.clone()
+    }
+
     fn class(&self) -> ObjectRef {
         STR_TYPE.clone()
     }
@@ -86,18 +99,6 @@ impl ObjectTrait for Str {
 }
 
 // Display -------------------------------------------------------------
-
-impl fmt::Display for StrType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "<{}.{}>", self.module(), self.name())
-    }
-}
-
-impl fmt::Debug for StrType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{self}")
-    }
-}
 
 impl fmt::Display for Str {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

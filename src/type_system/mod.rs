@@ -1,8 +1,10 @@
 mod base;
 mod bool;
+mod builtins;
 mod class;
 mod create;
 mod int;
+mod module;
 mod nil;
 mod ns;
 mod str;

@@ -3,6 +3,7 @@
 //! These constructors simplify the creation system objects.
 use std::sync::Arc;
 
+use crate::type_system::module::Module;
 use num_bigint::BigInt;
 use once_cell::sync::Lazy;
 
@@ -35,6 +36,10 @@ pub fn new_int(value: BigInt) -> ObjectRef {
 
 pub fn new_int_from_usize(value: usize) -> ObjectRef {
     Arc::new(Int::from_usize(value))
+}
+
+pub fn new_module<S: Into<String>>(name: S, ns: Arc<Namespace>) -> ObjectRef {
+    Arc::new(Module::new(name, ns))
 }
 
 pub fn new_namespace() -> ObjectRef {
