@@ -13,6 +13,7 @@ mod format;
 mod parser;
 mod result;
 mod scanner;
+mod type_system;
 mod types;
 mod util;
 mod vm;
