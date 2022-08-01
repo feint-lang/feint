@@ -5,18 +5,10 @@ use std::sync::Arc;
 
 use once_cell::sync::Lazy;
 
-use crate::type_system::bool::Bool;
-use crate::type_system::class::Type;
-use crate::type_system::int::Int;
-use crate::type_system::module::Module;
-use crate::type_system::nil::Nil;
-use crate::type_system::str::Str;
+use super::create;
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
-use super::builtins::BUILTINS;
 use super::class::TYPE_TYPE;
-
-use super::create;
 
 pub type NamespaceObjects = HashMap<String, ObjectRef>;
 
@@ -49,10 +41,6 @@ impl TypeTrait for NamespaceType {
     fn full_name(&self) -> &str {
         "builtins.Namespace"
     }
-
-    fn namespace(&self) -> ObjectRef {
-        self.namespace.clone()
-    }
 }
 
 impl ObjectTrait for NamespaceType {
@@ -60,11 +48,11 @@ impl ObjectTrait for NamespaceType {
         self
     }
 
-    fn metaclass(&self) -> TypeRef {
+    fn type_type(&self) -> TypeRef {
         TYPE_TYPE.clone()
     }
 
-    fn class(&self) -> ObjectRef {
+    fn type_obj(&self) -> ObjectRef {
         TYPE_TYPE.clone()
     }
 
@@ -105,11 +93,11 @@ impl ObjectTrait for Namespace {
         self
     }
 
-    fn metaclass(&self) -> TypeRef {
+    fn type_type(&self) -> TypeRef {
         NS_TYPE.clone()
     }
 
-    fn class(&self) -> ObjectRef {
+    fn type_obj(&self) -> ObjectRef {
         NS_TYPE.clone()
     }
 
@@ -128,7 +116,7 @@ impl ObjectTrait for Namespace {
 
 impl fmt::Display for Namespace {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} @ {}", self.class(), self.id())
+        write!(f, "{} @ {}", self.type_obj(), self.id())
     }
 }
 

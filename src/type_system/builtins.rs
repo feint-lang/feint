@@ -2,16 +2,15 @@ use std::sync::Arc;
 
 use once_cell::sync::Lazy;
 
-use super::base::ObjectRef;
-use super::bool::{Bool, BoolType, BOOL_TYPE};
-use super::class::{Type, TypeType, TYPE_TYPE};
-use super::int::{Int, IntType, INT_TYPE};
-use super::module::{Module, ModuleType, MODULE_TYPE};
-use super::nil::{Nil, NilType, NIL_TYPE};
-use super::ns::{Namespace, NamespaceType, NS_TYPE};
-use super::str::{Str, StrType, STR_TYPE};
-
 use super::create;
+
+use super::bool::BOOL_TYPE;
+use super::class::TYPE_TYPE;
+use super::int::INT_TYPE;
+use super::module::{Module, MODULE_TYPE};
+use super::nil::NIL_TYPE;
+use super::ns::{Namespace, NS_TYPE};
+use super::str::STR_TYPE;
 
 pub static BUILTINS: Lazy<Arc<Module>> = Lazy::new(|| {
     let mut ns = Namespace::new();

@@ -4,12 +4,11 @@ use std::sync::Arc;
 
 use once_cell::sync::Lazy;
 
+use super::create;
+
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
-use super::builtins::BUILTINS;
 use super::class::TYPE_TYPE;
 use super::ns::Namespace;
-
-use super::create;
 
 // Str Type ------------------------------------------------------------
 
@@ -39,10 +38,6 @@ impl TypeTrait for StrType {
     fn full_name(&self) -> &str {
         "builtins.Str"
     }
-
-    fn namespace(&self) -> ObjectRef {
-        self.namespace.clone()
-    }
 }
 
 impl ObjectTrait for StrType {
@@ -50,11 +45,11 @@ impl ObjectTrait for StrType {
         self
     }
 
-    fn metaclass(&self) -> TypeRef {
+    fn type_type(&self) -> TypeRef {
         TYPE_TYPE.clone()
     }
 
-    fn class(&self) -> ObjectRef {
+    fn type_obj(&self) -> ObjectRef {
         TYPE_TYPE.clone()
     }
 
@@ -85,11 +80,11 @@ impl ObjectTrait for Str {
         self
     }
 
-    fn metaclass(&self) -> TypeRef {
+    fn type_type(&self) -> TypeRef {
         STR_TYPE.clone()
     }
 
-    fn class(&self) -> ObjectRef {
+    fn type_obj(&self) -> ObjectRef {
         STR_TYPE.clone()
     }
 

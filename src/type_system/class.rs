@@ -7,9 +7,9 @@ use std::sync::Arc;
 
 use once_cell::sync::Lazy;
 
-use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
-use super::builtins::BUILTINS;
 use super::create;
+
+use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
 use super::ns::Namespace;
 
 // Type Type -----------------------------------------------------------
@@ -40,10 +40,6 @@ impl TypeTrait for TypeType {
     fn full_name(&self) -> &str {
         "builtins.Type"
     }
-
-    fn namespace(&self) -> ObjectRef {
-        self.namespace.clone()
-    }
 }
 
 impl ObjectTrait for TypeType {
@@ -51,11 +47,11 @@ impl ObjectTrait for TypeType {
         self
     }
 
-    fn metaclass(&self) -> TypeRef {
+    fn type_type(&self) -> TypeRef {
         TYPE_TYPE.clone()
     }
 
-    fn class(&self) -> ObjectRef {
+    fn type_obj(&self) -> ObjectRef {
         TYPE_TYPE.clone()
     }
 
@@ -85,11 +81,11 @@ impl ObjectTrait for Type {
         self
     }
 
-    fn metaclass(&self) -> TypeRef {
+    fn type_type(&self) -> TypeRef {
         TYPE_TYPE.clone()
     }
 
-    fn class(&self) -> ObjectRef {
+    fn type_obj(&self) -> ObjectRef {
         TYPE_TYPE.clone()
     }
 
@@ -102,7 +98,7 @@ impl ObjectTrait for Type {
 
 impl fmt::Display for Type {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} @ {}", self.class(), self.id())
+        write!(f, "{} @ {}", self.type_obj(), self.id())
     }
 }
 

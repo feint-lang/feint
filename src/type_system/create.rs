@@ -3,13 +3,13 @@
 //! These constructors simplify the creation system objects.
 use std::sync::Arc;
 
-use crate::type_system::module::Module;
 use num_bigint::BigInt;
 use once_cell::sync::Lazy;
 
 use super::base::ObjectRef;
 use super::bool::Bool;
 use super::int::Int;
+use super::module::Module;
 use super::nil::Nil;
 use super::ns::Namespace;
 use super::str::Str;

@@ -4,12 +4,11 @@ use std::sync::Arc;
 
 use once_cell::sync::Lazy;
 
+use super::create;
+
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
-use super::builtins::BUILTINS;
 use super::class::TYPE_TYPE;
 use super::ns::Namespace;
-
-use super::create;
 
 // Nil Type ------------------------------------------------------------
 
@@ -39,10 +38,6 @@ impl TypeTrait for NilType {
     fn full_name(&self) -> &str {
         "builtins.Nil"
     }
-
-    fn namespace(&self) -> ObjectRef {
-        self.namespace.clone()
-    }
 }
 
 impl ObjectTrait for NilType {
@@ -50,11 +45,11 @@ impl ObjectTrait for NilType {
         self
     }
 
-    fn metaclass(&self) -> TypeRef {
+    fn type_type(&self) -> TypeRef {
         TYPE_TYPE.clone()
     }
 
-    fn class(&self) -> ObjectRef {
+    fn type_obj(&self) -> ObjectRef {
         TYPE_TYPE.clone()
     }
 
@@ -83,11 +78,11 @@ impl ObjectTrait for Nil {
         self
     }
 
-    fn metaclass(&self) -> TypeRef {
+    fn type_type(&self) -> TypeRef {
         NIL_TYPE.clone()
     }
 
-    fn class(&self) -> ObjectRef {
+    fn type_obj(&self) -> ObjectRef {
         NIL_TYPE.clone()
     }
 

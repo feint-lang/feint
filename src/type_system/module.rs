@@ -4,12 +4,11 @@ use std::sync::Arc;
 
 use once_cell::sync::Lazy;
 
+use super::create;
+
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
-use super::builtins::BUILTINS;
 use super::class::TYPE_TYPE;
 use super::ns::Namespace;
-
-use super::create;
 
 // Module Type ---------------------------------------------------------
 
@@ -40,10 +39,6 @@ impl TypeTrait for ModuleType {
     fn full_name(&self) -> &str {
         "builtins.Module"
     }
-
-    fn namespace(&self) -> ObjectRef {
-        self.namespace.clone()
-    }
 }
 
 impl ObjectTrait for ModuleType {
@@ -51,11 +46,11 @@ impl ObjectTrait for ModuleType {
         self
     }
 
-    fn metaclass(&self) -> TypeRef {
+    fn type_type(&self) -> TypeRef {
         TYPE_TYPE.clone()
     }
 
-    fn class(&self) -> ObjectRef {
+    fn type_obj(&self) -> ObjectRef {
         TYPE_TYPE.clone()
     }
 
@@ -89,11 +84,11 @@ impl ObjectTrait for Module {
         self
     }
 
-    fn metaclass(&self) -> TypeRef {
+    fn type_type(&self) -> TypeRef {
         MODULE_TYPE.clone()
     }
 
-    fn class(&self) -> ObjectRef {
+    fn type_obj(&self) -> ObjectRef {
         MODULE_TYPE.clone()
     }
 
