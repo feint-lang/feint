@@ -33,14 +33,14 @@ impl Object for Bool {
 
     // Unary operations -----------------------------------------------
 
-    fn as_bool(&self, _ctx: &RuntimeContext) -> RuntimeBoolResult {
+    fn bool_val(&self, _ctx: &RuntimeContext) -> RuntimeBoolResult {
         Ok(*self.value())
     }
 
     // Binary operations -----------------------------------------------
 
     fn is_equal(&self, rhs: &dyn Object, _ctx: &RuntimeContext) -> bool {
-        if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
+        if let Some(rhs) = rhs.as_bool() {
             self.is(rhs) || self.value() == rhs.value()
         } else {
             false
@@ -48,7 +48,7 @@ impl Object for Bool {
     }
 
     fn and(&self, rhs: &dyn Object, _ctx: &RuntimeContext) -> RuntimeBoolResult {
-        if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
+        if let Some(rhs) = rhs.as_bool() {
             Ok(*self.value() && *rhs.value())
         } else {
             Err(RuntimeErr::new_type_err(format!(
@@ -60,7 +60,7 @@ impl Object for Bool {
     }
 
     fn or(&self, rhs: &dyn Object, _ctx: &RuntimeContext) -> RuntimeBoolResult {
-        if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
+        if let Some(rhs) = rhs.as_bool() {
             Ok(*self.value() || *rhs.value())
         } else {
             Err(RuntimeErr::new_type_err(format!(

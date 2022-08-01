@@ -27,7 +27,7 @@ impl Object for Nil {
 
     // Unary operations -----------------------------------------------
 
-    fn as_bool(&self, _ctx: &RuntimeContext) -> RuntimeBoolResult {
+    fn bool_val(&self, _ctx: &RuntimeContext) -> RuntimeBoolResult {
         Ok(false)
     }
 }

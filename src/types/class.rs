@@ -24,6 +24,9 @@ pub struct Type {
     qualified_name: String,
 }
 
+unsafe impl Send for Type {}
+unsafe impl Sync for Type {}
+
 impl Type {
     pub fn new<S: Into<String>>(module: S, name: S) -> Self {
         let module = module.into();
@@ -82,9 +85,6 @@ impl Object for Type {
             return Ok(attr);
         }
         let attr = match name {
-            "$module" => ctx.builtins.new_str(self.module()),
-            "$name" => ctx.builtins.new_str(self.name()),
-            "$qualified_name" => ctx.builtins.new_str(self.qualified_name()),
             "new" => match self.name.as_str() {
                 "Float" => ctx.builtins.new_builtin_func(
                     "new",

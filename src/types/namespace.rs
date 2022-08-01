@@ -9,8 +9,6 @@ use super::class::TypeRef;
 use super::object::{Object, ObjectExt, ObjectRef};
 use super::result::GetAttrResult;
 
-// Namespace -----------------------------------------------------------
-
 pub struct Namespace {
     objects: HashMap<String, ObjectRef>,
 }
@@ -28,15 +26,15 @@ impl Namespace {
         self.objects.len()
     }
 
-    /// Add a var, settings its initial value as specified (usually
+    /// Add an entry, settings its initial value as specified (usually
     /// nil).
-    pub fn add_var<S: Into<String>>(&mut self, name: S, initial: ObjectRef) {
+    pub fn add_entry<S: Into<String>>(&mut self, name: S, initial: ObjectRef) {
         self.objects.insert(name.into(), initial);
     }
 
-    /// Set a var's value. This will only succeed if the var already
-    /// exists.
-    pub fn set_var(&mut self, name: &str, obj: ObjectRef) -> bool {
+    /// Set a entry's value. This will only succeed if the entry
+    /// already exists.
+    pub fn set_entry(&mut self, name: &str, obj: ObjectRef) -> bool {
         if self.objects.contains_key(name) {
             self.objects.insert(name.to_owned(), obj);
             true
@@ -45,8 +43,8 @@ impl Namespace {
         }
     }
 
-    /// Get a var.
-    pub fn get_var(&self, name: &str) -> Option<&ObjectRef> {
+    /// Get an entry.
+    pub fn get_entry(&self, name: &str) -> Option<&ObjectRef> {
         self.objects.get(name)
     }
 }
@@ -69,7 +67,7 @@ impl Object for Namespace {
         if let Some(attr) = self.get_base_attr(name, ctx) {
             return Ok(attr);
         }
-        if let Some(obj) = self.get_var(name) {
+        if let Some(obj) = self.get_entry(name) {
             Ok(obj.clone())
         } else {
             Err(self.attr_does_not_exist(name))
@@ -77,7 +75,7 @@ impl Object for Namespace {
     }
 
     fn is_equal(&self, rhs: &dyn Object, ctx: &RuntimeContext) -> bool {
-        if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
+        if let Some(rhs) = rhs.as_namespace() {
             if self.is(&rhs) {
                 true
             } else {

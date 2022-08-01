@@ -8,7 +8,6 @@ use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeErr, RuntimeObjResult}
 
 use super::builtin_types::BUILTIN_TYPES;
 use super::class::TypeRef;
-use super::int::Int;
 use super::object::{Object, ObjectExt};
 use super::util::{eq_int_float, gt_int_float, lt_int_float};
 
@@ -29,9 +28,9 @@ impl Float {
 macro_rules! make_op {
     ( $meth:ident, $op:tt, $message:literal, $trunc:literal ) => {
         fn $meth(&self, rhs: &dyn Object, ctx: &RuntimeContext) -> RuntimeObjResult {
-            let value = if let Some(rhs) = rhs.as_any().downcast_ref::<Float>() {
+            let value = if let Some(rhs) = rhs.as_float() {
                 *rhs.value()
-            } else if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
+            } else if let Some(rhs) = rhs.as_int() {
                 rhs.value().to_f64().unwrap()
             } else {
                 return Err(RuntimeErr::new_type_err(format!($message, rhs.type_name())));
@@ -59,14 +58,14 @@ impl Object for Float {
         Ok(ctx.builtins.new_float(-self.value()))
     }
 
-    fn as_bool(&self, _ctx: &RuntimeContext) -> RuntimeBoolResult {
+    fn bool_val(&self, _ctx: &RuntimeContext) -> RuntimeBoolResult {
         Ok(if *self.value() == 0.0 { false } else { true })
     }
 
     fn is_equal(&self, rhs: &dyn Object, _ctx: &RuntimeContext) -> bool {
-        if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
+        if let Some(rhs) = rhs.as_float() {
             self.is(rhs) || self.value() == rhs.value()
-        } else if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
+        } else if let Some(rhs) = rhs.as_int() {
             eq_int_float(rhs, self)
         } else {
             false
@@ -74,9 +73,9 @@ impl Object for Float {
     }
 
     fn less_than(&self, rhs: &dyn Object, _ctx: &RuntimeContext) -> RuntimeBoolResult {
-        if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
+        if let Some(rhs) = rhs.as_float() {
             Ok(self.value() < rhs.value())
-        } else if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
+        } else if let Some(rhs) = rhs.as_int() {
             Ok(lt_int_float(rhs, self))
         } else {
             Err(RuntimeErr::new_type_err(format!(
@@ -92,9 +91,9 @@ impl Object for Float {
         rhs: &dyn Object,
         _ctx: &RuntimeContext,
     ) -> RuntimeBoolResult {
-        if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
+        if let Some(rhs) = rhs.as_float() {
             Ok(self.value() > rhs.value())
-        } else if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
+        } else if let Some(rhs) = rhs.as_int() {
             Ok(gt_int_float(rhs, self))
         } else {
             Err(RuntimeErr::new_type_err(format!(
@@ -106,9 +105,9 @@ impl Object for Float {
     }
 
     fn pow(&self, rhs: &dyn Object, ctx: &RuntimeContext) -> RuntimeObjResult {
-        let exp = if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
+        let exp = if let Some(rhs) = rhs.as_float() {
             *rhs.value()
-        } else if let Some(rhs) = rhs.as_any().downcast_ref::<Int>() {
+        } else if let Some(rhs) = rhs.as_int() {
             rhs.value().to_f64().unwrap()
         } else {
             return Err(RuntimeErr::new_type_err(format!(

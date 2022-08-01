@@ -74,7 +74,7 @@ impl Object for Tuple {
     }
 
     fn is_equal(&self, rhs: &dyn Object, _ctx: &RuntimeContext) -> bool {
-        if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
+        if let Some(rhs) = rhs.as_tuple() {
             if self.is(rhs) {
                 return true;
             }

@@ -41,7 +41,7 @@ impl Object for Custom {
         if let Some(attr) = self.get_base_attr(name, ctx) {
             return Ok(attr);
         }
-        if let Some(value) = self.attrs.borrow().get_var(name) {
+        if let Some(value) = self.attrs.borrow().get_entry(name) {
             return Ok(value.clone());
         }
         Err(self.attr_does_not_exist(name))
@@ -53,7 +53,7 @@ impl Object for Custom {
         value: ObjectRef,
         _ctx: &RuntimeContext,
     ) -> SetAttrResult {
-        self.attrs.borrow_mut().add_var(name, value);
+        self.attrs.borrow_mut().add_entry(name, value);
         Ok(())
     }
 

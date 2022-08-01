@@ -2,7 +2,7 @@
 alias b="cargo build"
 
 # test
-alias t='cargo test'
+alias t='cargo test --'
 
 # run
 alias r="cargo run --"

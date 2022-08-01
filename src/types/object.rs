@@ -184,8 +184,14 @@ pub trait Object {
     // These convert objects to their concrete types.
 
     make_type_converter!(as_type, Type);
-    make_type_converter!(as_func, Func);
+    make_type_converter!(as_bool, Bool);
     make_type_converter!(as_builtin_func, BuiltinFunc);
+    make_type_converter!(as_float, Float);
+    make_type_converter!(as_func, Func);
+    make_type_converter!(as_int, Int);
+    make_type_converter!(as_namespace, Namespace);
+    make_type_converter!(as_nil, Nil);
+    make_type_converter!(as_string, Str);
     make_type_converter!(as_tuple, Tuple);
 
     // Value extractors ------------------------------------------------
@@ -199,10 +205,10 @@ pub trait Object {
     // Unary operations ------------------------------------------------
 
     make_unary_op!(negate, "-", RuntimeObjResult);
-    make_unary_op!(as_bool, "!!", RuntimeBoolResult);
+    make_unary_op!(bool_val, "!!", RuntimeBoolResult);
 
     fn not(&self, ctx: &RuntimeContext) -> RuntimeBoolResult {
-        match self.as_bool(ctx) {
+        match self.bool_val(ctx) {
             Ok(true) => Ok(false),
             Ok(false) => Ok(true),
             err => err,

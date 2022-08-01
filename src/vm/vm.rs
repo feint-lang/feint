@@ -118,7 +118,7 @@ impl VM {
                 JumpIf(addr, scope_exit_count) => {
                     self.exit_scopes(*scope_exit_count);
                     let obj = self.pop_obj()?;
-                    if obj.as_bool(&self.ctx)? {
+                    if obj.bool_val(&self.ctx)? {
                         jump_ip = *addr;
                         is_jump = true;
                     }
@@ -126,7 +126,7 @@ impl VM {
                 JumpIfNot(addr, scope_exit_count) => {
                     self.exit_scopes(*scope_exit_count);
                     let obj = self.pop_obj()?;
-                    if !obj.as_bool(&self.ctx)? {
+                    if !obj.bool_val(&self.ctx)? {
                         jump_ip = *addr;
                         is_jump = true;
                     }
@@ -135,7 +135,7 @@ impl VM {
                     self.exit_scopes(*scope_exit_count);
                     let obj = self.pop_obj()?;
                     let addr =
-                        if obj.as_bool(&self.ctx)? { *if_addr } else { *else_addr };
+                        if obj.bool_val(&self.ctx)? { *if_addr } else { *else_addr };
                     jump_ip = addr;
                     is_jump = true;
                 }
@@ -255,7 +255,7 @@ impl VM {
         use UnaryCompareOperator::*;
         let a = self.pop_obj()?;
         let result = match op {
-            AsBool => a.as_bool(&self.ctx)?,
+            AsBool => a.bool_val(&self.ctx)?,
             Not => a.not(&self.ctx)?,
         };
         let obj = self.ctx.builtins.bool_obj_from_bool(result);

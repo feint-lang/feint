@@ -88,7 +88,7 @@ impl RuntimeContext {
     pub fn declare_var(&mut self, name: &str) {
         let initial = self.builtins.nil_obj.clone();
         let namespace = self.current_namespace();
-        namespace.add_var(name, initial);
+        namespace.add_entry(name, initial);
     }
 
     /// Assign value to var. This looks up the var by name in the
@@ -99,7 +99,7 @@ impl RuntimeContext {
         obj: ObjectRef,
     ) -> Result<usize, RuntimeErr> {
         let namespace = self.current_namespace();
-        if namespace.set_var(name, obj) {
+        if namespace.set_entry(name, obj) {
             Ok(self.depth())
         } else {
             let message = format!("Name not defined in current namespace: {name}");
@@ -125,7 +125,7 @@ impl RuntimeContext {
         name: &str,
         obj: ObjectRef,
     ) -> RuntimeResult {
-        if self.namespace_stack[depth].set_var(name, obj) {
+        if self.namespace_stack[depth].set_entry(name, obj) {
             Ok(())
         } else {
             let message = format!("Name not defined at depth {depth}: {name}");
@@ -139,7 +139,7 @@ impl RuntimeContext {
         let mut depth = self.depth();
         loop {
             let namespace = &self.namespace_stack[depth];
-            if let Some(_) = namespace.get_var(name) {
+            if let Some(_) = namespace.get_entry(name) {
                 break Ok(depth);
             }
             if depth == 0 {
@@ -156,7 +156,7 @@ impl RuntimeContext {
         name: &str,
     ) -> Result<&ObjectRef, RuntimeErr> {
         let namespace = self.current_namespace();
-        if let Some(obj) = namespace.get_var(name) {
+        if let Some(obj) = namespace.get_entry(name) {
             Ok(obj)
         } else {
             let message = format!("Name not defined in current namespace: {name}");
@@ -170,7 +170,7 @@ impl RuntimeContext {
         depth: usize,
         name: &str,
     ) -> Result<&ObjectRef, RuntimeErr> {
-        if let Some(obj) = self.namespace_stack[depth].get_var(name) {
+        if let Some(obj) = self.namespace_stack[depth].get_entry(name) {
             Ok(obj)
         } else {
             let message = format!("Name not defined at depth {depth}: {name}");
@@ -196,7 +196,7 @@ impl Default for RuntimeContext {
         // global scope.
         let mut builtins_ns = Namespace::new();
         for (name, class) in BUILTIN_TYPES.iter() {
-            builtins_ns.add_var(*name, class.clone());
+            builtins_ns.add_entry(*name, class.clone());
             if let Err(err) = ctx.declare_and_assign_var(name, class.clone()) {
                 panic!("Could not define builtin type {name}: {err}");
             }
@@ -207,7 +207,7 @@ impl Default for RuntimeContext {
         for spec in get_builtin_func_specs() {
             let (name, params, func) = spec;
             let func = ctx.builtins.new_builtin_func(name, params, func, None);
-            builtins_ns.add_var(name, func.clone());
+            builtins_ns.add_entry(name, func.clone());
             if let Err(err) = ctx.declare_and_assign_var(name, func.clone()) {
                 panic!("Could not define builtin func: {err}");
             }
