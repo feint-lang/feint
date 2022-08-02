@@ -37,10 +37,10 @@ pub struct VM {
     // is exited, these sizes are used to truncate the value stack back
     // to its previous size so that items can be freed.
     scope_stack: Stack<usize>,
-
     // Whenever an object is retrieved via dot notation, the object on
     // the left of the dot becomes the current bound method context
     // (AKA this).
+    // TODO: Need to think more about when this should be set & cleared.
     this: Option<ObjectRef>,
 }
 
@@ -70,8 +70,7 @@ impl VM {
         use ValueStackKind::*;
 
         let mut ip: usize = 0;
-        let mut jump_ip = 0;
-        let mut is_jump = false;
+        let mut jump_ip = None;
 
         loop {
             #[cfg(debug_assertions)]
@@ -89,6 +88,10 @@ impl VM {
                     self.push(Constant(*index));
                 }
                 // Scopes
+                EndStatement => {
+                    // Statements are quasi-scopes
+                    self.this = None;
+                }
                 ScopeStart => {
                     self.enter_scope();
                 }
@@ -113,37 +116,32 @@ impl VM {
                 // Jumps
                 Jump(addr, scope_exit_count) => {
                     self.exit_scopes(*scope_exit_count);
-                    jump_ip = *addr;
-                    is_jump = true;
+                    jump_ip = Some(*addr);
                 }
                 JumpPushNil(addr, scope_exit_count) => {
                     self.push(Constant(0));
                     self.exit_scopes(*scope_exit_count);
-                    jump_ip = *addr;
-                    is_jump = true;
+                    jump_ip = Some(*addr);
                 }
                 JumpIf(addr, scope_exit_count) => {
                     self.exit_scopes(*scope_exit_count);
                     let obj = self.pop_obj()?;
                     if obj.bool_val()? {
-                        jump_ip = *addr;
-                        is_jump = true;
+                        jump_ip = Some(*addr);
                     }
                 }
                 JumpIfNot(addr, scope_exit_count) => {
                     self.exit_scopes(*scope_exit_count);
                     let obj = self.pop_obj()?;
                     if !obj.bool_val()? {
-                        jump_ip = *addr;
-                        is_jump = true;
+                        jump_ip = Some(*addr);
                     }
                 }
                 JumpIfElse(if_addr, else_addr, scope_exit_count) => {
                     self.exit_scopes(*scope_exit_count);
                     let obj = self.pop_obj()?;
                     let addr = if obj.bool_val()? { *if_addr } else { *else_addr };
-                    jump_ip = addr;
-                    is_jump = true;
+                    jump_ip = Some(addr);
                 }
                 // Operations
                 UnaryOp(op) => {
@@ -160,6 +158,13 @@ impl VM {
                 }
                 InplaceOp(op) => {
                     self.handle_inplace_op(op)?;
+                }
+                // Functions
+                Call(n) => {
+                    self.handle_call(*n)?;
+                }
+                Return => {
+                    // Return is a no-op
                 }
                 // Object construction
                 MakeString(n) => {
@@ -179,13 +184,6 @@ impl VM {
                     }
                     let tuple = create::new_tuple(items);
                     self.push(Temp(tuple));
-                }
-                // Functions
-                Call(n) => {
-                    self.handle_call(*n)?;
-                }
-                Return => {
-                    // Return is a no-op
                 }
                 // Placeholders
                 Placeholder(addr, inst, message) => {
@@ -223,10 +221,9 @@ impl VM {
                 }
             }
 
-            if is_jump {
-                ip = jump_ip;
-                jump_ip = 0;
-                is_jump = false;
+            if let Some(new_ip) = jump_ip {
+                ip = new_ip;
+                jump_ip = None;
             } else {
                 ip += 1;
             }
@@ -361,11 +358,11 @@ impl VM {
             }
         }
         if let Some(func) = callable.down_to_builtin_func() {
+            // NOTE: this must be cleared before calling the function.
+            let this = self.this.clone();
+            self.this = None;
             self.check_call_args(&func.name, &func.params, &args, false)?;
-            let result = callable.call(self.this.clone(), args, self)?;
-            if self.this.is_some() {
-                self.this = None;
-            }
+            let result = callable.call(this, args, self)?;
             let return_val = match result {
                 Some(return_val) => return_val,
                 None => create::new_nil(),
@@ -422,6 +419,7 @@ impl VM {
     }
 
     pub fn enter_scope(&mut self) {
+        self.this = None;
         self.scope_stack.push(self.value_stack.size());
         self.ctx.enter_scope();
     }
@@ -432,6 +430,7 @@ impl VM {
     /// back onto the stack. After taking care of the VM stack, the
     /// scope's namespace is then cleared and removed.
     fn exit_scopes(&mut self, count: usize) {
+        self.this = None;
         if count == 0 {
             return;
         }
@@ -605,7 +604,7 @@ impl VM {
             Some(kind) => match self.get_obj(kind.clone()) {
                 Ok(obj) => {
                     let class = obj.class();
-                    let str = format!("{obj:?} <{class}>");
+                    let str = format!("{obj:?} {class}");
                     str.replace('\n', "\\n").replace('\r', "\\r")
                 }
                 Err(err) => format!("[ERROR: Could not get object: {err}]"),
@@ -620,6 +619,7 @@ impl VM {
                 let obj_str = obj_str(Some(&Constant(*index)));
                 self.format_aligned("LOAD_CONST", format!("{index} : {obj_str}"))
             }
+            EndStatement => "END_STATEMENT".to_string(),
             ScopeStart => "SCOPE_START".to_string(),
             ScopeEnd => "SCOPE_END".to_string(),
             DeclareVar(name) => self.format_aligned("DECLARE_VAR", name),
@@ -649,10 +649,10 @@ impl VM {
             BinaryOp(operator) => self.format_aligned("BINARY_OP", operator),
             CompareOp(operator) => self.format_aligned("COMPARE_OP", operator),
             InplaceOp(operator) => self.format_aligned("INPLACE_OP", operator),
-            MakeString(n) => self.format_aligned("MAKE_STRING", n),
-            MakeTuple(n) => self.format_aligned("MAKE_TUPLE", n),
             Call(n) => self.format_aligned("CALL", n),
             Return => "RETURN".to_string(),
+            MakeString(n) => self.format_aligned("MAKE_STRING", n),
+            MakeTuple(n) => self.format_aligned("MAKE_TUPLE", n),
             Halt(code) => self.format_aligned("HALT", code),
             HaltTop => {
                 if let Ok(peek) = self.peek_obj() {
