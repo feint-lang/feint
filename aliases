@@ -4,6 +4,10 @@ alias b="cargo build"
 # test
 alias t='cargo test --'
 
+# lint
+alias lint='cargo clippy'
+alias lint-out='cargo clippy 2>lint.out'
+
 # run
 alias r="cargo run --"
 alias c="cargo run -- -c"
