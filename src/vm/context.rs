@@ -189,23 +189,20 @@ impl Default for RuntimeContext {
 
         // Builtins ----------------------------------------------------
 
+        // Add builtins module to global scope.
         let builtins = BUILTINS.clone();
+        if let Err(err) = ctx.declare_and_assign_var("builtins", builtins) {
+            panic!("Could not define builtins module: {err}");
+        }
 
         // Add shorthand aliases for builtin types and objects to global
         // scope.
-        for (name, obj) in builtins.namespace().borrow().iter() {
-            if !name.starts_with('$') {
-                if let Err(err) = ctx.declare_and_assign_var(name, obj.clone()) {
-                    panic!(
-                        "Could not add alias for builtin object `{name}` to global scope: {err}"
-                    );
-                }
+        let builtins = BUILTINS.clone();
+        let ns = builtins.namespace().borrow();
+        for (name, obj) in ns.iter() {
+            if let Err(err) = ctx.declare_and_assign_var(name, (*obj).clone()) {
+                panic!("Could not add alias for builtin object `{name}` to global scope: {err}");
             }
-        }
-
-        // Add builtins module to global scope.
-        if let Err(err) = ctx.declare_and_assign_var("builtins", builtins) {
-            panic!("Could not define builtins module: {err}");
         }
 
         ctx
