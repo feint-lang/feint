@@ -28,9 +28,9 @@ impl Float {
 macro_rules! make_op {
     ( $meth:ident, $op:tt, $message:literal, $trunc:literal ) => {
         fn $meth(&self, rhs: &dyn Object, ctx: &RuntimeContext) -> RuntimeObjResult {
-            let value = if let Some(rhs) = rhs.as_float() {
+            let value = if let Some(rhs) = rhs.down_to_float() {
                 *rhs.value()
-            } else if let Some(rhs) = rhs.as_int() {
+            } else if let Some(rhs) = rhs.down_to_int() {
                 rhs.value().to_f64().unwrap()
             } else {
                 return Err(RuntimeErr::new_type_err(format!($message, rhs.type_name())));
@@ -63,9 +63,9 @@ impl Object for Float {
     }
 
     fn is_equal(&self, rhs: &dyn Object, _ctx: &RuntimeContext) -> bool {
-        if let Some(rhs) = rhs.as_float() {
+        if let Some(rhs) = rhs.down_to_float() {
             self.is(rhs) || self.value() == rhs.value()
-        } else if let Some(rhs) = rhs.as_int() {
+        } else if let Some(rhs) = rhs.down_to_int() {
             eq_int_float(rhs, self)
         } else {
             false
@@ -73,9 +73,9 @@ impl Object for Float {
     }
 
     fn less_than(&self, rhs: &dyn Object, _ctx: &RuntimeContext) -> RuntimeBoolResult {
-        if let Some(rhs) = rhs.as_float() {
+        if let Some(rhs) = rhs.down_to_float() {
             Ok(self.value() < rhs.value())
-        } else if let Some(rhs) = rhs.as_int() {
+        } else if let Some(rhs) = rhs.down_to_int() {
             Ok(lt_int_float(rhs, self))
         } else {
             Err(RuntimeErr::new_type_err(format!(
@@ -91,9 +91,9 @@ impl Object for Float {
         rhs: &dyn Object,
         _ctx: &RuntimeContext,
     ) -> RuntimeBoolResult {
-        if let Some(rhs) = rhs.as_float() {
+        if let Some(rhs) = rhs.down_to_float() {
             Ok(self.value() > rhs.value())
-        } else if let Some(rhs) = rhs.as_int() {
+        } else if let Some(rhs) = rhs.down_to_int() {
             Ok(gt_int_float(rhs, self))
         } else {
             Err(RuntimeErr::new_type_err(format!(
@@ -105,9 +105,9 @@ impl Object for Float {
     }
 
     fn pow(&self, rhs: &dyn Object, ctx: &RuntimeContext) -> RuntimeObjResult {
-        let exp = if let Some(rhs) = rhs.as_float() {
+        let exp = if let Some(rhs) = rhs.down_to_float() {
             *rhs.value()
-        } else if let Some(rhs) = rhs.as_int() {
+        } else if let Some(rhs) = rhs.down_to_int() {
             rhs.value().to_f64().unwrap()
         } else {
             return Err(RuntimeErr::new_type_err(format!(

@@ -30,7 +30,7 @@ macro_rules! make_type_checker {
     };
 }
 
-macro_rules! make_type_converter {
+macro_rules! make_down_to {
     ( $func:ident, $ty:ty) => {
         fn $func(&self) -> Option<&$ty> {
             self.as_any().downcast_ref::<$ty>()
@@ -171,24 +171,24 @@ pub trait Object {
     //
     // These convert objects to their concrete types.
 
-    make_type_converter!(as_type, Type);
-    make_type_converter!(as_bool, Bool);
-    make_type_converter!(as_builtin_func, BuiltinFunc);
-    make_type_converter!(as_float, Float);
-    make_type_converter!(as_func, Func);
-    make_type_converter!(as_int, Int);
-    make_type_converter!(as_namespace, Namespace);
-    make_type_converter!(as_nil, Nil);
-    make_type_converter!(as_string, Str);
-    make_type_converter!(as_tuple, Tuple);
+    make_down_to!(down_to_type, Type);
+    make_down_to!(down_to_bool, Bool);
+    make_down_to!(down_to_builtin_func, BuiltinFunc);
+    make_down_to!(down_to_float, Float);
+    make_down_to!(down_to_func, Func);
+    make_down_to!(down_to_int, Int);
+    make_down_to!(down_to_namespace, Namespace);
+    make_down_to!(down_to_nil, Nil);
+    make_down_to!(down_to_string, Str);
+    make_down_to!(down_to_tuple, Tuple);
 
     // Value extractors ------------------------------------------------
     //
     // These extract the inner value from an object.
 
-    make_value_extractor!(float_val, Float, f64, clone);
-    make_value_extractor!(int_val, Int, BigInt, clone);
-    make_value_extractor!(str_val, Str, String, to_owned);
+    make_value_extractor!(get_float_val, Float, f64, clone);
+    make_value_extractor!(get_int_val, Int, BigInt, clone);
+    make_value_extractor!(get_str_val, Str, String, to_owned);
 
     // Unary operations ------------------------------------------------
 

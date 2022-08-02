@@ -6,11 +6,11 @@ use crate::vm::{RuntimeErr, VM};
 
 pub fn new(args: Args, vm: &mut VM) -> CallResult {
     let arg = args.get(0).unwrap();
-    let int = if let Some(val) = arg.int_val() {
+    let int = if let Some(val) = arg.get_int_val() {
         vm.ctx.builtins.new_int(val)
-    } else if let Some(val) = arg.float_val() {
+    } else if let Some(val) = arg.get_float_val() {
         vm.ctx.builtins.new_int(BigInt::from_f64(val).unwrap())
-    } else if let Some(val) = arg.str_val() {
+    } else if let Some(val) = arg.get_str_val() {
         vm.ctx.builtins.new_int_from_string(val)
     } else {
         let message = format!("Int new expected string or int; got {arg}");

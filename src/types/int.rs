@@ -28,9 +28,9 @@ impl Int {
     // Cast both LHS and RHS to f64 and divide them
     fn div_f64(&self, rhs: &dyn Object) -> Result<f64, RuntimeErr> {
         let lhs_val = self.value().to_f64().unwrap();
-        let rhs_val = if let Some(rhs) = rhs.as_int() {
+        let rhs_val = if let Some(rhs) = rhs.down_to_int() {
             rhs.value().to_f64().unwrap()
-        } else if let Some(rhs) = rhs.as_float() {
+        } else if let Some(rhs) = rhs.down_to_float() {
             *rhs.value()
         } else {
             return Err(RuntimeErr::new_type_err(format!(
@@ -45,12 +45,12 @@ impl Int {
 macro_rules! make_op {
     ( $meth:ident, $op:tt, $message:literal ) => {
         fn $meth(&self, rhs: &dyn Object, ctx: &RuntimeContext) -> RuntimeObjResult {
-            if let Some(rhs) = rhs.as_int() {
+            if let Some(rhs) = rhs.down_to_int() {
                 // XXX: Return Int
                 let value = self.value() $op rhs.value();
                 let value = ctx.builtins.new_int(value);
                 Ok(value)
-            } else if let Some(rhs) = rhs.as_float() {
+            } else if let Some(rhs) = rhs.down_to_float() {
                 // XXX: Return Float
                 let value = self.value().to_f64().unwrap() $op rhs.value();
                 let value = ctx.builtins.new_float(value);
@@ -80,9 +80,9 @@ impl Object for Int {
     }
 
     fn is_equal(&self, rhs: &dyn Object, _ctx: &RuntimeContext) -> bool {
-        if let Some(rhs) = rhs.as_int() {
+        if let Some(rhs) = rhs.down_to_int() {
             self.is(rhs) || self.value() == rhs.value()
-        } else if let Some(rhs) = rhs.as_float() {
+        } else if let Some(rhs) = rhs.down_to_float() {
             eq_int_float(self, rhs)
         } else {
             false
@@ -90,9 +90,9 @@ impl Object for Int {
     }
 
     fn less_than(&self, rhs: &dyn Object, _ctx: &RuntimeContext) -> RuntimeBoolResult {
-        if let Some(rhs) = rhs.as_int() {
+        if let Some(rhs) = rhs.down_to_int() {
             Ok(self.value() < rhs.value())
-        } else if let Some(rhs) = rhs.as_float() {
+        } else if let Some(rhs) = rhs.down_to_float() {
             Ok(lt_int_float(self, rhs))
         } else {
             Err(RuntimeErr::new_type_err(format!(
@@ -108,9 +108,9 @@ impl Object for Int {
         rhs: &dyn Object,
         _ctx: &RuntimeContext,
     ) -> RuntimeBoolResult {
-        if let Some(rhs) = rhs.as_int() {
+        if let Some(rhs) = rhs.down_to_int() {
             Ok(self.value() > rhs.value())
-        } else if let Some(rhs) = rhs.as_float() {
+        } else if let Some(rhs) = rhs.down_to_float() {
             Ok(gt_int_float(self, rhs))
         } else {
             Err(RuntimeErr::new_type_err(format!(
@@ -122,14 +122,14 @@ impl Object for Int {
     }
 
     fn pow(&self, rhs: &dyn Object, ctx: &RuntimeContext) -> RuntimeObjResult {
-        if let Some(rhs) = rhs.as_int() {
+        if let Some(rhs) = rhs.down_to_int() {
             // XXX: Return Int
             let base = self.value();
             let exp = rhs.value().to_u32().unwrap();
             let value = base.pow(exp);
             let value = ctx.builtins.new_int(value);
             Ok(value)
-        } else if let Some(rhs) = rhs.as_float() {
+        } else if let Some(rhs) = rhs.down_to_float() {
             // XXX: Return Float
             let base = self.value().to_f64().unwrap();
             let exp = *rhs.value();

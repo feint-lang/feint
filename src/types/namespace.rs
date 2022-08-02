@@ -75,7 +75,7 @@ impl Object for Namespace {
     }
 
     fn is_equal(&self, rhs: &dyn Object, ctx: &RuntimeContext) -> bool {
-        if let Some(rhs) = rhs.as_namespace() {
+        if let Some(rhs) = rhs.down_to_namespace() {
             if self.is(rhs) {
                 true
             } else {

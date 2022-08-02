@@ -32,7 +32,7 @@ impl Object for Str {
     }
 
     fn is_equal(&self, rhs: &dyn Object, _ctx: &RuntimeContext) -> bool {
-        if let Some(rhs) = rhs.as_string() {
+        if let Some(rhs) = rhs.down_to_string() {
             self.is(rhs) || self.value() == rhs.value()
         } else {
             false
@@ -40,7 +40,7 @@ impl Object for Str {
     }
 
     fn add(&self, rhs: &dyn Object, ctx: &RuntimeContext) -> RuntimeObjResult {
-        if let Some(rhs) = rhs.as_string() {
+        if let Some(rhs) = rhs.down_to_string() {
             let a = self.value();
             let b = rhs.value();
             let mut value = String::with_capacity(a.len() + b.len());
@@ -58,7 +58,7 @@ impl Object for Str {
     }
 
     fn less_than(&self, rhs: &dyn Object, _ctx: &RuntimeContext) -> RuntimeBoolResult {
-        if let Some(rhs) = rhs.as_string() {
+        if let Some(rhs) = rhs.down_to_string() {
             Ok(self.value() < rhs.value())
         } else {
             Err(RuntimeErr::new_type_err(format!(
@@ -74,7 +74,7 @@ impl Object for Str {
         rhs: &dyn Object,
         _ctx: &RuntimeContext,
     ) -> RuntimeBoolResult {
-        if let Some(rhs) = rhs.as_string() {
+        if let Some(rhs) = rhs.down_to_string() {
             Ok(self.value() > rhs.value())
         } else {
             Err(RuntimeErr::new_type_err(format!(

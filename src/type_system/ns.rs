@@ -145,16 +145,16 @@ mod tests {
         assert!(class_type_type.is(&*TYPE_TYPE.clone()));
 
         let module = ns.get_attr("$module").unwrap();
-        assert_eq!(module.to_module().unwrap().name(), "builtins");
+        assert_eq!(module.down_to_mod().unwrap().name(), "builtins");
 
         let name = ns.get_attr("$name").unwrap();
-        assert_eq!(name.to_str().unwrap().value(), "Namespace");
+        assert_eq!(name.down_to_str().unwrap().value(), "Namespace");
 
         let full_name = ns.get_attr("$full_name").unwrap();
-        assert_eq!(full_name.to_str().unwrap().value(), "builtins.Namespace");
+        assert_eq!(full_name.down_to_str().unwrap().value(), "builtins.Namespace");
 
         let id = ns.get_attr("$id");
         assert!(id.is_some());
-        assert!(id.unwrap().to_int().is_some());
+        assert!(id.unwrap().down_to_int().is_some());
     }
 }

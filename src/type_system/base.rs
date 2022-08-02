@@ -32,14 +32,11 @@ pub trait TypeTrait {
 
 // Object Trait --------------------------------------------------------
 
-macro_rules! to_type {
+/// Create associated function to downcast from object ref to impl.
+macro_rules! make_down_to {
     ( $func:ident, $ty:ty) => {
         fn $func(&self) -> Option<&$ty> {
-            if let Some(obj) = self.as_any().downcast_ref::<$ty>() {
-                Some(obj)
-            } else {
-                None
-            }
+            self.as_any().downcast_ref::<$ty>()
         }
     };
 }
@@ -80,21 +77,20 @@ pub trait ObjectTrait {
             return Some(self.id_obj());
         }
         let ns = self.namespace();
-        if let Some(obj) = ns.to_namespace().unwrap().get_obj(name) {
+        if let Some(obj) = ns.down_to_ns().unwrap().get_obj(name) {
             return Some(obj);
         }
         let ns = self.type_obj().namespace();
-        ns.to_namespace().unwrap().get_obj(name)
+        ns.down_to_ns().unwrap().get_obj(name)
     }
 
-    // Downcast from object reference to concrete implementation.
-    to_type!(to_type, Type);
-    to_type!(to_bool, Bool);
-    to_type!(to_int, Int);
-    to_type!(to_module, Module);
-    to_type!(to_namespace, Namespace);
-    to_type!(to_nil, Nil);
-    to_type!(to_str, Str);
+    make_down_to!(down_to_type, Type);
+    make_down_to!(down_to_bool, Bool);
+    make_down_to!(down_to_int, Int);
+    make_down_to!(down_to_mod, Module);
+    make_down_to!(down_to_ns, Namespace);
+    make_down_to!(down_to_nil, Nil);
+    make_down_to!(down_to_str, Str);
 }
 
 pub trait ObjectTraitExt: ObjectTrait {

@@ -1,6 +1,7 @@
 //! Tuple type
 use std::any::Any;
 use std::fmt;
+use std::slice::Iter;
 
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
@@ -23,8 +24,8 @@ impl Tuple {
         Self { items }
     }
 
-    pub fn items(&self) -> &Vec<ObjectRef> {
-        &self.items
+    pub fn iter(&self) -> Iter<'_, ObjectRef> {
+        self.items.iter()
     }
 
     pub fn len(&self) -> usize {
@@ -74,14 +75,14 @@ impl Object for Tuple {
     }
 
     fn is_equal(&self, rhs: &dyn Object, _ctx: &RuntimeContext) -> bool {
-        if let Some(rhs) = rhs.as_tuple() {
+        if let Some(rhs) = rhs.down_to_tuple() {
             if self.is(rhs) {
                 return true;
             }
             if self.len() != rhs.len() {
                 return false;
             }
-            for (a, b) in self.items().iter().zip(rhs.items()) {
+            for (a, b) in self.iter().zip(rhs.iter()) {
                 if !a.is_equal(&**b, _ctx) {
                     return false;
                 }
@@ -97,9 +98,8 @@ impl Object for Tuple {
 
 impl fmt::Display for Tuple {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let items = self.items();
-        let num_items = items.len();
-        let items: Vec<String> = items.iter().map(|item| format!("{item:?}")).collect();
+        let num_items = self.len();
+        let items: Vec<String> = self.iter().map(|item| format!("{item:?}")).collect();
         let items_str = items.join(", ");
         let trailing_comma = if num_items == 1 { "," } else { "" };
         write!(f, "({}{})", items_str, trailing_comma)

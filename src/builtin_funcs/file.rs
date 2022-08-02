@@ -8,7 +8,7 @@ use crate::vm::{RuntimeErr, RuntimeErrKind, VM};
 /// Returns Str
 pub fn read_file(args: Args, vm: &mut VM) -> CallResult {
     let arg = args.get(0).unwrap();
-    if let Some(file_name) = arg.str_val() {
+    if let Some(file_name) = arg.get_str_val() {
         match read_to_string(file_name) {
             Ok(contents) => Ok(Some(vm.ctx.builtins.new_str(contents))),
             Err(err) => {
@@ -24,7 +24,7 @@ pub fn read_file(args: Args, vm: &mut VM) -> CallResult {
 /// Returns Tuple<Str>
 pub fn read_file_lines(args: Args, vm: &mut VM) -> CallResult {
     let arg = args.get(0).unwrap();
-    if let Some(file_name) = arg.str_val() {
+    if let Some(file_name) = arg.get_str_val() {
         let file = File::open(file_name).unwrap();
         let reader = BufReader::new(file);
         let mut items = vec![];

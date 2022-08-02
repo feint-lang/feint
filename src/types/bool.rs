@@ -40,7 +40,7 @@ impl Object for Bool {
     // Binary operations -----------------------------------------------
 
     fn is_equal(&self, rhs: &dyn Object, _ctx: &RuntimeContext) -> bool {
-        if let Some(rhs) = rhs.as_bool() {
+        if let Some(rhs) = rhs.down_to_bool() {
             self.is(rhs) || self.value() == rhs.value()
         } else {
             false
@@ -48,7 +48,7 @@ impl Object for Bool {
     }
 
     fn and(&self, rhs: &dyn Object, _ctx: &RuntimeContext) -> RuntimeBoolResult {
-        if let Some(rhs) = rhs.as_bool() {
+        if let Some(rhs) = rhs.down_to_bool() {
             Ok(*self.value() && *rhs.value())
         } else {
             Err(RuntimeErr::new_type_err(format!(
@@ -60,7 +60,7 @@ impl Object for Bool {
     }
 
     fn or(&self, rhs: &dyn Object, _ctx: &RuntimeContext) -> RuntimeBoolResult {
-        if let Some(rhs) = rhs.as_bool() {
+        if let Some(rhs) = rhs.down_to_bool() {
             Ok(*self.value() || *rhs.value())
         } else {
             Err(RuntimeErr::new_type_err(format!(

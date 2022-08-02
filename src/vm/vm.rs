@@ -208,7 +208,7 @@ impl VM {
                 }
                 HaltTop => {
                     let obj = self.pop_obj()?;
-                    let return_code = match obj.int_val() {
+                    let return_code = match obj.get_int_val() {
                         Some(int) => {
                             self.halt();
                             #[cfg(debug_assertions)]
@@ -285,9 +285,9 @@ impl VM {
             Add => a.add(b, &self.ctx)?,
             Sub => a.sub(b, &self.ctx)?,
             Dot => {
-                if let Some(name) = b.str_val() {
+                if let Some(name) = b.get_str_val() {
                     a.get_attr(name.as_str(), &self.ctx, a.clone())?
-                } else if let Some(int) = b.int_val() {
+                } else if let Some(int) = b.get_int_val() {
                     a.get_item(&int, &self.ctx)?
                 } else {
                     let message = format!("Not an attribute name or index: {b:?}");
@@ -361,7 +361,7 @@ impl VM {
                 args.push(objects.get(i).unwrap().clone());
             }
         }
-        if let Some(func) = callable.as_builtin_func() {
+        if let Some(func) = callable.down_to_builtin_func() {
             if let Some(this) = &func.this {
                 args.insert(0, this.clone());
             }
@@ -374,7 +374,7 @@ impl VM {
             // For builtin functions, the return value isn't on the
             // stack, so we have to put it there.
             self.push(ReturnVal(return_val));
-        } else if let Some(func) = callable.as_func() {
+        } else if let Some(func) = callable.down_to_func() {
             // Wrap the function call in a scope where the
             // function's locals are defined. After the
             // call, this scope will be cleared out.
@@ -563,14 +563,14 @@ impl VM {
     pub fn dis_functions(&mut self) -> usize {
         let mut funcs = vec![];
         for obj in self.ctx.iter_constants() {
-            let is_func = obj.as_func().is_some();
+            let is_func = obj.down_to_func().is_some();
             if is_func {
                 funcs.push(obj.clone());
             }
         }
         let num_funcs = funcs.len();
         for (i, func_obj) in funcs.iter().enumerate() {
-            let func = func_obj.as_func().unwrap();
+            let func = func_obj.down_to_func().unwrap();
             let heading = format!("{func:?} ");
             eprintln!("{:=<79}", heading);
             if let Err(err) = self.dis_list(&func.chunk) {
