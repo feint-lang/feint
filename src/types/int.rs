@@ -36,7 +36,7 @@ impl IntType {
         ns.add_obj("$full_name", create::new_str("builtins.Int"));
         ns.add_obj(
             "new",
-            create::new_builtin_func("map", Some(vec!["this", "value"]), int::new),
+            create::new_builtin_func("new", Some(vec!["value"]), int::new),
         );
         Self { namespace: RefCell::new(ns) }
     }
