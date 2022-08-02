@@ -9,8 +9,8 @@ fn test_float() {
     let float2 = ctx.builtins.new_float(0.0);
     let float3 = ctx.builtins.new_float(1.0);
 
-    assert!(float1.class().is(&float2.class()));
-    assert!(float2.class().is(&float3.class()));
+    assert!(float1.class().is(float2.class()));
+    assert!(float2.class().is(float3.class()));
 
     assert!(float1.is(&*float1));
     assert!(!float1.is(&*float2));
@@ -42,7 +42,7 @@ fn test_custom() {
     let t1_obj3 = ctx.builtins.new_custom_instance(t1.clone());
 
     assert!((t1.clone() as ObjectRef).get_attr("$id", &ctx, t1.clone()).is_ok());
-    assert!((t1.clone() as ObjectRef).get_attr("$type", &ctx, t1.clone()).is_ok());
+    assert!((t1.clone() as ObjectRef).get_attr("$type", &ctx, t1).is_ok());
     assert!(t1_obj1.get_attr("$id", &ctx, t1_obj1.clone()).is_ok());
     assert!(t1_obj1.get_attr("$type", &ctx, t1_obj1.clone()).is_ok());
 
@@ -51,7 +51,7 @@ fn test_custom() {
         .expect("Could not set attribute");
 
     let t2 = ctx.builtins.new_type("test", "Custom2");
-    let t2_obj1 = ctx.builtins.new_custom_instance(t2.clone());
+    let t2_obj1 = ctx.builtins.new_custom_instance(t2);
 
     // An object should be equal to itself.
     assert!(t1_obj1.is_equal(&*t1_obj1, &ctx));

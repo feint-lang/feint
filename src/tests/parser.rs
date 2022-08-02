@@ -11,7 +11,7 @@ use crate::parser::*;
 pub fn parse_text(text: &str) -> ParseResult {
     let mut source = source_from_text(text);
     let scanner = Scanner::new(&mut source);
-    let mut parser = Parser::new(scanner.into_iter());
+    let mut parser = Parser::new(scanner);
     parser.parse()
 }
 

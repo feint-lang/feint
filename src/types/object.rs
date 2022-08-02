@@ -90,8 +90,7 @@ pub trait Object {
 
     fn id(&self) -> usize {
         let p = self as *const Self;
-        let p = p as *const () as usize;
-        p
+        p as *const () as usize
     }
 
     fn type_name(&self) -> String {

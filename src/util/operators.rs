@@ -29,13 +29,13 @@ impl fmt::Display for UnaryOperator {
             Self::Plus => "+",
             Self::Negate => "-",
         };
-        write!(f, "{}", string)
+        write!(f, "{string}")
     }
 }
 
 impl fmt::Debug for UnaryOperator {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.to_string())
+        write!(f, "{self}")
     }
 }
 

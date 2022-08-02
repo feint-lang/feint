@@ -219,7 +219,7 @@ impl<'a> Visitor<'a> {
         branches: Vec<(ast::Expr, ast::StatementBlock)>,
         default: Option<ast::StatementBlock>,
     ) -> VisitResult {
-        assert!(branches.len() > 0, "At least one branch required for conditional");
+        assert!(!branches.is_empty(), "At least one branch required for conditional");
 
         // Addresses of branch jump-out instructions (added after each
         // branch's block). The target address for these isn't known
@@ -330,7 +330,7 @@ impl<'a> Visitor<'a> {
     }
 
     fn visit_func(&mut self, node: ast::Func, name: Option<String>) -> VisitResult {
-        let mut func_visitor = Visitor::new(&mut self.ctx);
+        let mut func_visitor = Visitor::new(self.ctx);
         let name = if name.is_some() {
             let name = name.unwrap();
             self.has_main = name == "$main" && self.scope_tree.in_global_scope();

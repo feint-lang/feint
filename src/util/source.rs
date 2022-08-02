@@ -32,16 +32,14 @@ pub fn source_from_file(file_path: &str) -> Result<Source<BufReader<File>>, io::
 /// Create source from the specified text.
 pub fn source_from_text(text: &str) -> Source<Cursor<&str>> {
     let cursor = Cursor::new(text);
-    let source = Source::new(cursor);
-    source
+    Source::new(cursor)
 }
 
 /// Create source from stdin.
 pub fn source_from_stdin() -> Source<BufReader<io::Stdin>> {
     let stdin = io::stdin();
     let reader = BufReader::new(stdin);
-    let source = Source::new(reader);
-    source
+    Source::new(reader)
 }
 
 /// A wrapper around some source, typically either some text or a file.

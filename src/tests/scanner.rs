@@ -55,7 +55,7 @@ fn scan_binary_number() {
 fn scan_float() {
     let tokens = scan_optimistic("123.1");
     assert_eq!(tokens.len(), 2);
-    check_token(tokens.get(0), Token::Float(123.1 as f64), 1, 1, 1, 5);
+    check_token(tokens.get(0), Token::Float(123.1_f64), 1, 1, 1, 5);
     check_token(tokens.get(1), Token::EndOfStatement, 1, 6, 1, 6);
 }
 

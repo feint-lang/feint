@@ -95,7 +95,7 @@ impl ScopeTree {
     /// will be passed the current scope and its depth.
     pub fn walk_up(&self, mut visit: impl FnMut(&Scope, usize) -> bool) {
         for scope in self.storage.iter().filter(|n| n.is_leaf()) {
-            let depth = self.scope_depth(&scope);
+            let depth = self.scope_depth(scope);
             if visit(scope, depth) {
                 match scope.parent {
                     Some(parent_index) => {
@@ -149,7 +149,7 @@ impl Scope {
     }
 
     fn is_leaf(&self) -> bool {
-        self.children.len() == 0
+        self.children.is_empty()
     }
 
     pub fn jumps(&self) -> &HashMap<String, usize> {
@@ -175,7 +175,7 @@ impl Scope {
 
         if let Some(label_addr) = self.labels.get(name) {
             if label_addr > jump_addr {
-                return Some((*label_addr, tree.scope_depth(&self)));
+                return Some((*label_addr, tree.scope_depth(self)));
             }
         }
 

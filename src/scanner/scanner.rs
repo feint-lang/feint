@@ -249,7 +249,7 @@ impl<'a, T: BufRead> Scanner<'a, T> {
 
     fn handle_number(&mut self, first_digit: char, start: Location) -> AddTokenResult {
         let (string, radix) = self.read_number(first_digit);
-        let is_float = string.contains(".") || string.contains("E");
+        let is_float = string.contains('.') || string.contains('E');
         if is_float {
             let value = string
                 .parse::<f64>()
@@ -319,7 +319,7 @@ impl<'a, T: BufRead> Scanner<'a, T> {
             self.add_token_to_queue(Token::InlineScopeStart, start, end);
             self.inline_scope_stack.push(start);
         }
-        return Ok(());
+        Ok(())
     }
 
     fn handle_newline(&mut self, loc: Location) -> AddTokensResult {
@@ -330,7 +330,7 @@ impl<'a, T: BufRead> Scanner<'a, T> {
         } else {
             self.consume_whitespace();
         }
-        return Ok(());
+        Ok(())
     }
 
     fn handle_end_of_input(&mut self, loc: Location) -> AddTokensResult {
@@ -338,7 +338,7 @@ impl<'a, T: BufRead> Scanner<'a, T> {
             return Err(ScanErr::new(ErrKind::UnmatchedOpeningBracket(c), bracket_loc));
         }
         self.add_token_to_queue(Token::EndOfInput, loc, loc);
-        return Ok(());
+        Ok(())
     }
 
     fn maybe_add_end_of_statement_token(&mut self, loc: Location) {
@@ -796,9 +796,9 @@ impl<'a, T: BufRead> Scanner<'a, T> {
     fn read_ident(&mut self, first_char: char) -> String {
         let mut string = first_char.to_string();
         loop {
-            match self
-                .next_char_if(|&c| c.is_ascii_lowercase() || c.is_digit(10) || c == '_')
-            {
+            match self.next_char_if(|&c| {
+                c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_'
+            }) {
                 Some((c, _, _)) => string.push(c),
                 None => break string,
             }
@@ -814,7 +814,8 @@ impl<'a, T: BufRead> Scanner<'a, T> {
     fn read_type_ident(&mut self, first_char: char) -> String {
         let mut string = first_char.to_string();
         loop {
-            match self.next_char_if(|&c| c.is_ascii_alphabetic() || c.is_digit(10)) {
+            match self.next_char_if(|&c| c.is_ascii_alphabetic() || c.is_ascii_digit())
+            {
                 Some((c, _, _)) => string.push(c),
                 None => break string,
             }

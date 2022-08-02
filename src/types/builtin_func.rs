@@ -26,7 +26,7 @@ impl BuiltinFunc {
         func: BuiltinFn,
         this: Option<ObjectRef>,
     ) -> Self {
-        let arity = if let Some(params) = &params { Some(params.len()) } else { None };
+        let arity = params.as_ref().map(|params| params.len());
         Self { name: name.into(), params, arity, func, this }
     }
 }

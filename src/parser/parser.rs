@@ -96,10 +96,10 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
             if let Token::Ident(name) = ident_token.token {
                 Ok(ast::Statement::new_jump(name, start, ident_token.end))
             } else {
-                return Err(self.err(ParseErrKind::UnexpectedToken(ident_token)));
+                Err(self.err(ParseErrKind::UnexpectedToken(ident_token)))
             }
         } else {
-            return Err(self.err(ParseErrKind::ExpectedIdent(self.next_loc())));
+            Err(self.err(ParseErrKind::ExpectedIdent(self.next_loc())))
         }
     }
 
@@ -395,7 +395,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
         let op_token = &prefix_token.token;
         let rhs = self.expr(prec)?;
         let (start, end) = (prefix_token.start, rhs.end);
-        Ok(ast::Expr::new_unary_op(&op_token, rhs, start, end))
+        Ok(ast::Expr::new_unary_op(op_token, rhs, start, end))
     }
 
     /// See if the expr is followed by an infix operator. If so, get the
@@ -473,7 +473,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
                     self.current_token = Some(t.clone());
                     Some(t)
                 })
-                .map_err(|err| self.scan_err(err.clone()));
+                .map_err(|err| self.scan_err(err));
         }
         Ok(None)
     }
@@ -502,7 +502,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
     fn next_token_if(&mut self, func: impl FnOnce(&Token) -> bool) -> NextTokenResult {
         if let Some(t) = self.peek_token()? {
             if func(&t.token) {
-                return Ok(self.next_token()?);
+                return self.next_token();
             }
         }
         Ok(None)
@@ -512,7 +512,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
     /// to specified token. Otherwise, leave the token in the stream and
     /// return false.
     fn next_token_is(&mut self, token: &Token) -> BoolResult {
-        if let Some(_) = self.next_token_if(|t| t == token)? {
+        if (self.next_token_if(|t| t == token)?).is_some() {
             return Ok(true);
         }
         Ok(false)
@@ -522,7 +522,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
     /// equal to specified tokens. Otherwise, leave the tokens in the
     /// stream and return false.
     fn next_tokens_are(&mut self, tokens: Vec<&Token>) -> BoolResult {
-        assert!(tokens.len() > 0, "At least one token is required");
+        assert!(!tokens.is_empty(), "At least one token is required");
         let mut temp_queue: VecDeque<TokenWithLocation> = VecDeque::new();
         for token in tokens {
             match self.next_token_if(|t| t == token)? {
@@ -563,7 +563,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
         if let Some(result) = self.token_stream.peek() {
             return result
                 .as_ref()
-                .map(|t| Some(t))
+                .map(Some)
                 .map_err(|err| ParseErr::new(ParseErrKind::ScanErr(err.clone())));
         }
         Ok(None)
@@ -583,7 +583,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
     /// Look at the next token and return true if it's equal to the
     /// specified token. Otherwise, return false.
     fn peek_token_is(&mut self, token: &Token) -> BoolResult {
-        if let Some(_) = self.peek_token_if(|t| t == token)? {
+        if (self.peek_token_if(|t| t == token)?).is_some() {
             return Ok(true);
         }
         Ok(false)

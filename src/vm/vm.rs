@@ -203,7 +203,7 @@ impl VM {
                 Halt(code) => {
                     self.halt();
                     #[cfg(debug_assertions)]
-                    self.dis(dis, ip, &chunk);
+                    self.dis(dis, ip, chunk);
                     break Ok(VMState::Halted(*code));
                 }
                 HaltTop => {
@@ -212,7 +212,7 @@ impl VM {
                         Some(int) => {
                             self.halt();
                             #[cfg(debug_assertions)]
-                            self.dis(dis, ip, &chunk);
+                            self.dis(dis, ip, chunk);
                             int.to_u8().unwrap_or(255)
                         }
                         None => 0,
@@ -222,7 +222,7 @@ impl VM {
             }
 
             #[cfg(debug_assertions)]
-            self.dis(dis, ip, &chunk);
+            self.dis(dis, ip, chunk);
 
             if is_jump {
                 ip = jump_ip;
@@ -415,11 +415,9 @@ impl VM {
                     self.ctx.declare_and_assign_var(name, arg.clone())?;
                 }
             }
-        } else {
-            if bind {
-                let args = self.ctx.builtins.new_tuple(args.clone());
-                self.ctx.declare_and_assign_var("$args", args)?;
-            }
+        } else if bind {
+            let args = self.ctx.builtins.new_tuple(args.clone());
+            self.ctx.declare_and_assign_var("$args", args)?;
         }
         Ok(())
     }
@@ -604,22 +602,22 @@ impl VM {
                 Ok(obj) => {
                     let type_name = obj.type_name();
                     let str = format!("{obj:?} <{type_name}>");
-                    str.replace("\n", "\\n").replace("\r", "\\r")
+                    str.replace('\n', "\\n").replace('\r', "\\r")
                 }
                 Err(err) => format!("[ERROR: Could not get object: {err}]"),
             },
-            None => format!("[Object not found]"),
+            None => "[Object not found]".to_string(),
         };
 
         match inst {
-            NoOp => format!("NOOP"),
+            NoOp => "NOOP".to_string(),
             Truncate(size) => self.format_aligned("TRUNCATE", format!("{size}")),
             LoadConst(index) => {
                 let obj_str = obj_str(Some(&Constant(*index)));
                 self.format_aligned("LOAD_CONST", format!("{index} : {obj_str}"))
             }
-            ScopeStart => format!("SCOPE_START"),
-            ScopeEnd => format!("SCOPE_END"),
+            ScopeStart => "SCOPE_START".to_string(),
+            ScopeEnd => "SCOPE_END".to_string(),
             DeclareVar(name) => self.format_aligned("DECLARE_VAR", name),
             AssignVar(name) => {
                 let obj_str = obj_str(self.peek());
@@ -650,7 +648,7 @@ impl VM {
             MakeString(n) => self.format_aligned("MAKE_STRING", n),
             MakeTuple(n) => self.format_aligned("MAKE_TUPLE", n),
             Call(n) => self.format_aligned("CALL", n),
-            Return => format!("RETURN"),
+            Return => "RETURN".to_string(),
             Halt(code) => self.format_aligned("HALT", code),
             HaltTop => {
                 if let Ok(peek) = self.peek_obj() {

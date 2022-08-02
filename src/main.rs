@@ -114,6 +114,5 @@ fn main() -> ExitCode {
 fn default_history_path() -> PathBuf {
     let home = dirs::home_dir();
     let base_path = home.unwrap_or_default();
-    let history_path_buf = base_path.join(".feint_history");
-    history_path_buf
+    base_path.join(".feint_history")
 }

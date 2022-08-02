@@ -43,7 +43,6 @@ impl<'a> Repl<'a> {
             match self.read_line("→ ", true) {
                 Ok(None) => {
                     // Blank or all-whitespace line.
-                    ()
                 }
                 Ok(Some(input)) => {
                     // Evaluate the input. If eval returns a result of
@@ -81,7 +80,7 @@ impl<'a> Repl<'a> {
         trim_blank: bool,
     ) -> Result<Option<String>, ReadlineError> {
         match self.reader.readline(prompt) {
-            Ok(input) if trim_blank && input.trim().len() == 0 => Ok(None),
+            Ok(input) if trim_blank && input.trim().is_empty() => Ok(None),
             Ok(input) => Ok(Some(input)),
             Err(err) => Err(err),
         }
@@ -177,7 +176,7 @@ impl<'a> Repl<'a> {
             loop {
                 match self.read_line("+ ", false) {
                     Ok(None) => unreachable!(),
-                    Ok(Some(new_input)) if new_input == "" => {
+                    Ok(Some(new_input)) if new_input.is_empty() => {
                         input.push('\n');
                         if blank_line_count > 0 {
                             break self.eval(input.as_str(), true);

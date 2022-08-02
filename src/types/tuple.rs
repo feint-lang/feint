@@ -69,7 +69,7 @@ impl Object for Tuple {
         let index = index.to_usize().unwrap();
         match self.items.get(index) {
             Some(obj) => Ok(obj.clone()),
-            None => return Err(RuntimeErr::new_index_out_of_bounds(index)),
+            None => Err(RuntimeErr::new_index_out_of_bounds(index)),
         }
     }
 
@@ -86,7 +86,7 @@ impl Object for Tuple {
                     return false;
                 }
             }
-            return true;
+            true
         } else {
             false
         }

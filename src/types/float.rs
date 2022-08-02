@@ -59,7 +59,7 @@ impl Object for Float {
     }
 
     fn bool_val(&self, _ctx: &RuntimeContext) -> RuntimeBoolResult {
-        Ok(if *self.value() == 0.0 { false } else { true })
+        Ok(*self.value() != 0.0)
     }
 
     fn is_equal(&self, rhs: &dyn Object, _ctx: &RuntimeContext) -> bool {

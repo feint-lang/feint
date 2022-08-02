@@ -58,7 +58,7 @@ impl<'a> Executor<'a> {
     /// Execute source.
     pub fn execute_source<T: BufRead>(&mut self, source: &mut Source<T>) -> ExeResult {
         let scanner = Scanner::new(source);
-        let mut parser = Parser::new(scanner.into_iter());
+        let mut parser = Parser::new(scanner);
         let program = match parser.parse() {
             Ok(program) => program,
             Err(err) => {
@@ -154,7 +154,7 @@ impl<'a> Executor<'a> {
     }
 
     fn print_err_message(&self, message: String, loc: Location) {
-        if message.len() > 0 {
+        if !message.is_empty() {
             let marker_loc = if loc.col == 0 { 0 } else { loc.col - 1 };
             eprintln!("    |{:>marker_loc$}^\n\n  {}\n", "", message);
         }
@@ -174,7 +174,7 @@ impl<'a> Executor<'a> {
 
     fn handle_scan_err(&self, err: &ScanErr) {
         use ScanErrKind::*;
-        let mut loc = err.location.clone();
+        let mut loc = err.location;
         let col = loc.col;
         let message = match &err.kind {
             UnexpectedChar(c) => {
@@ -189,36 +189,32 @@ impl<'a> Executor<'a> {
             InvalidIndent(num_spaces) => {
                 format!("Syntax error: Invalid indent with {num_spaces} spaces (should be a multiple of 4)")
             }
-            ExpectedBlock => {
-                format!("Syntax error: Expected block")
-            }
+            ExpectedBlock => "Syntax error: Expected block".to_string(),
             ExpectedIndentedBlock(_) => {
-                format!("Syntax error: Expected indented block")
+                "Syntax error: Expected indented block".to_string()
             }
-            UnexpectedIndent(_) => {
-                format!("Syntax error: Unexpected indent")
-            }
+            UnexpectedIndent(_) => "Syntax error: Unexpected indent".to_string(),
             WhitespaceAfterIndent | UnexpectedWhitespace => {
-                format!("Syntax error: Unexpected whitespace")
+                "Syntax error: Unexpected whitespace".to_string()
             }
             FormatStrErr(err) => {
                 use crate::format::FormatStrErr::*;
                 match err {
                     EmptyExpr(pos) => {
                         loc = Location::new(loc.line, loc.col + pos);
-                        format!("Syntax error in format string: expected expression")
+                        "Syntax error in format string: expected expression".to_string()
                     }
                     UnmatchedOpeningBracket(pos) => {
                         loc = Location::new(loc.line, loc.col + pos);
-                        format!("Unmatched opening bracket in format string")
+                        "Unmatched opening bracket in format string".to_string()
                     }
                     UnmatchedClosingBracket(pos) => {
                         loc = Location::new(loc.line, loc.col + pos);
-                        format!("Unmatched closing bracket in format string")
+                        "Unmatched closing bracket in format string".to_string()
                     }
                     ScanErr(_, pos) => {
                         loc = Location::new(loc.line, loc.col + *pos);
-                        format!("Error while scanning format string")
+                        "Error while scanning format string".to_string()
                     }
                 }
             }
@@ -254,30 +250,30 @@ impl<'a> Executor<'a> {
                 }
             }
             ExpectedBlock(loc) => {
-                (loc.clone(), format!("Parse error: expected indented block at {loc}"))
+                (*loc, format!("Parse error: expected indented block at {loc}"))
             }
             ExpectedToken(loc, token) => {
-                (loc.clone(), format!("Parse error: expected token '{token}' at {loc}"))
+                (*loc, format!("Parse error: expected token '{token}' at {loc}"))
             }
             ExpectedExpr(loc) => {
-                (loc.clone(), format!("Parse error: expected expression at {loc}",))
+                (*loc, format!("Parse error: expected expression at {loc}",))
             }
             ExpectedIdent(loc) => {
-                (loc.clone(), format!("Parse error: expected identifier at {loc}",))
+                (*loc, format!("Parse error: expected identifier at {loc}",))
             }
             UnexpectedBreak(loc) => (
-                loc.clone(),
+                *loc,
                 format!(
                     "Parse error: unexpected break at {loc} (break must be in a loop)"
                 ),
             ),
             UnexpectedContinue(loc) => (
-                loc.clone(),
+                *loc,
                 format!(
                     "Parse error: unexpected continue at {loc} (continue must be in a loop)"
                 ),
             ),
-            SyntaxErr(loc) => (loc.clone(), format!("Syntax error at {loc}",)),
+            SyntaxErr(loc) => (*loc, format!("Syntax error at {loc}",)),
             kind => (Location::new(0, 0), format!("Unhandled parse error: {:?}", kind)),
         };
         self.print_err_message(message, loc);
@@ -298,9 +294,7 @@ impl<'a> Executor<'a> {
             DuplicateLabelInScope(name) => {
                 format!("duplicate label in scope: {name}")
             }
-            ExpectedIdent => {
-                format!("expected identifier")
-            }
+            ExpectedIdent => "expected identifier".to_string(),
             CannotAssignSpecialIdent(name) => {
                 format!("cannot assign to special name: {name}")
             }

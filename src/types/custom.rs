@@ -59,10 +59,10 @@ impl Object for Custom {
 
     fn is_equal(&self, rhs: &dyn Object, ctx: &RuntimeContext) -> bool {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
-            if self.is(&rhs) {
+            if self.is(rhs) {
                 // Object is equal to itself.
                 true
-            } else if !self.class().is(&rhs.class()) {
+            } else if !self.class().is(rhs.class()) {
                 // Objects are not the same type so they can't be equal.
                 false
             } else {

@@ -47,7 +47,7 @@ pub fn scan_format_string(string: &str) -> Result<Vec<FormatStrToken>, FormatStr
             ('{', _) => {
                 // Start of expression
                 stack.push(pos);
-                if str.len() > 0 {
+                if !str.is_empty() {
                     tokens.push(Str(str.clone()));
                     str.clear();
                 }
@@ -55,9 +55,9 @@ pub fn scan_format_string(string: &str) -> Result<Vec<FormatStrToken>, FormatStr
             ('}', _) => {
                 // End of expression
                 if let Some(i) = stack.pop() {
-                    if stack.len() == 0 {
+                    if stack.is_empty() {
                         let expr = string[i + 1..pos].trim();
-                        if expr.len() == 0 {
+                        if expr.is_empty() {
                             return Err(EmptyExpr(i));
                         }
                         let mut source = source_from_text(expr);
@@ -73,7 +73,7 @@ pub fn scan_format_string(string: &str) -> Result<Vec<FormatStrToken>, FormatStr
                 }
             }
             _ => {
-                if stack.len() == 0 {
+                if stack.is_empty() {
                     str.push(c);
                 }
             }
@@ -81,11 +81,11 @@ pub fn scan_format_string(string: &str) -> Result<Vec<FormatStrToken>, FormatStr
         pos += 1;
     }
 
-    if stack.len() > 0 {
+    if !stack.is_empty() {
         return Err(UnmatchedOpeningBracket(stack.pop().unwrap() + 2));
     }
 
-    if str.len() > 0 {
+    if !str.is_empty() {
         tokens.push(Str(str.clone()));
     }
 

@@ -139,7 +139,7 @@ impl RuntimeContext {
         let mut depth = self.depth();
         loop {
             let namespace = &self.namespace_stack[depth];
-            if let Some(_) = namespace.get_entry(name) {
+            if namespace.get_entry(name).is_some() {
                 break Ok(depth);
             }
             if depth == 0 {
