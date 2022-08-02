@@ -74,6 +74,9 @@ impl VM {
         let mut is_jump = false;
 
         loop {
+            #[cfg(debug_assertions)]
+            self.dis(dis, ip, chunk);
+
             match &chunk[ip] {
                 NoOp => {
                     // do nothing
@@ -205,8 +208,6 @@ impl VM {
                 // VM control
                 Halt(code) => {
                     self.halt();
-                    #[cfg(debug_assertions)]
-                    self.dis(dis, ip, chunk);
                     break Ok(VMState::Halted(*code));
                 }
                 HaltTop => {
@@ -214,8 +215,6 @@ impl VM {
                     let return_code = match obj.get_int_val() {
                         Some(int) => {
                             self.halt();
-                            #[cfg(debug_assertions)]
-                            self.dis(dis, ip, chunk);
                             int.to_u8().unwrap_or(255)
                         }
                         None => 0,
@@ -223,9 +222,6 @@ impl VM {
                     break Ok(VMState::Halted(return_code));
                 }
             }
-
-            #[cfg(debug_assertions)]
-            self.dis(dis, ip, chunk);
 
             if is_jump {
                 ip = jump_ip;
