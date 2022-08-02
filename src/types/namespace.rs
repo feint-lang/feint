@@ -81,13 +81,11 @@ impl Object for Namespace {
             } else {
                 let lhs_objects = &self.objects;
                 let rhs_objects = &rhs.objects;
-                if lhs_objects.len() != rhs_objects.len() {
-                    // Namespaces have a different number of entries, so
-                    // they can't be equal.
-                    false
-                } else if !lhs_objects.keys().all(|k| rhs_objects.contains_key(k)) {
-                    // Namespaces have differing keys, so they can't be
-                    // equal.
+                if lhs_objects.len() != rhs_objects.len()
+                    || !lhs_objects.keys().all(|k| rhs_objects.contains_key(k))
+                {
+                    // Namespaces have a different number of entries or
+                    // have differing keys, so they can't be equal.
                     false
                 } else {
                     // Otherwise, compare all entries for equality.

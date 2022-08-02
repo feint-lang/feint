@@ -12,11 +12,8 @@ pub fn get_binary_precedence(token: &Token) -> u8 {
 
 /// Return true if the token represents a right-associate operator.
 pub fn is_right_associative(token: &Token) -> bool {
-    match token {
-        Token::Caret => true, // a ^ b (exponentiation)
-        Token::Equal => true, // a = b = c (assignment)
-        _ => false,
-    }
+    // Exponentiation and assignment
+    matches!(token, Token::Caret | Token::Equal)
 }
 
 #[rustfmt::skip]

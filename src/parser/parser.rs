@@ -194,8 +194,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
         } else {
             let first_item = self.expr(0)?;
             if self.peek_token_is(&Comma)? {
-                let mut items = vec![];
-                items.push(first_item);
+                let mut items = vec![first_item];
                 loop {
                     if self.next_token_is(&RParen)? {
                         break;
@@ -294,16 +293,11 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
         let block = self.block()?;
         end = block.end;
         branches.push((cond, block));
-        loop {
-            match self.next_tokens_are(vec![&EndOfStatement, &Else, &If])? {
-                true => {
-                    let cond = self.expr(0)?;
-                    let block = self.block()?;
-                    end = block.end;
-                    branches.push((cond, block))
-                }
-                false => break,
-            }
+        while let true = self.next_tokens_are(vec![&EndOfStatement, &Else, &If])? {
+            let cond = self.expr(0)?;
+            let block = self.block()?;
+            end = block.end;
+            branches.push((cond, block))
         }
         let default = match self.next_tokens_are(vec![&EndOfStatement, &Else])? {
             true => {
@@ -418,7 +412,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
                 let op_token = &infix_token.token;
                 lhs = match op_token {
                     // Assignment
-                    &Token::Equal => {
+                    Token::Equal => {
                         if let ast::ExprKind::Ident(ident) = lhs.kind {
                             let value = self.expr(infix_prec)?;
                             let end = value.end;
@@ -428,7 +422,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
                         }
                     }
                     // Call
-                    &Token::LParen => self.call(lhs, infix_token.start)?,
+                    Token::LParen => self.call(lhs, infix_token.start)?,
                     // Binary operation
                     _ => {
                         let rhs = self.expr(infix_prec)?;

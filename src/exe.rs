@@ -32,7 +32,7 @@ impl<'a> Executor<'a> {
             }
             Err(err) => {
                 let message = format!("{file_path}: {err}");
-                Err(ExeErr::new(ExeErrKind::CouldNotReadSourceFileErr(message)))
+                Err(ExeErr::new(ExeErrKind::CouldNotReadSourceFile(message)))
             }
         }
     }
@@ -163,13 +163,13 @@ impl<'a> Executor<'a> {
     fn ignore_scan_err(&self, err: &ScanErr) -> bool {
         use ScanErrKind::*;
         self.incremental
-            && match &err.kind {
+            && matches!(
+                &err.kind,
                 ExpectedBlock
-                | ExpectedIndentedBlock(_)
-                | UnmatchedOpeningBracket(_)
-                | UnterminatedStr(_) => true,
-                _ => false,
-            }
+                    | ExpectedIndentedBlock(_)
+                    | UnmatchedOpeningBracket(_)
+                    | UnterminatedStr(_)
+            )
     }
 
     fn handle_scan_err(&self, err: &ScanErr) {
@@ -227,11 +227,7 @@ impl<'a> Executor<'a> {
 
     fn ignore_parse_err(&self, err: &ParseErr) -> bool {
         use ParseErrKind::*;
-        self.incremental
-            && match &err.kind {
-                ExpectedBlock(_) => true,
-                _ => false,
-            }
+        self.incremental && matches!(&err.kind, ExpectedBlock(_))
     }
 
     fn handle_parse_err(&self, err: &ParseErr) {
@@ -304,11 +300,7 @@ impl<'a> Executor<'a> {
 
     fn ignore_comp_err(&self, err: &CompErr) -> bool {
         use CompErrKind::*;
-        self.incremental
-            && match &err.kind {
-                LabelNotFoundInScope(_) => true,
-                _ => false,
-            }
+        self.incremental && matches!(&err.kind, LabelNotFoundInScope(_))
     }
 
     fn handle_runtime_err(&self, err: &RuntimeErr) {

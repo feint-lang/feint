@@ -331,8 +331,7 @@ impl<'a> Visitor<'a> {
 
     fn visit_func(&mut self, node: ast::Func, name: Option<String>) -> VisitResult {
         let mut func_visitor = Visitor::new(self.ctx);
-        let name = if name.is_some() {
-            let name = name.unwrap();
+        let name = if let Some(name) = name {
             self.has_main = name == "$main" && self.scope_tree.in_global_scope();
             name
         } else {
@@ -340,11 +339,7 @@ impl<'a> Visitor<'a> {
         };
         let params = node.params;
         let return_nil = if let Some(last) = node.block.statements.last() {
-            if let ast::StatementKind::Expr(_) = last.kind {
-                false
-            } else {
-                true
-            }
+            !matches!(last.kind, ast::StatementKind::Expr(_))
         } else {
             true // XXX: This should never happen
         };

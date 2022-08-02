@@ -260,10 +260,7 @@ impl Expr {
 
     /// Check if expression is ellipsis.
     pub fn is_ellipsis(&self) -> bool {
-        match &self.kind {
-            ExprKind::Literal(Literal { kind: LiteralKind::Ellipsis }) => true,
-            _ => false,
-        }
+        matches!(&self.kind, ExprKind::Literal(Literal { kind: LiteralKind::Ellipsis }))
     }
 
     // Expression type checkers ----------------------------------------

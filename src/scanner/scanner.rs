@@ -662,42 +662,35 @@ impl<'a, T: BufRead> Scanner<'a, T> {
         }
         string.push_str(self.collect_digits(radix).as_str());
         if radix == 10 {
-            match self.next_two_chars_if(|&c| c == '.', |&d| d.is_digit(radix)) {
+            if let Some((dot, digit, _)) =
+                self.next_two_chars_if(|&c| c == '.', |&d| d.is_digit(radix))
+            {
                 // If the number is followed by a dot and at least one
                 // digit consume the dot, the digit, and any following
                 // digits.
-                Some((dot, digit, _)) => {
-                    string.push(dot);
-                    string.push(digit);
-                    string.push_str(self.collect_digits(radix).as_str());
-                }
-                _ => (),
+                string.push(dot);
+                string.push(digit);
+                string.push_str(self.collect_digits(radix).as_str());
             }
             // Handle E notation *without* sign.
-            match self
+            if let Some((_, digit, _)) = self
                 .next_two_chars_if(|&c| c == 'e' || c == 'E', |&e| e.is_digit(radix))
             {
-                Some((_, digit, _)) => {
-                    string.push('E');
-                    string.push('+');
-                    string.push(digit);
-                    string.push_str(self.collect_digits(radix).as_str());
-                }
-                _ => (),
+                string.push('E');
+                string.push('+');
+                string.push(digit);
+                string.push_str(self.collect_digits(radix).as_str());
             }
             // Handle E notation *with* sign.
-            match self.next_three_chars_if(
+            if let Some((_, sign, digit)) = self.next_three_chars_if(
                 |&c| c == 'e' || c == 'E',
                 |&d| d == '+' || d == '-',
                 |&e| e.is_digit(radix),
             ) {
-                Some((_, sign, digit)) => {
-                    string.push('E');
-                    string.push(sign);
-                    string.push(digit);
-                    string.push_str(self.collect_digits(radix).as_str());
-                }
-                _ => (),
+                string.push('E');
+                string.push(sign);
+                string.push(digit);
+                string.push_str(self.collect_digits(radix).as_str());
             }
         }
         (string, radix)

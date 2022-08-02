@@ -31,7 +31,7 @@ impl ExeErr {
 
 #[derive(Debug)]
 pub enum ExeErrKind {
-    CouldNotReadSourceFileErr(String),
+    CouldNotReadSourceFile(String),
     ScanErr(ScanErrKind),
     ParseErr(ParseErrKind),
     CompErr(CompErrKind),

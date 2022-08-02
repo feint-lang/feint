@@ -25,10 +25,7 @@ pub type ObjectRef = Arc<dyn Object>;
 macro_rules! make_type_checker {
     ( $func:ident, $ty:ty) => {
         fn $func(&self) -> bool {
-            match self.as_any().downcast_ref::<$ty>() {
-                Some(_) => true,
-                None => false,
-            }
+            self.as_any().downcast_ref::<$ty>().is_some()
         }
     };
 }
@@ -36,11 +33,7 @@ macro_rules! make_type_checker {
 macro_rules! make_type_converter {
     ( $func:ident, $ty:ty) => {
         fn $func(&self) -> Option<&$ty> {
-            if let Some(obj) = self.as_any().downcast_ref::<$ty>() {
-                Some(obj)
-            } else {
-                None
-            }
+            self.as_any().downcast_ref::<$ty>()
         }
     };
 }
@@ -48,11 +41,7 @@ macro_rules! make_type_converter {
 macro_rules! make_value_extractor {
     ( $func:ident, $ty:ty, $val_ty:ty, $op:ident) => {
         fn $func(&self) -> Option<$val_ty> {
-            if let Some(obj) = self.as_any().downcast_ref::<$ty>() {
-                Some(obj.value().$op())
-            } else {
-                None
-            }
+            self.as_any().downcast_ref::<$ty>().map(|obj| obj.value().$op())
         }
     };
 }

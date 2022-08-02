@@ -36,7 +36,7 @@ impl Objects {
         index: usize,
         obj: ObjectRef,
     ) -> Result<usize, RuntimeErr> {
-        if let Some(_) = self.storage.get(index) {
+        if self.storage.get(index).is_some() {
             self.storage[index] = obj;
             Ok(index)
         } else {
