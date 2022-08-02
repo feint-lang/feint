@@ -11,6 +11,5 @@ fib = (n) ->
 #         : -> fib(n - 1) + fib(n - 2)
 
 $main = (...) ->
-#     i = 0
-#     loop i < 20 -> print($"fib {i} -> {fib(i += 1)}")
-    print(fib(10))
+    n = if $args.length -> Int.new($args.0) else -> 10
+    print(fib(n))

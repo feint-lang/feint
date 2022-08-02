@@ -8,6 +8,7 @@ use once_cell::sync::Lazy;
 use crate::builtin_funcs::tuple;
 
 use super::create;
+use super::result::GetAttrResult;
 
 use super::base::{ObjectRef, ObjectTrait, ObjectTraitExt, TypeRef, TypeTrait};
 use super::class::TYPE_TYPE;
@@ -87,14 +88,6 @@ impl Tuple {
     pub fn len(&self) -> usize {
         self.items.len()
     }
-
-    pub fn get_item(&self, index: usize) -> Option<ObjectRef> {
-        if let Some(item) = self.items.get(index) {
-            Some(item.clone())
-        } else {
-            None
-        }
-    }
 }
 
 impl ObjectTrait for Tuple {
@@ -112,6 +105,14 @@ impl ObjectTrait for Tuple {
 
     fn namespace(&self) -> &Namespace {
         &self.namespace
+    }
+
+    fn get_item(&self, index: usize) -> GetAttrResult {
+        if let Some(item) = self.items.get(index) {
+            Ok(item.clone())
+        } else {
+            Err(self.item_does_not_exist(index))
+        }
     }
 
     fn is_equal(&self, rhs: &dyn ObjectTrait) -> bool {
