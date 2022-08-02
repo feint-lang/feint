@@ -9,6 +9,7 @@ pub fn print(this: This, args: Args, _vm: &mut VM) -> CallResult {
         let last = num_args - 1;
         let mut sep = " ";
         for (i, arg) in args.iter().enumerate() {
+            let arg = arg.read().unwrap();
             if i == last {
                 sep = "";
             }

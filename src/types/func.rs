@@ -1,7 +1,6 @@
 use std::any::Any;
-use std::cell::RefCell;
 use std::fmt;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use once_cell::sync::Lazy;
 
@@ -16,10 +15,11 @@ use super::result::{Args, CallResult, Params, This};
 
 // Function Type -------------------------------------------------------
 
-pub static FUNC_TYPE: Lazy<Arc<FuncType>> = Lazy::new(|| Arc::new(FuncType::new()));
+pub static FUNC_TYPE: Lazy<Arc<RwLock<FuncType>>> =
+    Lazy::new(|| Arc::new(RwLock::new(FuncType::new())));
 
 pub struct FuncType {
-    namespace: RefCell<Namespace>,
+    namespace: Namespace,
 }
 
 unsafe impl Send for FuncType {}
@@ -30,7 +30,7 @@ impl FuncType {
         let mut ns = Namespace::new();
         ns.add_obj("$name", create::new_str("Func"));
         ns.add_obj("$full_name", create::new_str("builtins.Func"));
-        Self { namespace: RefCell::new(ns) }
+        Self { namespace: ns }
     }
 }
 
@@ -57,7 +57,7 @@ impl ObjectTrait for FuncType {
         TYPE_TYPE.clone()
     }
 
-    fn namespace(&self) -> &RefCell<Namespace> {
+    fn namespace(&self) -> &Namespace {
         &self.namespace
     }
 }
@@ -65,7 +65,7 @@ impl ObjectTrait for FuncType {
 // Func Object ----------------------------------------------------------
 
 pub struct Func {
-    namespace: RefCell<Namespace>,
+    namespace: Namespace,
     pub name: String,
     pub params: Params,
     pub arity: Option<usize>,
@@ -78,13 +78,7 @@ unsafe impl Sync for Func {}
 impl Func {
     pub fn new<S: Into<String>>(name: S, params: Params, chunk: Chunk) -> Self {
         let arity = params.as_ref().map(|params| params.len());
-        Self {
-            namespace: RefCell::new(Namespace::new()),
-            name: name.into(),
-            params,
-            arity,
-            chunk,
-        }
+        Self { namespace: Namespace::new(), name: name.into(), params, arity, chunk }
     }
 }
 
@@ -101,7 +95,7 @@ impl ObjectTrait for Func {
         FUNC_TYPE.clone()
     }
 
-    fn namespace(&self) -> &RefCell<Namespace> {
+    fn namespace(&self) -> &Namespace {
         &self.namespace
     }
 

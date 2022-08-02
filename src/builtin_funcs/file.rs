@@ -9,6 +9,7 @@ use crate::vm::{RuntimeErr, RuntimeErrKind, VM};
 pub fn read_file(this: This, args: Args, _vm: &mut VM) -> CallResult {
     assert!(this.is_none());
     let arg = args.get(0).unwrap();
+    let arg = arg.read().unwrap();
     if let Some(file_name) = arg.get_str_val() {
         match read_to_string(file_name) {
             Ok(contents) => Ok(Some(create::new_str(contents))),
@@ -26,6 +27,7 @@ pub fn read_file(this: This, args: Args, _vm: &mut VM) -> CallResult {
 pub fn read_file_lines(this: This, args: Args, _vm: &mut VM) -> CallResult {
     assert!(this.is_none());
     let arg = args.get(0).unwrap();
+    let arg = arg.read().unwrap();
     if let Some(file_name) = arg.get_str_val() {
         let file = File::open(file_name).unwrap();
         let reader = BufReader::new(file);

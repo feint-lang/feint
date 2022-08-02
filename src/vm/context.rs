@@ -198,7 +198,8 @@ impl Default for RuntimeContext {
         // Add shorthand aliases for builtin types and objects to global
         // scope.
         let builtins = BUILTINS.clone();
-        let ns = builtins.namespace().borrow();
+        let reader = builtins.read().unwrap();
+        let ns = reader.namespace();
         for (name, obj) in ns.iter() {
             if let Err(err) = ctx.declare_and_assign_var(name, (*obj).clone()) {
                 panic!("Could not add alias for builtin object `{name}` to global scope: {err}");

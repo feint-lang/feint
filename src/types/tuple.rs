@@ -1,8 +1,7 @@
 use std::any::Any;
-use std::cell::RefCell;
 use std::fmt;
 use std::slice::Iter;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use once_cell::sync::Lazy;
 
@@ -16,10 +15,11 @@ use super::ns::Namespace;
 
 // Tuple Type ----------------------------------------------------------
 
-pub static TUPLE_TYPE: Lazy<Arc<TupleType>> = Lazy::new(|| Arc::new(TupleType::new()));
+pub static TUPLE_TYPE: Lazy<Arc<RwLock<TupleType>>> =
+    Lazy::new(|| Arc::new(RwLock::new(TupleType::new())));
 
 pub struct TupleType {
-    namespace: RefCell<Namespace>,
+    namespace: Namespace,
 }
 
 impl TupleType {
@@ -31,7 +31,7 @@ impl TupleType {
             "map",
             create::new_builtin_func("map", Some(vec!["map_fn"]), tuple::map),
         );
-        Self { namespace: RefCell::new(ns) }
+        Self { namespace: ns }
     }
 }
 
@@ -61,7 +61,7 @@ impl ObjectTrait for TupleType {
         TYPE_TYPE.clone()
     }
 
-    fn namespace(&self) -> &RefCell<Namespace> {
+    fn namespace(&self) -> &Namespace {
         &self.namespace
     }
 }
@@ -69,7 +69,7 @@ impl ObjectTrait for TupleType {
 // Tuple Object ----------------------------------------------------------
 
 pub struct Tuple {
-    namespace: RefCell<Namespace>,
+    namespace: Namespace,
     items: Vec<ObjectRef>,
 }
 
@@ -77,7 +77,7 @@ impl Tuple {
     pub fn new(items: Vec<ObjectRef>) -> Self {
         let mut ns = Namespace::new();
         ns.add_obj("length", create::new_int(items.len()));
-        Self { namespace: RefCell::new(ns), items }
+        Self { namespace: ns, items }
     }
 
     pub fn iter(&self) -> Iter<'_, ObjectRef> {
@@ -110,7 +110,7 @@ impl ObjectTrait for Tuple {
         TUPLE_TYPE.clone()
     }
 
-    fn namespace(&self) -> &RefCell<Namespace> {
+    fn namespace(&self) -> &Namespace {
         &self.namespace
     }
 
@@ -123,7 +123,9 @@ impl ObjectTrait for Tuple {
                 return false;
             }
             for (a, b) in self.iter().zip(rhs.iter()) {
-                if !a.is_equal(&**b) {
+                let a = a.read().unwrap();
+                let b = b.read().unwrap();
+                if !a.is_equal(&*b) {
                     return false;
                 }
             }

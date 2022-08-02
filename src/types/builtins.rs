@@ -1,5 +1,5 @@
 //! Builtins Module
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use once_cell::sync::Lazy;
 
@@ -19,7 +19,7 @@ use super::ns::Namespace;
 use super::str::STR_TYPE;
 use super::tuple::TUPLE_TYPE;
 
-pub static BUILTINS: Lazy<Arc<Module>> = Lazy::new(|| {
+pub static BUILTINS: Lazy<Arc<RwLock<Module>>> = Lazy::new(|| {
     let mut ns = Namespace::new();
 
     ns.add_obj("$name", create::new_str("builtins"));

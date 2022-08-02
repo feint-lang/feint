@@ -1,7 +1,6 @@
 use std::any::Any;
-use std::cell::RefCell;
 use std::fmt;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use once_cell::sync::Lazy;
 
@@ -18,11 +17,11 @@ pub type BuiltinFn = fn(This, Args, &mut VM) -> CallResult;
 
 // Builtin Function Type -----------------------------------------------
 
-pub static BUILTIN_FUNC_TYPE: Lazy<Arc<BuiltinFuncType>> =
-    Lazy::new(|| Arc::new(BuiltinFuncType::new()));
+pub static BUILTIN_FUNC_TYPE: Lazy<Arc<RwLock<BuiltinFuncType>>> =
+    Lazy::new(|| Arc::new(RwLock::new(BuiltinFuncType::new())));
 
 pub struct BuiltinFuncType {
-    namespace: RefCell<Namespace>,
+    namespace: Namespace,
 }
 
 unsafe impl Send for BuiltinFuncType {}
@@ -33,7 +32,7 @@ impl BuiltinFuncType {
         let mut ns = Namespace::new();
         ns.add_obj("$name", create::new_str("BuiltinFunc"));
         ns.add_obj("$full_name", create::new_str("builtins.BuiltinFunc"));
-        Self { namespace: RefCell::new(ns) }
+        Self { namespace: ns }
     }
 }
 
@@ -60,7 +59,7 @@ impl ObjectTrait for BuiltinFuncType {
         TYPE_TYPE.clone()
     }
 
-    fn namespace(&self) -> &RefCell<Namespace> {
+    fn namespace(&self) -> &Namespace {
         &self.namespace
     }
 }
@@ -68,7 +67,7 @@ impl ObjectTrait for BuiltinFuncType {
 // BuiltinFunc Object ----------------------------------------------------------
 
 pub struct BuiltinFunc {
-    namespace: RefCell<Namespace>,
+    namespace: Namespace,
     pub name: String,
     pub params: Params,
     pub arity: Option<usize>,
@@ -81,13 +80,7 @@ unsafe impl Sync for BuiltinFunc {}
 impl BuiltinFunc {
     pub fn new<S: Into<String>>(name: S, params: Params, func: BuiltinFn) -> Self {
         let arity = params.as_ref().map(|params| params.len());
-        Self {
-            namespace: RefCell::new(Namespace::new()),
-            name: name.into(),
-            params,
-            arity,
-            func,
-        }
+        Self { namespace: Namespace::new(), name: name.into(), params, arity, func }
     }
 }
 
@@ -104,7 +97,7 @@ impl ObjectTrait for BuiltinFunc {
         BUILTIN_FUNC_TYPE.clone()
     }
 
-    fn namespace(&self) -> &RefCell<Namespace> {
+    fn namespace(&self) -> &Namespace {
         &self.namespace
     }
 

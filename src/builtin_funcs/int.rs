@@ -6,6 +6,7 @@ use crate::vm::{RuntimeErr, VM};
 
 pub fn new(_this: This, args: Args, _vm: &mut VM) -> CallResult {
     let arg = args.get(0).unwrap();
+    let arg = arg.read().unwrap();
     let int = if let Some(val) = arg.get_int_val() {
         create::new_int(val)
     } else if let Some(val) = arg.get_float_val() {

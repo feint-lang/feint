@@ -1,7 +1,6 @@
 use std::any::Any;
-use std::cell::RefCell;
 use std::fmt;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use once_cell::sync::Lazy;
 
@@ -13,10 +12,11 @@ use super::ns::Namespace;
 
 // Nil Type ------------------------------------------------------------
 
-pub static NIL_TYPE: Lazy<Arc<NilType>> = Lazy::new(|| Arc::new(NilType::new()));
+pub static NIL_TYPE: Lazy<Arc<RwLock<NilType>>> =
+    Lazy::new(|| Arc::new(RwLock::new(NilType::new())));
 
 pub struct NilType {
-    namespace: RefCell<Namespace>,
+    namespace: Namespace,
 }
 
 unsafe impl Send for NilType {}
@@ -27,7 +27,7 @@ impl NilType {
         let mut ns = Namespace::new();
         ns.add_obj("$name", create::new_str("Nil"));
         ns.add_obj("$full_name", create::new_str("builtins.Nil"));
-        Self { namespace: RefCell::new(ns) }
+        Self { namespace: ns }
     }
 }
 
@@ -54,7 +54,7 @@ impl ObjectTrait for NilType {
         TYPE_TYPE.clone()
     }
 
-    fn namespace(&self) -> &RefCell<Namespace> {
+    fn namespace(&self) -> &Namespace {
         &self.namespace
     }
 }
@@ -62,7 +62,7 @@ impl ObjectTrait for NilType {
 // Nil Object ----------------------------------------------------------
 
 pub struct Nil {
-    namespace: RefCell<Namespace>,
+    namespace: Namespace,
 }
 
 unsafe impl Send for Nil {}
@@ -70,7 +70,7 @@ unsafe impl Sync for Nil {}
 
 impl Nil {
     pub fn new() -> Self {
-        Self { namespace: RefCell::new(Namespace::new()) }
+        Self { namespace: Namespace::new() }
     }
 }
 
@@ -87,7 +87,7 @@ impl ObjectTrait for Nil {
         NIL_TYPE.clone()
     }
 
-    fn namespace(&self) -> &RefCell<Namespace> {
+    fn namespace(&self) -> &Namespace {
         &self.namespace
     }
 }

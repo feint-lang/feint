@@ -1,7 +1,6 @@
 use std::any::Any;
-use std::cell::RefCell;
 use std::fmt;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use once_cell::sync::Lazy;
 
@@ -15,10 +14,11 @@ use super::ns::Namespace;
 
 // Bool Type -----------------------------------------------------------
 
-pub static BOOL_TYPE: Lazy<Arc<BoolType>> = Lazy::new(|| Arc::new(BoolType::new()));
+pub static BOOL_TYPE: Lazy<Arc<RwLock<BoolType>>> =
+    Lazy::new(|| Arc::new(RwLock::new(BoolType::new())));
 
 pub struct BoolType {
-    namespace: RefCell<Namespace>,
+    namespace: Namespace,
 }
 
 unsafe impl Send for BoolType {}
@@ -29,7 +29,7 @@ impl BoolType {
         let mut ns = Namespace::new();
         ns.add_obj("$name", create::new_str("Bool"));
         ns.add_obj("$full_name", create::new_str("builtins.Bool"));
-        Self { namespace: RefCell::new(ns) }
+        Self { namespace: ns }
     }
 }
 
@@ -56,7 +56,7 @@ impl ObjectTrait for BoolType {
         TYPE_TYPE.clone()
     }
 
-    fn namespace(&self) -> &RefCell<Namespace> {
+    fn namespace(&self) -> &Namespace {
         &self.namespace
     }
 }
@@ -64,7 +64,7 @@ impl ObjectTrait for BoolType {
 // Bool Object ---------------------------------------------------------
 
 pub struct Bool {
-    namespace: RefCell<Namespace>,
+    namespace: Namespace,
     value: bool,
 }
 
@@ -73,7 +73,7 @@ unsafe impl Sync for Bool {}
 
 impl Bool {
     pub fn new(value: bool) -> Self {
-        Self { namespace: RefCell::new(Namespace::new()), value }
+        Self { namespace: Namespace::new(), value }
     }
 
     pub fn value(&self) -> &bool {
@@ -94,7 +94,7 @@ impl ObjectTrait for Bool {
         BOOL_TYPE.clone()
     }
 
-    fn namespace(&self) -> &RefCell<Namespace> {
+    fn namespace(&self) -> &Namespace {
         &self.namespace
     }
 
@@ -120,8 +120,8 @@ impl ObjectTrait for Bool {
         } else {
             Err(RuntimeErr::new_type_err(format!(
                 "{} && {} not implemented",
-                self.class(),
-                rhs.class()
+                self.class().read().unwrap(),
+                rhs.class().read().unwrap(),
             )))
         }
     }
@@ -132,8 +132,8 @@ impl ObjectTrait for Bool {
         } else {
             Err(RuntimeErr::new_type_err(format!(
                 "{} || {} not implemented",
-                self.class(),
-                rhs.class()
+                self.class().read().unwrap(),
+                rhs.class().read().unwrap(),
             )))
         }
     }

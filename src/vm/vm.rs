@@ -126,6 +126,7 @@ impl VM {
                 JumpIf(addr, scope_exit_count) => {
                     self.exit_scopes(*scope_exit_count);
                     let obj = self.pop_obj()?;
+                    let obj = obj.read().unwrap();
                     if obj.bool_val()? {
                         jump_ip = Some(*addr);
                     }
@@ -133,6 +134,7 @@ impl VM {
                 JumpIfNot(addr, scope_exit_count) => {
                     self.exit_scopes(*scope_exit_count);
                     let obj = self.pop_obj()?;
+                    let obj = obj.read().unwrap();
                     if !obj.bool_val()? {
                         jump_ip = Some(*addr);
                     }
@@ -140,6 +142,7 @@ impl VM {
                 JumpIfElse(if_addr, else_addr, scope_exit_count) => {
                     self.exit_scopes(*scope_exit_count);
                     let obj = self.pop_obj()?;
+                    let obj = obj.read().unwrap();
                     let addr = if obj.bool_val()? { *if_addr } else { *else_addr };
                     jump_ip = Some(addr);
                 }
@@ -171,6 +174,7 @@ impl VM {
                     let objects = self.pop_n_obj(*n)?;
                     let mut string = String::with_capacity(32);
                     for obj in objects {
+                        let obj = obj.read().unwrap();
                         string.push_str(obj.to_string().as_str());
                     }
                     let string_obj = create::new_str(string);
@@ -210,6 +214,7 @@ impl VM {
                 }
                 HaltTop => {
                     let obj = self.pop_obj()?;
+                    let obj = obj.read().unwrap();
                     let return_code = match obj.get_int_val() {
                         Some(int) => {
                             self.halt();
@@ -241,7 +246,7 @@ impl VM {
         let a = self.pop_obj()?;
         let result = match op {
             Plus => a, // no-op
-            Negate => a.negate()?,
+            Negate => a.read().unwrap().negate()?,
         };
         self.push(ValueStackKind::Temp(result));
         Ok(())
@@ -250,6 +255,7 @@ impl VM {
     fn handle_unary_compare_op(&mut self, op: &UnaryCompareOperator) -> RuntimeResult {
         use UnaryCompareOperator::*;
         let a = self.pop_obj()?;
+        let a = a.read().unwrap();
         let result = match op {
             AsBool => a.bool_val()?,
             Not => a.not()?,
@@ -270,7 +276,9 @@ impl VM {
     /// result value onto stack.
     fn handle_binary_op(&mut self, op: &BinaryOperator) -> RuntimeResult {
         use BinaryOperator::*;
-        let (a, b) = self.get_binary_operands()?;
+        let (a_ref, b_ref) = self.get_binary_operands()?;
+        let a = a_ref.read().unwrap();
+        let b = b_ref.read().unwrap();
         let b = &*b;
         let result = match op {
             Pow => a.pow(b)?,
@@ -289,7 +297,7 @@ impl VM {
                     let message = format!("Not an attribute name or index: {b:?}");
                     return Err(RuntimeErr::new_type_err(message));
                 };
-                self.this = Some(a.clone());
+                self.this = Some(a_ref.clone());
                 obj
             }
         };
@@ -302,6 +310,8 @@ impl VM {
     fn handle_compare_op(&mut self, op: &CompareOperator) -> RuntimeResult {
         use CompareOperator::*;
         let (a, b) = self.get_binary_operands()?;
+        let a = a.read().unwrap();
+        let b = b.read().unwrap();
         let b = &*b;
         let result = match op {
             Is => a.is(b),
@@ -333,6 +343,8 @@ impl VM {
             return Err(RuntimeErr::new(RuntimeErrKind::NotEnoughValuesOnStack(2)));
         };
         if let ValueStackKind::Var(depth, name) = a_kind {
+            let a = a.read().unwrap();
+            let b = b.read().unwrap();
             let b = &*b;
             let result = match op {
                 AddEqual => a.add(b)?,
@@ -350,7 +362,8 @@ impl VM {
     fn handle_call(&mut self, n: usize) -> RuntimeResult {
         use ValueStackKind::ReturnVal;
         let objects = self.pop_n_obj(n + 1)?;
-        let callable = objects.get(0).unwrap();
+        let callable_ref = objects.get(0).unwrap();
+        let callable = callable_ref.read().unwrap();
         let mut args: Args = vec![];
         if objects.len() > 1 {
             for i in 1..objects.len() {
@@ -383,7 +396,7 @@ impl VM {
             self.execute(&func.chunk, false)?;
             self.exit_scopes(1);
         } else {
-            return Err(RuntimeErr::new_not_callable(callable.clone()));
+            return Err(RuntimeErr::new_not_callable(callable_ref.clone()));
         }
         Ok(())
     }
@@ -539,6 +552,7 @@ impl VM {
     /// Show constants.
     pub fn display_constants(&self) {
         for (index, obj) in self.ctx.iter_constants().enumerate() {
+            let obj = obj.read().unwrap();
             eprintln!("{index:0>8} {obj}");
         }
     }
@@ -565,14 +579,16 @@ impl VM {
     /// were disassembled.
     pub fn dis_functions(&mut self) -> usize {
         let mut funcs = vec![];
-        for obj in self.ctx.iter_constants() {
+        for obj_ref in self.ctx.iter_constants() {
+            let obj = obj_ref.read().unwrap();
             let is_func = obj.down_to_func().is_some();
             if is_func {
-                funcs.push(obj.clone());
+                funcs.push(obj_ref.clone());
             }
         }
         let num_funcs = funcs.len();
         for (i, func_obj) in funcs.iter().enumerate() {
+            let func_obj = func_obj.read().unwrap();
             let func = func_obj.down_to_func().unwrap();
             let heading = format!("{func:?} ");
             eprintln!("{:=<79}", heading);
@@ -603,8 +619,8 @@ impl VM {
         let obj_str = |kind_opt: Option<&ValueStackKind>| match kind_opt {
             Some(kind) => match self.get_obj(kind.clone()) {
                 Ok(obj) => {
-                    let class = obj.class();
-                    let str = format!("{obj:?} {class}");
+                    let obj = &*obj.read().unwrap();
+                    let str = format!("{obj:?} {}", obj.class().read().unwrap());
                     str.replace('\n', "\\n").replace('\r', "\\r")
                 }
                 Err(err) => format!("[ERROR: Could not get object: {err}]"),
@@ -657,6 +673,7 @@ impl VM {
             HaltTop => {
                 if let Ok(peek) = self.peek_obj() {
                     if let Some(code) = peek {
+                        let code = code.read().unwrap();
                         self.format_aligned("HALT_TOP", code.to_string())
                     } else {
                         self.format_aligned("HALT_TOP", "[ERROR: stack empty]")

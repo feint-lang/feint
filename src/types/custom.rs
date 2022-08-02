@@ -1,7 +1,6 @@
 use std::any::Any;
-use std::cell::RefCell;
 use std::fmt;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use super::create;
 use super::result::SetAttrResult;
@@ -14,18 +13,20 @@ use super::ns::Namespace;
 // Custom Type ---------------------------------------------------------
 
 pub struct CustomType {
-    namespace: RefCell<Namespace>,
-    module: Arc<Module>,
+    namespace: Namespace,
+    module: Arc<RwLock<Module>>,
     name: String,
+    full_name: String,
 }
 
 impl CustomType {
-    pub fn new<S: Into<String>>(module: Arc<Module>, name: S) -> Self {
+    pub fn new<S: Into<String>>(module: Arc<RwLock<Module>>, name: S) -> Self {
         let mut ns = Namespace::new();
         let name = name.into();
+        let full_name = format!("{}.{name}", module.read().unwrap().name());
         ns.add_obj("$name", create::new_str(name.as_str()));
-        ns.add_obj("$full_name", create::new_str(module.name()));
-        Self { namespace: RefCell::new(ns), module, name }
+        ns.add_obj("$full_name", create::new_str(full_name.as_str()));
+        Self { namespace: ns, module, name, full_name }
     }
 }
 
@@ -42,7 +43,7 @@ impl TypeTrait for CustomType {
     }
 
     fn full_name(&self) -> &str {
-        self.module.name()
+        self.full_name.as_str()
     }
 }
 
@@ -59,7 +60,7 @@ impl ObjectTrait for CustomType {
         TYPE_TYPE.clone()
     }
 
-    fn namespace(&self) -> &RefCell<Namespace> {
+    fn namespace(&self) -> &Namespace {
         &self.namespace
     }
 }
@@ -67,16 +68,16 @@ impl ObjectTrait for CustomType {
 // Custom Object -------------------------------------------------------
 
 pub struct CustomObj {
-    class: Arc<CustomType>,
-    namespace: RefCell<Namespace>,
+    class: Arc<RwLock<CustomType>>,
+    namespace: Namespace,
 }
 
 unsafe impl Send for CustomObj {}
 unsafe impl Sync for CustomObj {}
 
 impl CustomObj {
-    pub fn new(class: Arc<CustomType>, attrs: Namespace) -> Self {
-        Self { class, namespace: RefCell::new(attrs) }
+    pub fn new(class: Arc<RwLock<CustomType>>, attrs: Namespace) -> Self {
+        Self { class, namespace: attrs }
     }
 }
 
@@ -93,12 +94,12 @@ impl ObjectTrait for CustomObj {
         self.class.clone()
     }
 
-    fn namespace(&self) -> &RefCell<Namespace> {
+    fn namespace(&self) -> &Namespace {
         &self.namespace
     }
 
     fn set_attr(&mut self, name: &str, value: ObjectRef) -> SetAttrResult {
-        self.namespace.borrow_mut().set_obj(name, value);
+        self.namespace.set_obj(name, value);
         Ok(())
     }
 
@@ -108,7 +109,7 @@ impl ObjectTrait for CustomObj {
                 return true;
             }
         }
-        self.namespace.borrow().is_equal(&rhs.namespace().borrow())
+        self.namespace.is_equal(rhs.namespace())
     }
 }
 
@@ -117,7 +118,8 @@ impl ObjectTrait for CustomObj {
 impl fmt::Display for CustomObj {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // TODO: Check for $string attr and use that value if present
-        write!(f, "<{}> object @ {}", self.class.full_name(), self.id())
+        let class = self.class.read().unwrap();
+        write!(f, "<{}> object @ {}", class.full_name(), self.id())
     }
 }
 

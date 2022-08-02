@@ -24,4 +24,4 @@ mod tuple;
 mod util;
 
 #[cfg(test)]
-pub(crate) use base::TypeTraitExt;
+pub(crate) use base::{TypeTrait, TypeTraitExt};

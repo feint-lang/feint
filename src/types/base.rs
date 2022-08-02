@@ -1,8 +1,7 @@
 //! Type System
 use std::any::Any;
-use std::cell::RefCell;
 use std::fmt;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
@@ -26,8 +25,8 @@ use super::ns::Namespace;
 use super::str::{Str, StrType};
 use super::tuple::{Tuple, TupleType};
 
-pub type TypeRef = Arc<dyn TypeTrait>;
-pub type ObjectRef = Arc<dyn ObjectTrait>;
+pub type TypeRef = Arc<RwLock<dyn TypeTrait>>;
+pub type ObjectRef = Arc<RwLock<dyn ObjectTrait>>;
 
 // Type Trait ----------------------------------------------------------
 
@@ -95,7 +94,7 @@ macro_rules! make_unary_op {
                 "Unary operator {} ({}) not implemented for {}",
                 $op,
                 stringify!($meth),
-                self.type_obj()
+                self.type_obj().read().unwrap()
             )))
         }
     };
@@ -109,7 +108,7 @@ macro_rules! make_bin_op {
                 "Binary operator {} ({}) not implemented for {}",
                 $op,
                 stringify!($func),
-                self.type_obj()
+                self.type_obj().read().unwrap()
             )))
         }
     };
@@ -129,7 +128,7 @@ pub trait ObjectTrait {
     fn type_obj(&self) -> ObjectRef;
 
     /// Each object has a namespace that holds its attributes.
-    fn namespace(&self) -> &RefCell<Namespace>;
+    fn namespace(&self) -> &Namespace;
 
     fn id(&self) -> usize {
         let p = self as *const Self;
@@ -147,26 +146,33 @@ pub trait ObjectTrait {
             return Ok(self.type_obj().clone());
         }
         if name == "$module" {
-            return Ok(self.class().module().clone());
+            let module = self.class().read().unwrap().module().clone();
+            return Ok(module);
         }
         if name == "$id" {
             return Ok(self.id_obj());
         }
-        if let Some(obj) = self.namespace().borrow().get_obj(name) {
+        if let Some(obj) = self.namespace().get_obj(name) {
             return Ok(obj);
         }
-        if let Some(obj) = self.type_obj().namespace().borrow().get_obj(name) {
+        if let Some(obj) = self.type_obj().read().unwrap().namespace().get_obj(name) {
             return Ok(obj);
         }
         Err(self.attr_does_not_exist(name))
     }
 
     fn set_attr(&mut self, name: &str, _value: ObjectRef) -> SetAttrResult {
-        Err(RuntimeErr::new_attr_cannot_be_set(self.class().full_name(), name))
+        Err(RuntimeErr::new_attr_cannot_be_set(
+            self.class().read().unwrap().full_name(),
+            name,
+        ))
     }
 
     fn attr_does_not_exist(&self, name: &str) -> RuntimeErr {
-        RuntimeErr::new_attr_does_not_exist(self.class().full_name(), name)
+        RuntimeErr::new_attr_does_not_exist(
+            self.class().read().unwrap().full_name(),
+            name,
+        )
     }
 
     // Items (accessed by index) ---------------------------------------
@@ -176,7 +182,10 @@ pub trait ObjectTrait {
     }
 
     fn item_does_not_exist(&self, index: usize) -> RuntimeErr {
-        RuntimeErr::new_item_does_not_exist(self.class().full_name(), index)
+        RuntimeErr::new_item_does_not_exist(
+            self.class().read().unwrap().full_name(),
+            index,
+        )
     }
 
     // Type checkers ---------------------------------------------------
@@ -263,8 +272,10 @@ pub trait ObjectTrait {
     // Call ------------------------------------------------------------
 
     fn call(&self, _this: This, _args: Args, _vm: &mut VM) -> CallResult {
-        let class = self.class();
-        Err(RuntimeErr::new_type_err(format!("Call not implemented for type {class}")))
+        Err(RuntimeErr::new_type_err(format!(
+            "Call not implemented for type {}",
+            self.class().read().unwrap()
+        )))
     }
 }
 
@@ -354,7 +365,7 @@ impl fmt::Display for dyn ObjectTrait {
             Str,
             Tuple
         );
-        panic!("Display must be defined for {self:?}");
+        panic!("Display must be defined");
     }
 }
 
@@ -390,6 +401,6 @@ impl fmt::Debug for dyn ObjectTrait {
             Str,
             Tuple
         );
-        panic!("Debug must be defined for {self:?}");
+        panic!("Debug must be defined");
     }
 }

@@ -2,9 +2,8 @@
 //! same thing. Lower case "class" is used instead of "type" because the
 //! latter is a Rust keyword.
 use std::any::Any;
-use std::cell::RefCell;
 use std::fmt;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use once_cell::sync::Lazy;
 
@@ -15,10 +14,11 @@ use super::ns::Namespace;
 
 // Type Type -----------------------------------------------------------
 
-pub static TYPE_TYPE: Lazy<Arc<TypeType>> = Lazy::new(|| Arc::new(TypeType::new()));
+pub static TYPE_TYPE: Lazy<Arc<RwLock<TypeType>>> =
+    Lazy::new(|| Arc::new(RwLock::new(TypeType::new())));
 
 pub struct TypeType {
-    namespace: RefCell<Namespace>,
+    namespace: Namespace,
 }
 
 impl TypeType {
@@ -26,7 +26,7 @@ impl TypeType {
         let mut ns = Namespace::new();
         ns.add_obj("$name", create::new_str("Type"));
         ns.add_obj("$full_name", create::new_str("builtins.Type"));
-        Self { namespace: RefCell::new(ns) }
+        Self { namespace: ns }
     }
 }
 
@@ -56,7 +56,7 @@ impl ObjectTrait for TypeType {
         TYPE_TYPE.clone()
     }
 
-    fn namespace(&self) -> &RefCell<Namespace> {
+    fn namespace(&self) -> &Namespace {
         &self.namespace
     }
 }
@@ -64,7 +64,7 @@ impl ObjectTrait for TypeType {
 // Type Object ---------------------------------------------------------
 
 pub struct Type {
-    namespace: RefCell<Namespace>,
+    namespace: Namespace,
 }
 
 unsafe impl Send for Type {}
@@ -73,7 +73,7 @@ unsafe impl Sync for Type {}
 impl Type {
     pub fn new() -> Self {
         let ns = Namespace::new();
-        Self { namespace: RefCell::new(ns) }
+        Self { namespace: ns }
     }
 }
 
@@ -90,7 +90,7 @@ impl ObjectTrait for Type {
         TYPE_TYPE.clone()
     }
 
-    fn namespace(&self) -> &RefCell<Namespace> {
+    fn namespace(&self) -> &Namespace {
         &self.namespace
     }
 }
@@ -99,14 +99,12 @@ impl ObjectTrait for Type {
 
 impl fmt::Display for Type {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        println!("6");
-        write!(f, "{} @ {}", self.type_obj(), self.id())
+        write!(f, "{} @ {}", self.type_obj().read().unwrap(), self.id())
     }
 }
 
 impl fmt::Debug for Type {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        println!("7");
         write!(f, "{self}")
     }
 }

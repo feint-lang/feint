@@ -25,8 +25,14 @@ fn test_add_retrieve() {
     let int_copy = int.clone();
     let index = ctx.add_const(int.clone());
     let retrieved = ctx.get_const(index).unwrap();
-    assert!(retrieved.class().is(&*int_copy.class()));
-    assert!(retrieved.is(&*int_copy));
-    assert!(retrieved.is_equal(&*int_copy));
-    assert_eq!(retrieved.id(), int_copy.id());
+    let retrieved = retrieved.read().unwrap();
+    assert!(retrieved.class().read().unwrap().is(&*int_copy
+        .read()
+        .unwrap()
+        .class()
+        .read()
+        .unwrap()));
+    assert!(retrieved.is(&*int_copy.read().unwrap()));
+    assert!(retrieved.is_equal(&*int_copy.read().unwrap()));
+    assert_eq!(retrieved.id(), int_copy.read().unwrap().id());
 }

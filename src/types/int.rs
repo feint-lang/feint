@@ -1,7 +1,6 @@
 use std::any::Any;
-use std::cell::RefCell;
 use std::fmt;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use num_bigint::BigInt;
 use num_traits::{FromPrimitive, ToPrimitive, Zero};
@@ -20,10 +19,11 @@ use super::ns::Namespace;
 
 // Int Type ------------------------------------------------------------
 
-pub static INT_TYPE: Lazy<Arc<IntType>> = Lazy::new(|| Arc::new(IntType::new()));
+pub static INT_TYPE: Lazy<Arc<RwLock<IntType>>> =
+    Lazy::new(|| Arc::new(RwLock::new(IntType::new())));
 
 pub struct IntType {
-    namespace: RefCell<Namespace>,
+    namespace: Namespace,
 }
 
 unsafe impl Send for IntType {}
@@ -38,7 +38,7 @@ impl IntType {
             "new",
             create::new_builtin_func("new", Some(vec!["value"]), int::new),
         );
-        Self { namespace: RefCell::new(ns) }
+        Self { namespace: ns }
     }
 }
 
@@ -65,7 +65,7 @@ impl ObjectTrait for IntType {
         TYPE_TYPE.clone()
     }
 
-    fn namespace(&self) -> &RefCell<Namespace> {
+    fn namespace(&self) -> &Namespace {
         &self.namespace
     }
 }
@@ -86,14 +86,14 @@ macro_rules! make_op {
                 let value = create::new_float(value);
                 Ok(value)
             } else {
-                Err(RuntimeErr::new_type_err(format!($message, rhs.class())))
+                Err(RuntimeErr::new_type_err(format!($message, rhs.class().read().unwrap())))
             }
         }
     };
 }
 
 pub struct Int {
-    namespace: RefCell<Namespace>,
+    namespace: Namespace,
     value: BigInt,
 }
 
@@ -102,7 +102,7 @@ unsafe impl Sync for Int {}
 
 impl Int {
     pub fn new(value: BigInt) -> Self {
-        Self { namespace: RefCell::new(Namespace::new()), value }
+        Self { namespace: Namespace::new(), value }
     }
 
     pub fn value(&self) -> &BigInt {
@@ -119,7 +119,7 @@ impl Int {
         } else {
             return Err(RuntimeErr::new_type_err(format!(
                 "Could not divide {} into Int",
-                rhs.class()
+                rhs.class().read().unwrap()
             )));
         };
         Ok(lhs_val / rhs_val)
@@ -139,7 +139,7 @@ impl ObjectTrait for Int {
         INT_TYPE.clone()
     }
 
-    fn namespace(&self) -> &RefCell<Namespace> {
+    fn namespace(&self) -> &Namespace {
         &self.namespace
     }
 
@@ -169,8 +169,8 @@ impl ObjectTrait for Int {
         } else {
             Err(RuntimeErr::new_type_err(format!(
                 "Could not compare {} to {}: >",
-                rhs.class(),
-                self.class(),
+                self.class().read().unwrap(),
+                rhs.class().read().unwrap()
             )))
         }
     }
@@ -183,8 +183,8 @@ impl ObjectTrait for Int {
         } else {
             Err(RuntimeErr::new_type_err(format!(
                 "Could not compare {} to {}: >",
-                self.class(),
-                rhs.class()
+                self.class().read().unwrap(),
+                rhs.class().read().unwrap()
             )))
         }
     }
@@ -207,8 +207,8 @@ impl ObjectTrait for Int {
         } else {
             Err(RuntimeErr::new_type_err(format!(
                 "Could not raise {} by {}",
-                self.class(),
-                rhs.class()
+                self.class().read().unwrap(),
+                rhs.class().read().unwrap()
             )))
         }
     }

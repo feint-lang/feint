@@ -1,7 +1,6 @@
 use std::any::Any;
-use std::cell::RefCell;
 use std::fmt;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use num_traits::ToPrimitive;
 use once_cell::sync::Lazy;
@@ -18,10 +17,11 @@ use super::ns::Namespace;
 
 // Float Type ----------------------------------------------------------
 
-pub static FLOAT_TYPE: Lazy<Arc<FloatType>> = Lazy::new(|| Arc::new(FloatType::new()));
+pub static FLOAT_TYPE: Lazy<Arc<RwLock<FloatType>>> =
+    Lazy::new(|| Arc::new(RwLock::new(FloatType::new())));
 
 pub struct FloatType {
-    namespace: RefCell<Namespace>,
+    namespace: Namespace,
 }
 
 unsafe impl Send for FloatType {}
@@ -36,7 +36,7 @@ impl FloatType {
             "new",
             create::new_builtin_func("map", Some(vec!["value"]), float::new),
         );
-        Self { namespace: RefCell::new(ns) }
+        Self { namespace: ns }
     }
 }
 
@@ -63,7 +63,7 @@ impl ObjectTrait for FloatType {
         TYPE_TYPE.clone()
     }
 
-    fn namespace(&self) -> &RefCell<Namespace> {
+    fn namespace(&self) -> &Namespace {
         &self.namespace
     }
 }
@@ -78,7 +78,7 @@ macro_rules! make_op {
             } else if let Some(rhs) = rhs.down_to_int() {
                 rhs.value().to_f64().unwrap()
             } else {
-                return Err(RuntimeErr::new_type_err(format!($message, rhs.class())));
+                return Err(RuntimeErr::new_type_err(format!($message, rhs.class().read().unwrap())));
             };
             let mut value = &self.value $op value;
             if $trunc {
@@ -91,7 +91,7 @@ macro_rules! make_op {
 }
 
 pub struct Float {
-    namespace: RefCell<Namespace>,
+    namespace: Namespace,
     value: f64,
 }
 
@@ -100,7 +100,7 @@ unsafe impl Sync for Float {}
 
 impl Float {
     pub fn new(value: f64) -> Self {
-        Self { namespace: RefCell::new(Namespace::new()), value }
+        Self { namespace: Namespace::new(), value }
     }
 
     pub fn value(&self) -> &f64 {
@@ -121,7 +121,7 @@ impl ObjectTrait for Float {
         FLOAT_TYPE.clone()
     }
 
-    fn namespace(&self) -> &RefCell<Namespace> {
+    fn namespace(&self) -> &Namespace {
         &self.namespace
     }
 
@@ -151,8 +151,8 @@ impl ObjectTrait for Float {
         } else {
             Err(RuntimeErr::new_type_err(format!(
                 "Could not compare {} to {}: <",
-                self.class(),
-                rhs.class()
+                self.class().read().unwrap(),
+                rhs.class().read().unwrap()
             )))
         }
     }
@@ -165,8 +165,8 @@ impl ObjectTrait for Float {
         } else {
             Err(RuntimeErr::new_type_err(format!(
                 "Could not compare {} to {}: >",
-                self.class(),
-                rhs.class()
+                self.class().read().unwrap(),
+                rhs.class().read().unwrap()
             )))
         }
     }
@@ -179,8 +179,8 @@ impl ObjectTrait for Float {
         } else {
             return Err(RuntimeErr::new_type_err(format!(
                 "Could not raise {} by {}",
-                self.class(),
-                rhs.class()
+                self.class().read().unwrap(),
+                rhs.class().read().unwrap()
             )));
         };
         let value = self.value().powf(exp);

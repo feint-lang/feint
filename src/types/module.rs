@@ -1,7 +1,6 @@
 use std::any::Any;
-use std::cell::RefCell;
 use std::fmt;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use once_cell::sync::Lazy;
 
@@ -13,11 +12,11 @@ use super::ns::Namespace;
 
 // Module Type ---------------------------------------------------------
 
-pub static MODULE_TYPE: Lazy<Arc<ModuleType>> =
-    Lazy::new(|| Arc::new(ModuleType::new()));
+pub static MODULE_TYPE: Lazy<Arc<RwLock<ModuleType>>> =
+    Lazy::new(|| Arc::new(RwLock::new(ModuleType::new())));
 
 pub struct ModuleType {
-    namespace: RefCell<Namespace>,
+    namespace: Namespace,
 }
 
 unsafe impl Send for ModuleType {}
@@ -28,7 +27,7 @@ impl ModuleType {
         let mut ns = Namespace::new();
         ns.add_obj("$name", create::new_str("Module"));
         ns.add_obj("$full_name", create::new_str("builtins.Module"));
-        Self { namespace: RefCell::new(ns) }
+        Self { namespace: ns }
     }
 }
 
@@ -55,7 +54,7 @@ impl ObjectTrait for ModuleType {
         TYPE_TYPE.clone()
     }
 
-    fn namespace(&self) -> &RefCell<Namespace> {
+    fn namespace(&self) -> &Namespace {
         &self.namespace
     }
 }
@@ -64,14 +63,14 @@ impl ObjectTrait for ModuleType {
 
 pub struct Module {
     name: String,
-    namespace: RefCell<Namespace>,
+    namespace: Namespace,
 }
 
 unsafe impl Send for Module {}
 unsafe impl Sync for Module {}
 
 impl Module {
-    pub fn new<S: Into<String>>(name: S, namespace: RefCell<Namespace>) -> Self {
+    pub fn new<S: Into<String>>(name: S, namespace: Namespace) -> Self {
         Self { namespace, name: name.into() }
     }
 
@@ -93,7 +92,7 @@ impl ObjectTrait for Module {
         MODULE_TYPE.clone()
     }
 
-    fn namespace(&self) -> &RefCell<Namespace> {
+    fn namespace(&self) -> &Namespace {
         &self.namespace
     }
 }

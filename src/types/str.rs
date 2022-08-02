@@ -1,7 +1,6 @@
 use std::any::Any;
-use std::cell::RefCell;
 use std::fmt;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use once_cell::sync::Lazy;
 
@@ -15,10 +14,11 @@ use super::ns::Namespace;
 
 // Str Type ------------------------------------------------------------
 
-pub static STR_TYPE: Lazy<Arc<StrType>> = Lazy::new(|| Arc::new(StrType::new()));
+pub static STR_TYPE: Lazy<Arc<RwLock<StrType>>> =
+    Lazy::new(|| Arc::new(RwLock::new(StrType::new())));
 
 pub struct StrType {
-    namespace: RefCell<Namespace>,
+    namespace: Namespace,
 }
 
 impl StrType {
@@ -26,7 +26,7 @@ impl StrType {
         let mut ns = Namespace::new();
         ns.add_obj("$name", create::new_str("Str"));
         ns.add_obj("$full_name", create::new_str("builtins.Str"));
-        Self { namespace: RefCell::new(ns) }
+        Self { namespace: ns }
     }
 }
 
@@ -56,7 +56,7 @@ impl ObjectTrait for StrType {
         TYPE_TYPE.clone()
     }
 
-    fn namespace(&self) -> &RefCell<Namespace> {
+    fn namespace(&self) -> &Namespace {
         &self.namespace
     }
 }
@@ -64,13 +64,13 @@ impl ObjectTrait for StrType {
 // Str Object ----------------------------------------------------------
 
 pub struct Str {
-    namespace: RefCell<Namespace>,
+    namespace: Namespace,
     value: String,
 }
 
 impl Str {
     pub fn new<S: Into<String>>(value: S) -> Self {
-        Self { namespace: RefCell::new(Namespace::new()), value: value.into() }
+        Self { namespace: Namespace::new(), value: value.into() }
     }
 
     pub fn value(&self) -> &str {
@@ -91,7 +91,7 @@ impl ObjectTrait for Str {
         STR_TYPE.clone()
     }
 
-    fn namespace(&self) -> &RefCell<Namespace> {
+    fn namespace(&self) -> &Namespace {
         &self.namespace
     }
 
@@ -115,8 +115,8 @@ impl ObjectTrait for Str {
         } else {
             Err(RuntimeErr::new_type_err(format!(
                 "Cannot concatenate {} to {}",
-                rhs.class(),
-                self.class(),
+                self.class().read().unwrap(),
+                rhs.class().read().unwrap(),
             )))
         }
     }
@@ -127,8 +127,8 @@ impl ObjectTrait for Str {
         } else {
             Err(RuntimeErr::new_type_err(format!(
                 "Cannot compare {} to {}: <",
-                rhs.class(),
-                self.class(),
+                self.class().read().unwrap(),
+                rhs.class().read().unwrap(),
             )))
         }
     }
@@ -139,8 +139,8 @@ impl ObjectTrait for Str {
         } else {
             Err(RuntimeErr::new_type_err(format!(
                 "Cannot compare {} to {}: >",
-                rhs.class(),
-                self.class(),
+                self.class().read().unwrap(),
+                rhs.class().read().unwrap(),
             )))
         }
     }

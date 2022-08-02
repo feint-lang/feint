@@ -70,7 +70,8 @@ impl Namespace {
         }
         // Otherwise, compare all entries for equality.
         for (name, lhs_val) in self.objects.iter() {
-            let rhs_val = &other.objects[name];
+            let lhs_val = lhs_val.read().unwrap();
+            let rhs_val = &other.objects[name].read().unwrap();
             if !lhs_val.is_equal(&**rhs_val) {
                 return false;
             }

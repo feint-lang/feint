@@ -1,8 +1,7 @@
 //! Type Constructors.
 //!
 //! These constructors simplify the creation system objects.
-use std::cell::RefCell;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use crate::types::Namespace;
 use num_bigint::BigInt;
@@ -25,9 +24,11 @@ use super::tuple::Tuple;
 
 use super::result::Params;
 
-static NIL: Lazy<Arc<Nil>> = Lazy::new(|| Arc::new(Nil::new()));
-static TRUE: Lazy<Arc<Bool>> = Lazy::new(|| Arc::new(Bool::new(true)));
-static FALSE: Lazy<Arc<Bool>> = Lazy::new(|| Arc::new(Bool::new(false)));
+static NIL: Lazy<Arc<RwLock<Nil>>> = Lazy::new(|| Arc::new(RwLock::new(Nil::new())));
+static TRUE: Lazy<Arc<RwLock<Bool>>> =
+    Lazy::new(|| Arc::new(RwLock::new(Bool::new(true))));
+static FALSE: Lazy<Arc<RwLock<Bool>>> =
+    Lazy::new(|| Arc::new(RwLock::new(Bool::new(false))));
 
 // Builtin type constructors ---------------------------------------
 
@@ -49,11 +50,11 @@ pub fn new_builtin_func<S: Into<String>>(
     func: BuiltinFn,
 ) -> ObjectRef {
     let params = collect_params(params);
-    Arc::new(BuiltinFunc::new(name, params, func))
+    Arc::new(RwLock::new(BuiltinFunc::new(name, params, func)))
 }
 
 pub fn new_float(value: f64) -> ObjectRef {
-    Arc::new(Float::new(value))
+    Arc::new(RwLock::new(Float::new(value)))
 }
 
 pub fn new_float_from_string<S: Into<String>>(value: S) -> ObjectRef {
@@ -68,12 +69,12 @@ pub fn new_func<S: Into<String>>(
     chunk: Chunk,
 ) -> ObjectRef {
     let params = collect_params(params);
-    Arc::new(Func::new(name, params, chunk))
+    Arc::new(RwLock::new(Func::new(name, params, chunk)))
 }
 
 pub fn new_int<I: Into<BigInt>>(value: I) -> ObjectRef {
     let value = value.into();
-    Arc::new(Int::new(value))
+    Arc::new(RwLock::new(Int::new(value)))
 }
 
 pub fn new_int_from_string<S: Into<String>>(value: S) -> ObjectRef {
@@ -87,26 +88,32 @@ pub fn new_int_from_string<S: Into<String>>(value: S) -> ObjectRef {
     }
 }
 
-pub fn new_module<S: Into<String>>(name: S, ns: Namespace) -> Arc<Module> {
-    Arc::new(Module::new(name, RefCell::new(ns)))
+pub fn new_module<S: Into<String>>(name: S, ns: Namespace) -> Arc<RwLock<Module>> {
+    Arc::new(RwLock::new(Module::new(name, ns)))
 }
 
 pub fn new_str<S: Into<String>>(value: S) -> ObjectRef {
-    Arc::new(Str::new(value))
+    Arc::new(RwLock::new(Str::new(value)))
 }
 
 pub fn new_tuple(items: Vec<ObjectRef>) -> ObjectRef {
-    Arc::new(Tuple::new(items))
+    Arc::new(RwLock::new(Tuple::new(items)))
 }
 
 // Custom type constructor -----------------------------------------
 
-pub fn new_custom_type(module: Arc<Module>, name: &str) -> Arc<CustomType> {
-    Arc::new(CustomType::new(module, name))
+pub fn new_custom_type(
+    module: Arc<RwLock<Module>>,
+    name: &str,
+) -> Arc<RwLock<CustomType>> {
+    Arc::new(RwLock::new(CustomType::new(module, name)))
 }
 
-pub fn new_custom_instance(class: Arc<CustomType>, attrs: Namespace) -> ObjectRef {
-    Arc::new(CustomObj::new(class, attrs))
+pub fn new_custom_instance(
+    class: Arc<RwLock<CustomType>>,
+    attrs: Namespace,
+) -> ObjectRef {
+    Arc::new(RwLock::new(CustomObj::new(class, attrs)))
 }
 
 // Utilities -------------------------------------------------------

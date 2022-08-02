@@ -6,6 +6,7 @@ use crate::vm::VM;
 pub fn type_of(this: This, args: Args, _vm: &mut VM) -> CallResult {
     assert!(this.is_none());
     let arg = args.first().unwrap();
+    let arg = arg.read().unwrap();
     Ok(Some(arg.type_obj().clone()))
 }
 
@@ -13,5 +14,6 @@ pub fn type_of(this: This, args: Args, _vm: &mut VM) -> CallResult {
 pub fn obj_id(this: This, args: Args, _vm: &mut VM) -> CallResult {
     assert!(this.is_none());
     let arg = args.first().unwrap();
+    let arg = arg.read().unwrap();
     Ok(Some(create::new_int(arg.id())))
 }
