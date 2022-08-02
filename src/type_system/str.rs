@@ -2,11 +2,12 @@ use std::any::Any;
 use std::fmt;
 use std::sync::Arc;
 
+use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeErr, RuntimeObjResult};
 use once_cell::sync::Lazy;
 
 use super::create;
 
-use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
+use super::base::{ObjectRef, ObjectTrait, ObjectTraitExt, TypeRef, TypeTrait};
 use super::class::TYPE_TYPE;
 use super::ns::Namespace;
 
@@ -45,7 +46,7 @@ impl ObjectTrait for StrType {
         self
     }
 
-    fn type_type(&self) -> TypeRef {
+    fn class(&self) -> TypeRef {
         TYPE_TYPE.clone()
     }
 
@@ -80,7 +81,7 @@ impl ObjectTrait for Str {
         self
     }
 
-    fn type_type(&self) -> TypeRef {
+    fn class(&self) -> TypeRef {
         STR_TYPE.clone()
     }
 
@@ -90,6 +91,64 @@ impl ObjectTrait for Str {
 
     fn namespace(&self) -> ObjectRef {
         self.namespace.clone()
+    }
+
+    fn is_equal(&self, rhs: &dyn ObjectTrait, _ctx: &RuntimeContext) -> bool {
+        if let Some(rhs) = rhs.down_to_str() {
+            self.is(rhs) || self.value() == rhs.value()
+        } else {
+            false
+        }
+    }
+
+    fn add(&self, rhs: &dyn ObjectTrait, ctx: &RuntimeContext) -> RuntimeObjResult {
+        if let Some(rhs) = rhs.down_to_str() {
+            let a = self.value();
+            let b = rhs.value();
+            let mut value = String::with_capacity(a.len() + b.len());
+            value.push_str(a);
+            value.push_str(b);
+            let value = ctx.builtins.new_str(value);
+            Ok(value)
+        } else {
+            Err(RuntimeErr::new_type_err(format!(
+                "Cannot concatenate {} to {}",
+                rhs.class(),
+                self.class(),
+            )))
+        }
+    }
+
+    fn less_than(
+        &self,
+        rhs: &dyn ObjectTrait,
+        _ctx: &RuntimeContext,
+    ) -> RuntimeBoolResult {
+        if let Some(rhs) = rhs.down_to_str() {
+            Ok(self.value() < rhs.value())
+        } else {
+            Err(RuntimeErr::new_type_err(format!(
+                "Cannot compare {} to {}: <",
+                rhs.class(),
+                self.class(),
+            )))
+        }
+    }
+
+    fn greater_than(
+        &self,
+        rhs: &dyn ObjectTrait,
+        _ctx: &RuntimeContext,
+    ) -> RuntimeBoolResult {
+        if let Some(rhs) = rhs.down_to_str() {
+            Ok(self.value() > rhs.value())
+        } else {
+            Err(RuntimeErr::new_type_err(format!(
+                "Cannot compare {} to {}: >",
+                rhs.class(),
+                self.class(),
+            )))
+        }
     }
 }
 

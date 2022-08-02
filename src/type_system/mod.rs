@@ -1,10 +1,17 @@
 mod base;
 mod bool;
+mod builtin_func;
 mod builtins;
 mod class;
 mod create;
+mod custom;
+mod float;
+mod func;
 mod int;
 mod module;
 mod nil;
 mod ns;
+mod result;
 mod str;
+mod tuple;
+mod util;

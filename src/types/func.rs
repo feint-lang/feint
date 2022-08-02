@@ -2,12 +2,12 @@
 use std::any::Any;
 use std::fmt;
 
-use crate::types::{Args, CallResult, ObjectRef, Params};
 use crate::vm::{Chunk, VM};
 
 use super::builtin_types::BUILTIN_TYPES;
 use super::class::TypeRef;
-use super::object::Object;
+use super::object::{Object, ObjectRef};
+use super::result::{Args, CallResult, Params};
 
 pub struct Func {
     pub name: String,

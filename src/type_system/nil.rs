@@ -45,7 +45,7 @@ impl ObjectTrait for NilType {
         self
     }
 
-    fn type_type(&self) -> TypeRef {
+    fn class(&self) -> TypeRef {
         TYPE_TYPE.clone()
     }
 
@@ -78,7 +78,7 @@ impl ObjectTrait for Nil {
         self
     }
 
-    fn type_type(&self) -> TypeRef {
+    fn class(&self) -> TypeRef {
         NIL_TYPE.clone()
     }
 

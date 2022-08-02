@@ -46,7 +46,7 @@ impl ObjectTrait for ModuleType {
         self
     }
 
-    fn type_type(&self) -> TypeRef {
+    fn class(&self) -> TypeRef {
         TYPE_TYPE.clone()
     }
 
@@ -84,7 +84,7 @@ impl ObjectTrait for Module {
         self
     }
 
-    fn type_type(&self) -> TypeRef {
+    fn class(&self) -> TypeRef {
         MODULE_TYPE.clone()
     }
 

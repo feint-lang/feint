@@ -3,11 +3,12 @@ use std::collections::HashMap;
 use std::fmt;
 use std::sync::Arc;
 
+use crate::vm::RuntimeContext;
 use once_cell::sync::Lazy;
 
 use super::create;
 
-use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
+use super::base::{ObjectRef, ObjectTrait, ObjectTraitExt, TypeRef, TypeTrait};
 use super::class::TYPE_TYPE;
 
 pub type NamespaceObjects = HashMap<String, ObjectRef>;
@@ -48,7 +49,7 @@ impl ObjectTrait for NamespaceType {
         self
     }
 
-    fn type_type(&self) -> TypeRef {
+    fn class(&self) -> TypeRef {
         TYPE_TYPE.clone()
     }
 
@@ -75,6 +76,10 @@ impl Namespace {
         Self { objects: HashMap::new() }
     }
 
+    pub fn size(&self) -> usize {
+        self.objects.len()
+    }
+
     pub fn get_obj(&self, name: &str) -> Option<ObjectRef> {
         if let Some(obj) = self.objects.get(name) {
             Some(obj.clone())
@@ -93,7 +98,7 @@ impl ObjectTrait for Namespace {
         self
     }
 
-    fn type_type(&self) -> TypeRef {
+    fn class(&self) -> TypeRef {
         NS_TYPE.clone()
     }
 
@@ -110,6 +115,34 @@ impl ObjectTrait for Namespace {
     // fn get_attr(&self, _name: &str) -> Option<ObjectRef> {
     //     panic!("Don't use Namespace::get_attr()");
     // }
+
+    fn is_equal(&self, rhs: &dyn ObjectTrait, ctx: &RuntimeContext) -> bool {
+        if let Some(rhs) = rhs.down_to_ns() {
+            if self.is(rhs) {
+                return true;
+            }
+            if self.size() != rhs.size() {
+                // Namespaces have a different number of entries, so
+                // they can't be equal.
+                return false;
+            }
+            if !self.objects.keys().all(|k| rhs.objects.contains_key(k)) {
+                // Namespaces have differing keys, so they can't be
+                // equal.
+                return false;
+            }
+            // Otherwise, compare all entries for equality.
+            for (name, lhs_val) in self.objects.iter() {
+                let rhs_val = &rhs.objects[name];
+                if !lhs_val.is_equal(&**rhs_val, ctx) {
+                    return false;
+                }
+            }
+            true
+        } else {
+            false
+        }
+    }
 }
 
 // Display -------------------------------------------------------------

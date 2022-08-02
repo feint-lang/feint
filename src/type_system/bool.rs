@@ -2,11 +2,12 @@ use std::any::Any;
 use std::fmt;
 use std::sync::Arc;
 
+use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeErr};
 use once_cell::sync::Lazy;
 
 use super::create;
 
-use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
+use super::base::{ObjectRef, ObjectTrait, ObjectTraitExt, TypeRef, TypeTrait};
 use super::class::TYPE_TYPE;
 use super::ns::Namespace;
 
@@ -45,7 +46,7 @@ impl ObjectTrait for BoolType {
         self
     }
 
-    fn type_type(&self) -> TypeRef {
+    fn class(&self) -> TypeRef {
         TYPE_TYPE.clone()
     }
 
@@ -83,7 +84,7 @@ impl ObjectTrait for Bool {
         self
     }
 
-    fn type_type(&self) -> TypeRef {
+    fn class(&self) -> TypeRef {
         BOOL_TYPE.clone()
     }
 
@@ -93,6 +94,46 @@ impl ObjectTrait for Bool {
 
     fn namespace(&self) -> ObjectRef {
         self.namespace.clone()
+    }
+
+    // Unary operations -----------------------------------------------
+
+    fn bool_val(&self, _ctx: &RuntimeContext) -> RuntimeBoolResult {
+        Ok(*self.value())
+    }
+
+    // Binary operations -----------------------------------------------
+
+    fn is_equal(&self, rhs: &dyn ObjectTrait, _ctx: &RuntimeContext) -> bool {
+        if let Some(rhs) = rhs.down_to_bool() {
+            self.is(rhs) || self.value() == rhs.value()
+        } else {
+            false
+        }
+    }
+
+    fn and(&self, rhs: &dyn ObjectTrait, _ctx: &RuntimeContext) -> RuntimeBoolResult {
+        if let Some(rhs) = rhs.down_to_bool() {
+            Ok(*self.value() && *rhs.value())
+        } else {
+            Err(RuntimeErr::new_type_err(format!(
+                "{} && {} not implemented",
+                self.class(),
+                rhs.class()
+            )))
+        }
+    }
+
+    fn or(&self, rhs: &dyn ObjectTrait, _ctx: &RuntimeContext) -> RuntimeBoolResult {
+        if let Some(rhs) = rhs.down_to_bool() {
+            Ok(*self.value() || *rhs.value())
+        } else {
+            Err(RuntimeErr::new_type_err(format!(
+                "{} || {} not implemented",
+                self.class(),
+                rhs.class()
+            )))
+        }
     }
 }
 
