@@ -105,10 +105,6 @@ impl Int {
         Self { namespace: RefCell::new(Namespace::new()), value }
     }
 
-    pub fn from_usize(value: usize) -> Self {
-        Self::new(BigInt::from_usize(value).unwrap())
-    }
-
     pub fn value(&self) -> &BigInt {
         &self.value
     }

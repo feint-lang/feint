@@ -13,5 +13,5 @@ pub fn type_of(this: This, args: Args, _vm: &mut VM) -> CallResult {
 pub fn obj_id(this: This, args: Args, _vm: &mut VM) -> CallResult {
     assert!(this.is_none());
     let arg = args.first().unwrap();
-    Ok(Some(create::new_int_from_usize(arg.id())))
+    Ok(Some(create::new_int(arg.id())))
 }

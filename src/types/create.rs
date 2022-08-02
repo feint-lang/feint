@@ -76,10 +76,6 @@ pub fn new_int<I: Into<BigInt>>(value: I) -> ObjectRef {
     Arc::new(Int::new(value))
 }
 
-pub fn new_int_from_usize(value: usize) -> ObjectRef {
-    Arc::new(Int::from_usize(value))
-}
-
 pub fn new_int_from_string<S: Into<String>>(value: S) -> ObjectRef {
     let value = value.into();
     if let Ok(value) = BigInt::from_str_radix(value.as_ref(), 10) {

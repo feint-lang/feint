@@ -137,7 +137,7 @@ pub trait ObjectTrait {
     }
 
     fn id_obj(&self) -> ObjectRef {
-        create::new_int_from_usize(self.id())
+        create::new_int(self.id())
     }
 
     // Attributes (accessed by name) -----------------------------------
