@@ -1,8 +1,8 @@
 use num_bigint::BigInt;
 use num_traits::{FromPrimitive, ToPrimitive};
 
-use super::float::Float;
-use super::int::Int;
+use crate::types::float::Float;
+use crate::types::int::Int;
 
 /// Compare Int and Float for equality.
 pub fn eq_int_float(int: &Int, float: &Float) -> bool {

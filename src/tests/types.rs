@@ -1,23 +1,21 @@
-use crate::types::{ObjectExt, ObjectRef};
-use crate::vm::RuntimeContext;
+use crate::types::{create, Namespace, ObjectTrait, ObjectTraitExt, TypeTraitExt};
 
 #[test]
 fn test_float() {
-    let ctx = RuntimeContext::default();
+    let float1 = create::new_float(0.0);
+    let float2 = create::new_float(0.0);
+    let float3 = create::new_float(1.0);
 
-    let float1 = ctx.builtins.new_float(0.0);
-    let float2 = ctx.builtins.new_float(0.0);
-    let float3 = ctx.builtins.new_float(1.0);
-
-    assert!(float1.class().is(float2.class()));
-    assert!(float2.class().is(float3.class()));
+    // TODO:
+    assert!(float1.class().is(&*float2.class()));
+    assert!(float2.class().is(&*float3.class()));
 
     assert!(float1.is(&*float1));
     assert!(!float1.is(&*float2));
     assert!(!float1.is(&*float3));
 
-    assert!(float1.is_equal(&*float2, &ctx));
-    assert!(!float1.is_equal(&*float3, &ctx));
+    assert!(float1.is_equal(&*float2));
+    assert!(!float1.is_equal(&*float3));
 
     assert_ne!(float1.id(), float2.id());
     assert_ne!(float2.id(), float3.id());
@@ -25,46 +23,57 @@ fn test_float() {
 
 #[test]
 fn test_compare_float_to_int() {
-    let ctx = RuntimeContext::default();
-    let float = ctx.builtins.new_float(1.0);
-    let int = ctx.builtins.new_int(1u8);
-    assert!(float.is_equal(&*int, &ctx));
-    assert!(int.is_equal(&*float, &ctx));
+    let float = create::new_float(1.0);
+    let int = create::new_int(1);
+    assert!(float.is_equal(&*int));
+    assert!(int.is_equal(&*float));
 }
 
 #[test]
 fn test_custom() {
-    let ctx = RuntimeContext::default();
+    let mod1 = create::new_module("test1", Namespace::new());
 
-    let t1 = ctx.builtins.new_type("test", "Custom1");
-    let t1_obj1 = ctx.builtins.new_custom_instance(t1.clone());
-    let t1_obj2 = ctx.builtins.new_custom_instance(t1.clone());
-    let t1_obj3 = ctx.builtins.new_custom_instance(t1.clone());
+    let t1 = create::new_custom_type(mod1, "Custom1");
 
-    assert!((t1.clone() as ObjectRef).get_attr("$id", &ctx, t1.clone()).is_ok());
-    assert!((t1.clone() as ObjectRef).get_attr("$type", &ctx, t1).is_ok());
-    assert!(t1_obj1.get_attr("$id", &ctx, t1_obj1.clone()).is_ok());
-    assert!(t1_obj1.get_attr("$type", &ctx, t1_obj1.clone()).is_ok());
+    let mut ns = Namespace::new();
+    ns.add_obj("value", create::new_nil());
+    let t1_obj1 = create::new_custom_instance(t1.clone(), ns);
 
-    t1_obj3
-        .set_attr("value", ctx.builtins.new_int(1), &ctx)
-        .expect("Could not set attribute");
+    let mut ns = Namespace::new();
+    ns.add_obj("value", create::new_nil());
+    let t1_obj2 = create::new_custom_instance(t1.clone(), ns);
 
-    let t2 = ctx.builtins.new_type("test", "Custom2");
-    let t2_obj1 = ctx.builtins.new_custom_instance(t2);
+    let mut ns = Namespace::new();
+    ns.add_obj("value", create::new_nil());
+    let t1_obj3 = create::new_custom_instance(t1.clone(), ns);
+
+    assert!(t1.clone().get_attr("$id").is_ok());
+    assert!(t1.clone().get_attr("$type").is_ok());
+    assert!(t1_obj1.get_attr("$id").is_ok());
+    assert!(t1_obj1.get_attr("$type").is_ok());
+
+    let was_set = t1_obj3.namespace().borrow_mut().set_obj("value", create::new_int(1));
+    assert!(was_set, "Could not set `value` on t1_obj3");
+    assert!(t1_obj3.get_attr("value").is_ok());
+    assert!(t1_obj3.get_attr("value").unwrap().is_equal(&*create::new_int(1)));
+
+    let mod2 = create::new_module("test2", Namespace::new());
+
+    let t2 = create::new_custom_type(mod2, "Custom2");
+    let t2_obj1 = create::new_custom_instance(t2, Namespace::new());
 
     // An object should be equal to itself.
-    assert!(t1_obj1.is_equal(&*t1_obj1, &ctx));
+    assert!(t1_obj1.is_equal(&*t1_obj1));
 
     // An object should be equal to an object of the SAME type with
     // the same attributes.
-    assert!(t1_obj1.is_equal(&*t1_obj2, &ctx));
+    assert!(t1_obj1.is_equal(&*t1_obj2));
 
     // An object should NOT be equal to an object of the SAME type with
     // the DIFFERENT attributes.
-    assert!(!t1_obj1.is_equal(&*t1_obj3, &ctx));
+    assert!(!t1_obj1.is_equal(&*t1_obj3));
 
     // An object should NOT be equal to an object of a DIFFERENT type,
     // regardless of attributes.
-    assert!(!t1_obj1.is_equal(&*t2_obj1, &ctx));
+    assert!(!t1_obj1.is_equal(&*t2_obj1));
 }

@@ -1,20 +1,76 @@
-//! String type
 use std::any::Any;
+use std::cell::RefCell;
 use std::fmt;
+use std::sync::Arc;
 
-use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeErr, RuntimeObjResult};
+use once_cell::sync::Lazy;
 
-use super::builtin_types::BUILTIN_TYPES;
-use super::class::TypeRef;
-use super::object::{Object, ObjectExt};
+use crate::vm::{RuntimeBoolResult, RuntimeErr, RuntimeObjResult};
+
+use super::create;
+
+use super::base::{ObjectRef, ObjectTrait, ObjectTraitExt, TypeRef, TypeTrait};
+use super::class::TYPE_TYPE;
+use super::ns::Namespace;
+
+// Str Type ------------------------------------------------------------
+
+pub static STR_TYPE: Lazy<Arc<StrType>> = Lazy::new(|| Arc::new(StrType::new()));
+
+pub struct StrType {
+    namespace: RefCell<Namespace>,
+}
+
+impl StrType {
+    pub fn new() -> Self {
+        let mut ns = Namespace::new();
+        ns.add_obj("$name", create::new_str("Str"));
+        ns.add_obj("$full_name", create::new_str("builtins.Str"));
+        Self { namespace: RefCell::new(ns) }
+    }
+}
+
+unsafe impl Send for StrType {}
+unsafe impl Sync for StrType {}
+
+impl TypeTrait for StrType {
+    fn name(&self) -> &str {
+        "Str"
+    }
+
+    fn full_name(&self) -> &str {
+        "builtins.Str"
+    }
+}
+
+impl ObjectTrait for StrType {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn class(&self) -> TypeRef {
+        TYPE_TYPE.clone()
+    }
+
+    fn type_obj(&self) -> ObjectRef {
+        TYPE_TYPE.clone()
+    }
+
+    fn namespace(&self) -> &RefCell<Namespace> {
+        &self.namespace
+    }
+}
+
+// Str Object ----------------------------------------------------------
 
 pub struct Str {
+    namespace: RefCell<Namespace>,
     value: String,
 }
 
 impl Str {
     pub fn new<S: Into<String>>(value: S) -> Self {
-        Self { value: value.into() }
+        Self { namespace: RefCell::new(Namespace::new()), value: value.into() }
     }
 
     pub fn value(&self) -> &str {
@@ -22,31 +78,39 @@ impl Str {
     }
 }
 
-impl Object for Str {
-    fn class(&self) -> &TypeRef {
-        BUILTIN_TYPES.get("Str").unwrap()
-    }
-
+impl ObjectTrait for Str {
     fn as_any(&self) -> &dyn Any {
         self
     }
 
-    fn is_equal(&self, rhs: &dyn Object, _ctx: &RuntimeContext) -> bool {
-        if let Some(rhs) = rhs.down_to_string() {
+    fn class(&self) -> TypeRef {
+        STR_TYPE.clone()
+    }
+
+    fn type_obj(&self) -> ObjectRef {
+        STR_TYPE.clone()
+    }
+
+    fn namespace(&self) -> &RefCell<Namespace> {
+        &self.namespace
+    }
+
+    fn is_equal(&self, rhs: &dyn ObjectTrait) -> bool {
+        if let Some(rhs) = rhs.down_to_str() {
             self.is(rhs) || self.value() == rhs.value()
         } else {
             false
         }
     }
 
-    fn add(&self, rhs: &dyn Object, ctx: &RuntimeContext) -> RuntimeObjResult {
-        if let Some(rhs) = rhs.down_to_string() {
+    fn add(&self, rhs: &dyn ObjectTrait) -> RuntimeObjResult {
+        if let Some(rhs) = rhs.down_to_str() {
             let a = self.value();
             let b = rhs.value();
             let mut value = String::with_capacity(a.len() + b.len());
             value.push_str(a);
             value.push_str(b);
-            let value = ctx.builtins.new_str(value);
+            let value = create::new_str(value);
             Ok(value)
         } else {
             Err(RuntimeErr::new_type_err(format!(
@@ -57,8 +121,8 @@ impl Object for Str {
         }
     }
 
-    fn less_than(&self, rhs: &dyn Object, _ctx: &RuntimeContext) -> RuntimeBoolResult {
-        if let Some(rhs) = rhs.down_to_string() {
+    fn less_than(&self, rhs: &dyn ObjectTrait) -> RuntimeBoolResult {
+        if let Some(rhs) = rhs.down_to_str() {
             Ok(self.value() < rhs.value())
         } else {
             Err(RuntimeErr::new_type_err(format!(
@@ -69,12 +133,8 @@ impl Object for Str {
         }
     }
 
-    fn greater_than(
-        &self,
-        rhs: &dyn Object,
-        _ctx: &RuntimeContext,
-    ) -> RuntimeBoolResult {
-        if let Some(rhs) = rhs.down_to_string() {
+    fn greater_than(&self, rhs: &dyn ObjectTrait) -> RuntimeBoolResult {
+        if let Some(rhs) = rhs.down_to_str() {
             Ok(self.value() > rhs.value())
         } else {
             Err(RuntimeErr::new_type_err(format!(
@@ -90,12 +150,12 @@ impl Object for Str {
 
 impl fmt::Display for Str {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.value())
+        write!(f, "{}", self.value)
     }
 }
 
 impl fmt::Debug for Str {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "\"{}\"", self.value())
+        write!(f, "\"{}\"", self.value)
     }
 }

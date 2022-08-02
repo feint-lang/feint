@@ -1,27 +1,30 @@
 //! Type System
 use std::any::Any;
+use std::cell::RefCell;
 use std::fmt;
 use std::sync::Arc;
 
 use num_bigint::BigInt;
+use num_traits::ToPrimitive;
 
-use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeErr, RuntimeObjResult, VM};
+use crate::vm::{RuntimeBoolResult, RuntimeErr, RuntimeObjResult, VM};
 
 use super::builtins::BUILTINS;
 use super::create;
-use super::result::{Args, CallResult};
+use super::result::{Args, CallResult, GetAttrResult, SetAttrResult, This};
 
-use super::bool::Bool;
-use super::builtin_func::BuiltinFunc;
-use super::class::Type;
-use super::float::Float;
-use super::func::Func;
-use super::int::Int;
-use super::module::Module;
-use super::nil::Nil;
+use super::bool::{Bool, BoolType};
+use super::builtin_func::{BuiltinFunc, BuiltinFuncType};
+use super::class::{Type, TypeType};
+use super::custom::{CustomObj, CustomType};
+use super::float::{Float, FloatType};
+use super::func::{Func, FuncType};
+use super::int::{Int, IntType};
+use super::module::{Module, ModuleType};
+use super::nil::{Nil, NilType};
 use super::ns::Namespace;
-use super::str::Str;
-use super::tuple::Tuple;
+use super::str::{Str, StrType};
+use super::tuple::{Tuple, TupleType};
 
 pub type TypeRef = Arc<dyn TypeTrait>;
 pub type ObjectRef = Arc<dyn ObjectTrait>;
@@ -37,7 +40,20 @@ pub trait TypeTrait {
     }
     fn name(&self) -> &str;
     fn full_name(&self) -> &str;
+
+    fn id(&self) -> usize {
+        let p = self as *const Self;
+        p as *const () as usize
+    }
 }
+
+pub trait TypeTraitExt: TypeTrait {
+    fn is(&self, other: &Self) -> bool {
+        self.id() == other.id()
+    }
+}
+
+impl<T: TypeTrait + ?Sized> TypeTraitExt for T {}
 
 // Object Trait --------------------------------------------------------
 
@@ -74,7 +90,7 @@ macro_rules! make_value_extractor {
 /// Create associated unary op function.
 macro_rules! make_unary_op {
     ( $meth:ident, $op:literal, $result:ty ) => {
-        fn $meth(&self, _ctx: &RuntimeContext) -> $result {
+        fn $meth(&self) -> $result {
             Err(RuntimeErr::new_type_err(format!(
                 "Unary operator {} ({}) not implemented for {}",
                 $op,
@@ -88,7 +104,7 @@ macro_rules! make_unary_op {
 /// Create associated binary op function.
 macro_rules! make_bin_op {
     ( $func:ident, $op:literal, $result:ty ) => {
-        fn $func(&self, _rhs: &dyn ObjectTrait, _ctx: &RuntimeContext) -> $result {
+        fn $func(&self, _rhs: &dyn ObjectTrait) -> $result {
             Err(RuntimeErr::new_type_err(format!(
                 "Binary operator {} ({}) not implemented for {}",
                 $op,
@@ -113,7 +129,7 @@ pub trait ObjectTrait {
     fn type_obj(&self) -> ObjectRef;
 
     /// Each object has a namespace that holds its attributes.
-    fn namespace(&self) -> ObjectRef;
+    fn namespace(&self) -> &RefCell<Namespace>;
 
     fn id(&self) -> usize {
         let p = self as *const Self;
@@ -126,28 +142,41 @@ pub trait ObjectTrait {
 
     // Attributes (accessed by name) -----------------------------------
 
-    fn get_attr(&self, name: &str) -> Option<ObjectRef> {
+    fn get_attr(&self, name: &str) -> GetAttrResult {
         if name == "$type" {
-            return Some(self.type_obj().clone());
+            return Ok(self.type_obj().clone());
         }
         if name == "$module" {
-            return Some(self.class().module().clone());
+            return Ok(self.class().module().clone());
         }
         if name == "$id" {
-            return Some(self.id_obj());
+            return Ok(self.id_obj());
         }
-        let ns = self.namespace();
-        if let Some(obj) = ns.down_to_ns().unwrap().get_obj(name) {
-            return Some(obj);
+        if let Some(obj) = self.namespace().borrow().get_obj(name) {
+            return Ok(obj);
         }
-        let ns = self.type_obj().namespace();
-        ns.down_to_ns().unwrap().get_obj(name)
+        if let Some(obj) = self.type_obj().namespace().borrow().get_obj(name) {
+            return Ok(obj);
+        }
+        Err(self.attr_does_not_exist(name))
+    }
+
+    fn set_attr(&mut self, name: &str, _value: ObjectRef) -> SetAttrResult {
+        Err(RuntimeErr::new_attr_cannot_be_set(self.class().full_name(), name))
+    }
+
+    fn attr_does_not_exist(&self, name: &str) -> RuntimeErr {
+        RuntimeErr::new_attr_does_not_exist(self.class().full_name(), name)
     }
 
     // Items (accessed by index) ---------------------------------------
 
-    fn get_item(&self, _index: usize) -> Option<ObjectRef> {
-        None
+    fn get_item(&self, index: usize) -> GetAttrResult {
+        Err(self.item_does_not_exist(index))
+    }
+
+    fn item_does_not_exist(&self, index: usize) -> RuntimeErr {
+        RuntimeErr::new_item_does_not_exist(self.class().full_name(), index)
     }
 
     // Type checkers ---------------------------------------------------
@@ -167,7 +196,9 @@ pub trait ObjectTrait {
 
     make_down_to!(down_to_type, Type);
     make_down_to!(down_to_bool, Bool);
+    make_down_to!(down_to_builtin_func, BuiltinFunc);
     make_down_to!(down_to_float, Float);
+    make_down_to!(down_to_func, Func);
     make_down_to!(down_to_int, Int);
     make_down_to!(down_to_mod, Module);
     make_down_to!(down_to_ns, Namespace);
@@ -183,13 +214,21 @@ pub trait ObjectTrait {
     make_value_extractor!(get_int_val, Int, BigInt, clone);
     make_value_extractor!(get_str_val, Str, String, to_owned);
 
+    fn get_usize_val(&self) -> Option<usize> {
+        if let Some(int) = self.get_int_val() {
+            int.to_usize()
+        } else {
+            None
+        }
+    }
+
     // Unary operations ------------------------------------------------
 
     make_unary_op!(negate, "-", RuntimeObjResult);
     make_unary_op!(bool_val, "!!", RuntimeBoolResult);
 
-    fn not(&self, ctx: &RuntimeContext) -> RuntimeBoolResult {
-        match self.bool_val(ctx) {
+    fn not(&self) -> RuntimeBoolResult {
+        match self.bool_val() {
             Ok(true) => Ok(false),
             Ok(false) => Ok(true),
             err => err,
@@ -198,14 +237,14 @@ pub trait ObjectTrait {
 
     // Binary operations -----------------------------------------------
 
-    fn is_equal(&self, rhs: &dyn ObjectTrait, _ctx: &RuntimeContext) -> bool {
+    fn is_equal(&self, rhs: &dyn ObjectTrait) -> bool {
         // This duplicates ObjectExt::is(), but that method can't be
         // used here.
         self.id() == rhs.id()
     }
 
-    fn not_equal(&self, rhs: &dyn ObjectTrait, ctx: &RuntimeContext) -> bool {
-        !self.is_equal(rhs, ctx)
+    fn not_equal(&self, rhs: &dyn ObjectTrait) -> bool {
+        !self.is_equal(rhs)
     }
 
     make_bin_op!(less_than, "<", RuntimeBoolResult);
@@ -223,7 +262,7 @@ pub trait ObjectTrait {
 
     // Call ------------------------------------------------------------
 
-    fn call(&self, _args: Args, _vm: &mut VM) -> CallResult {
+    fn call(&self, _this: This, _args: Args, _vm: &mut VM) -> CallResult {
         let class = self.class();
         Err(RuntimeErr::new_type_err(format!("Call not implemented for type {class}")))
     }
@@ -239,25 +278,41 @@ impl<T: ObjectTrait + ?Sized> ObjectTraitExt for T {}
 
 // Display -------------------------------------------------------------
 
+macro_rules! write_type_instance {
+    ( $f:ident, $t:ident, $($A:ty),+ ) => { $(
+        if let Some(t) = $t.as_any().downcast_ref::<$A>() {
+            return write!($f, "<{}>", t.full_name());
+        }
+    )+ };
+}
+
+macro_rules! debug_type_instance {
+    ( $f:ident, $t:ident, $($A:ty),+ ) => { $(
+        if let Some(t) = $t.as_any().downcast_ref::<$A>() {
+            return write!($f, "<{}> @ {}", t.full_name(), ObjectTrait::id(t));
+        }
+    )+ };
+}
+
 macro_rules! write_instance {
-    ( $f:ident, $a:ident, $($A:ty),+ ) => { $(
-        if let Some(a) = $a.as_any().downcast_ref::<$A>() {
-            return write!($f, "{}", a);
+    ( $f:ident, $i:ident, $($A:ty),+ ) => { $(
+        if let Some(i) = $i.as_any().downcast_ref::<$A>() {
+            return write!($f, "{i}");
         }
     )+ };
 }
 
 macro_rules! debug_instance {
-    ( $f:ident, $a:ident, $($A:ty),+ ) => { $(
-        if let Some(a) = $a.as_any().downcast_ref::<$A>() {
-            return write!($f, "{:?}", a);
+    ( $f:ident, $i:ident, $($A:ty),+ ) => { $(
+        if let Some(i) = $i.as_any().downcast_ref::<$A>() {
+            return write!($f, "{i:?}");
         }
     )+ };
 }
 
 impl fmt::Display for dyn TypeTrait {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "<{}.{}>", self.module(), self.name())
+        write!(f, "<{}>", self.full_name())
     }
 }
 
@@ -269,16 +324,72 @@ impl fmt::Debug for dyn TypeTrait {
 
 impl fmt::Display for dyn ObjectTrait {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write_instance!(f, self, Type, Bool, Int, Module, Namespace, Nil, Str);
-        // Fallback
-        write!(f, "{} object @ {}", self.type_obj(), self.id())
+        write_type_instance!(
+            f,
+            self,
+            TypeType,
+            BoolType,
+            BuiltinFuncType,
+            CustomType,
+            FloatType,
+            FuncType,
+            IntType,
+            ModuleType,
+            NilType,
+            StrType,
+            TupleType
+        );
+        write_instance!(
+            f,
+            self,
+            Type,
+            Bool,
+            BuiltinFunc,
+            CustomObj,
+            Float,
+            Func,
+            Int,
+            Module,
+            Nil,
+            Str,
+            Tuple
+        );
+        panic!("Display must be defined for {self:?}");
     }
 }
 
 impl fmt::Debug for dyn ObjectTrait {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        debug_instance!(f, self, Type, Bool, Int, Module, Namespace, Nil, Str);
-        // Fallback
-        write!(f, "{self}")
+        debug_type_instance!(
+            f,
+            self,
+            TypeType,
+            BoolType,
+            BuiltinFuncType,
+            CustomType,
+            FloatType,
+            FuncType,
+            IntType,
+            ModuleType,
+            NilType,
+            StrType,
+            TupleType
+        );
+        debug_instance!(
+            f,
+            self,
+            Type,
+            Bool,
+            BuiltinFunc,
+            CustomObj,
+            Float,
+            Func,
+            Int,
+            Module,
+            Nil,
+            Str,
+            Tuple
+        );
+        panic!("Debug must be defined for {self:?}");
     }
 }

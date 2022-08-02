@@ -1,14 +1,11 @@
 use std::slice::Iter;
-use std::sync::Arc;
 
-use crate::builtin_funcs::get_builtin_func_specs;
-use crate::types::{Builtins, Namespace, ObjectRef, BUILTIN_TYPES};
+use crate::types::{create, Namespace, ObjectRef, ObjectTrait, BUILTINS};
 
 use super::objects::Objects;
 use super::result::{RuntimeErr, RuntimeResult};
 
 pub struct RuntimeContext {
-    pub builtins: Builtins,
     constants: Objects,
     namespace_stack: Vec<Namespace>,
     pub argv: Vec<String>,
@@ -16,12 +13,11 @@ pub struct RuntimeContext {
 
 impl RuntimeContext {
     pub fn new(
-        builtins: Builtins,
         constants: Objects,
         namespace_stack: Vec<Namespace>,
         argv: Vec<String>,
     ) -> Self {
-        Self { builtins, constants, namespace_stack, argv }
+        Self { constants, namespace_stack, argv }
     }
 
     pub fn with_argv(argv: Vec<&str>) -> Self {
@@ -86,9 +82,9 @@ impl RuntimeContext {
     /// the var in the current namespace and sets its initial value to
     /// nil.
     pub fn declare_var(&mut self, name: &str) {
-        let initial = self.builtins.nil_obj.clone();
+        let initial = create::new_nil();
         let namespace = self.current_namespace();
-        namespace.add_entry(name, initial);
+        namespace.add_obj(name, initial);
     }
 
     /// Assign value to var. This looks up the var by name in the
@@ -99,7 +95,7 @@ impl RuntimeContext {
         obj: ObjectRef,
     ) -> Result<usize, RuntimeErr> {
         let namespace = self.current_namespace();
-        if namespace.set_entry(name, obj) {
+        if namespace.set_obj(name, obj) {
             Ok(self.depth())
         } else {
             let message = format!("Name not defined in current namespace: {name}");
@@ -125,7 +121,7 @@ impl RuntimeContext {
         name: &str,
         obj: ObjectRef,
     ) -> RuntimeResult {
-        if self.namespace_stack[depth].set_entry(name, obj) {
+        if self.namespace_stack[depth].set_obj(name, obj) {
             Ok(())
         } else {
             let message = format!("Name not defined at depth {depth}: {name}");
@@ -139,7 +135,7 @@ impl RuntimeContext {
         let mut depth = self.depth();
         loop {
             let namespace = &self.namespace_stack[depth];
-            if namespace.get_entry(name).is_some() {
+            if namespace.get_obj(name).is_some() {
                 break Ok(depth);
             }
             if depth == 0 {
@@ -154,9 +150,9 @@ impl RuntimeContext {
     pub fn get_var_in_current_namespace(
         &mut self,
         name: &str,
-    ) -> Result<&ObjectRef, RuntimeErr> {
+    ) -> Result<ObjectRef, RuntimeErr> {
         let namespace = self.current_namespace();
-        if let Some(obj) = namespace.get_entry(name) {
+        if let Some(obj) = namespace.get_obj(name) {
             Ok(obj)
         } else {
             let message = format!("Name not defined in current namespace: {name}");
@@ -169,8 +165,8 @@ impl RuntimeContext {
         &self,
         depth: usize,
         name: &str,
-    ) -> Result<&ObjectRef, RuntimeErr> {
-        if let Some(obj) = self.namespace_stack[depth].get_entry(name) {
+    ) -> Result<ObjectRef, RuntimeErr> {
+        if let Some(obj) = self.namespace_stack[depth].get_obj(name) {
             Ok(obj)
         } else {
             let message = format!("Name not defined at depth {depth}: {name}");
@@ -181,42 +177,35 @@ impl RuntimeContext {
 
 impl Default for RuntimeContext {
     fn default() -> Self {
-        let mut ctx =
-            RuntimeContext::new(Builtins::new(), Objects::default(), vec![], vec![]);
+        let mut ctx = RuntimeContext::new(Objects::default(), vec![], vec![]);
 
         // Add singleton constants.
-        ctx.add_const(ctx.builtins.nil_obj.clone()); // 0
-        ctx.add_const(ctx.builtins.true_obj.clone()); // 1
-        ctx.add_const(ctx.builtins.false_obj.clone()); // 2
+        ctx.add_const(create::new_nil()); // 0
+        ctx.add_const(create::new_true()); // 1
+        ctx.add_const(create::new_false()); // 2
 
         // Enter global scope.
         ctx.enter_scope();
 
-        // Add builtin types to builtins namespace and add aliases to
-        // global scope.
-        let mut builtins_ns = Namespace::new();
-        for (name, class) in BUILTIN_TYPES.iter() {
-            builtins_ns.add_entry(*name, class.clone());
-            if let Err(err) = ctx.declare_and_assign_var(name, class.clone()) {
-                panic!("Could not define builtin type {name}: {err}");
+        // Builtins ----------------------------------------------------
+
+        let builtins = BUILTINS.clone();
+
+        // Add shorthand aliases for builtin types and objects to global
+        // scope.
+        for (name, obj) in builtins.namespace().borrow().iter() {
+            if !name.starts_with('$') {
+                if let Err(err) = ctx.declare_and_assign_var(name, obj.clone()) {
+                    panic!(
+                        "Could not add alias for builtin object `{name}` to global scope: {err}"
+                    );
+                }
             }
         }
 
-        // Add builtin functions to builtins namespace and add aliases
-        // to global scope.
-        for spec in get_builtin_func_specs() {
-            let (name, params, func) = spec;
-            let func = ctx.builtins.new_builtin_func(name, params, func, None);
-            builtins_ns.add_entry(name, func.clone());
-            if let Err(err) = ctx.declare_and_assign_var(name, func.clone()) {
-                panic!("Could not define builtin func: {err}");
-            }
-        }
-
-        // Add builtins namespace to global scope.
-        let builtins_ns_var = Arc::new(builtins_ns);
-        if let Err(err) = ctx.declare_and_assign_var("builtins", builtins_ns_var) {
-            panic!("Could not define global builtins var: {err}");
+        // Add builtins module to global scope.
+        if let Err(err) = ctx.declare_and_assign_var("builtins", builtins) {
+            panic!("Could not define builtins module: {err}");
         }
 
         ctx

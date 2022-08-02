@@ -1,95 +1,127 @@
-//! A custom object may have builtin objects and other custom objects as
-//! attributes. This is opposed to fundamental/builtin types, like
-//! `Bool` and `Float` that wrap Rust primitives.
 use std::any::Any;
 use std::cell::RefCell;
 use std::fmt;
+use std::sync::Arc;
 
-use crate::vm::RuntimeContext;
+use super::create;
+use super::result::SetAttrResult;
 
-use super::class::TypeRef;
-use super::namespace::Namespace;
-use super::object::{Object, ObjectExt, ObjectRef};
-use super::result::{GetAttrResult, SetAttrResult};
+use super::base::{ObjectRef, ObjectTrait, ObjectTraitExt, TypeRef, TypeTrait};
+use super::class::TYPE_TYPE;
+use super::module::Module;
+use super::ns::Namespace;
 
-pub struct Custom {
-    class: TypeRef,
-    attrs: RefCell<Namespace>,
+// Custom Type ---------------------------------------------------------
+
+pub struct CustomType {
+    namespace: RefCell<Namespace>,
+    module: Arc<Module>,
+    name: String,
 }
 
-impl Custom {
-    pub fn new(class: TypeRef) -> Self {
-        Self { class, attrs: RefCell::new(Namespace::new()) }
+impl CustomType {
+    pub fn new<S: Into<String>>(module: Arc<Module>, name: S) -> Self {
+        let mut ns = Namespace::new();
+        let name = name.into();
+        ns.add_obj("$name", create::new_str(name.as_str()));
+        ns.add_obj("$full_name", create::new_str(module.name()));
+        Self { namespace: RefCell::new(ns), module, name }
     }
 }
 
-impl Object for Custom {
-    fn class(&self) -> &TypeRef {
-        &self.class
+unsafe impl Send for CustomType {}
+unsafe impl Sync for CustomType {}
+
+impl TypeTrait for CustomType {
+    fn module(&self) -> ObjectRef {
+        self.module.clone()
     }
 
+    fn name(&self) -> &str {
+        self.name.as_str()
+    }
+
+    fn full_name(&self) -> &str {
+        self.module.name()
+    }
+}
+
+impl ObjectTrait for CustomType {
     fn as_any(&self) -> &dyn Any {
         self
     }
 
-    fn get_attr(
-        &self,
-        name: &str,
-        ctx: &RuntimeContext,
-        _this: ObjectRef,
-    ) -> GetAttrResult {
-        if let Some(attr) = self.get_base_attr(name, ctx) {
-            return Ok(attr);
-        }
-        if let Some(value) = self.attrs.borrow().get_entry(name) {
-            return Ok(value.clone());
-        }
-        Err(self.attr_does_not_exist(name))
+    fn class(&self) -> TypeRef {
+        TYPE_TYPE.clone()
     }
 
-    fn set_attr(
-        &self,
-        name: &str,
-        value: ObjectRef,
-        _ctx: &RuntimeContext,
-    ) -> SetAttrResult {
-        self.attrs.borrow_mut().add_entry(name, value);
+    fn type_obj(&self) -> ObjectRef {
+        TYPE_TYPE.clone()
+    }
+
+    fn namespace(&self) -> &RefCell<Namespace> {
+        &self.namespace
+    }
+}
+
+// Custom Object -------------------------------------------------------
+
+pub struct CustomObj {
+    class: Arc<CustomType>,
+    namespace: RefCell<Namespace>,
+}
+
+unsafe impl Send for CustomObj {}
+unsafe impl Sync for CustomObj {}
+
+impl CustomObj {
+    pub fn new(class: Arc<CustomType>, attrs: Namespace) -> Self {
+        Self { class, namespace: RefCell::new(attrs) }
+    }
+}
+
+impl ObjectTrait for CustomObj {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn class(&self) -> TypeRef {
+        self.class.clone()
+    }
+
+    fn type_obj(&self) -> ObjectRef {
+        self.class.clone()
+    }
+
+    fn namespace(&self) -> &RefCell<Namespace> {
+        &self.namespace
+    }
+
+    fn set_attr(&mut self, name: &str, value: ObjectRef) -> SetAttrResult {
+        self.namespace.borrow_mut().set_obj(name, value);
         Ok(())
     }
 
-    fn is_equal(&self, rhs: &dyn Object, ctx: &RuntimeContext) -> bool {
+    fn is_equal(&self, rhs: &dyn ObjectTrait) -> bool {
         if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
             if self.is(rhs) {
-                // Object is equal to itself.
-                true
-            } else if !self.class().is(rhs.class()) {
-                // Objects are not the same type so they can't be equal.
-                false
-            } else {
-                // Otherwise, objects are the same type, so check their
-                // attribute namespaces for equality.
-                let lhs_attrs = self.attrs.borrow();
-                let rhs_attrs = &*rhs.attrs.borrow();
-                lhs_attrs.is_equal(rhs_attrs, ctx)
+                return true;
             }
-        } else {
-            false
         }
+        self.namespace.borrow().is_equal(&rhs.namespace().borrow())
     }
 }
 
 // Display -------------------------------------------------------------
 
-impl fmt::Display for Custom {
+impl fmt::Display for CustomObj {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // TODO: Check for $string attr and use that value if present
-        let type_name = self.class();
-        let id = self.id();
-        write!(f, "<{type_name}> object @ {id}")
+        write!(f, "<{}> object @ {}", self.class.full_name(), self.id())
     }
 }
 
-impl fmt::Debug for Custom {
+impl fmt::Debug for CustomObj {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{self}")
     }

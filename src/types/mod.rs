@@ -1,23 +1,27 @@
+pub(crate) use base::{ObjectRef, ObjectTrait, ObjectTraitExt};
 pub(crate) use builtin_func::BuiltinFn;
-pub(crate) use builtin_types::BUILTIN_TYPES;
-pub(crate) use builtins::Builtins;
-pub(crate) use namespace::Namespace;
-pub(crate) use object::{ObjectExt, ObjectRef};
-pub(crate) use result::{Args, CallResult, Params};
+pub(crate) use builtins::BUILTINS;
+pub(crate) use ns::Namespace;
+pub(crate) use result::{Args, CallResult, Params, This};
 
+pub(crate) mod create;
+
+mod base;
 mod bool;
 mod builtin_func;
-mod builtin_types;
 mod builtins;
 mod class;
 mod custom;
 mod float;
 mod func;
 mod int;
-mod namespace;
+mod module;
 mod nil;
-mod object;
+mod ns;
 mod result;
 mod str;
 mod tuple;
 mod util;
+
+#[cfg(test)]
+pub(crate) use base::TypeTraitExt;

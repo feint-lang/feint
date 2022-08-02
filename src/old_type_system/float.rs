@@ -1,78 +1,39 @@
+//! Float type (64 bit)
 use std::any::Any;
 use std::fmt;
-use std::sync::Arc;
 
 use num_traits::ToPrimitive;
-use once_cell::sync::Lazy;
 
 use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeErr, RuntimeObjResult};
 
-use super::create;
+use super::builtin_types::BUILTIN_TYPES;
+use super::class::TypeRef;
+use super::object::{Object, ObjectExt};
 use super::util::{eq_int_float, gt_int_float, lt_int_float};
 
-use super::base::{ObjectRef, ObjectTrait, ObjectTraitExt, TypeRef, TypeTrait};
-use super::class::TYPE_TYPE;
-use super::ns::Namespace;
-
-// Float Type ----------------------------------------------------------
-
-pub static FLOAT_TYPE: Lazy<Arc<FloatType>> = Lazy::new(|| Arc::new(FloatType::new()));
-
-pub struct FloatType {
-    namespace: Arc<Namespace>,
+pub struct Float {
+    value: f64,
 }
 
-unsafe impl Send for FloatType {}
-unsafe impl Sync for FloatType {}
+impl Float {
+    pub fn new(value: f64) -> Self {
+        Self { value }
+    }
 
-impl FloatType {
-    pub fn new() -> Self {
-        let mut ns = Namespace::new();
-        ns.add_obj("$name", create::new_str("Float"));
-        ns.add_obj("$full_name", create::new_str("builtins.Float"));
-        Self { namespace: Arc::new(ns) }
+    pub fn value(&self) -> &f64 {
+        &self.value
     }
 }
-
-impl TypeTrait for FloatType {
-    fn name(&self) -> &str {
-        "Float"
-    }
-
-    fn full_name(&self) -> &str {
-        "builtins.Float"
-    }
-}
-
-impl ObjectTrait for FloatType {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn class(&self) -> TypeRef {
-        TYPE_TYPE.clone()
-    }
-
-    fn type_obj(&self) -> ObjectRef {
-        TYPE_TYPE.clone()
-    }
-
-    fn namespace(&self) -> ObjectRef {
-        self.namespace.clone()
-    }
-}
-
-// Float Object --------------------------------------------------------
 
 macro_rules! make_op {
     ( $meth:ident, $op:tt, $message:literal, $trunc:literal ) => {
-        fn $meth(&self, rhs: &dyn ObjectTrait, ctx: &RuntimeContext) -> RuntimeObjResult {
+        fn $meth(&self, rhs: &dyn Object, ctx: &RuntimeContext) -> RuntimeObjResult {
             let value = if let Some(rhs) = rhs.down_to_float() {
                 *rhs.value()
             } else if let Some(rhs) = rhs.down_to_int() {
                 rhs.value().to_f64().unwrap()
             } else {
-                return Err(RuntimeErr::new_type_err(format!($message, rhs.class())));
+                return Err(RuntimeErr::new_type_err(format!($message, rhs.type_name())));
             };
             let mut value = &self.value $op value;
             if $trunc {
@@ -84,39 +45,13 @@ macro_rules! make_op {
     };
 }
 
-pub struct Float {
-    namespace: Arc<Namespace>,
-    value: f64,
-}
-
-unsafe impl Send for Float {}
-unsafe impl Sync for Float {}
-
-impl Float {
-    pub fn new(value: f64) -> Self {
-        Self { namespace: Arc::new(Namespace::new()), value }
+impl Object for Float {
+    fn class(&self) -> &TypeRef {
+        BUILTIN_TYPES.get("Float").unwrap()
     }
 
-    pub fn value(&self) -> &f64 {
-        &self.value
-    }
-}
-
-impl ObjectTrait for Float {
     fn as_any(&self) -> &dyn Any {
         self
-    }
-
-    fn class(&self) -> TypeRef {
-        FLOAT_TYPE.clone()
-    }
-
-    fn type_obj(&self) -> ObjectRef {
-        FLOAT_TYPE.clone()
-    }
-
-    fn namespace(&self) -> ObjectRef {
-        self.namespace.clone()
     }
 
     fn negate(&self, ctx: &RuntimeContext) -> RuntimeObjResult {
@@ -127,7 +62,7 @@ impl ObjectTrait for Float {
         Ok(*self.value() != 0.0)
     }
 
-    fn is_equal(&self, rhs: &dyn ObjectTrait, _ctx: &RuntimeContext) -> bool {
+    fn is_equal(&self, rhs: &dyn Object, _ctx: &RuntimeContext) -> bool {
         if let Some(rhs) = rhs.down_to_float() {
             self.is(rhs) || self.value() == rhs.value()
         } else if let Some(rhs) = rhs.down_to_int() {
@@ -137,11 +72,7 @@ impl ObjectTrait for Float {
         }
     }
 
-    fn less_than(
-        &self,
-        rhs: &dyn ObjectTrait,
-        _ctx: &RuntimeContext,
-    ) -> RuntimeBoolResult {
+    fn less_than(&self, rhs: &dyn Object, _ctx: &RuntimeContext) -> RuntimeBoolResult {
         if let Some(rhs) = rhs.down_to_float() {
             Ok(self.value() < rhs.value())
         } else if let Some(rhs) = rhs.down_to_int() {
@@ -157,7 +88,7 @@ impl ObjectTrait for Float {
 
     fn greater_than(
         &self,
-        rhs: &dyn ObjectTrait,
+        rhs: &dyn Object,
         _ctx: &RuntimeContext,
     ) -> RuntimeBoolResult {
         if let Some(rhs) = rhs.down_to_float() {
@@ -173,7 +104,7 @@ impl ObjectTrait for Float {
         }
     }
 
-    fn pow(&self, rhs: &dyn ObjectTrait, ctx: &RuntimeContext) -> RuntimeObjResult {
+    fn pow(&self, rhs: &dyn Object, ctx: &RuntimeContext) -> RuntimeObjResult {
         let exp = if let Some(rhs) = rhs.down_to_float() {
             *rhs.value()
         } else if let Some(rhs) = rhs.down_to_int() {
@@ -203,9 +134,9 @@ impl ObjectTrait for Float {
 impl fmt::Display for Float {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.value().fract() == 0.0 {
-            write!(f, "{}.0", self.value)
+            write!(f, "{}.0", self.value())
         } else {
-            write!(f, "{}", self.value)
+            write!(f, "{}", self.value())
         }
     }
 }

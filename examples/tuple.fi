@@ -1,0 +1,8 @@
+tuple = ("a", "b")
+map_fn = (item, index) -> print(item, index)
+print($"Mapping the tuple {tuple} with {map_fn}")
+tuple.map(map_fn)
+print($"\nThe output above should look like this:
+a 0
+b 1
+")

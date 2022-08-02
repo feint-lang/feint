@@ -1,27 +1,83 @@
-//! Tuple type
 use std::any::Any;
+use std::cell::RefCell;
 use std::fmt;
 use std::slice::Iter;
+use std::sync::Arc;
 
-use num_bigint::BigInt;
-use num_traits::ToPrimitive;
+use once_cell::sync::Lazy;
 
 use crate::builtin_funcs::tuple;
 
-use crate::vm::{RuntimeContext, RuntimeErr};
+use super::create;
 
-use super::builtin_types::BUILTIN_TYPES;
-use super::class::TypeRef;
-use super::object::{Object, ObjectExt, ObjectRef};
-use super::result::GetAttrResult;
+use super::base::{ObjectRef, ObjectTrait, ObjectTraitExt, TypeRef, TypeTrait};
+use super::class::TYPE_TYPE;
+use super::ns::Namespace;
+
+// Tuple Type ----------------------------------------------------------
+
+pub static TUPLE_TYPE: Lazy<Arc<TupleType>> = Lazy::new(|| Arc::new(TupleType::new()));
+
+pub struct TupleType {
+    namespace: RefCell<Namespace>,
+}
+
+impl TupleType {
+    pub fn new() -> Self {
+        let mut ns = Namespace::new();
+        ns.add_obj("$name", create::new_str("Tuple"));
+        ns.add_obj("$full_name", create::new_str("builtins.Tuple"));
+        ns.add_obj(
+            "map",
+            create::new_builtin_func("map", Some(vec!["map_fn"]), tuple::map),
+        );
+        Self { namespace: RefCell::new(ns) }
+    }
+}
+
+unsafe impl Send for TupleType {}
+unsafe impl Sync for TupleType {}
+
+impl TypeTrait for TupleType {
+    fn name(&self) -> &str {
+        "Tuple"
+    }
+
+    fn full_name(&self) -> &str {
+        "builtins.Tuple"
+    }
+}
+
+impl ObjectTrait for TupleType {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn class(&self) -> TypeRef {
+        TYPE_TYPE.clone()
+    }
+
+    fn type_obj(&self) -> ObjectRef {
+        TYPE_TYPE.clone()
+    }
+
+    fn namespace(&self) -> &RefCell<Namespace> {
+        &self.namespace
+    }
+}
+
+// Tuple Object ----------------------------------------------------------
 
 pub struct Tuple {
+    namespace: RefCell<Namespace>,
     items: Vec<ObjectRef>,
 }
 
 impl Tuple {
     pub fn new(items: Vec<ObjectRef>) -> Self {
-        Self { items }
+        let mut ns = Namespace::new();
+        ns.add_obj("length", create::new_int(items.len()));
+        Self { namespace: RefCell::new(ns), items }
     }
 
     pub fn iter(&self) -> Iter<'_, ObjectRef> {
@@ -31,50 +87,34 @@ impl Tuple {
     pub fn len(&self) -> usize {
         self.items.len()
     }
+
+    pub fn get_item(&self, index: usize) -> Option<ObjectRef> {
+        if let Some(item) = self.items.get(index) {
+            Some(item.clone())
+        } else {
+            None
+        }
+    }
 }
 
-impl Object for Tuple {
-    fn class(&self) -> &TypeRef {
-        BUILTIN_TYPES.get("Tuple").unwrap()
-    }
-
+impl ObjectTrait for Tuple {
     fn as_any(&self) -> &dyn Any {
         self
     }
 
-    fn get_attr(
-        &self,
-        name: &str,
-        ctx: &RuntimeContext,
-        this: ObjectRef,
-    ) -> GetAttrResult {
-        if let Some(attr) = self.get_base_attr(name, ctx) {
-            return Ok(attr);
-        }
-        let attr = match name {
-            "length" => ctx.builtins.new_int(self.len()),
-            "map" => ctx.builtins.new_builtin_func(
-                "map",
-                Some(vec!["this", "map_fn"]),
-                tuple::map,
-                Some(this),
-            ),
-            _ => {
-                return Err(self.attr_does_not_exist(name));
-            }
-        };
-        Ok(attr)
+    fn class(&self) -> TypeRef {
+        TUPLE_TYPE.clone()
     }
 
-    fn get_item(&self, index: &BigInt, _ctx: &RuntimeContext) -> GetAttrResult {
-        let index = index.to_usize().unwrap();
-        match self.items.get(index) {
-            Some(obj) => Ok(obj.clone()),
-            None => Err(RuntimeErr::new_index_out_of_bounds(index)),
-        }
+    fn type_obj(&self) -> ObjectRef {
+        TUPLE_TYPE.clone()
     }
 
-    fn is_equal(&self, rhs: &dyn Object, _ctx: &RuntimeContext) -> bool {
+    fn namespace(&self) -> &RefCell<Namespace> {
+        &self.namespace
+    }
+
+    fn is_equal(&self, rhs: &dyn ObjectTrait) -> bool {
         if let Some(rhs) = rhs.down_to_tuple() {
             if self.is(rhs) {
                 return true;
@@ -83,7 +123,7 @@ impl Object for Tuple {
                 return false;
             }
             for (a, b) in self.iter().zip(rhs.iter()) {
-                if !a.is_equal(&**b, _ctx) {
+                if !a.is_equal(&**b) {
                     return false;
                 }
             }

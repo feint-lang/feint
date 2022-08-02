@@ -2,138 +2,111 @@
 //! same thing. Lower case "class" is used instead of "type" because the
 //! latter is a Rust keyword.
 use std::any::Any;
+use std::cell::RefCell;
 use std::fmt;
 use std::sync::Arc;
 
-use crate::builtin_funcs::float;
-use crate::builtin_funcs::int;
+use once_cell::sync::Lazy;
 
-use crate::vm::{RuntimeContext, RuntimeErr};
+use super::create;
 
-use super::builtin_types::BUILTIN_TYPES;
-use super::object::{Object, ObjectRef};
-use super::result::GetAttrResult;
+use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
+use super::ns::Namespace;
 
-pub type TypeRef = Arc<Type>;
+// Type Type -----------------------------------------------------------
 
-/// Represents a type, whether builtin or user-defined.
-#[derive(Clone)]
+pub static TYPE_TYPE: Lazy<Arc<TypeType>> = Lazy::new(|| Arc::new(TypeType::new()));
+
+pub struct TypeType {
+    namespace: RefCell<Namespace>,
+}
+
+impl TypeType {
+    pub fn new() -> Self {
+        let mut ns = Namespace::new();
+        ns.add_obj("$name", create::new_str("Type"));
+        ns.add_obj("$full_name", create::new_str("builtins.Type"));
+        Self { namespace: RefCell::new(ns) }
+    }
+}
+
+unsafe impl Send for TypeType {}
+unsafe impl Sync for TypeType {}
+
+impl TypeTrait for TypeType {
+    fn name(&self) -> &str {
+        "Type"
+    }
+
+    fn full_name(&self) -> &str {
+        "builtins.Type"
+    }
+}
+
+impl ObjectTrait for TypeType {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn class(&self) -> TypeRef {
+        TYPE_TYPE.clone()
+    }
+
+    fn type_obj(&self) -> ObjectRef {
+        TYPE_TYPE.clone()
+    }
+
+    fn namespace(&self) -> &RefCell<Namespace> {
+        &self.namespace
+    }
+}
+
+// Type Object ---------------------------------------------------------
+
 pub struct Type {
-    module: String,
-    name: String,
-    qualified_name: String,
+    namespace: RefCell<Namespace>,
 }
 
 unsafe impl Send for Type {}
 unsafe impl Sync for Type {}
 
 impl Type {
-    pub fn new<S: Into<String>>(module: S, name: S) -> Self {
-        let module = module.into();
-        let name = name.into();
-        let qualified_name = format!("{}.{}", module, name);
-        Self { module, name, qualified_name }
-    }
-
-    pub fn id(&self) -> usize {
-        self as *const Self as usize
-    }
-
-    pub fn module(&self) -> String {
-        self.module.clone()
-    }
-
-    pub fn name(&self) -> String {
-        self.name.clone()
-    }
-
-    pub fn qualified_name(&self) -> String {
-        self.qualified_name.clone()
-    }
-
-    pub fn is(&self, other: &Self) -> bool {
-        self.id() == other.id()
-    }
-
-    // Attributes ------------------------------------------------------
-
-    fn get_tuple_attr(&self, name: &str, ctx: &RuntimeContext) -> Option<ObjectRef> {
-        let attr = match name {
-            "new" => ctx.builtins.new_tuple(vec![]),
-            _ => return None,
-        };
-        Some(attr)
+    pub fn new() -> Self {
+        let ns = Namespace::new();
+        Self { namespace: RefCell::new(ns) }
     }
 }
 
-impl Object for Type {
-    fn class(&self) -> &TypeRef {
-        BUILTIN_TYPES.get("Type").unwrap()
-    }
-
+impl ObjectTrait for Type {
     fn as_any(&self) -> &dyn Any {
         self
     }
 
-    fn get_attr(
-        &self,
-        name: &str,
-        ctx: &RuntimeContext,
-        _this: ObjectRef,
-    ) -> GetAttrResult {
-        if let Some(attr) = self.get_base_attr(name, ctx) {
-            return Ok(attr);
-        }
-        let attr = match name {
-            "new" => match self.name.as_str() {
-                "Float" => ctx.builtins.new_builtin_func(
-                    "new",
-                    Some(vec!["value"]),
-                    float::new,
-                    None,
-                ),
-                "Int" => ctx.builtins.new_builtin_func(
-                    "new",
-                    Some(vec!["value"]),
-                    int::new,
-                    None,
-                ),
-                _ => {
-                    let message = format!("new not implemented for type {self}");
-                    return Err(RuntimeErr::new_type_err(message));
-                }
-            },
-            _ => {
-                let attr = match self.qualified_name.as_str() {
-                    "builtins.Tuple" => self.get_tuple_attr(name, ctx),
-                    _ => return Err(self.attr_does_not_exist(name)),
-                };
-                if let Some(attr) = attr {
-                    attr
-                } else {
-                    return Err(self.attr_does_not_exist(name));
-                }
-            }
-        };
-        Ok(attr)
+    fn class(&self) -> TypeRef {
+        TYPE_TYPE.clone()
+    }
+
+    fn type_obj(&self) -> ObjectRef {
+        TYPE_TYPE.clone()
+    }
+
+    fn namespace(&self) -> &RefCell<Namespace> {
+        &self.namespace
     }
 }
 
-impl PartialEq for Type {
-    fn eq(&self, other: &Self) -> bool {
-        self.is(other)
-    }
-}
+// Display -------------------------------------------------------------
 
 impl fmt::Display for Type {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let name = self.qualified_name();
-        write!(f, "<{name}>")
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        println!("6");
+        write!(f, "{} @ {}", self.type_obj(), self.id())
     }
 }
 
 impl fmt::Debug for Type {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        println!("7");
         write!(f, "{self}")
     }
 }

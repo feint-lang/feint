@@ -1,20 +1,79 @@
-//! Boolean type
 use std::any::Any;
+use std::cell::RefCell;
 use std::fmt;
+use std::sync::Arc;
 
-use crate::vm::{RuntimeBoolResult, RuntimeContext, RuntimeErr};
+use once_cell::sync::Lazy;
 
-use super::builtin_types::BUILTIN_TYPES;
-use super::class::TypeRef;
-use super::object::{Object, ObjectExt};
+use crate::vm::{RuntimeBoolResult, RuntimeErr};
+
+use super::create;
+
+use super::base::{ObjectRef, ObjectTrait, ObjectTraitExt, TypeRef, TypeTrait};
+use super::class::TYPE_TYPE;
+use super::ns::Namespace;
+
+// Bool Type -----------------------------------------------------------
+
+pub static BOOL_TYPE: Lazy<Arc<BoolType>> = Lazy::new(|| Arc::new(BoolType::new()));
+
+pub struct BoolType {
+    namespace: RefCell<Namespace>,
+}
+
+unsafe impl Send for BoolType {}
+unsafe impl Sync for BoolType {}
+
+impl BoolType {
+    pub fn new() -> Self {
+        let mut ns = Namespace::new();
+        ns.add_obj("$name", create::new_str("Bool"));
+        ns.add_obj("$full_name", create::new_str("builtins.Bool"));
+        Self { namespace: RefCell::new(ns) }
+    }
+}
+
+impl TypeTrait for BoolType {
+    fn name(&self) -> &str {
+        "Bool"
+    }
+
+    fn full_name(&self) -> &str {
+        "builtins.Bool"
+    }
+}
+
+impl ObjectTrait for BoolType {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn class(&self) -> TypeRef {
+        TYPE_TYPE.clone()
+    }
+
+    fn type_obj(&self) -> ObjectRef {
+        TYPE_TYPE.clone()
+    }
+
+    fn namespace(&self) -> &RefCell<Namespace> {
+        &self.namespace
+    }
+}
+
+// Bool Object ---------------------------------------------------------
 
 pub struct Bool {
+    namespace: RefCell<Namespace>,
     value: bool,
 }
 
+unsafe impl Send for Bool {}
+unsafe impl Sync for Bool {}
+
 impl Bool {
     pub fn new(value: bool) -> Self {
-        Self { value }
+        Self { namespace: RefCell::new(Namespace::new()), value }
     }
 
     pub fn value(&self) -> &bool {
@@ -22,24 +81,32 @@ impl Bool {
     }
 }
 
-impl Object for Bool {
-    fn class(&self) -> &TypeRef {
-        BUILTIN_TYPES.get("Bool").unwrap()
-    }
-
+impl ObjectTrait for Bool {
     fn as_any(&self) -> &dyn Any {
         self
     }
 
+    fn class(&self) -> TypeRef {
+        BOOL_TYPE.clone()
+    }
+
+    fn type_obj(&self) -> ObjectRef {
+        BOOL_TYPE.clone()
+    }
+
+    fn namespace(&self) -> &RefCell<Namespace> {
+        &self.namespace
+    }
+
     // Unary operations -----------------------------------------------
 
-    fn bool_val(&self, _ctx: &RuntimeContext) -> RuntimeBoolResult {
+    fn bool_val(&self) -> RuntimeBoolResult {
         Ok(*self.value())
     }
 
     // Binary operations -----------------------------------------------
 
-    fn is_equal(&self, rhs: &dyn Object, _ctx: &RuntimeContext) -> bool {
+    fn is_equal(&self, rhs: &dyn ObjectTrait) -> bool {
         if let Some(rhs) = rhs.down_to_bool() {
             self.is(rhs) || self.value() == rhs.value()
         } else {
@@ -47,7 +114,7 @@ impl Object for Bool {
         }
     }
 
-    fn and(&self, rhs: &dyn Object, _ctx: &RuntimeContext) -> RuntimeBoolResult {
+    fn and(&self, rhs: &dyn ObjectTrait) -> RuntimeBoolResult {
         if let Some(rhs) = rhs.down_to_bool() {
             Ok(*self.value() && *rhs.value())
         } else {
@@ -59,7 +126,7 @@ impl Object for Bool {
         }
     }
 
-    fn or(&self, rhs: &dyn Object, _ctx: &RuntimeContext) -> RuntimeBoolResult {
+    fn or(&self, rhs: &dyn ObjectTrait) -> RuntimeBoolResult {
         if let Some(rhs) = rhs.down_to_bool() {
             Ok(*self.value() || *rhs.value())
         } else {
@@ -82,6 +149,6 @@ impl fmt::Display for Bool {
 
 impl fmt::Debug for Bool {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self)
+        write!(f, "{self}")
     }
 }

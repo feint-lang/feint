@@ -6,7 +6,7 @@ use std::fmt;
 
 use num_traits::ToPrimitive;
 
-use crate::types::{Args, ObjectExt, ObjectRef, Params};
+use crate::types::{create, Args, ObjectRef, ObjectTraitExt, Params};
 use crate::util::{
     BinaryOperator, CompareOperator, InplaceOperator, Stack, UnaryCompareOperator,
     UnaryOperator,
@@ -31,12 +31,17 @@ pub struct VM {
     pub ctx: RuntimeContext,
     // The value stack contains "pointers" to the different value types:
     // constants, vars, temporaries, and return values.
-    pub(crate) value_stack: Stack<ValueStackKind>,
+    value_stack: Stack<ValueStackKind>,
     // The scope stack contains value stack sizes. Each size is the size
     // that the stack was just before a scope was entered. When a scope
     // is exited, these sizes are used to truncate the value stack back
     // to its previous size so that items can be freed.
-    pub(crate) scope_stack: Stack<usize>,
+    scope_stack: Stack<usize>,
+
+    // Whenever an object is retrieved via dot notation, the object on
+    // the left of the dot becomes the current bound method context
+    // (AKA this).
+    this: Option<ObjectRef>,
 }
 
 impl Default for VM {
@@ -47,7 +52,7 @@ impl Default for VM {
 
 impl VM {
     pub fn new(ctx: RuntimeContext) -> Self {
-        VM { ctx, value_stack: Stack::new(), scope_stack: Stack::new() }
+        VM { ctx, value_stack: Stack::new(), scope_stack: Stack::new(), this: None }
     }
 
     pub fn with_argv(argv: Vec<&str>) -> Self {
@@ -82,8 +87,7 @@ impl VM {
                 }
                 // Scopes
                 ScopeStart => {
-                    self.scope_stack.push(self.value_stack.size());
-                    self.ctx.enter_scope();
+                    self.enter_scope();
                 }
                 ScopeEnd => {
                     self.exit_scopes(1);
@@ -118,7 +122,7 @@ impl VM {
                 JumpIf(addr, scope_exit_count) => {
                     self.exit_scopes(*scope_exit_count);
                     let obj = self.pop_obj()?;
-                    if obj.bool_val(&self.ctx)? {
+                    if obj.bool_val()? {
                         jump_ip = *addr;
                         is_jump = true;
                     }
@@ -126,7 +130,7 @@ impl VM {
                 JumpIfNot(addr, scope_exit_count) => {
                     self.exit_scopes(*scope_exit_count);
                     let obj = self.pop_obj()?;
-                    if !obj.bool_val(&self.ctx)? {
+                    if !obj.bool_val()? {
                         jump_ip = *addr;
                         is_jump = true;
                     }
@@ -134,8 +138,7 @@ impl VM {
                 JumpIfElse(if_addr, else_addr, scope_exit_count) => {
                     self.exit_scopes(*scope_exit_count);
                     let obj = self.pop_obj()?;
-                    let addr =
-                        if obj.bool_val(&self.ctx)? { *if_addr } else { *else_addr };
+                    let addr = if obj.bool_val()? { *if_addr } else { *else_addr };
                     jump_ip = addr;
                     is_jump = true;
                 }
@@ -162,7 +165,7 @@ impl VM {
                     for obj in objects {
                         string.push_str(obj.to_string().as_str());
                     }
-                    let string_obj = self.ctx.builtins.new_str(string);
+                    let string_obj = create::new_str(string);
                     self.push(Temp(string_obj));
                 }
                 MakeTuple(n) => {
@@ -171,7 +174,7 @@ impl VM {
                     for obj in objects {
                         items.push(obj.clone());
                     }
-                    let tuple = self.ctx.builtins.new_tuple(items);
+                    let tuple = create::new_tuple(items);
                     self.push(Temp(tuple));
                 }
                 // Functions
@@ -245,7 +248,7 @@ impl VM {
         let a = self.pop_obj()?;
         let result = match op {
             Plus => a, // no-op
-            Negate => a.negate(&self.ctx)?,
+            Negate => a.negate()?,
         };
         self.push(ValueStackKind::Temp(result));
         Ok(())
@@ -255,10 +258,10 @@ impl VM {
         use UnaryCompareOperator::*;
         let a = self.pop_obj()?;
         let result = match op {
-            AsBool => a.bool_val(&self.ctx)?,
-            Not => a.not(&self.ctx)?,
+            AsBool => a.bool_val()?,
+            Not => a.not()?,
         };
-        let obj = self.ctx.builtins.bool_obj_from_bool(result);
+        let obj = create::bool_obj_from_bool(result);
         self.push(ValueStackKind::Temp(obj));
         Ok(())
     }
@@ -277,22 +280,24 @@ impl VM {
         let (a, b) = self.get_binary_operands()?;
         let b = &*b;
         let result = match op {
-            Pow => a.pow(b, &self.ctx)?,
-            Mul => a.mul(b, &self.ctx)?,
-            Div => a.div(b, &self.ctx)?,
-            FloorDiv => a.floor_div(b, &self.ctx)?,
-            Mod => a.modulo(b, &self.ctx)?,
-            Add => a.add(b, &self.ctx)?,
-            Sub => a.sub(b, &self.ctx)?,
+            Pow => a.pow(b)?,
+            Mul => a.mul(b)?,
+            Div => a.div(b)?,
+            FloorDiv => a.floor_div(b)?,
+            Mod => a.modulo(b)?,
+            Add => a.add(b)?,
+            Sub => a.sub(b)?,
             Dot => {
-                if let Some(name) = b.get_str_val() {
-                    a.get_attr(name.as_str(), &self.ctx, a.clone())?
-                } else if let Some(int) = b.get_int_val() {
-                    a.get_item(&int, &self.ctx)?
+                let obj = if let Some(name) = b.get_str_val() {
+                    a.get_attr(name.as_str())?
+                } else if let Some(index) = b.get_usize_val() {
+                    a.get_item(index)?
                 } else {
                     let message = format!("Not an attribute name or index: {b:?}");
                     return Err(RuntimeErr::new_type_err(message));
-                }
+                };
+                self.this = Some(a.clone());
+                obj
             }
         };
         self.push(ValueStackKind::Temp(result));
@@ -307,18 +312,16 @@ impl VM {
         let b = &*b;
         let result = match op {
             Is => a.is(b),
-            IsEqual => a.is_equal(b, &self.ctx),
-            NotEqual => a.not_equal(b, &self.ctx),
-            And => a.and(b, &self.ctx)?,
-            Or => a.or(b, &self.ctx)?,
-            LessThan => a.less_than(b, &self.ctx)?,
-            LessThanOrEqual => a.less_than(b, &self.ctx)? || a.is_equal(b, &self.ctx),
-            GreaterThan => a.greater_than(b, &self.ctx)?,
-            GreaterThanOrEqual => {
-                a.greater_than(b, &self.ctx)? || a.is_equal(b, &self.ctx)
-            }
+            IsEqual => a.is_equal(b),
+            NotEqual => a.not_equal(b),
+            And => a.and(b)?,
+            Or => a.or(b)?,
+            LessThan => a.less_than(b)?,
+            LessThanOrEqual => a.less_than(b)? || a.is_equal(b),
+            GreaterThan => a.greater_than(b)?,
+            GreaterThanOrEqual => a.greater_than(b)? || a.is_equal(b),
         };
-        let obj = self.ctx.builtins.bool_obj_from_bool(result);
+        let obj = create::bool_obj_from_bool(result);
         self.push(ValueStackKind::Temp(obj));
         Ok(())
     }
@@ -339,8 +342,8 @@ impl VM {
         if let ValueStackKind::Var(depth, name) = a_kind {
             let b = &*b;
             let result = match op {
-                AddEqual => a.add(b, &self.ctx)?,
-                SubEqual => a.sub(b, &self.ctx)?,
+                AddEqual => a.add(b)?,
+                SubEqual => a.sub(b)?,
             };
             self.ctx.assign_var_at_depth(depth, name.as_str(), result)?;
             self.push(ValueStackKind::Var(depth, name));
@@ -362,14 +365,14 @@ impl VM {
             }
         }
         if let Some(func) = callable.down_to_builtin_func() {
-            if let Some(this) = &func.this {
-                args.insert(0, this.clone());
-            }
             self.check_call_args(&func.name, &func.params, &args, false)?;
-            let result = callable.call(args, self)?;
+            let result = callable.call(self.this.clone(), args, self)?;
+            if self.this.is_some() {
+                self.this = None;
+            }
             let return_val = match result {
                 Some(return_val) => return_val,
-                None => self.ctx.builtins.nil_obj.clone(),
+                None => create::new_nil(),
             };
             // For builtin functions, the return value isn't on the
             // stack, so we have to put it there.
@@ -378,10 +381,10 @@ impl VM {
             // Wrap the function call in a scope where the
             // function's locals are defined. After the
             // call, this scope will be cleared out.
-            self.scope_stack.push(self.value_stack.size());
-            self.ctx.enter_scope();
-            if let Some(this) = &func.this {
-                args.insert(0, this.clone());
+            self.enter_scope();
+            if let Some(this) = &self.this {
+                self.ctx.declare_and_assign_var("this", this.clone())?;
+                self.this = None;
             }
             self.check_call_args(&func.name, &func.params, &args, true)?;
             self.execute(&func.chunk, false)?;
@@ -416,10 +419,15 @@ impl VM {
                 }
             }
         } else if bind {
-            let args = self.ctx.builtins.new_tuple(args.clone());
+            let args = create::new_tuple(args.clone());
             self.ctx.declare_and_assign_var("$args", args)?;
         }
         Ok(())
+    }
+
+    pub fn enter_scope(&mut self) {
+        self.scope_stack.push(self.value_stack.size());
+        self.ctx.enter_scope();
     }
 
     /// When exiting a scope, we first save the top of the stack (which
@@ -600,8 +608,8 @@ impl VM {
         let obj_str = |kind_opt: Option<&ValueStackKind>| match kind_opt {
             Some(kind) => match self.get_obj(kind.clone()) {
                 Ok(obj) => {
-                    let type_name = obj.type_name();
-                    let str = format!("{obj:?} <{type_name}>");
+                    let class = obj.class();
+                    let str = format!("{obj:?} <{class}>");
                     str.replace('\n', "\\n").replace('\r', "\\r")
                 }
                 Err(err) => format!("[ERROR: Could not get object: {err}]"),

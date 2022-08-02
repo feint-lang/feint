@@ -1,5 +1,5 @@
 use crate::ast;
-use crate::types::ObjectRef;
+use crate::types::{create, ObjectRef};
 use crate::util::{
     BinaryOperator, CompareOperator, InplaceOperator, UnaryCompareOperator,
     UnaryOperator,
@@ -52,7 +52,7 @@ impl<'a> Visitor<'a> {
             let argc = argv.len();
             self.push(Inst::LoadVar("$main".to_string()));
             for arg in argv.iter() {
-                self.add_const(self.ctx.builtins.new_str(arg));
+                self.add_const(create::new_str(arg));
             }
             self.push(Inst::Call(argc));
             self.push(Inst::Return);
@@ -155,13 +155,13 @@ impl<'a> Visitor<'a> {
             Kind::Bool(false) => self.push_const(2),
             Kind::Ellipsis => self.push_const(0),
             Kind::Int(value) => {
-                self.add_const(self.ctx.builtins.new_int(value));
+                self.add_const(create::new_int(value));
             }
             Kind::Float(value) => {
-                self.add_const(self.ctx.builtins.new_float(value));
+                self.add_const(create::new_float(value));
             }
             Kind::String(value) => {
-                self.add_const(self.ctx.builtins.new_str(value));
+                self.add_const(create::new_str(value));
             }
         }
         Ok(())
@@ -355,7 +355,7 @@ impl<'a> Visitor<'a> {
         func_visitor.exit_scope();
         assert_eq!(func_visitor.scope_tree.pointer(), 0);
         let chunk = func_visitor.chunk;
-        let func = self.ctx.builtins.new_func(name, params, chunk, None);
+        let func = create::new_func(name, params, chunk);
         self.add_const(func);
         Ok(())
     }
