@@ -14,7 +14,7 @@ pub fn map(this: This, args: Args, vm: &mut VM) -> CallResult {
         Ok(None)
     } else {
         let message = format!(
-            "Tuple.map() expected a tuple as its first arg; got {:?}",
+            "map() expected a tuple as its first arg; got {:?}",
             this.type_obj()
         );
         Err(RuntimeErr::new_type_err(message))
