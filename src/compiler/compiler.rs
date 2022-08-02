@@ -74,7 +74,7 @@ impl<'a> Visitor<'a> {
         type Kind = ast::StatementKind;
         match node.kind {
             Kind::Jump(name) => {
-                let jump_addr = self.chunk.len();
+                let jump_addr = self.len();
                 self.push(Inst::Placeholder(
                     0,
                     Box::new(Inst::Jump(0, 0)),
@@ -83,7 +83,7 @@ impl<'a> Visitor<'a> {
                 self.scope_tree.add_jump(name.as_str(), jump_addr);
             }
             Kind::Label(name, expr) => {
-                let addr = self.chunk.len();
+                let addr = self.len();
                 self.visit_expr(expr, None)?;
                 if self.scope_tree.add_label(name.as_str(), addr).is_some() {
                     return Err(CompErr::new_duplicate_label_in_scope(name));
@@ -98,12 +98,12 @@ impl<'a> Visitor<'a> {
 
     fn visit_break(&mut self, expr: ast::Expr) -> VisitResult {
         self.visit_expr(expr, None)?;
-        self.chunk.push(Inst::BreakPlaceholder(self.chunk.len(), self.scope_depth));
+        self.push(Inst::BreakPlaceholder(self.len(), self.scope_depth));
         Ok(())
     }
 
     fn visit_continue(&mut self) -> VisitResult {
-        self.chunk.push(Inst::ContinuePlaceholder(self.chunk.len(), self.scope_depth));
+        self.push(Inst::ContinuePlaceholder(self.len(), self.scope_depth));
         Ok(())
     }
 
@@ -231,7 +231,7 @@ impl<'a> Visitor<'a> {
             self.visit_expr(expr, None)?;
 
             // Placeholder for jump depending on result of branch expr.
-            let jump_index = self.chunk.len();
+            let jump_index = self.len();
             self.push(Inst::Placeholder(
                 jump_index,
                 Box::new(Inst::JumpIfElse(0, 0, 0)),
@@ -245,7 +245,7 @@ impl<'a> Visitor<'a> {
 
             // Placeholder for jump out of conditional suite if this
             // branch is selected.
-            let jump_out_addr = self.chunk.len();
+            let jump_out_addr = self.len();
             jump_out_addrs.push(jump_out_addr);
             self.push(Inst::Placeholder(
                 jump_out_addr,
@@ -254,7 +254,7 @@ impl<'a> Visitor<'a> {
             ));
 
             // Jump target if branch condition is false.
-            let next_addr = self.chunk.len();
+            let next_addr = self.len();
 
             self.chunk[jump_index] = Inst::JumpIfElse(block_addr, next_addr, 0);
         }
@@ -267,7 +267,7 @@ impl<'a> Visitor<'a> {
         }
 
         // Address of instruction after conditional suite.
-        let after_addr = self.chunk.len();
+        let after_addr = self.len();
 
         // Replace jump-out placeholders with actual jumps.
         for addr in jump_out_addrs {
@@ -283,7 +283,7 @@ impl<'a> Visitor<'a> {
         block: ast::StatementBlock,
     ) -> VisitResult {
         let loop_scope_depth = self.scope_depth;
-        let loop_addr = self.chunk.len();
+        let loop_addr = self.len();
         let true_cond = expr.is_true();
         let jump_out_index = if true_cond {
             // Skip evaluation since we know it will always succeed.
@@ -293,7 +293,7 @@ impl<'a> Visitor<'a> {
             // Evaluate loop expression on every iteration.
             self.visit_expr(expr, None)?;
             // Placeholder for jump-out if result is false.
-            let jump_out_index = self.chunk.len();
+            let jump_out_index = self.len();
             self.push(Inst::Placeholder(
                 jump_out_index,
                 Box::new(Inst::JumpIfNot(0, 0)),
@@ -306,7 +306,7 @@ impl<'a> Visitor<'a> {
         // Jump to top of loop.
         self.push(Inst::Jump(loop_addr, 0));
         // Jump-out address.
-        let after_addr = self.chunk.len();
+        let after_addr = self.len();
         // Set address of jump-out placeholder (not needed if loop
         // expression is always true).
         if !true_cond {
@@ -458,6 +458,10 @@ impl<'a> Visitor<'a> {
 
     fn push(&mut self, inst: Inst) {
         self.chunk.push(inst);
+    }
+
+    fn len(&self) -> usize {
+        self.chunk.len()
     }
 
     fn push_const(&mut self, index: usize) {
