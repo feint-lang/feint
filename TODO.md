@@ -4,6 +4,8 @@
 - [x] Implement format strings (AKA $ strings)
 - [x] Implement `Tuple`
 - [ ] Implement `List`
+- [ ] Implement `Map`
+- [ ] Implement `Set`
 - [x] Implement vars
 - [x] Implement dot operator (attribute & item access)
 - [x] Implement `block`
@@ -17,7 +19,7 @@
 - [ ] Implement ternary operator (can use inline
       `x = if <cond> -> <expr> else -> <expr>` for this so maybe an op
       isn't necessary)
-- [ ] Implement `match`?
+- [x] Implement `match`
 - [ ] Implement range
 - [ ] Implement `loop`
   - [x] Implement while loops
@@ -28,13 +30,17 @@
   - [ ] Verify implementation
 - [x] Implement native functions
   - [x] Implement `print` function (`print` is currently implemented as a statement and has limited functionality)
+- [x] Implement `this` binding for functions
 - [ ] Check tuple items / args and throw error when invalid items are included (e.g., `break` isn't allowed)
-- [ ] Implement modules (add `Module` type)
-- [ ] Implement custom classes
+- [ ] Implement modules
+  - [x] Add `Module` type
+  - [ ] Implement module loading
 - [ ] Implement `import`
   - [ ] `import <name>`
   - [ ] `import from <name>: <names>`
+- [ ] Implement custom classes
 - [ ] Figure out a nice way to do multi-line lambdas
+- [ ] Implement error handling (exceptions or something)
 - [ ] Improve error handling/reporting
   - [ ] Make source location available in AST (started)
   - [ ] Fix locations in format strings

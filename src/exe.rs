@@ -240,7 +240,7 @@ impl<'a> Executor<'a> {
                 let loc = token.start;
                 let token = &token.token;
                 if token == &Token::EndOfStatement {
-                    (loc, format!("Syntax error at {loc}"))
+                    (loc, format!("Syntax error at {loc} (unexpected end of statement)"))
                 } else {
                     (loc, format!("Parse error: unexpected token at {loc}: {token:?}"))
                 }
@@ -268,6 +268,12 @@ impl<'a> Executor<'a> {
                 format!(
                     "Parse error: unexpected continue at {loc} (continue must be in a loop)"
                 ),
+            ),
+            InlineMatchNotAllowed(loc) => (
+                *loc, "Parse error: match blocks must be idented".to_string(),
+            ),
+            MatchDefaultMustBeLast(loc) => (
+                *loc, "Parse error: extra match arm found after default match arm".to_string(),
             ),
             SyntaxErr(loc) => (*loc, format!("Syntax error at {loc}",)),
             kind => (Location::new(0, 0), format!("Unhandled parse error: {:?}", kind)),

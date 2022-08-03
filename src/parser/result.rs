@@ -43,4 +43,7 @@ pub enum ParseErrKind {
 
     UnexpectedBreak(Location),
     UnexpectedContinue(Location),
+
+    InlineMatchNotAllowed(Location),
+    MatchDefaultMustBeLast(Location),
 }

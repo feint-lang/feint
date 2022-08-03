@@ -149,6 +149,14 @@ inline_else_if :
 inline_else :
     | "else" "->" expr
 
+match :
+    | "match" cond "->" NEWLINE INDENT (match_arm)+ [default_match_arm]
+    | "match" cond "->" NEWLINE INDENT (match_arm)* default_match_arm
+match_arm :
+    | expr "->" (suite | expr)
+default_match_arm :
+    | ":" "->" (suite | expr)
+
 loop :
     | "loop" "->" suite
     | "loop" cond "->" suite

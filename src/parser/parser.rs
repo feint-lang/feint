@@ -161,6 +161,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
                 ast::Expr::new_block(block, start, end)
             }
             If => self.conditional(start)?,
+            Match => self.match_conditional(start)?,
             Loop => self.loop_(start)?,
             Ident(name) => {
                 ast::Expr::new_ident(ast::Ident::new_ident(name), start, end)
@@ -308,6 +309,58 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
             false => None,
         };
         Ok(ast::Expr::new_conditional(branches, default, start, end))
+    }
+
+    /// Handle `match <expr> -> ...`. Inline `match` expressions aren't
+    /// supported because they would be too confusing.
+    fn match_conditional(&mut self, start: Location) -> ExprResult {
+        use ParseErrKind::{
+            ExpectedExpr, ExpectedToken, InlineMatchNotAllowed, MatchDefaultMustBeLast,
+        };
+        use Token::{
+            Colon, EndOfStatement, EqualEqual, InlineScopeStart, ScopeEnd, ScopeStart,
+        };
+        let lhs = self.expr(0).map_err(|_| self.err(ExpectedExpr(self.loc())))?;
+        let mut branches = vec![];
+        let mut default = None;
+        let mut end = start;
+        if self.next_token_is(&ScopeStart)? {
+            loop {
+                if !self.has_tokens()? || self.peek_token_is(&ScopeEnd)? {
+                    break;
+                }
+                if self.next_token_is(&Colon)? {
+                    let block = self.block()?;
+                    end = block.end;
+                    default = Some(block);
+                    self.expect_token(&EndOfStatement)?;
+                    if !self.peek_token_is(&ScopeEnd)? {
+                        return Err(self.err(MatchDefaultMustBeLast(self.next_loc())));
+                    }
+                    break;
+                } else {
+                    let rhs = self.expr(0)?;
+                    let rhs_end = rhs.end;
+                    let cond = ast::Expr::new_binary_op(
+                        lhs.clone(),
+                        &EqualEqual,
+                        rhs,
+                        start,
+                        rhs_end,
+                    );
+                    let block = self.block()?;
+                    end = block.end;
+                    branches.push((cond, block));
+                    self.expect_token(&EndOfStatement)?;
+                }
+            }
+            self.expect_token(&ScopeEnd)?;
+            Ok(ast::Expr::new_conditional(branches, default, start, end))
+        } else if self.next_token_is(&InlineScopeStart)? {
+            Err(self.err(InlineMatchNotAllowed(self.next_loc())))
+        } else {
+            Err(self.err(ExpectedToken(self.next_loc(), ScopeStart)))
+        }
     }
 
     /// Handle `loop -> ...` and `loop <cond> -> ...` (`while` loops).
