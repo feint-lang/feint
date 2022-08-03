@@ -67,12 +67,15 @@ impl RuntimeErr {
         Self::new(RuntimeErrKind::ItemCannotBeSet(type_name.into(), index))
     }
 
-    pub fn new_index_out_of_bounds(index: usize) -> Self {
-        Self::new(RuntimeErrKind::IndexOutOfBounds(index))
+    pub fn new_index_out_of_bounds<S: Into<String>>(
+        type_name: S,
+        index: usize,
+    ) -> Self {
+        Self::new(RuntimeErrKind::IndexOutOfBounds(type_name.into(), index))
     }
 
-    pub fn new_not_callable(obj: ObjectRef) -> Self {
-        Self::new(RuntimeErrKind::NotCallable(obj))
+    pub fn new_not_callable<S: Into<String>>(type_name: S) -> Self {
+        Self::new(RuntimeErrKind::NotCallable(type_name.into()))
     }
 }
 
@@ -99,8 +102,8 @@ pub enum RuntimeErrKind {
     AttrCannotBeSet(String, String),
     ItemDoesNotExist(String, usize),
     ItemCannotBeSet(String, usize),
-    IndexOutOfBounds(usize),
-    NotCallable(ObjectRef),
+    IndexOutOfBounds(String, usize),
+    NotCallable(String),
 
     // Move?
     CouldNotReadFile(String),

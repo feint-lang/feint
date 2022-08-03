@@ -362,14 +362,14 @@ impl VM {
 
     fn handle_call(&mut self, n: usize) -> RuntimeResult {
         let objects = self.pop_n_obj(n + 1)?;
-        let callable_ref = objects.get(0).unwrap();
-        let callable = callable_ref.read().unwrap();
+        let callable = objects.get(0).unwrap();
+        let callable = callable.read().unwrap();
         let args = objects.iter().skip(1).cloned().collect();
         if callable.is_builtin_func() || callable.is_func() {
             let return_val = callable.call(None, args, self)?;
             self.push_return_val(return_val);
         } else {
-            return Err(RuntimeErr::new_not_callable(callable_ref.clone()));
+            return Err(callable.not_callable());
         };
         Ok(())
     }

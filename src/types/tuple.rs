@@ -6,6 +6,7 @@ use std::sync::{Arc, RwLock};
 use once_cell::sync::Lazy;
 
 use crate::builtin_funcs::tuple;
+use crate::vm::RuntimeErr;
 
 use super::create;
 use super::result::GetAttrResult;
@@ -108,6 +109,9 @@ impl ObjectTrait for Tuple {
     }
 
     fn get_item(&self, index: usize) -> GetAttrResult {
+        if index >= self.items.len() {
+            return Err(self.index_out_of_bounds(index));
+        }
         if let Some(item) = self.items.get(index) {
             Ok(item.clone())
         } else {

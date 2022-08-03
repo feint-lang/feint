@@ -314,7 +314,19 @@ impl<'a> Executor<'a> {
             AttrDoesNotExist(type_name, name) => {
                 format!("Attribute does not exist on type {type_name}: {name}")
             }
-            NotCallable(obj) => format!("Object is not callable: {obj:?}"),
+            AttrCannotBeSet(type_name, name) => {
+                format!("Attribute cannot be set on {type_name}: {name}")
+            }
+            ItemDoesNotExist(type_name, index) => {
+                format!("Item with index does not exist on type {type_name}: {index}")
+            }
+            ItemCannotBeSet(type_name, index) => {
+                format!("Item cannot be set by index on {type_name}: {index}")
+            }
+            IndexOutOfBounds(type_name, index) => {
+                format!("Index out of bounds on {type_name}: {index}")
+            }
+            NotCallable(type_name) => format!("Object is not callable: {type_name}"),
             kind => format!("Unhandled runtime error: {:?}", kind),
         };
         eprintln!("    |\n\n  {}", message);

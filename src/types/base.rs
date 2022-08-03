@@ -181,8 +181,22 @@ pub trait ObjectTrait {
         Err(self.item_does_not_exist(index))
     }
 
+    fn set_item(&mut self, index: usize, _value: ObjectRef) -> GetAttrResult {
+        Err(RuntimeErr::new_item_cannot_be_set(
+            self.class().read().unwrap().full_name(),
+            index,
+        ))
+    }
+
     fn item_does_not_exist(&self, index: usize) -> RuntimeErr {
         RuntimeErr::new_item_does_not_exist(
+            self.class().read().unwrap().full_name(),
+            index,
+        )
+    }
+
+    fn index_out_of_bounds(&self, index: usize) -> RuntimeErr {
+        RuntimeErr::new_index_out_of_bounds(
             self.class().read().unwrap().full_name(),
             index,
         )
@@ -276,6 +290,10 @@ pub trait ObjectTrait {
             "Call not implemented for type {}",
             self.class().read().unwrap()
         )))
+    }
+
+    fn not_callable(&self) -> RuntimeErr {
+        RuntimeErr::new_not_callable(self.class().read().unwrap().full_name())
     }
 }
 
