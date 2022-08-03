@@ -8,6 +8,10 @@ use super::result::{RuntimeErr, RuntimeResult};
 pub struct RuntimeContext {
     constants: Constants,
     namespace_stack: Vec<Namespace>,
+    // Number of namespaces on stack
+    size: usize,
+    // Index of namespace associated with current scope
+    current_depth: usize,
     pub argv: Vec<String>,
 }
 
@@ -22,6 +26,8 @@ impl RuntimeContext {
         let mut ctx = Self {
             constants: Constants::default(),
             namespace_stack: vec![],
+            size: 0,
+            current_depth: 0,
             argv: argv.into_iter().map(|a| a.to_owned()).collect(),
         };
         ctx.init();
@@ -61,33 +67,31 @@ impl RuntimeContext {
         self.constants.iter()
     }
 
+    #[inline]
     fn current_namespace(&mut self) -> &mut Namespace {
-        let index = self.depth();
-        &mut self.namespace_stack[index]
+        &mut self.namespace_stack[self.current_depth]
     }
 
     pub fn enter_scope(&mut self) {
-        let namespace = Namespace::new();
-        self.namespace_stack.push(namespace);
+        self.current_depth = self.size;
+        self.namespace_stack.push(Namespace::new());
+        self.size += 1;
     }
 
     pub fn exit_scope(&mut self) {
-        if self.depth() == 0 {
+        if self.current_depth == 0 {
             panic!("Can't remove global namespace");
         }
-        if let Some(mut namespace) = self.namespace_stack.pop() {
-            namespace.clear();
-        }
+        let mut ns = self.namespace_stack.pop().expect("Expected namespace");
+        ns.clear();
+        self.size -= 1;
+        self.current_depth -= 1;
     }
 
     pub fn exit_scopes(&mut self, count: usize) {
         for _ in 0..count {
             self.exit_scope();
         }
-    }
-
-    fn depth(&self) -> usize {
-        self.namespace_stack.len() - 1
     }
 
     // Constants -------------------------------------------------------
@@ -123,7 +127,7 @@ impl RuntimeContext {
     ) -> Result<usize, RuntimeErr> {
         let namespace = self.current_namespace();
         if namespace.set_obj(name, obj) {
-            Ok(self.depth())
+            Ok(self.current_depth)
         } else {
             let message = format!("Name not defined in current namespace: {name}");
             Err(RuntimeErr::new_name_err(message))
@@ -159,17 +163,17 @@ impl RuntimeContext {
     /// Get the depth of the namespace where the specified var is
     /// defined.
     pub fn get_var_depth(&mut self, name: &str) -> Result<usize, RuntimeErr> {
-        let mut depth = self.depth();
+        let mut var_depth = self.current_depth;
         loop {
-            let namespace = &self.namespace_stack[depth];
+            let namespace = &self.namespace_stack[var_depth];
             if namespace.get_obj(name).is_some() {
-                break Ok(depth);
+                break Ok(var_depth);
             }
-            if depth == 0 {
+            if var_depth == 0 {
                 let message = format!("Name not found: {name}");
                 break Err(RuntimeErr::new_name_err(message));
             }
-            depth -= 1;
+            var_depth -= 1;
         }
     }
 
