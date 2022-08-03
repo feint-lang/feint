@@ -411,7 +411,12 @@ impl<'a> Visitor<'a> {
     ) -> VisitResult {
         use ast::IdentKind::{Ident, SpecialIdent};
         let name = match ident.kind {
-            Ident(name) => name,
+            Ident(name) => {
+                if name == "this" {
+                    return Err(CompErr::new_cannot_assign_special_ident(name));
+                }
+                name
+            }
             SpecialIdent(name) => {
                 if name == "$main" && self.scope_tree.in_global_scope() {
                     name
