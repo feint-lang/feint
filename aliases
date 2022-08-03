@@ -18,6 +18,9 @@ alias d="cargo run -- --dis --debug"
 alias f="./target/release/feint"
 alias bf="cargo build --release && ./target/release/feint"
 
+# profile
+alias p="cargo flamegraph --root --"
+
 # run all examples and show exit code
 function e
     cargo build --release

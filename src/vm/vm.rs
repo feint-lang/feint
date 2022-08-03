@@ -265,18 +265,13 @@ impl VM {
         Ok(())
     }
 
-    fn get_binary_operands(&mut self) -> Result<(ObjectRef, ObjectRef), RuntimeErr> {
-        let operands = self.pop_n_obj(2)?;
-        let a = operands.get(0).unwrap().clone();
-        let b = operands.get(1).unwrap().clone();
-        Ok((a, b))
-    }
-
     /// Pop top two operands from stack, apply operation, and push temp
     /// result value onto stack.
     fn handle_binary_op(&mut self, op: &BinaryOperator) -> RuntimeResult {
         use BinaryOperator::*;
-        let (a_ref, b_ref) = self.get_binary_operands()?;
+        let operands = self.pop_n_obj(2)?;
+        let a_ref = operands.get(0).unwrap();
+        let b_ref = operands.get(1).unwrap();
         let a = a_ref.read().unwrap();
         let b = b_ref.read().unwrap();
         let b = &*b;
@@ -309,9 +304,11 @@ impl VM {
     /// temp value onto stack.
     fn handle_compare_op(&mut self, op: &CompareOperator) -> RuntimeResult {
         use CompareOperator::*;
-        let (a, b) = self.get_binary_operands()?;
-        let a = a.read().unwrap();
-        let b = b.read().unwrap();
+        let operands = self.pop_n_obj(2)?;
+        let a_ref = operands.get(0).unwrap();
+        let b_ref = operands.get(1).unwrap();
+        let a = a_ref.read().unwrap();
+        let b = b_ref.read().unwrap();
         let b = &*b;
         let result = match op {
             Is => a.is(b),
@@ -334,27 +331,24 @@ impl VM {
     /// be a variable.
     fn handle_inplace_op(&mut self, op: &InplaceOperator) -> RuntimeResult {
         use InplaceOperator::*;
-        let (a_kind, a, b) = if let Some(kinds) = self.pop_n(2) {
-            let a_kind = kinds[0].clone();
-            let a = self.get_obj(kinds[0].clone())?;
-            let b = self.get_obj(kinds[1].clone())?;
-            (a_kind, a, b)
+        if let Some(kinds) = self.pop_n(2) {
+            if let ValueStackKind::Var(depth, name) = kinds.get(0).unwrap() {
+                let a = self.get_obj(kinds.get(0).unwrap())?;
+                let b = self.get_obj(kinds.get(1).unwrap())?;
+                let a = a.read().unwrap();
+                let b = b.read().unwrap();
+                let result = match op {
+                    AddEqual => a.add(&*b)?,
+                    SubEqual => a.sub(&*b)?,
+                };
+                self.ctx.assign_var_at_depth(*depth, name.as_str(), result)?;
+                self.push(ValueStackKind::Var(*depth, name.clone()));
+            } else {
+                let message = format!("Binary op: {}", op);
+                return Err(RuntimeErr::new(RuntimeErrKind::ExpectedVar(message)));
+            }
         } else {
             return Err(RuntimeErr::new(RuntimeErrKind::NotEnoughValuesOnStack(2)));
-        };
-        if let ValueStackKind::Var(depth, name) = a_kind {
-            let a = a.read().unwrap();
-            let b = b.read().unwrap();
-            let b = &*b;
-            let result = match op {
-                AddEqual => a.add(b)?,
-                SubEqual => a.sub(b)?,
-            };
-            self.ctx.assign_var_at_depth(depth, name.as_str(), result)?;
-            self.push(ValueStackKind::Var(depth, name));
-        } else {
-            let message = format!("Binary op: {}", op);
-            return Err(RuntimeErr::new(RuntimeErrKind::ExpectedVar(message)));
         }
         Ok(())
     }
@@ -472,7 +466,7 @@ impl VM {
 
     // Const stack -----------------------------------------------------
 
-    pub(crate) fn push(&mut self, kind: ValueStackKind) {
+    pub fn push(&mut self, kind: ValueStackKind) {
         self.value_stack.push(kind);
     }
 
@@ -480,9 +474,9 @@ impl VM {
         self.value_stack.pop()
     }
 
-    pub(crate) fn pop_obj(&mut self) -> PopObjResult {
+    pub fn pop_obj(&mut self) -> PopObjResult {
         match self.pop() {
-            Some(kind) => self.get_obj(kind),
+            Some(kind) => self.get_obj(&kind),
             None => Err(RuntimeErr::new(RuntimeErrKind::EmptyStack)),
         }
     }
@@ -493,13 +487,7 @@ impl VM {
 
     fn pop_n_obj(&mut self, n: usize) -> PopNObjResult {
         match self.pop_n(n) {
-            Some(kinds) => {
-                let mut objects = vec![];
-                for kind in kinds {
-                    objects.push(self.get_obj(kind)?);
-                }
-                Ok(objects)
-            }
+            Some(kinds) => kinds.iter().map(|k| self.get_obj(k)).collect(),
             None => Err(RuntimeErr::new(RuntimeErrKind::NotEnoughValuesOnStack(n))),
         }
     }
@@ -511,19 +499,19 @@ impl VM {
     pub fn peek_obj(&mut self) -> PeekObjResult {
         match self.peek() {
             Some(kind) => {
-                let obj = self.get_obj(kind.clone())?;
+                let obj = self.get_obj(kind)?;
                 Ok(Some(obj))
             }
             None => Ok(None),
         }
     }
 
-    fn get_obj(&self, kind: ValueStackKind) -> Result<ObjectRef, RuntimeErr> {
+    fn get_obj(&self, kind: &ValueStackKind) -> Result<ObjectRef, RuntimeErr> {
         use ValueStackKind::*;
         match kind {
-            Constant(index) => Ok(self.ctx.get_const(index)?.clone()),
+            Constant(index) => Ok(self.ctx.get_const(*index)?.clone()),
             Var(depth, name) => {
-                let val = self.ctx.get_var_at_depth(depth, name.as_str())?;
+                let val = self.ctx.get_var_at_depth(*depth, name.as_str())?;
                 Ok(val.clone())
             }
             Temp(obj) => Ok(obj.clone()),
@@ -539,7 +527,7 @@ impl VM {
             return eprintln!("[EMPTY]");
         }
         for (i, kind) in self.value_stack.iter().enumerate() {
-            let obj = self.get_obj(kind.clone());
+            let obj = self.get_obj(kind);
             match obj {
                 Ok(obj) => {
                     eprintln!("{:0>8} {:?}", i, obj)
@@ -617,7 +605,7 @@ impl VM {
         use ValueStackKind::*;
 
         let obj_str = |kind_opt: Option<&ValueStackKind>| match kind_opt {
-            Some(kind) => match self.get_obj(kind.clone()) {
+            Some(kind) => match self.get_obj(kind) {
                 Ok(obj) => {
                     let obj = &*obj.read().unwrap();
                     let str = format!("{obj:?} {}", obj.class().read().unwrap());
