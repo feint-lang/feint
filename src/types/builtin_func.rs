@@ -79,8 +79,17 @@ unsafe impl Sync for BuiltinFunc {}
 
 impl BuiltinFunc {
     pub fn new<S: Into<String>>(name: S, params: Params, func: BuiltinFn) -> Self {
+        let mut ns = Namespace::new();
+        let name = name.into();
         let arity = params.as_ref().map(|params| params.len());
-        Self { namespace: Namespace::new(), name: name.into(), params, arity, func }
+        let arity_obj = if let Some(int) = arity {
+            create::new_int(int)
+        } else {
+            create::new_nil()
+        };
+        ns.add_obj("$name", create::new_str(name.as_str()));
+        ns.add_obj("$arity", arity_obj);
+        Self { namespace: ns, name, params, arity, func }
     }
 }
 
@@ -103,6 +112,10 @@ impl ObjectTrait for BuiltinFunc {
 
     fn call(&self, this: This, args: Args, vm: &mut VM) -> CallResult {
         vm.enter_scope();
+        if this.is_some() {
+            let this_var = this.clone().unwrap().clone();
+            vm.ctx.declare_and_assign_var("this", this_var)?;
+        }
         vm.check_call_args(self.name.as_str(), &self.params, &args)?;
         let return_val = (self.func)(this, args, vm)?;
         vm.push_temp(return_val);

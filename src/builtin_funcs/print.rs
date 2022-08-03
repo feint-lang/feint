@@ -3,7 +3,6 @@ use crate::vm::VM;
 
 /// Returns Nil
 pub fn print(_this: This, args: Args, _vm: &mut VM) -> CallResult {
-    // assert!(this.is_none());
     let num_args = args.len();
     if num_args > 0 {
         let last = num_args - 1;

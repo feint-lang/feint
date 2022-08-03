@@ -3,7 +3,6 @@
 //! These constructors simplify the creation system objects.
 use std::sync::{Arc, RwLock};
 
-use crate::types::Namespace;
 use num_bigint::BigInt;
 use num_traits::{FromPrimitive, Num};
 use once_cell::sync::Lazy;
@@ -12,6 +11,7 @@ use crate::vm::Chunk;
 
 use super::base::ObjectRef;
 use super::bool::Bool;
+use super::bound_func::BoundFunc;
 use super::builtin_func::{BuiltinFn, BuiltinFunc};
 use super::custom::{CustomObj, CustomType};
 use super::float::Float;
@@ -19,6 +19,7 @@ use super::func::Func;
 use super::int::Int;
 use super::module::Module;
 use super::nil::Nil;
+use super::ns::Namespace;
 use super::str::Str;
 use super::tuple::Tuple;
 
@@ -45,6 +46,10 @@ pub fn new_true() -> ObjectRef {
 #[inline]
 pub fn new_false() -> ObjectRef {
     FALSE.clone()
+}
+
+pub fn new_bound_func(func: ObjectRef, this: ObjectRef) -> ObjectRef {
+    Arc::new(RwLock::new(BoundFunc::new(func, this)))
 }
 
 pub fn new_builtin_func<S: Into<String>>(

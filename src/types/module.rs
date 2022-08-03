@@ -107,6 +107,6 @@ impl fmt::Display for Module {
 
 impl fmt::Debug for Module {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{self}")
+        write!(f, "<module {} @ {}>", self.name(), self.id())
     }
 }

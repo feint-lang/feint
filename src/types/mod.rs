@@ -8,6 +8,7 @@ pub(crate) mod create;
 
 mod base;
 mod bool;
+mod bound_func;
 mod builtin_func;
 mod builtins;
 mod class;

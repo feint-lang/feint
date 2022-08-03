@@ -13,6 +13,7 @@ use super::create;
 use super::result::{Args, CallResult, GetAttrResult, SetAttrResult, This};
 
 use super::bool::{Bool, BoolType};
+use super::bound_func::{BoundFunc, BoundFuncType};
 use super::builtin_func::{BuiltinFunc, BuiltinFuncType};
 use super::class::{Type, TypeType};
 use super::custom::{CustomObj, CustomType};
@@ -205,6 +206,7 @@ pub trait ObjectTrait {
     // Type checkers ---------------------------------------------------
 
     make_type_checker!(is_bool, Bool);
+    make_type_checker!(is_bound_func, BoundFunc);
     make_type_checker!(is_builtin_func, BuiltinFunc);
     make_type_checker!(is_float, Float);
     make_type_checker!(is_func, Func);
@@ -219,6 +221,7 @@ pub trait ObjectTrait {
 
     make_down_to!(down_to_type, Type);
     make_down_to!(down_to_bool, Bool);
+    make_down_to!(down_to_bound_func, BoundFunc);
     make_down_to!(down_to_builtin_func, BuiltinFunc);
     make_down_to!(down_to_float, Float);
     make_down_to!(down_to_func, Func);
@@ -347,7 +350,7 @@ impl fmt::Display for dyn TypeTrait {
 
 impl fmt::Debug for dyn TypeTrait {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{self}")
+        write!(f, "<{} @ {}>", self.full_name(), self.id())
     }
 }
 
@@ -358,6 +361,7 @@ impl fmt::Display for dyn ObjectTrait {
             self,
             TypeType,
             BoolType,
+            BoundFuncType,
             BuiltinFuncType,
             CustomType,
             FloatType,
@@ -373,6 +377,7 @@ impl fmt::Display for dyn ObjectTrait {
             self,
             Type,
             Bool,
+            BoundFunc,
             BuiltinFunc,
             CustomObj,
             Float,
@@ -394,6 +399,7 @@ impl fmt::Debug for dyn ObjectTrait {
             self,
             TypeType,
             BoolType,
+            BoundFuncType,
             BuiltinFuncType,
             CustomType,
             FloatType,
@@ -409,6 +415,7 @@ impl fmt::Debug for dyn ObjectTrait {
             self,
             Type,
             Bool,
+            BoundFunc,
             BuiltinFunc,
             CustomObj,
             Float,

@@ -291,7 +291,7 @@ impl VM {
             Add => a.add(b)?,
             Sub => a.sub(b)?,
             Dot => {
-                let obj = if let Some(name) = b.get_str_val() {
+                let obj_ref = if let Some(name) = b.get_str_val() {
                     a.get_attr(name.as_str())?
                 } else if let Some(index) = b.get_usize_val() {
                     a.get_item(index)?
@@ -299,8 +299,16 @@ impl VM {
                     let message = format!("Not an attribute name or index: {b:?}");
                     return Err(RuntimeErr::new_type_err(message));
                 };
-                // TODO: bind this if obj is a function
-                obj
+                let bind = {
+                    let obj = obj_ref.read().unwrap();
+                    obj.is_builtin_func() || obj.is_func()
+                };
+                if bind {
+                    // If `b` in `a.b` is a function, bind `b` to `a`.
+                    create::new_bound_func(obj_ref.clone(), a_ref.clone())
+                } else {
+                    obj_ref
+                }
             }
         };
         self.push_temp(result);
@@ -365,7 +373,14 @@ impl VM {
         let callable = objects.get(0).unwrap();
         let callable = callable.read().unwrap();
         let args = objects.iter().skip(1).cloned().collect();
-        if callable.is_builtin_func() || callable.is_func() {
+        if let Some(bound_func) = callable.down_to_bound_func() {
+            let return_val = bound_func.func.read().unwrap().call(
+                Some(bound_func.this.clone()),
+                args,
+                self,
+            )?;
+            self.push_return_val(return_val);
+        } else if callable.is_builtin_func() || callable.is_func() {
             let return_val = callable.call(None, args, self)?;
             self.push_return_val(return_val);
         } else {
@@ -438,7 +453,7 @@ impl VM {
         // TODO: Not sure what this should do or if it's even needed
     }
 
-    // Const stack -----------------------------------------------------
+    // Value stack -----------------------------------------------------
 
     fn push(&mut self, kind: ValueStackKind) {
         self.value_stack.push(kind);
