@@ -8,8 +8,8 @@ pub(crate) use result::{
     RuntimeBoolResult, RuntimeErr, RuntimeErrKind, RuntimeObjResult,
 };
 
+mod constants;
 mod context;
 mod inst;
-mod objects;
 mod result;
 mod vm;

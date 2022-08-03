@@ -2,11 +2,11 @@ use std::slice::Iter;
 
 use crate::types::{create, Namespace, ObjectRef, ObjectTrait, BUILTINS};
 
-use super::objects::Objects;
+use super::constants::Constants;
 use super::result::{RuntimeErr, RuntimeResult};
 
 pub struct RuntimeContext {
-    constants: Objects,
+    constants: Constants,
     namespace_stack: Vec<Namespace>,
     pub argv: Vec<String>,
 }
@@ -20,7 +20,7 @@ impl Default for RuntimeContext {
 impl RuntimeContext {
     pub fn new(argv: Vec<&str>) -> Self {
         let mut ctx = Self {
-            constants: Objects::default(),
+            constants: Constants::default(),
             namespace_stack: vec![],
             argv: argv.into_iter().map(|a| a.to_owned()).collect(),
         };
