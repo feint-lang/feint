@@ -1,4 +1,5 @@
-use std::slice::Iter;
+use std::collections::hash_map;
+use std::slice;
 
 use crate::types::{create, Namespace, ObjectRef, ObjectTrait, BUILTINS};
 
@@ -56,15 +57,19 @@ impl RuntimeContext {
         let builtins = BUILTINS.clone();
         let reader = builtins.read().unwrap();
         let ns = reader.namespace();
-        for (name, obj) in ns.iter() {
+        for (name, obj) in ns.iter().filter(|(n, _)| !n.starts_with('$')) {
             if let Err(err) = self.declare_and_assign_var(name, (*obj).clone()) {
                 panic!("Could not add alias for builtin object `{name}` to global scope: {err}");
             }
         }
     }
 
-    pub fn iter_constants(&self) -> Iter<'_, ObjectRef> {
+    pub fn iter_constants(&self) -> slice::Iter<'_, ObjectRef> {
         self.constants.iter()
+    }
+
+    pub fn iter_vars(&self) -> hash_map::Iter<'_, String, ObjectRef> {
+        self.namespace_stack[self.current_depth].iter()
     }
 
     #[inline]

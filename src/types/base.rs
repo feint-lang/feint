@@ -120,6 +120,22 @@ macro_rules! make_bin_op {
 pub trait ObjectTrait {
     fn as_any(&self) -> &dyn Any;
 
+    fn module(&self) -> ObjectRef {
+        let class = self.class();
+        let class = class.read().unwrap();
+        class.module().clone()
+    }
+
+    fn module_name(&self) -> String {
+        let module = self.module();
+        let module = module.read().unwrap();
+        if let Some(module) = module.down_to_mod() {
+            String::from(module.name())
+        } else {
+            String::from("[unknown module]")
+        }
+    }
+
     /// Get an instance's type as a type. This is needed to retrieve
     /// type level attributes.
     fn class(&self) -> TypeRef;

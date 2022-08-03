@@ -78,8 +78,9 @@ impl VM {
         let mut jump_ip = None;
 
         loop {
-            #[cfg(debug_assertions)]
-            self.dis(dis, ip, chunk);
+            if dis {
+                self.dis(ip, chunk);
+            }
 
             match &chunk[ip] {
                 NoOp => {
@@ -553,7 +554,14 @@ impl VM {
 
     /// Show vars.
     pub fn display_vars(&self) {
-        // TODO:
+        let mut entries = self.ctx.iter_vars().collect::<Vec<_>>();
+        entries.sort_by_key(|(n, _)| n.as_str());
+        for (name, obj) in entries.iter() {
+            let obj = obj.read().unwrap();
+            if obj.module_name() != "builtins" {
+                eprintln!("{name} = {obj}");
+            }
+        }
     }
 
     // Disassembler ----------------------------------------------------
@@ -564,7 +572,7 @@ impl VM {
     /// Disassemble a list of instructions.
     pub fn dis_list(&mut self, chunk: &Chunk) -> ExeResult {
         for (ip, _) in chunk.iter().enumerate() {
-            self.dis(true, ip, chunk);
+            self.dis(ip, chunk);
         }
         Ok(VMState::Halted(0))
     }
@@ -596,14 +604,11 @@ impl VM {
         num_funcs
     }
 
-    /// Disassemble a single instruction. The `flag` arg is so that
-    /// we don't have to wrap every call in `if dis { self.dis(...) }`.
-    pub fn dis(&mut self, flag: bool, ip: usize, chunk: &Chunk) {
-        if flag {
-            let inst = &chunk[ip];
-            let formatted = self.format_instruction(chunk, inst);
-            eprintln!("{:0>4} {}", ip, formatted);
-        }
+    /// Disassemble a single instruction.
+    pub fn dis(&mut self, ip: usize, chunk: &Chunk) {
+        let inst = &chunk[ip];
+        let formatted = self.format_instruction(chunk, inst);
+        eprintln!("{:0>4} {}", ip, formatted);
     }
 
     fn format_instruction(&mut self, chunk: &Chunk, inst: &Inst) -> String {

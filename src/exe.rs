@@ -104,47 +104,40 @@ impl<'a> Executor<'a> {
 
     /// Execute a chunk (a list of instructions).
     pub fn execute_chunk(&mut self, chunk: Vec<Inst>) -> ExeResult {
-        let result = if cfg!(debug_assertions) {
-            if self.dis {
-                eprintln!("{:=<79}", "INSTRUCTIONS ");
-            } else if self.debug {
-                eprintln!("{:=<79}", "OUTPUT ");
-            }
-            self.vm.execute(&chunk, self.dis)
-        } else if self.dis {
+        if self.dis {
             eprintln!("{:=<79}", "INSTRUCTIONS ");
-            let result = self.vm.dis_list(&chunk);
-            eprintln!("NOTE: Full disassembly is only available in debug builds");
-            result
-        } else {
-            if self.debug {
-                eprintln!("{:=<79}", "OUTPUT ");
-            }
-            self.vm.execute(&chunk, false)
-        };
+        } else if self.debug {
+            eprintln!("{:=<79}", "OUTPUT ");
+        }
+
+        let result = self.vm.execute(&chunk, self.dis);
+
         let num_funcs = if self.dis {
             eprintln!();
             self.vm.dis_functions()
         } else {
             0
         };
+
         if self.debug {
             if !self.dis || num_funcs > 0 {
                 eprintln!();
             }
             eprintln!("{:=<79}", "STACK ");
             self.vm.display_stack();
+            eprintln!("\n{:=<79}", "CONSTANTS ");
+            self.vm.display_constants();
+            eprintln!("\n{:=<79}", "VARS ");
+            self.vm.display_vars();
             eprintln!("\n{:=<79}", "VM STATE ");
             eprintln!("{:?}", result);
         }
-        match result {
-            Ok(vm_state) => Ok(vm_state),
-            Err(err) => {
-                self.print_err_line(0, "<line not available (TODO)>");
-                self.handle_runtime_err(&err);
-                Err(ExeErr::new(ExeErrKind::RuntimeErr(err.kind)))
-            }
-        }
+
+        result.map_err(|err| {
+            self.print_err_line(0, "<line not available (TODO)>");
+            self.handle_runtime_err(&err);
+            ExeErr::new(ExeErrKind::RuntimeErr(err.kind))
+        })
     }
 
     fn print_err_line(&self, line_no: usize, line: &str) {

@@ -1,4 +1,4 @@
-use std::collections::hash_map::Iter;
+use std::collections::hash_map;
 use std::collections::HashMap;
 use std::fmt;
 
@@ -24,7 +24,7 @@ impl Namespace {
         self.objects.clear()
     }
 
-    pub fn iter(&self) -> Iter<'_, String, ObjectRef> {
+    pub fn iter(&self) -> hash_map::Iter<'_, String, ObjectRef> {
         self.objects.iter()
     }
 

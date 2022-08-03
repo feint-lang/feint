@@ -1,5 +1,5 @@
 use crate::types::{
-    create, Namespace, ObjectTrait, ObjectTraitExt, TypeTrait, TypeTraitExt,
+    create, Namespace, ObjectTrait, ObjectTraitExt, TypeTraitExt,
 };
 
 #[test]
