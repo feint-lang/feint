@@ -45,11 +45,6 @@ pub struct VM {
     max_call_depth: CallDepth,
     // Current depth of "call stack".
     call_depth: CallDepth,
-    // Whenever an object is retrieved via dot notation, the object on
-    // the left of the dot becomes the current bound method context
-    // (AKA this).
-    // TODO: Need to think more about when this should be set & cleared.
-    this: Option<ObjectRef>,
 }
 
 impl Default for VM {
@@ -66,7 +61,6 @@ impl VM {
             scope_stack: Stack::new(),
             max_call_depth,
             call_depth: 0,
-            this: None,
         }
     }
 
@@ -78,7 +72,6 @@ impl VM {
     /// execute.
     pub fn execute(&mut self, chunk: &Chunk, dis: bool) -> ExeResult {
         use Inst::*;
-        use ValueStackKind::*;
 
         let max_call_depth = self.max_call_depth;
         let mut ip: usize = 0;
@@ -97,13 +90,9 @@ impl VM {
                 }
                 // Constants
                 LoadConst(index) => {
-                    self.push(Constant(*index));
+                    self.push_const(*index);
                 }
                 // Scopes
-                EndStatement => {
-                    // Statements are quasi-scopes
-                    self.this = None;
-                }
                 ScopeStart => {
                     self.enter_scope();
                 }
@@ -119,11 +108,11 @@ impl VM {
                 AssignVar(name) => {
                     let obj = self.pop_obj()?;
                     let depth = self.ctx.assign_var(name, obj)?;
-                    self.push(Var(depth, name.clone()));
+                    self.push_var(depth, name.clone());
                 }
                 LoadVar(name) => {
                     let depth = self.ctx.get_var_depth(name.as_str())?;
-                    self.push(Var(depth, name.clone()));
+                    self.push_var(depth, name.clone());
                 }
                 // Jumps
                 Jump(addr, scope_exit_count) => {
@@ -131,7 +120,7 @@ impl VM {
                     jump_ip = Some(*addr);
                 }
                 JumpPushNil(addr, scope_exit_count) => {
-                    self.push(Constant(0));
+                    self.push_const(0);
                     self.exit_scopes(*scope_exit_count);
                     jump_ip = Some(*addr);
                 }
@@ -196,7 +185,7 @@ impl VM {
                         string.push_str(obj.to_string().as_str());
                     }
                     let string_obj = create::new_str(string);
-                    self.push(Temp(string_obj));
+                    self.push_temp(string_obj);
                 }
                 MakeTuple(n) => {
                     let objects = self.pop_n_obj(*n)?;
@@ -205,7 +194,7 @@ impl VM {
                         items.push(obj.clone());
                     }
                     let tuple = create::new_tuple(items);
-                    self.push(Temp(tuple));
+                    self.push_temp(tuple);
                 }
                 // Placeholders
                 Placeholder(addr, inst, message) => {
@@ -266,7 +255,7 @@ impl VM {
             Plus => a, // no-op
             Negate => a.read().unwrap().negate()?,
         };
-        self.push(ValueStackKind::Temp(result));
+        self.push_temp(result);
         Ok(())
     }
 
@@ -279,7 +268,7 @@ impl VM {
             Not => a.not()?,
         };
         let obj = create::bool_obj_from_bool(result);
-        self.push(ValueStackKind::Temp(obj));
+        self.push_temp(obj);
         Ok(())
     }
 
@@ -310,11 +299,11 @@ impl VM {
                     let message = format!("Not an attribute name or index: {b:?}");
                     return Err(RuntimeErr::new_type_err(message));
                 };
-                self.this = Some(a_ref.clone());
+                // TODO: bind this if obj is a function
                 obj
             }
         };
-        self.push(ValueStackKind::Temp(result));
+        self.push_temp(result);
         Ok(())
     }
 
@@ -340,7 +329,7 @@ impl VM {
             GreaterThanOrEqual => a.greater_than(b)? || a.is_equal(b),
         };
         let obj = create::bool_obj_from_bool(result);
-        self.push(ValueStackKind::Temp(obj));
+        self.push_temp(obj);
         Ok(())
     }
 
@@ -360,7 +349,7 @@ impl VM {
                     SubEqual => a.sub(&*b)?,
                 };
                 self.ctx.assign_var_at_depth(*depth, name.as_str(), result)?;
-                self.push(ValueStackKind::Var(*depth, name.clone()));
+                self.push_var(*depth, name.clone());
             } else {
                 let message = format!("Binary op: {}", op);
                 return Err(RuntimeErr::new(RuntimeErrKind::ExpectedVar(message)));
@@ -372,44 +361,16 @@ impl VM {
     }
 
     fn handle_call(&mut self, n: usize) -> RuntimeResult {
-        use ValueStackKind::ReturnVal;
         let objects = self.pop_n_obj(n + 1)?;
         let callable_ref = objects.get(0).unwrap();
         let callable = callable_ref.read().unwrap();
-        let mut args: Args = vec![];
-        if objects.len() > 1 {
-            for i in 1..objects.len() {
-                args.push(objects.get(i).unwrap().clone());
-            }
-        }
-        if let Some(func) = callable.down_to_builtin_func() {
-            // NOTE: this must be cleared before calling the function.
-            let this = self.this.clone();
-            self.this = None;
-            self.check_call_args(&func.name, &func.params, &args, false)?;
-            let result = callable.call(this, args, self)?;
-            let return_val = match result {
-                Some(return_val) => return_val,
-                None => create::new_nil(),
-            };
-            // For builtin functions, the return value isn't on the
-            // stack, so we have to put it there.
-            self.push(ReturnVal(return_val));
-        } else if let Some(func) = callable.down_to_func() {
-            // Wrap the function call in a scope where the
-            // function's locals are defined. After the
-            // call, this scope will be cleared out.
-            self.enter_scope();
-            if let Some(this) = &self.this {
-                self.ctx.declare_and_assign_var("this", this.clone())?;
-                self.this = None;
-            }
-            self.check_call_args(&func.name, &func.params, &args, true)?;
-            self.execute(&func.chunk, false)?;
-            self.exit_scopes(1);
+        let args = objects.iter().skip(1).cloned().collect();
+        if callable.is_builtin_func() || callable.is_func() {
+            let return_val = callable.call(None, args, self)?;
+            self.push_return_val(return_val);
         } else {
             return Err(RuntimeErr::new_not_callable(callable_ref.clone()));
-        }
+        };
         Ok(())
     }
 
@@ -420,7 +381,6 @@ impl VM {
         name: &str,
         params: &Params,
         args: &Args,
-        bind: bool,
     ) -> RuntimeResult {
         if let Some(params) = &params {
             let arity = params.len();
@@ -431,12 +391,10 @@ impl VM {
                     "{name}() expected {arity} arg{ess}; got {num_args}"
                 )));
             }
-            if bind {
-                for (name, arg) in params.iter().zip(args) {
-                    self.ctx.declare_and_assign_var(name, arg.clone())?;
-                }
+            for (name, arg) in params.iter().zip(args) {
+                self.ctx.declare_and_assign_var(name, arg.clone())?;
             }
-        } else if bind {
+        } else {
             let args = create::new_tuple(args.clone());
             self.ctx.declare_and_assign_var("$args", args)?;
         }
@@ -444,7 +402,6 @@ impl VM {
     }
 
     pub fn enter_scope(&mut self) {
-        self.this = None;
         self.scope_stack.push(self.value_stack.size());
         self.ctx.enter_scope();
     }
@@ -454,8 +411,7 @@ impl VM {
     /// added in the scope, and finally push the scope's "return value"
     /// back onto the stack. After taking care of the VM stack, the
     /// scope's namespace is then cleared and removed.
-    fn exit_scopes(&mut self, count: usize) {
-        self.this = None;
+    pub fn exit_scopes(&mut self, count: usize) {
         if count == 0 {
             return;
         }
@@ -471,9 +427,9 @@ impl VM {
             panic!("Scope stack unexpectedly empty when exiting scope(s): {count}");
         };
         if let Ok(obj) = return_val {
-            self.push(ValueStackKind::Temp(obj));
+            self.push_temp(obj);
         } else {
-            panic!("Stack unexpectedly empty when exiting scope(s): {count}");
+            panic!("Value stack unexpectedly empty when exiting scope(s): {count}");
         }
         self.ctx.exit_scopes(count);
     }
@@ -484,8 +440,24 @@ impl VM {
 
     // Const stack -----------------------------------------------------
 
-    pub fn push(&mut self, kind: ValueStackKind) {
+    fn push(&mut self, kind: ValueStackKind) {
         self.value_stack.push(kind);
+    }
+
+    pub fn push_const(&mut self, index: usize) {
+        self.push(ValueStackKind::Constant(index));
+    }
+
+    pub fn push_return_val(&mut self, obj: ObjectRef) {
+        self.push(ValueStackKind::ReturnVal(obj));
+    }
+
+    pub fn push_temp(&mut self, obj: ObjectRef) {
+        self.push(ValueStackKind::Temp(obj));
+    }
+
+    pub fn push_var(&mut self, depth: usize, name: String) {
+        self.push(ValueStackKind::Var(depth, name));
     }
 
     fn pop(&mut self) -> Option<ValueStackKind> {
@@ -548,6 +520,7 @@ impl VM {
             let obj = self.get_obj(kind);
             match obj {
                 Ok(obj) => {
+                    let obj = &*obj.read().unwrap();
                     eprintln!("{:0>8} {:?}", i, obj)
                 }
                 Err(_) => eprintln!("{:0>4} [NOT AN OBJECT]", i),
@@ -641,7 +614,6 @@ impl VM {
                 let obj_str = obj_str(Some(&Constant(*index)));
                 self.format_aligned("LOAD_CONST", format!("{index} : {obj_str}"))
             }
-            EndStatement => "END_STATEMENT".to_string(),
             ScopeStart => "SCOPE_START".to_string(),
             ScopeEnd => "SCOPE_END".to_string(),
             DeclareVar(name) => self.format_aligned("DECLARE_VAR", name),

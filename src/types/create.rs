@@ -32,14 +32,17 @@ static FALSE: Lazy<Arc<RwLock<Bool>>> =
 
 // Builtin type constructors ---------------------------------------
 
+#[inline]
 pub fn new_nil() -> ObjectRef {
     NIL.clone()
 }
 
+#[inline]
 pub fn new_true() -> ObjectRef {
     TRUE.clone()
 }
 
+#[inline]
 pub fn new_false() -> ObjectRef {
     FALSE.clone()
 }

@@ -101,20 +101,12 @@ impl ObjectTrait for Func {
 
     /// This provides a way to call user functions from builtin
     /// functions. Perhaps there's a better way to do this?
-    fn call(&self, this: This, args: Args, vm: &mut VM) -> CallResult {
+    fn call(&self, _this: This, args: Args, vm: &mut VM) -> CallResult {
         vm.enter_scope();
-        if let Some(this) = &this {
-            vm.ctx.declare_and_assign_var("this", this.clone())?;
-        }
-        vm.check_call_args(self.name.as_str(), &self.params, &args, true)?;
-        let result = if let Err(err) = vm.execute(&self.chunk, false) {
-            Err(err)
-        } else {
-            let result = vm.pop_obj()?;
-            Ok(Some(result))
-        };
-        vm.ctx.exit_scopes(1);
-        result
+        vm.check_call_args(self.name.as_str(), &self.params, &args)?;
+        vm.execute(&self.chunk, false)?;
+        vm.exit_scopes(1);
+        vm.pop_obj()
     }
 }
 

@@ -16,5 +16,5 @@ pub fn new(_this: This, args: Args, _vm: &mut VM) -> CallResult {
         let message = format!("Float new expected string or float; got {arg}");
         return Err(RuntimeErr::new_type_err(message));
     };
-    Ok(Some(float))
+    Ok(float)
 }

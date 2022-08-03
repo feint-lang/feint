@@ -12,7 +12,7 @@ pub fn read_file(_this: This, args: Args, _vm: &mut VM) -> CallResult {
     let arg = arg.read().unwrap();
     if let Some(file_name) = arg.get_str_val() {
         match read_to_string(file_name) {
-            Ok(contents) => Ok(Some(create::new_str(contents))),
+            Ok(contents) => Ok(create::new_str(contents)),
             Err(err) => {
                 Err(RuntimeErr::new(RuntimeErrKind::CouldNotReadFile(err.to_string())))
             }
@@ -36,7 +36,7 @@ pub fn read_file_lines(_this: This, args: Args, _vm: &mut VM) -> CallResult {
             let item = create::new_str(line.unwrap());
             items.push(item);
         }
-        Ok(Some(create::new_tuple(items)))
+        Ok(create::new_tuple(items))
     } else {
         Err(RuntimeErr::new_type_err("Expected string"))
     }

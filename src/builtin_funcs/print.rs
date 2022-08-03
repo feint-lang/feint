@@ -1,4 +1,4 @@
-use crate::types::{Args, CallResult, This};
+use crate::types::{create, Args, CallResult, This};
 use crate::vm::VM;
 
 /// Returns Nil
@@ -17,5 +17,5 @@ pub fn print(_this: This, args: Args, _vm: &mut VM) -> CallResult {
         }
     }
     println!();
-    Ok(None)
+    Ok(create::new_nil())
 }

@@ -102,7 +102,12 @@ impl ObjectTrait for BuiltinFunc {
     }
 
     fn call(&self, this: This, args: Args, vm: &mut VM) -> CallResult {
-        (self.func)(this, args, vm)
+        vm.enter_scope();
+        vm.check_call_args(self.name.as_str(), &self.params, &args)?;
+        let return_val = (self.func)(this, args, vm)?;
+        vm.push_temp(return_val);
+        vm.exit_scopes(1);
+        vm.pop_obj()
     }
 }
 

@@ -15,7 +15,6 @@ pub enum Inst {
 
     LoadConst(usize),
 
-    EndStatement,
     ScopeStart,
     ScopeEnd,
 

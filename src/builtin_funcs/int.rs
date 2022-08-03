@@ -17,5 +17,5 @@ pub fn new(_this: This, args: Args, _vm: &mut VM) -> CallResult {
         let message = format!("Int new expected string or int; got {arg}");
         return Err(RuntimeErr::new_type_err(message));
     };
-    Ok(Some(int))
+    Ok(int)
 }

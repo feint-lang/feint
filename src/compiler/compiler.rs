@@ -93,7 +93,6 @@ impl<'a> Visitor<'a> {
             Kind::Continue => self.visit_continue()?,
             Kind::Expr(expr) => self.visit_expr(expr, None)?,
         }
-        self.push(Inst::EndStatement);
         Ok(())
     }
 

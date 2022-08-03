@@ -9,4 +9,4 @@ pub type SetAttrResult = Result<(), RuntimeErr>;
 pub type Params = Option<Vec<String>>;
 pub type This = Option<ObjectRef>;
 pub type Args = Vec<ObjectRef>;
-pub type CallResult = Result<Option<ObjectRef>, RuntimeErr>;
+pub type CallResult = Result<ObjectRef, RuntimeErr>;

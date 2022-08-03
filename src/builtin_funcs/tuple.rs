@@ -11,7 +11,7 @@ pub fn map(this: This, args: Args, vm: &mut VM) -> CallResult {
             let i = create::new_int(i);
             map_fn.call(None, vec![item.clone(), i], vm)?;
         }
-        Ok(None)
+        Ok(create::new_nil())
     } else {
         let message = format!(
             "map() expected a tuple as its first arg; got {:?}",
