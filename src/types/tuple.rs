@@ -5,11 +5,10 @@ use std::sync::{Arc, RwLock};
 
 use once_cell::sync::Lazy;
 
-use crate::builtin_funcs::tuple;
-use crate::vm::RuntimeErr;
+use crate::vm::{RuntimeErr, VM};
 
 use super::create;
-use super::result::GetAttrResult;
+use super::result::{Args, CallResult, GetAttrResult, This};
 
 use super::base::{ObjectRef, ObjectTrait, ObjectTraitExt, TypeRef, TypeTrait};
 use super::class::TYPE_TYPE;
@@ -29,10 +28,7 @@ impl TupleType {
         let mut ns = Namespace::new();
         ns.add_obj("$name", create::new_str("Tuple"));
         ns.add_obj("$full_name", create::new_str("builtins.Tuple"));
-        ns.add_obj(
-            "map",
-            create::new_builtin_func("map", Some(vec!["map_fn"]), tuple::map),
-        );
+        ns.add_obj("map", create::new_builtin_func("map", Some(vec!["map_fn"]), map));
         Self { namespace: ns }
     }
 }
@@ -68,7 +64,7 @@ impl ObjectTrait for TupleType {
     }
 }
 
-// Tuple Object ----------------------------------------------------------
+// Tuple Object --------------------------------------------------------
 
 pub struct Tuple {
     namespace: Namespace,
@@ -146,7 +142,8 @@ impl ObjectTrait for Tuple {
 impl fmt::Display for Tuple {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let num_items = self.len();
-        let items: Vec<String> = self.iter().map(|item| format!("{item:?}")).collect();
+        let items: Vec<String> =
+            self.iter().map(|item| format!("{:?}", &*item.read().unwrap())).collect();
         let items_str = items.join(", ");
         let trailing_comma = if num_items == 1 { "," } else { "" };
         write!(f, "({}{})", items_str, trailing_comma)
@@ -156,5 +153,27 @@ impl fmt::Display for Tuple {
 impl fmt::Debug for Tuple {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{self}")
+    }
+}
+
+// Methods -------------------------------------------------------------
+
+pub fn map(this: This, args: Args, vm: &mut VM) -> CallResult {
+    let this = this.expect("Expected this");
+    let this = this.read().unwrap();
+    if let Some(tuple) = this.down_to_tuple() {
+        let map_fn = args.get(0).unwrap();
+        let map_fn = map_fn.read().unwrap();
+        for (i, item) in tuple.iter().enumerate() {
+            let i = create::new_int(i);
+            map_fn.call(None, vec![item.clone(), i], vm)?;
+        }
+        Ok(create::new_nil())
+    } else {
+        let message = format!(
+            "map() expected a tuple as its first arg; got {:?}",
+            this.type_obj()
+        );
+        Err(RuntimeErr::new_type_err(message))
     }
 }
