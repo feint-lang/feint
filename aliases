@@ -1,5 +1,6 @@
 # build
 alias b="cargo build"
+alias br="cargo build --release"
 
 # test
 alias t='cargo test --'
@@ -13,12 +14,16 @@ alias r="cargo run --"
 alias c="cargo run -- -c"
 alias d="cargo run -- --dis --debug"
 
+# run release binary
+alias f="./target/release/feint"
+alias bf="cargo build --release && ./target/release/feint"
+
 # run all examples and show exit code
 function e
-    cargo build
+    cargo build --release
     for f in examples/*.fi
         echo -n "> $f";
-        feint "$f" 1>/dev/null
+        ./target/release/feint "$f" 1>/dev/null
         echo -- " -> $status"
     end
 end
