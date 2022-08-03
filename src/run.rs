@@ -1,32 +1,38 @@
 //! # FeInt code runner
 use crate::exe::Executor;
 use crate::result::{ExeErrKind, ExeResult, ExitResult};
-use crate::vm::{VMState, VM};
+use crate::vm::{CallDepth, RuntimeContext, VMState, VM};
 
 /// Run source from file.
 pub fn run_file(
     file_path: &str,
     argv: Vec<&str>,
+    max_call_depth: CallDepth,
     dis: bool,
     debug: bool,
 ) -> ExitResult {
-    let mut vm = VM::with_argv(argv);
+    let mut vm = VM::new(RuntimeContext::new(argv), max_call_depth);
     let mut executor = Executor::new(&mut vm, false, dis, debug);
     let result = executor.execute_file(file_path);
     exit(result)
 }
 
 /// Read and run source from stdin.
-pub fn run_stdin(dis: bool, debug: bool) -> ExitResult {
-    let mut vm = VM::default();
+pub fn run_stdin(max_call_depth: CallDepth, dis: bool, debug: bool) -> ExitResult {
+    let mut vm = VM::new(RuntimeContext::default(), max_call_depth);
     let mut executor = Executor::new(&mut vm, false, dis, debug);
     let result = executor.execute_stdin();
     exit(result)
 }
 
 /// Run text source.
-pub fn run_text(text: &str, dis: bool, debug: bool) -> ExitResult {
-    let mut vm = VM::default();
+pub fn run_text(
+    text: &str,
+    max_call_depth: CallDepth,
+    dis: bool,
+    debug: bool,
+) -> ExitResult {
+    let mut vm = VM::new(RuntimeContext::default(), max_call_depth);
     let mut executor = Executor::new(&mut vm, false, dis, debug);
     let result = executor.execute_text(text, None);
     exit(result)

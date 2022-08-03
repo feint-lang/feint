@@ -1,13 +1,16 @@
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use clap::{Arg, Command};
+use clap::{value_parser, Arg, ArgAction, Command};
 
 use feint::repl;
 use feint::run;
+use feint::vm::{CallDepth, DEFAULT_MAX_CALL_DEPTH};
 
 /// Interpret a file if one is specified. Otherwise, run the REPL.
 fn main() -> ExitCode {
+    let default_max_call_depth = DEFAULT_MAX_CALL_DEPTH.to_string();
+
     let app = Command::new("FeInt")
         .version("0.0.0")
         .trailing_var_arg(true)
@@ -37,35 +40,41 @@ fn main() -> ExitCode {
         .arg(
             Arg::new("no_history")
                 .long("no-history")
-                .required(false)
-                .takes_value(false)
+                .action(ArgAction::SetTrue)
                 .help("Disable REPL history?"),
+        )
+        .arg(
+            Arg::new("max_call_depth")
+                .short('m')
+                .long("max-call-depth")
+                .default_value(default_max_call_depth.as_str())
+                .value_parser(value_parser!(CallDepth))
+                .help("Maximum call/recursion depth [1024]"),
         )
         .arg(
             Arg::new("dis")
                 .short('i')
                 .long("dis")
-                .required(false)
-                .takes_value(false)
-                .help("Disassemble instructions?"),
+                .action(ArgAction::SetTrue)
+                .help("disassemble instructions?"),
         )
         .arg(
             Arg::new("debug")
                 .short('d')
                 .long("debug")
-                .required(false)
-                .takes_value(false)
+                .action(ArgAction::SetTrue)
                 .help("Enable debug mode?"),
         )
         .arg(Arg::new("argv").index(2).multiple(true));
 
     let matches = app.get_matches();
-    let file_name = matches.value_of("FILE_NAME");
-    let code = matches.value_of("code");
-    let history_path = matches.value_of("history_path");
-    let save_repl_history = !matches.is_present("no_history");
-    let dis = matches.is_present("dis");
-    let debug = matches.is_present("debug");
+    let file_name = matches.get_one::<String>("FILE_NAME");
+    let code = matches.get_one::<String>("code");
+    let history_path = matches.get_one::<String>("history_path");
+    let save_repl_history = !matches.get_one::<bool>("no_history").unwrap();
+    let max_call_depth = *matches.get_one("max_call_depth").unwrap();
+    let dis = *matches.get_one::<bool>("dis").unwrap();
+    let debug = *matches.get_one::<bool>("debug").unwrap();
 
     let argv: Vec<&str> = match matches.values_of("argv") {
         Some(values) => values.collect(),
@@ -73,12 +82,12 @@ fn main() -> ExitCode {
     };
 
     let result = if let Some(code) = code {
-        run::run_text(code, dis, debug)
+        run::run_text(code, max_call_depth, dis, debug)
     } else if let Some(file_name) = file_name {
         if file_name == "-" {
-            run::run_stdin(dis, debug)
+            run::run_stdin(max_call_depth, dis, debug)
         } else {
-            run::run_file(file_name, argv, dis, debug)
+            run::run_file(file_name, argv, max_call_depth, dis, debug)
         }
     } else {
         match save_repl_history {

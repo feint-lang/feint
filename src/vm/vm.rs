@@ -15,9 +15,12 @@ use crate::util::{
 use super::context::RuntimeContext;
 use super::inst::{Chunk, Inst};
 use super::result::{
-    ExeResult, PeekObjResult, PopNObjResult, PopObjResult, RuntimeErr, RuntimeErrKind,
-    RuntimeResult, VMState,
+    CallDepth, ExeResult, PeekObjResult, PopNObjResult, PopObjResult, RuntimeErr,
+    RuntimeErrKind, RuntimeResult, VMState,
 };
+
+pub const DEFAULT_MAX_CALL_DEPTH: CallDepth =
+    if cfg!(debug_assertions) { 256 } else { 1024 };
 
 #[derive(Clone)]
 pub enum ValueStackKind {
@@ -37,6 +40,11 @@ pub struct VM {
     // is exited, these sizes are used to truncate the value stack back
     // to its previous size so that items can be freed.
     scope_stack: Stack<usize>,
+    // Maximum depth of "call stack" (quotes because there's no explicit
+    // call stack)
+    max_call_depth: CallDepth,
+    // Current depth of "call stack".
+    call_depth: CallDepth,
     // Whenever an object is retrieved via dot notation, the object on
     // the left of the dot becomes the current bound method context
     // (AKA this).
@@ -46,17 +54,20 @@ pub struct VM {
 
 impl Default for VM {
     fn default() -> Self {
-        VM::new(RuntimeContext::default())
+        VM::new(RuntimeContext::default(), DEFAULT_MAX_CALL_DEPTH)
     }
 }
 
 impl VM {
-    pub fn new(ctx: RuntimeContext) -> Self {
-        VM { ctx, value_stack: Stack::new(), scope_stack: Stack::new(), this: None }
-    }
-
-    pub fn with_argv(argv: Vec<&str>) -> Self {
-        VM::new(RuntimeContext::with_argv(argv))
+    pub fn new(ctx: RuntimeContext, max_call_depth: CallDepth) -> Self {
+        VM {
+            ctx,
+            value_stack: Stack::new(),
+            scope_stack: Stack::new(),
+            max_call_depth,
+            call_depth: 0,
+            this: None,
+        }
     }
 
     /// Execute the specified instructions and return the VM's state. If
@@ -69,6 +80,7 @@ impl VM {
         use Inst::*;
         use ValueStackKind::*;
 
+        let max_call_depth = self.max_call_depth;
         let mut ip: usize = 0;
         let mut jump_ip = None;
 
@@ -164,10 +176,16 @@ impl VM {
                 }
                 // Functions
                 Call(n) => {
+                    self.call_depth += 1;
+                    if self.call_depth > max_call_depth {
+                        return Err(RuntimeErr::new_recursion_depth_exceeded(
+                            max_call_depth,
+                        ));
+                    }
                     self.handle_call(*n)?;
                 }
                 Return => {
-                    // Return is a no-op
+                    self.call_depth -= 1;
                 }
                 // Object construction
                 MakeString(n) => {

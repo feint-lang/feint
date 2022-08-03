@@ -1,0 +1,5 @@
+# This will cause the recursion depth limit to be exceeded and exit
+# with an error.
+$main = () ->
+    recurs = () -> recurs()
+    recurs()

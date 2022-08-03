@@ -5,6 +5,7 @@
 pub mod exe;
 pub mod repl;
 pub mod run;
+pub mod vm;
 
 mod ast;
 mod builtin_funcs;
@@ -15,7 +16,6 @@ mod result;
 mod scanner;
 mod types;
 mod util;
-mod vm;
 
 #[cfg(test)]
 mod tests;

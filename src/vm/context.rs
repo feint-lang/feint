@@ -11,23 +11,50 @@ pub struct RuntimeContext {
     pub argv: Vec<String>,
 }
 
+impl Default for RuntimeContext {
+    fn default() -> Self {
+        RuntimeContext::new(vec![])
+    }
+}
+
 impl RuntimeContext {
-    pub fn new(
-        constants: Objects,
-        namespace_stack: Vec<Namespace>,
-        argv: Vec<String>,
-    ) -> Self {
-        Self { constants, namespace_stack, argv }
+    pub fn new(argv: Vec<&str>) -> Self {
+        let mut ctx = Self {
+            constants: Objects::default(),
+            namespace_stack: vec![],
+            argv: argv.into_iter().map(|a| a.to_owned()).collect(),
+        };
+        ctx.init();
+        ctx
     }
 
-    pub fn with_argv(argv: Vec<&str>) -> Self {
-        let mut ctx = Self::default();
-        let mut owned_argv: Vec<String> = vec![];
-        for arg in argv.iter() {
-            owned_argv.push(arg.to_string());
+    fn init(&mut self) {
+        // Add singleton constants.
+        self.add_const(create::new_nil()); // 0
+        self.add_const(create::new_true()); // 1
+        self.add_const(create::new_false()); // 2
+
+        // Enter global scope.
+        self.enter_scope();
+
+        // Builtins ----------------------------------------------------
+
+        // Add builtins module to global scope.
+        let builtins = BUILTINS.clone();
+        if let Err(err) = self.declare_and_assign_var("builtins", builtins) {
+            panic!("Could not define builtins module: {err}");
         }
-        ctx.argv = owned_argv;
-        ctx
+
+        // Add shorthand aliases for builtin types and objects to global
+        // scope.
+        let builtins = BUILTINS.clone();
+        let reader = builtins.read().unwrap();
+        let ns = reader.namespace();
+        for (name, obj) in ns.iter() {
+            if let Err(err) = self.declare_and_assign_var(name, (*obj).clone()) {
+                panic!("Could not add alias for builtin object `{name}` to global scope: {err}");
+            }
+        }
     }
 
     pub fn iter_constants(&self) -> Iter<'_, ObjectRef> {
@@ -172,40 +199,5 @@ impl RuntimeContext {
             let message = format!("Name not defined at depth {depth}: {name}");
             Err(RuntimeErr::new_name_err(message))
         }
-    }
-}
-
-impl Default for RuntimeContext {
-    fn default() -> Self {
-        let mut ctx = RuntimeContext::new(Objects::default(), vec![], vec![]);
-
-        // Add singleton constants.
-        ctx.add_const(create::new_nil()); // 0
-        ctx.add_const(create::new_true()); // 1
-        ctx.add_const(create::new_false()); // 2
-
-        // Enter global scope.
-        ctx.enter_scope();
-
-        // Builtins ----------------------------------------------------
-
-        // Add builtins module to global scope.
-        let builtins = BUILTINS.clone();
-        if let Err(err) = ctx.declare_and_assign_var("builtins", builtins) {
-            panic!("Could not define builtins module: {err}");
-        }
-
-        // Add shorthand aliases for builtin types and objects to global
-        // scope.
-        let builtins = BUILTINS.clone();
-        let reader = builtins.read().unwrap();
-        let ns = reader.namespace();
-        for (name, obj) in ns.iter() {
-            if let Err(err) = ctx.declare_and_assign_var(name, (*obj).clone()) {
-                panic!("Could not add alias for builtin object `{name}` to global scope: {err}");
-            }
-        }
-
-        ctx
     }
 }

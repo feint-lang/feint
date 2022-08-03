@@ -306,6 +306,9 @@ impl<'a> Executor<'a> {
     fn handle_runtime_err(&self, err: &RuntimeErr) {
         use RuntimeErrKind::*;
         let message = match &err.kind {
+            RecursionDepthExceeded(max_call_depth) => {
+                format!("Maximum recursion depth of {max_call_depth} was exceeded")
+            }
             NameErr(message) => format!("Name error: {message}"),
             TypeErr(message) => format!("Type error: {message}"),
             AttrDoesNotExist(type_name, name) => {

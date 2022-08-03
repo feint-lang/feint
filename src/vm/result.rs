@@ -5,6 +5,7 @@ use crate::compiler::CompErr;
 use crate::parser::ParseErr;
 use crate::types::ObjectRef;
 
+pub type CallDepth = u32;
 pub type ExeResult = Result<VMState, RuntimeErr>;
 pub type RuntimeResult = Result<(), RuntimeErr>;
 pub type RuntimeObjResult = Result<ObjectRef, RuntimeErr>;
@@ -29,6 +30,10 @@ pub struct RuntimeErr {
 impl RuntimeErr {
     pub fn new(kind: RuntimeErrKind) -> Self {
         Self { kind }
+    }
+
+    pub fn new_recursion_depth_exceeded(max_call_depth: CallDepth) -> Self {
+        Self::new(RuntimeErrKind::RecursionDepthExceeded(max_call_depth))
     }
 
     pub fn new_object_not_found_err(index: usize) -> Self {
@@ -81,6 +86,7 @@ impl fmt::Display for RuntimeErr {
 pub enum RuntimeErrKind {
     EmptyStack,
     NotEnoughValuesOnStack(usize),
+    RecursionDepthExceeded(CallDepth),
     ObjectNotFound(usize),
     ExpectedVar(String),
     ParseErr(ParseErr),
