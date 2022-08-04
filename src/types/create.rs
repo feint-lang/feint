@@ -7,7 +7,7 @@ use num_bigint::BigInt;
 use num_traits::{FromPrimitive, Num};
 use once_cell::sync::Lazy;
 
-use crate::vm::Chunk;
+use crate::vm::Code;
 
 use super::base::ObjectRef;
 use super::bool::Bool;
@@ -74,10 +74,10 @@ pub fn new_float_from_string<S: Into<String>>(value: S) -> ObjectRef {
 pub fn new_func<S: Into<String>>(
     name: S,
     params: Option<Vec<S>>,
-    chunk: Chunk,
+    code: Code,
 ) -> ObjectRef {
     let params = collect_params(params);
-    Arc::new(RwLock::new(Func::new(name, params, chunk)))
+    Arc::new(RwLock::new(Func::new(name, params, code)))
 }
 
 pub fn new_int<I: Into<BigInt>>(value: I) -> ObjectRef {

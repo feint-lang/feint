@@ -7,29 +7,21 @@ use super::constants::Constants;
 use super::result::{RuntimeErr, RuntimeResult};
 
 pub struct RuntimeContext {
-    constants: Constants,
+    global_constants: Constants,
     namespace_stack: Vec<Namespace>,
     // Number of namespaces on stack
     size: usize,
     // Index of namespace associated with current scope
     current_depth: usize,
-    pub argv: Vec<String>,
-}
-
-impl Default for RuntimeContext {
-    fn default() -> Self {
-        RuntimeContext::new(vec![])
-    }
 }
 
 impl RuntimeContext {
-    pub fn new(argv: Vec<&str>) -> Self {
+    pub fn new() -> Self {
         let mut ctx = Self {
-            constants: Constants::default(),
+            global_constants: Constants::new(),
             namespace_stack: vec![],
             size: 0,
             current_depth: 0,
-            argv: argv.into_iter().map(|a| a.to_owned()).collect(),
         };
         ctx.init();
         ctx
@@ -37,9 +29,9 @@ impl RuntimeContext {
 
     fn init(&mut self) {
         // Add singleton constants.
-        self.add_const(create::new_nil()); // 0
-        self.add_const(create::new_true()); // 1
-        self.add_const(create::new_false()); // 2
+        self.add_global_const(create::new_nil()); // 0
+        self.add_global_const(create::new_true()); // 1
+        self.add_global_const(create::new_false()); // 2
 
         // Enter global scope.
         self.enter_scope();
@@ -62,14 +54,6 @@ impl RuntimeContext {
                 panic!("Could not add alias for builtin object `{name}` to global scope: {err}");
             }
         }
-    }
-
-    pub fn iter_constants(&self) -> slice::Iter<'_, ObjectRef> {
-        self.constants.iter()
-    }
-
-    pub fn iter_vars(&self) -> hash_map::Iter<'_, String, ObjectRef> {
-        self.namespace_stack[self.current_depth].iter()
     }
 
     #[inline]
@@ -99,17 +83,22 @@ impl RuntimeContext {
         }
     }
 
-    // Constants -------------------------------------------------------
+    // Global Constants ------------------------------------------------
     //
-    // Constants are allocated during compilation, are immutable, and
-    // are never collected.
+    // Global constants are allocated during compilation, are immutable,
+    // and are never collected. These are shared constants such as the
+    // singleton nil, true, and false objects.
 
-    pub fn add_const(&mut self, obj: ObjectRef) -> usize {
-        self.constants.add(obj)
+    pub fn add_global_const(&mut self, obj: ObjectRef) -> usize {
+        self.global_constants.add(obj)
     }
 
-    pub fn get_const(&self, index: usize) -> Result<&ObjectRef, RuntimeErr> {
-        self.constants.get(index)
+    pub fn get_global_const(&self, index: usize) -> Result<&ObjectRef, RuntimeErr> {
+        self.global_constants.get(index)
+    }
+
+    pub fn iter_constants(&self) -> slice::Iter<'_, ObjectRef> {
+        self.global_constants.iter()
     }
 
     // Vars ------------------------------------------------------------
@@ -214,5 +203,9 @@ impl RuntimeContext {
             let message = format!("Name not defined at depth {depth}: {name}");
             Err(RuntimeErr::new_name_err(message))
         }
+    }
+
+    pub fn iter_vars(&self) -> hash_map::Iter<'_, String, ObjectRef> {
+        self.namespace_stack[self.current_depth].iter()
     }
 }

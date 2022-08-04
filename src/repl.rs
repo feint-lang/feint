@@ -8,7 +8,7 @@ use crate::exe::Executor;
 use crate::parser::ParseErrKind;
 use crate::result::{ExeErr, ExeErrKind, ExitResult};
 use crate::scanner::ScanErrKind;
-use crate::vm::{Inst, VMState, VM};
+use crate::vm::{Code, Inst, VMState, VM};
 
 /// Run FeInt REPL until user exits.
 pub fn run(history_path: Option<&Path>, dis: bool, debug: bool) -> ExitResult {
@@ -139,7 +139,7 @@ impl<'a> Repl<'a> {
             let var = "_";
             let mut chunk = vec![Inst::DeclareVar(var.to_owned())];
             match self.executor.vm.peek_obj() {
-                Ok(Some(val_ref)) => {
+                Some(val_ref) => {
                     chunk.push(Inst::AssignVar(var.to_owned()));
                     // Print the result if it's not nil
                     let val = &*val_ref.read().unwrap();
@@ -147,19 +147,15 @@ impl<'a> Repl<'a> {
                         eprintln!("{val:?}");
                     }
                 }
-                Ok(None) => {
-                    // Empty stack
-                    chunk.push(Inst::LoadConst(0));
-                    chunk.push(Inst::AssignVar(var.to_owned()));
-                }
-                Err(err) => {
-                    eprintln!("ERROR: Could not get value at top of stack:\n{err}");
-                    chunk.push(Inst::LoadConst(0));
+                None => {
+                    // Empty stack (error?)
+                    chunk.push(Inst::LoadNil);
                     chunk.push(Inst::AssignVar(var.to_owned()));
                 }
             };
             chunk.push(Inst::Truncate(0));
-            if let Err(err) = self.executor.execute_chunk(chunk) {
+            let code = Code::with_chunk(chunk);
+            if let Err(err) = self.executor.execute_code(code) {
                 eprintln!("ERROR: Could not assign or print _:\n{err:?}");
             }
             return self.vm_state_to_exit_result(vm_state);

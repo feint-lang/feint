@@ -12,7 +12,7 @@ pub type RuntimeObjResult = Result<ObjectRef, RuntimeErr>;
 pub type RuntimeBoolResult = Result<bool, RuntimeErr>;
 pub type PopObjResult = Result<ObjectRef, RuntimeErr>;
 pub type PopNObjResult = Result<Vec<ObjectRef>, RuntimeErr>;
-pub type PeekObjResult = Result<Option<ObjectRef>, RuntimeErr>;
+pub type PeekObjResult = Option<ObjectRef>;
 
 #[derive(Debug, PartialEq)]
 pub enum VMState {

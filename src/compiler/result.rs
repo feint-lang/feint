@@ -1,7 +1,7 @@
 use crate::util::Location;
-use crate::vm::Chunk;
+use crate::vm::Code;
 
-pub type CompResult = Result<Chunk, CompErr>;
+pub type CompResult = Result<Code, CompErr>;
 
 #[derive(Clone, Debug)]
 pub struct CompErr {

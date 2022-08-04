@@ -4,40 +4,41 @@ use crate::util::{
     BinaryOperator, CompareOperator, InplaceOperator, UnaryCompareOperator,
     UnaryOperator,
 };
-use crate::vm::{Chunk, Inst, RuntimeContext, VM};
+use crate::vm::{Code, Inst};
 
 use super::result::{CompErr, CompResult};
 use super::scope::{Scope, ScopeKind, ScopeTree};
 
 // Compiler ------------------------------------------------------------
 
-/// Compile AST to VM instructions.
-pub fn compile(vm: &mut VM, program: ast::Program) -> CompResult {
-    let mut visitor = Visitor::new(&mut vm.ctx);
+/// Compile AST to code object.
+pub fn compile(program: ast::Program, argv: Vec<&str>) -> CompResult {
+    let argv = argv.into_iter().map(|a| a.to_owned()).collect();
+    let mut visitor = Visitor::new(argv);
     visitor.visit_program(program)?;
-    Ok(visitor.chunk)
+    Ok(visitor.code)
 }
 
 // Visitor -------------------------------------------------------------
 
 type VisitResult = Result<(), CompErr>;
 
-struct Visitor<'a> {
-    ctx: &'a mut RuntimeContext,
-    chunk: Chunk,
+struct Visitor {
+    code: Code,
     scope_tree: ScopeTree,
     scope_depth: usize,
     has_main: bool,
+    argv: Vec<String>,
 }
 
-impl<'a> Visitor<'a> {
-    fn new(ctx: &'a mut RuntimeContext) -> Self {
+impl Visitor {
+    fn new(argv: Vec<String>) -> Self {
         Self {
-            ctx,
-            chunk: Chunk::new(),
+            code: Code::new(),
             scope_tree: ScopeTree::new(),
             scope_depth: 0,
             has_main: false,
+            argv,
         }
     }
 
@@ -48,11 +49,10 @@ impl<'a> Visitor<'a> {
         assert_eq!(self.scope_tree.pointer(), 0);
         self.fix_jumps()?;
         if self.has_main {
-            let argv = self.ctx.argv.clone();
+            let argv: Vec<ObjectRef> = self.argv.iter().map(create::new_str).collect();
             let argc = argv.len();
-            self.push(Inst::LoadVar("$main".to_string()));
-            for arg in argv.iter() {
-                self.add_const(create::new_str(arg));
+            for arg in argv {
+                self.add_const(arg);
             }
             self.push(Inst::Call(argc));
             self.push(Inst::Return);
@@ -150,10 +150,10 @@ impl<'a> Visitor<'a> {
     fn visit_literal(&mut self, node: ast::Literal) -> VisitResult {
         type Kind = ast::LiteralKind;
         match node.kind {
-            Kind::Nil => self.push_const(0),
-            Kind::Bool(true) => self.push_const(1),
-            Kind::Bool(false) => self.push_const(2),
-            Kind::Ellipsis => self.push_const(0),
+            Kind::Nil => self.push_nil(),
+            Kind::Bool(true) => self.push_true(),
+            Kind::Bool(false) => self.push_false(),
+            Kind::Ellipsis => self.push_nil(),
             Kind::Int(value) => {
                 self.add_const(create::new_int(value));
             }
@@ -256,14 +256,15 @@ impl<'a> Visitor<'a> {
             // Jump target if branch condition is false.
             let next_addr = self.len();
 
-            self.chunk[jump_index] = Inst::JumpIfElse(block_addr, next_addr, 0);
+            self.code
+                .replace_inst(jump_index, Inst::JumpIfElse(block_addr, next_addr, 0));
         }
 
         // Default block (if present).
         if let Some(default_block) = default {
             self.visit_block(default_block)?;
         } else {
-            self.push(Inst::LoadConst(0));
+            self.push_nil();
         }
 
         // Address of instruction after conditional suite.
@@ -271,7 +272,7 @@ impl<'a> Visitor<'a> {
 
         // Replace jump-out placeholders with actual jumps.
         for addr in jump_out_addrs {
-            self.chunk[addr] = Inst::Jump(after_addr, 0);
+            self.code.replace_inst(addr, Inst::Jump(after_addr, 0));
         }
 
         Ok(())
@@ -310,27 +311,28 @@ impl<'a> Visitor<'a> {
         // Set address of jump-out placeholder (not needed if loop
         // expression is always true).
         if !true_cond {
-            self.chunk[jump_out_index] = Inst::JumpIfNot(after_addr, 0);
+            self.code.replace_inst(jump_out_index, Inst::JumpIfNot(after_addr, 0));
         }
         // Set address of breaks and continues.
         for addr in loop_addr..after_addr {
-            match self.chunk[addr] {
-                Inst::BreakPlaceholder(break_addr, depth) => {
-                    self.chunk[break_addr] =
-                        Inst::Jump(after_addr, depth - loop_scope_depth);
-                }
-                Inst::ContinuePlaceholder(continue_addr, depth) => {
-                    self.chunk[continue_addr] =
-                        Inst::JumpPushNil(loop_addr, depth - loop_scope_depth);
-                }
-                _ => (),
+            let inst = &self.code[addr];
+            if let Inst::BreakPlaceholder(break_addr, depth) = inst {
+                self.code.replace_inst(
+                    *break_addr,
+                    Inst::Jump(after_addr, depth - loop_scope_depth),
+                );
+            } else if let Inst::ContinuePlaceholder(continue_addr, depth) = inst {
+                self.code.replace_inst(
+                    *continue_addr,
+                    Inst::JumpPushNil(loop_addr, depth - loop_scope_depth),
+                );
             }
         }
         Ok(())
     }
 
     fn visit_func(&mut self, node: ast::Func, name: Option<String>) -> VisitResult {
-        let mut func_visitor = Visitor::new(self.ctx);
+        let mut func_visitor = Visitor::new(vec![]);
         let name = if let Some(name) = name {
             self.has_main = name == "$main" && self.scope_tree.in_global_scope();
             name
@@ -348,14 +350,14 @@ impl<'a> Visitor<'a> {
         func_visitor.visit_statements(node.block.statements)?;
         func_visitor.fix_jumps()?;
         if return_nil {
-            func_visitor.push(Inst::LoadConst(0));
+            func_visitor.push_nil();
         }
         func_visitor.push(Inst::Return);
         func_visitor.push(Inst::ScopeEnd);
         func_visitor.exit_scope();
         assert_eq!(func_visitor.scope_tree.pointer(), 0);
-        let chunk = func_visitor.chunk;
-        let func = create::new_func(name, params, chunk);
+        let code = func_visitor.code;
+        let func = create::new_func(name, params, code);
         self.add_const(func);
         Ok(())
     }
@@ -461,23 +463,36 @@ impl<'a> Visitor<'a> {
 
     // Utilities -------------------------------------------------------
 
-    fn push(&mut self, inst: Inst) {
-        self.chunk.push(inst);
-    }
-
     fn len(&self) -> usize {
-        self.chunk.len()
+        self.code.len_chunk()
     }
 
-    fn push_const(&mut self, index: usize) {
+    fn push(&mut self, inst: Inst) {
+        self.code.push_inst(inst);
+    }
+
+    // Global constants ------------------------------------------------
+
+    fn push_nil(&mut self) {
+        self.push(Inst::LoadNil)
+    }
+
+    fn push_true(&mut self) {
+        self.push(Inst::LoadTrue)
+    }
+
+    fn push_false(&mut self) {
+        self.push(Inst::LoadFalse)
+    }
+
+    // Code unit constants ---------------------------------------------
+
+    fn add_const(&mut self, val: ObjectRef) {
+        let index = self.code.add_const(val);
         self.push(Inst::LoadConst(index));
     }
 
-    fn add_const(&mut self, val: ObjectRef) -> usize {
-        let index = self.ctx.add_const(val);
-        self.push_const(index);
-        index
-    }
+    // Scopes ----------------------------------------------------------
 
     /// Add nested scope to current scope then make the new scope the
     /// current scope.
@@ -494,7 +509,7 @@ impl<'a> Visitor<'a> {
 
     /// Update jump instructions with their target label addresses.
     fn fix_jumps(&mut self) -> VisitResult {
-        let chunk = &mut self.chunk;
+        let code = &mut self.code;
         let scope_tree = &self.scope_tree;
         let mut not_found: Option<String> = None;
         let mut jump_out_of_func: Option<String> = None;
@@ -503,7 +518,7 @@ impl<'a> Visitor<'a> {
                 let result = scope.find_label(scope_tree, name, None);
                 if let Some((label_addr, label_depth)) = result {
                     let depth = jump_depth - label_depth;
-                    chunk[*jump_addr] = Inst::JumpPushNil(label_addr, depth);
+                    code.replace_inst(*jump_addr, Inst::JumpPushNil(label_addr, depth));
                 } else {
                     if scope.kind == ScopeKind::Func {
                         jump_out_of_func = Some(name.clone());

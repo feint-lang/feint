@@ -8,7 +8,7 @@ use crate::scanner::{ScanErr, ScanErrKind, Scanner, Token};
 use crate::util::{
     source_from_file, source_from_stdin, source_from_text, Location, Source,
 };
-use crate::vm::{Inst, RuntimeErr, RuntimeErrKind, VM};
+use crate::vm::{Code, RuntimeErr, RuntimeErrKind, VM};
 
 pub struct Executor<'a> {
     pub vm: &'a mut VM,
@@ -24,11 +24,11 @@ impl<'a> Executor<'a> {
     }
 
     /// Execute source from file.
-    pub fn execute_file(&mut self, file_path: &'a str) -> ExeResult {
+    pub fn execute_file(&mut self, file_path: &'a str, argv: Vec<&str>) -> ExeResult {
         match source_from_file(file_path) {
             Ok(mut source) => {
                 self.current_file_name = file_path;
-                self.execute_source(&mut source)
+                self.execute_source(&mut source, argv)
             }
             Err(err) => {
                 let message = format!("{file_path}: {err}");
@@ -41,7 +41,7 @@ impl<'a> Executor<'a> {
     pub fn execute_stdin(&mut self) -> ExeResult {
         self.current_file_name = "<stdin>";
         let mut source = source_from_stdin();
-        self.execute_source(&mut source)
+        self.execute_source(&mut source, vec![])
     }
 
     /// Execute text.
@@ -52,11 +52,15 @@ impl<'a> Executor<'a> {
     ) -> ExeResult {
         self.current_file_name = file_name.unwrap_or("<text>");
         let mut source = source_from_text(text);
-        self.execute_source(&mut source)
+        self.execute_source(&mut source, vec![])
     }
 
     /// Execute source.
-    pub fn execute_source<T: BufRead>(&mut self, source: &mut Source<T>) -> ExeResult {
+    pub fn execute_source<T: BufRead>(
+        &mut self,
+        source: &mut Source<T>,
+        argv: Vec<&str>,
+    ) -> ExeResult {
         let scanner = Scanner::new(source);
         let mut parser = Parser::new(scanner);
         let program = match parser.parse() {
@@ -86,8 +90,8 @@ impl<'a> Executor<'a> {
                 };
             }
         };
-        let chunk = match compile(self.vm, program) {
-            Ok(chunk) => chunk,
+        let code = match compile(program, argv) {
+            Ok(code) => code,
             Err(err) => {
                 if !self.ignore_comp_err(&err) {
                     self.print_err_line(
@@ -99,22 +103,22 @@ impl<'a> Executor<'a> {
                 return Err(ExeErr::new(ExeErrKind::CompErr(err.kind)));
             }
         };
-        self.execute_chunk(chunk)
+        self.execute_code(code)
     }
 
-    /// Execute a chunk (a list of instructions).
-    pub fn execute_chunk(&mut self, chunk: Vec<Inst>) -> ExeResult {
+    /// Execute a code (a list of instructions).
+    pub fn execute_code(&mut self, code: Code) -> ExeResult {
         if self.dis {
             eprintln!("{:=<79}", "INSTRUCTIONS ");
         } else if self.debug {
             eprintln!("{:=<79}", "OUTPUT ");
         }
 
-        let result = self.vm.execute(&chunk, self.dis);
+        let result = self.vm.execute(&code, self.dis);
 
         let num_funcs = if self.dis {
             eprintln!();
-            self.vm.dis_functions()
+            self.vm.dis_functions(&code)
         } else {
             0
         };

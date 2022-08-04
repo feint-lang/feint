@@ -9,8 +9,8 @@ pub struct Constants {
 }
 
 impl Constants {
-    pub fn new(storage: Vec<ObjectRef>) -> Self {
-        Self { storage }
+    pub fn new() -> Self {
+        Self { storage: Vec::new() }
     }
 
     pub fn iter(&self) -> Iter<'_, ObjectRef> {
@@ -29,11 +29,5 @@ impl Constants {
         } else {
             Err(RuntimeErr::new_object_not_found_err(index))
         }
-    }
-}
-
-impl Default for Constants {
-    fn default() -> Self {
-        Self::new(Vec::new())
     }
 }

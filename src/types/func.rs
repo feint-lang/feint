@@ -4,7 +4,7 @@ use std::sync::{Arc, RwLock};
 
 use once_cell::sync::Lazy;
 
-use crate::vm::{Chunk, VM};
+use crate::vm::{Code, VM};
 
 use super::create;
 
@@ -69,14 +69,14 @@ pub struct Func {
     pub name: String,
     pub params: Params,
     pub arity: Option<usize>,
-    pub chunk: Chunk,
+    pub code: Code,
 }
 
 unsafe impl Send for Func {}
 unsafe impl Sync for Func {}
 
 impl Func {
-    pub fn new<S: Into<String>>(name: S, params: Params, chunk: Chunk) -> Self {
+    pub fn new<S: Into<String>>(name: S, params: Params, code: Code) -> Self {
         let mut ns = Namespace::new();
         let name = name.into();
         let arity = params.as_ref().map(|params| params.len());
@@ -87,7 +87,7 @@ impl Func {
         };
         ns.add_obj("$name", create::new_str(name.as_str()));
         ns.add_obj("$arity", arity_obj);
-        Self { namespace: ns, name, params, arity, chunk }
+        Self { namespace: ns, name, params, arity, code }
     }
 }
 
@@ -116,7 +116,7 @@ impl ObjectTrait for Func {
             vm.ctx.declare_and_assign_var("this", this_var)?;
         }
         vm.check_call_args(self.name.as_str(), &self.params, &args)?;
-        vm.execute(&self.chunk, false)?;
+        vm.execute(&self.code, false)?;
         vm.exit_scopes(1);
         vm.pop_obj()
     }

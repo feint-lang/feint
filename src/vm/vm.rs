@@ -12,8 +12,9 @@ use crate::util::{
     UnaryOperator,
 };
 
+use super::code::Code;
 use super::context::RuntimeContext;
-use super::inst::{Chunk, Inst};
+use super::inst::Inst;
 use super::result::{
     CallDepth, ExeResult, PeekObjResult, PopNObjResult, PopObjResult, RuntimeErr,
     RuntimeErrKind, RuntimeResult, VMState,
@@ -24,8 +25,9 @@ pub const DEFAULT_MAX_CALL_DEPTH: CallDepth =
 
 #[derive(Clone, Debug)]
 pub enum ValueStackKind {
-    Constant(usize),
-    Var(usize, String),
+    GlobalConstant(ObjectRef, usize),
+    Constant(ObjectRef, usize),
+    Var(ObjectRef, usize, String),
     Temp(ObjectRef),
     ReturnVal(ObjectRef),
 }
@@ -49,7 +51,7 @@ pub struct VM {
 
 impl Default for VM {
     fn default() -> Self {
-        VM::new(RuntimeContext::default(), DEFAULT_MAX_CALL_DEPTH)
+        VM::new(RuntimeContext::new(), DEFAULT_MAX_CALL_DEPTH)
     }
 }
 
@@ -70,7 +72,7 @@ impl VM {
     /// When a HALT instruction is encountered, the VM's state will be
     /// cleared; it can be "restarted" by passing more instructions to
     /// execute.
-    pub fn execute(&mut self, chunk: &Chunk, dis: bool) -> ExeResult {
+    pub fn execute(&mut self, code: &Code, dis: bool) -> ExeResult {
         use Inst::*;
 
         let max_call_depth = self.max_call_depth;
@@ -79,10 +81,10 @@ impl VM {
 
         loop {
             if dis {
-                self.dis(ip, chunk);
+                self.dis(ip, code);
             }
 
-            match &chunk[ip] {
+            match &code[ip] {
                 NoOp => {
                     // do nothing
                 }
@@ -90,8 +92,20 @@ impl VM {
                     self.value_stack.truncate(*size);
                 }
                 // Constants
+                LoadGlobalConst(index) => {
+                    self.push_global_const(*index)?;
+                }
+                LoadNil => {
+                    self.push_global_const(0)?;
+                }
+                LoadTrue => {
+                    self.push_global_const(1)?;
+                }
+                LoadFalse => {
+                    self.push_global_const(2)?;
+                }
                 LoadConst(index) => {
-                    self.push_const(*index);
+                    self.push_const(code, *index)?;
                 }
                 // Scopes
                 ScopeStart => {
@@ -109,11 +123,11 @@ impl VM {
                 AssignVar(name) => {
                     let obj = self.pop_obj()?;
                     let depth = self.ctx.assign_var(name, obj)?;
-                    self.push_var(depth, name.clone());
+                    self.push_var(depth, name.clone())?;
                 }
                 LoadVar(name) => {
                     let depth = self.ctx.get_var_depth(name.as_str())?;
-                    self.push_var(depth, name.clone());
+                    self.push_var(depth, name.clone())?;
                 }
                 // Jumps
                 Jump(addr, scope_exit_count) => {
@@ -121,7 +135,7 @@ impl VM {
                     jump_ip = Some(*addr);
                 }
                 JumpPushNil(addr, scope_exit_count) => {
-                    self.push_const(0);
+                    self.push_const(code, 0)?;
                     self.exit_scopes(*scope_exit_count);
                     jump_ip = Some(*addr);
                 }
@@ -241,7 +255,7 @@ impl VM {
                 ip += 1;
             }
 
-            if ip == chunk.len() {
+            if ip == code.len_chunk() {
                 break Ok(VMState::Idle);
             }
         }
@@ -348,9 +362,8 @@ impl VM {
     fn handle_inplace_op(&mut self, op: &InplaceOperator) -> RuntimeResult {
         use InplaceOperator::*;
         if let Some(kinds) = self.pop_n(2) {
-            if let ValueStackKind::Var(depth, name) = kinds.get(0).unwrap() {
-                let a = self.get_obj(kinds.get(0).unwrap())?;
-                let b = self.get_obj(kinds.get(1).unwrap())?;
+            if let ValueStackKind::Var(a, depth, name) = kinds.get(0).unwrap() {
+                let b = self.get_obj(kinds.get(1).unwrap());
                 let a = a.read().unwrap();
                 let b = b.read().unwrap();
                 let result = match op {
@@ -358,7 +371,7 @@ impl VM {
                     SubEqual => a.sub(&*b)?,
                 };
                 self.ctx.assign_var_at_depth(*depth, name.as_str(), result)?;
-                self.push_var(*depth, name.clone());
+                self.push_var(*depth, name.clone())?;
             } else {
                 let message = format!("Binary op: {}", op);
                 return Err(RuntimeErr::new(RuntimeErrKind::ExpectedVar(message)));
@@ -460,8 +473,16 @@ impl VM {
         self.value_stack.push(kind);
     }
 
-    pub fn push_const(&mut self, index: usize) {
-        self.push(ValueStackKind::Constant(index));
+    pub fn push_global_const(&mut self, index: usize) -> RuntimeResult {
+        let obj = self.ctx.get_global_const(index)?.clone();
+        self.push(ValueStackKind::GlobalConstant(obj, index));
+        Ok(())
+    }
+
+    pub fn push_const(&mut self, code: &Code, index: usize) -> RuntimeResult {
+        let obj = code.get_const(index)?.clone();
+        self.push(ValueStackKind::Constant(obj, index));
+        Ok(())
     }
 
     pub fn push_return_val(&mut self, obj: ObjectRef) {
@@ -472,8 +493,10 @@ impl VM {
         self.push(ValueStackKind::Temp(obj));
     }
 
-    pub fn push_var(&mut self, depth: usize, name: String) {
-        self.push(ValueStackKind::Var(depth, name));
+    fn push_var(&mut self, depth: usize, name: String) -> RuntimeResult {
+        let obj = self.ctx.get_var_at_depth(depth, name.as_str())?;
+        self.push(ValueStackKind::Var(obj, depth, name));
+        Ok(())
     }
 
     fn pop(&mut self) -> Option<ValueStackKind> {
@@ -482,7 +505,7 @@ impl VM {
 
     pub fn pop_obj(&mut self) -> PopObjResult {
         match self.pop() {
-            Some(kind) => self.get_obj(&kind),
+            Some(kind) => Ok(self.get_obj(&kind)),
             None => Err(RuntimeErr::new(RuntimeErrKind::EmptyStack)),
         }
     }
@@ -493,7 +516,7 @@ impl VM {
 
     fn pop_n_obj(&mut self, n: usize) -> PopNObjResult {
         match self.pop_n(n) {
-            Some(kinds) => kinds.iter().map(|k| self.get_obj(k)).collect(),
+            Some(kinds) => Ok(kinds.iter().map(|k| self.get_obj(k)).collect()),
             None => Err(RuntimeErr::new(RuntimeErrKind::NotEnoughValuesOnStack(n))),
         }
     }
@@ -503,25 +526,17 @@ impl VM {
     }
 
     pub fn peek_obj(&mut self) -> PeekObjResult {
-        match self.peek() {
-            Some(kind) => {
-                let obj = self.get_obj(kind)?;
-                Ok(Some(obj))
-            }
-            None => Ok(None),
-        }
+        self.peek().map(|kind| self.get_obj(kind))
     }
 
-    fn get_obj(&self, kind: &ValueStackKind) -> Result<ObjectRef, RuntimeErr> {
+    fn get_obj(&self, kind: &ValueStackKind) -> ObjectRef {
         use ValueStackKind::*;
         match kind {
-            Constant(index) => Ok(self.ctx.get_const(*index)?.clone()),
-            Var(depth, name) => {
-                let val = self.ctx.get_var_at_depth(*depth, name.as_str())?;
-                Ok(val.clone())
-            }
-            Temp(obj) => Ok(obj.clone()),
-            ReturnVal(obj) => Ok(obj.clone()),
+            GlobalConstant(obj, ..) => obj.clone(),
+            Constant(obj, ..) => obj.clone(),
+            Var(obj, ..) => obj.clone(),
+            Temp(obj) => obj.clone(),
+            ReturnVal(obj) => obj.clone(),
         }
     }
 
@@ -534,13 +549,8 @@ impl VM {
         }
         for (i, kind) in self.value_stack.iter().enumerate() {
             let obj = self.get_obj(kind);
-            match obj {
-                Ok(obj) => {
-                    let obj = &*obj.read().unwrap();
-                    eprintln!("{:0>8} {:?}", i, obj)
-                }
-                Err(_) => eprintln!("{:0>4} [NOT AN OBJECT]", i),
-            }
+            let obj = &*obj.read().unwrap();
+            eprintln!("{:0>8} {:?}", i, obj);
         }
     }
 
@@ -570,18 +580,18 @@ impl VM {
     // more useful info like jump targets, values, etc.
 
     /// Disassemble a list of instructions.
-    pub fn dis_list(&mut self, chunk: &Chunk) -> ExeResult {
-        for (ip, _) in chunk.iter().enumerate() {
-            self.dis(ip, chunk);
+    pub fn dis_list(&mut self, code: &Code) -> ExeResult {
+        for (ip, _) in code.iter_inst().enumerate() {
+            self.dis(ip, code);
         }
         Ok(VMState::Halted(0))
     }
 
     /// Disassemble functions, returning the number of functions that
     /// were disassembled.
-    pub fn dis_functions(&mut self) -> usize {
+    pub fn dis_functions(&mut self, code: &Code) -> usize {
         let mut funcs = vec![];
-        for obj_ref in self.ctx.iter_constants() {
+        for obj_ref in code.iter_constants() {
             let obj = obj_ref.read().unwrap();
             let is_func = obj.down_to_func().is_some();
             if is_func {
@@ -594,7 +604,7 @@ impl VM {
             let func = func_obj.down_to_func().unwrap();
             let heading = format!("{func:?} ");
             eprintln!("{:=<79}", heading);
-            if let Err(err) = self.dis_list(&func.chunk) {
+            if let Err(err) = self.dis_list(&func.code) {
                 eprintln!("Could not disassemble function {func}: {err}");
             }
             if num_funcs > 1 && i < (num_funcs - 1) {
@@ -605,20 +615,21 @@ impl VM {
     }
 
     /// Disassemble a single instruction.
-    pub fn dis(&mut self, ip: usize, chunk: &Chunk) {
-        let inst = &chunk[ip];
-        let formatted = self.format_instruction(chunk, inst);
+    pub fn dis(&mut self, ip: usize, code: &Code) {
+        let inst = &code[ip];
+        let formatted = self.format_instruction(code, inst);
         eprintln!("{:0>4} {}", ip, formatted);
     }
 
-    fn obj_str(&self, obj: ObjectRef) -> String {
-        let obj = &*obj.read().unwrap();
-        let str = format!("{obj:?} {}", obj.class().read().unwrap());
-        str.replace('\n', "\\n").replace('\r', "\\r")
+    fn global_const_str(&self, index: usize) -> String {
+        match self.ctx.get_global_const(index) {
+            Ok(obj) => self.obj_str(obj.clone()),
+            Err(err) => format!("[COULD NOT LOAD GLOBAL CONSTANT AT {index}: {err}]"),
+        }
     }
 
-    fn const_str(&self, index: usize) -> String {
-        match self.ctx.get_const(index) {
+    fn const_str(&self, code: &Code, index: usize) -> String {
+        match code.get_const(index) {
             Ok(obj) => self.obj_str(obj.clone()),
             Err(err) => format!("[COULD NOT LOAD CONSTANT AT {index}: {err}]"),
         }
@@ -631,13 +642,26 @@ impl VM {
         }
     }
 
-    fn format_instruction(&mut self, chunk: &Chunk, inst: &Inst) -> String {
+    fn obj_str(&self, obj: ObjectRef) -> String {
+        let obj = &*obj.read().unwrap();
+        let str = format!("{obj:?} {}", obj.class().read().unwrap());
+        str.replace('\n', "\\n").replace('\r', "\\r")
+    }
+
+    fn format_instruction(&mut self, code: &Code, inst: &Inst) -> String {
         use Inst::*;
         match inst {
             NoOp => "NOOP".to_string(),
             Truncate(size) => self.format_aligned("TRUNCATE", format!("{size}")),
+            LoadGlobalConst(index) => {
+                let obj_str = self.global_const_str(*index);
+                self.format_aligned("LOAD_GLOBAL_CONST", format!("{index} : {obj_str}"))
+            }
+            LoadNil => "LOAD_NIL".to_string(),
+            LoadTrue => "LOAD_TRUE".to_string(),
+            LoadFalse => "LOAD_FALSE".to_string(),
             LoadConst(index) => {
-                let obj_str = self.const_str(*index);
+                let obj_str = self.const_str(code, *index);
                 self.format_aligned("LOAD_CONST", format!("{index} : {obj_str}"))
             }
             ScopeStart => "SCOPE_START".to_string(),
@@ -684,22 +708,15 @@ impl VM {
             MakeTuple(n) => self.format_aligned("MAKE_TUPLE", n),
             Halt(code) => self.format_aligned("HALT", code),
             HaltTop => {
-                if let Ok(peek) = self.peek_obj() {
-                    if let Some(code) = peek {
-                        let code = code.read().unwrap();
-                        self.format_aligned("HALT_TOP", code.to_string())
-                    } else {
-                        self.format_aligned("HALT_TOP", "[ERROR: stack empty]")
-                    }
+                if let Some(obj) = self.peek_obj() {
+                    let obj = obj.read().unwrap();
+                    self.format_aligned("HALT_TOP", obj.to_string())
                 } else {
-                    self.format_aligned(
-                        "HALT_TOP",
-                        "[ERROR: could not get top of stack]",
-                    )
+                    self.format_aligned("HALT_TOP", "[ERROR: empty stack]")
                 }
             }
             Placeholder(addr, inst, message) => {
-                let formatted_inst = self.format_instruction(chunk, inst);
+                let formatted_inst = self.format_instruction(code, inst);
                 self.format_aligned(
                     "PLACEHOLDER",
                     format!("{formatted_inst} @ {addr} ({message})"),

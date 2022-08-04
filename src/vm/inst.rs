@@ -3,8 +3,6 @@ use crate::util::{
     UnaryOperator,
 };
 
-pub type Chunk = Vec<Inst>;
-
 #[derive(Debug, PartialEq)]
 pub enum Inst {
     NoOp,
@@ -13,6 +11,15 @@ pub enum Inst {
     // the top.
     Truncate(usize),
 
+    // Global constants are shared globally by all code units.
+    LoadGlobalConst(usize),
+
+    // Special global constants with a known index.
+    LoadNil,   // 0
+    LoadTrue,  // 1
+    LoadFalse, // 2
+
+    // Other constants are local to a given code unit.
     LoadConst(usize),
 
     ScopeStart,

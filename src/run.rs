@@ -11,15 +11,15 @@ pub fn run_file(
     dis: bool,
     debug: bool,
 ) -> ExitResult {
-    let mut vm = VM::new(RuntimeContext::new(argv), max_call_depth);
+    let mut vm = VM::new(RuntimeContext::new(), max_call_depth);
     let mut executor = Executor::new(&mut vm, false, dis, debug);
-    let result = executor.execute_file(file_path);
+    let result = executor.execute_file(file_path, argv);
     exit(result)
 }
 
 /// Read and run source from stdin.
 pub fn run_stdin(max_call_depth: CallDepth, dis: bool, debug: bool) -> ExitResult {
-    let mut vm = VM::new(RuntimeContext::default(), max_call_depth);
+    let mut vm = VM::new(RuntimeContext::new(), max_call_depth);
     let mut executor = Executor::new(&mut vm, false, dis, debug);
     let result = executor.execute_stdin();
     exit(result)
@@ -32,7 +32,7 @@ pub fn run_text(
     dis: bool,
     debug: bool,
 ) -> ExitResult {
-    let mut vm = VM::new(RuntimeContext::default(), max_call_depth);
+    let mut vm = VM::new(RuntimeContext::new(), max_call_depth);
     let mut executor = Executor::new(&mut vm, false, dis, debug);
     let result = executor.execute_text(text, None);
     exit(result)
