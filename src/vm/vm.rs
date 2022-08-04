@@ -863,6 +863,6 @@ impl VM {
 
     /// Return a nicely formatted string of instructions.
     fn format_aligned<T: fmt::Display>(&self, name: &str, value: T) -> String {
-        format!("{: <w$}{: <x$}", name, value, w = 16, x = 4)
+        format!("{name: <w$}{value:}", w = 24)
     }
 }

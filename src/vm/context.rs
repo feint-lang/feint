@@ -33,6 +33,10 @@ impl RuntimeContext {
         self.add_global_const(create::new_true()); // 1
         self.add_global_const(create::new_false()); // 2
 
+        for i in 0..=256 {
+            self.add_global_const(create::new_int(i));
+        }
+
         // Enter global scope.
         self.enter_scope();
 

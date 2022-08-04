@@ -1,3 +1,8 @@
+use num_bigint::BigInt;
+use num_traits::{Signed, ToPrimitive, Zero};
+
+use once_cell::sync::Lazy;
+
 use crate::ast;
 use crate::types::{create, ObjectRef};
 use crate::util::{
@@ -8,6 +13,8 @@ use crate::vm::{Code, Inst};
 
 use super::result::{CompErr, CompResult};
 use super::scope::{Scope, ScopeKind, ScopeTree};
+
+static GLOBAL_INT_MAX: Lazy<BigInt> = Lazy::new(|| BigInt::from(255));
 
 // Compiler ------------------------------------------------------------
 
@@ -156,7 +163,15 @@ impl Visitor {
             Kind::Bool(false) => self.push_false(),
             Kind::Ellipsis => self.push_nil(),
             Kind::Int(value) => {
-                self.add_const(create::new_int(value));
+                if value.is_zero() {
+                    self.push(Inst::LoadGlobalConst(3))
+                } else if value.is_positive() && &value <= Lazy::force(&GLOBAL_INT_MAX)
+                {
+                    let index = value.to_usize().unwrap() + 3;
+                    self.push(Inst::LoadGlobalConst(index));
+                } else {
+                    self.add_const(create::new_int(value));
+                }
             }
             Kind::Float(value) => {
                 self.add_const(create::new_float(value));
