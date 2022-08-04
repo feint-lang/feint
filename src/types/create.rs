@@ -110,6 +110,7 @@ pub fn new_tuple(items: Vec<ObjectRef>) -> ObjectRef {
 
 // Custom type constructor -----------------------------------------
 
+#[allow(dead_code)]
 pub fn new_custom_type(
     module: Arc<RwLock<Module>>,
     name: &str,
@@ -117,6 +118,7 @@ pub fn new_custom_type(
     Arc::new(RwLock::new(CustomType::new(module, name)))
 }
 
+#[allow(dead_code)]
 pub fn new_custom_instance(
     class: Arc<RwLock<CustomType>>,
     attrs: Namespace,
