@@ -1,6 +1,7 @@
 pub(crate) use base::{ObjectRef, ObjectTrait, ObjectTraitExt};
-pub(crate) use builtin_func::BuiltinFn;
+pub(crate) use builtin_func::{BuiltinFn, BuiltinFunc};
 pub(crate) use builtins::BUILTINS;
+pub(crate) use func::Func;
 pub(crate) use ns::Namespace;
 pub(crate) use result::{Args, CallResult, Params, This};
 
@@ -25,4 +26,4 @@ mod tuple;
 mod util;
 
 #[cfg(test)]
-pub(crate) use base::{TypeTrait, TypeTraitExt};
+pub(crate) use base::TypeTraitExt;

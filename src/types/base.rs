@@ -6,11 +6,11 @@ use std::sync::{Arc, RwLock};
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 
-use crate::vm::{RuntimeBoolResult, RuntimeErr, RuntimeObjResult, VM};
+use crate::vm::{RuntimeBoolResult, RuntimeErr, RuntimeObjResult, RuntimeResult, VM};
 
 use super::builtins::BUILTINS;
 use super::create;
-use super::result::{Args, CallResult, GetAttrResult, SetAttrResult, This};
+use super::result::{Args, GetAttrResult, SetAttrResult};
 
 use super::bool::{Bool, BoolType};
 use super::bound_func::{BoundFunc, BoundFuncType};
@@ -304,11 +304,27 @@ pub trait ObjectTrait {
 
     // Call ------------------------------------------------------------
 
-    fn call(&self, _this: This, _args: Args, _vm: &mut VM) -> CallResult {
-        Err(RuntimeErr::new_type_err(format!(
-            "Call not implemented for type {}",
-            self.class().read().unwrap()
-        )))
+    // This is here so that functions can be called directly, in
+    // particular so that user functions can be called from builtin
+    // functions.
+    fn call(&self, args: Args, vm: &mut VM) -> RuntimeResult {
+        if let Some(bound_func) = self.down_to_bound_func() {
+            let func = bound_func.func.read().unwrap();
+            let this = Some(bound_func.this.clone());
+            if let Some(func) = func.down_to_builtin_func() {
+                vm.call_builtin_func(func, this, args)
+            } else if let Some(func) = func.down_to_func() {
+                vm.call_func(func, this, args)
+            } else {
+                Err(self.not_callable())
+            }
+        } else if let Some(func) = self.down_to_builtin_func() {
+            vm.call_builtin_func(func, None, args)
+        } else if let Some(func) = self.down_to_func() {
+            vm.call_func(func, None, args)
+        } else {
+            Err(self.not_callable())
+        }
     }
 
     fn not_callable(&self) -> RuntimeErr {

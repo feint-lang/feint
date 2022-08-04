@@ -109,19 +109,6 @@ impl ObjectTrait for BuiltinFunc {
     fn namespace(&self) -> &Namespace {
         &self.namespace
     }
-
-    fn call(&self, this: This, args: Args, vm: &mut VM) -> CallResult {
-        vm.enter_scope();
-        if this.is_some() {
-            let this_var = this.clone().unwrap().clone();
-            vm.ctx.declare_and_assign_var("this", this_var)?;
-        }
-        vm.check_call_args(self.name.as_str(), &self.params, &args)?;
-        let return_val = (self.func)(this, args, vm)?;
-        vm.push_temp(return_val);
-        vm.exit_scopes(1);
-        vm.pop_obj()
-    }
 }
 
 // Display -------------------------------------------------------------

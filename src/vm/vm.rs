@@ -6,7 +6,9 @@ use std::fmt;
 
 use num_traits::ToPrimitive;
 
-use crate::types::{create, Args, ObjectRef, ObjectTraitExt, Params};
+use crate::types::{
+    create, Args, BuiltinFunc, Func, ObjectRef, ObjectTraitExt, Params, This,
+};
 use crate::util::{
     BinaryOperator, CompareOperator, InplaceOperator, Stack, UnaryCompareOperator,
     UnaryOperator,
@@ -24,7 +26,7 @@ pub const DEFAULT_MAX_CALL_DEPTH: CallDepth =
     if cfg!(debug_assertions) { 256 } else { 1024 };
 
 #[derive(Clone, Debug)]
-pub enum ValueStackKind {
+enum ValueStackKind {
     GlobalConstant(ObjectRef, usize),
     Constant(ObjectRef, usize),
     Var(ObjectRef, usize, String),
@@ -382,24 +384,42 @@ impl VM {
         Ok(())
     }
 
-    fn handle_call(&mut self, n: usize) -> RuntimeResult {
-        let objects = self.pop_n_obj(n + 1)?;
-        let callable = objects.get(0).unwrap();
+    fn handle_call(&mut self, num_args: usize) -> RuntimeResult {
+        let callable = self.pop_obj()?;
         let callable = callable.read().unwrap();
-        let args = objects.iter().skip(1).cloned().collect();
-        if let Some(bound_func) = callable.down_to_bound_func() {
-            let return_val = bound_func.func.read().unwrap().call(
-                Some(bound_func.this.clone()),
-                args,
-                self,
-            )?;
-            self.push_return_val(return_val);
-        } else if callable.is_builtin_func() || callable.is_func() {
-            let return_val = callable.call(None, args, self)?;
-            self.push_return_val(return_val);
-        } else {
-            return Err(callable.not_callable());
-        };
+        let args = if num_args > 0 { self.pop_n_obj(num_args)? } else { vec![] };
+        callable.call(args, self)
+    }
+
+    pub fn call_builtin_func(
+        &mut self,
+        func: &BuiltinFunc,
+        this: This,
+        args: Args,
+    ) -> RuntimeResult {
+        self.enter_scope();
+        if this.is_some() {
+            // NOTE: We assign `this` here so that if a user function is
+            //       passed into a builtin function the user function
+            //       can access it.
+            let this_var = this.clone().unwrap().clone();
+            self.ctx.declare_and_assign_var("this", this_var)?;
+        }
+        self.check_call_args(func.name.as_str(), &func.params, &args)?;
+        let return_val = (func.func)(this, args, self)?;
+        self.push_return_val(return_val);
+        self.exit_scopes(1);
+        Ok(())
+    }
+
+    pub fn call_func(&mut self, func: &Func, this: This, args: Args) -> RuntimeResult {
+        self.enter_scope();
+        if let Some(this_var) = this {
+            self.ctx.declare_and_assign_var("this", this_var)?;
+        }
+        self.check_call_args(func.name.as_str(), &func.params, &args)?;
+        self.execute(&func.code, false)?;
+        self.exit_scopes(1);
         Ok(())
     }
 

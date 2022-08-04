@@ -4,14 +4,14 @@ use std::sync::{Arc, RwLock};
 
 use once_cell::sync::Lazy;
 
-use crate::vm::{Code, VM};
+use crate::vm::Code;
 
 use super::create;
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
 use super::class::TYPE_TYPE;
 use super::ns::Namespace;
-use super::result::{Args, CallResult, Params, This};
+use super::result::Params;
 
 // Function Type -------------------------------------------------------
 
@@ -106,19 +106,6 @@ impl ObjectTrait for Func {
 
     fn namespace(&self) -> &Namespace {
         &self.namespace
-    }
-
-    /// This provides a way to call user functions from builtin
-    /// functions. Perhaps there's a better way to do this?
-    fn call(&self, this: This, args: Args, vm: &mut VM) -> CallResult {
-        vm.enter_scope();
-        if let Some(this_var) = this {
-            vm.ctx.declare_and_assign_var("this", this_var)?;
-        }
-        vm.check_call_args(self.name.as_str(), &self.params, &args)?;
-        vm.execute(&self.code, false)?;
-        vm.exit_scopes(1);
-        vm.pop_obj()
     }
 }
 

@@ -166,7 +166,7 @@ pub fn map(this: This, args: Args, vm: &mut VM) -> CallResult {
         let map_fn = map_fn.read().unwrap();
         for (i, item) in tuple.iter().enumerate() {
             let i = create::new_int(i);
-            map_fn.call(None, vec![item.clone(), i], vm)?;
+            map_fn.call(vec![item.clone(), i], vm)?;
         }
         Ok(create::new_nil())
     } else {

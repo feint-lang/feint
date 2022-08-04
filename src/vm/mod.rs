@@ -6,7 +6,7 @@ pub(crate) use context::RuntimeContext;
 pub(crate) use inst::Inst;
 pub(crate) use result::VMState;
 pub(crate) use result::{
-    RuntimeBoolResult, RuntimeErr, RuntimeErrKind, RuntimeObjResult,
+    RuntimeBoolResult, RuntimeErr, RuntimeErrKind, RuntimeObjResult, RuntimeResult,
 };
 
 mod code;

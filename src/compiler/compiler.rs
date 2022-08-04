@@ -54,6 +54,7 @@ impl Visitor {
             for arg in argv {
                 self.add_const(arg);
             }
+            self.push(Inst::LoadVar("$main".to_string()));
             self.push(Inst::Call(argc));
             self.push(Inst::Return);
             self.push(Inst::HaltTop);
@@ -365,10 +366,10 @@ impl Visitor {
     fn visit_call(&mut self, node: ast::Call) -> VisitResult {
         let callable = node.callable;
         let args = node.args;
-        let n_args = args.len();
-        self.visit_expr(*callable, None)?;
+        let num_args = args.len();
         self.visit_exprs(args)?;
-        self.push(Inst::Call(n_args));
+        self.visit_expr(*callable, None)?;
+        self.push(Inst::Call(num_args));
         Ok(())
     }
 
