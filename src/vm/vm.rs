@@ -83,10 +83,6 @@ impl VM {
         let mut jump_ip = None;
 
         loop {
-            if dis {
-                self.dis(ip, code);
-            }
-
             match &code[ip] {
                 NoOp => {
                     // do nothing
@@ -233,9 +229,12 @@ impl VM {
                     break Ok(VMState::Halted(255));
                 }
                 // VM control
-                Halt(code) => {
+                Halt(return_code) => {
                     self.halt();
-                    break Ok(VMState::Halted(*code));
+                    if dis {
+                        self.dis(ip, code);
+                    }
+                    break Ok(VMState::Halted(*return_code));
                 }
                 HaltTop => {
                     let obj = self.pop_obj()?;
@@ -247,8 +246,15 @@ impl VM {
                         }
                         None => 0,
                     };
+                    if dis {
+                        self.dis(ip, code);
+                    }
                     break Ok(VMState::Halted(return_code));
                 }
+            }
+
+            if dis {
+                self.dis(ip, code);
             }
 
             if let Some(new_ip) = jump_ip {
@@ -689,15 +695,6 @@ impl VM {
             ScopeEnd => "SCOPE_END".to_string(),
             DeclareVar(name) => self.format_aligned("DECLARE_VAR", name),
             AssignVar(name) => {
-                // NOTE: Assign the var so its value will be displayed
-                //       correctly. Put the value back so it can be
-                //       executed as usual.
-                if let Ok(obj) = self.pop_obj() {
-                    self.ctx
-                        .assign_var(name, obj.clone())
-                        .expect("Could not assign var");
-                    self.push_temp(obj);
-                }
                 let obj_str = self.var_str(name);
                 self.format_aligned("ASSIGN_VAR", format!("{name} = {obj_str}"))
             }
