@@ -1,10 +1,19 @@
 use core::iter::Rev;
 use core::slice::Iter;
 use std::fmt;
+use std::ops::Index;
 
 #[derive(Debug)]
 pub struct Stack<T> {
     storage: Vec<T>,
+}
+
+impl<T> Index<usize> for Stack<T> {
+    type Output = T;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.storage[index]
+    }
 }
 
 impl<T> Stack<T> {

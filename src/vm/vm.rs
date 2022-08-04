@@ -34,6 +34,21 @@ enum ValueStackKind {
     ReturnVal(ObjectRef),
 }
 
+struct CallFrame {
+    pub _stack_position: usize,
+    pub locals: Vec<ObjectRef>,
+}
+
+impl CallFrame {
+    pub fn new(_stack_position: usize, locals: Vec<ObjectRef>) -> Self {
+        Self { _stack_position, locals }
+    }
+
+    pub fn set_local(&mut self, index: usize, obj: ObjectRef) {
+        self.locals[index] = obj;
+    }
+}
+
 pub struct VM {
     pub ctx: RuntimeContext,
     // The value stack contains "pointers" to the different value types:
@@ -44,11 +59,11 @@ pub struct VM {
     // is exited, these sizes are used to truncate the value stack back
     // to its previous size so that items can be freed.
     scope_stack: Stack<usize>,
+    // Pointer to stack position just before call.
+    call_stack: Stack<CallFrame>,
     // Maximum depth of "call stack" (quotes because there's no explicit
     // call stack)
     max_call_depth: CallDepth,
-    // Current depth of "call stack".
-    call_depth: CallDepth,
 }
 
 impl Default for VM {
@@ -63,8 +78,8 @@ impl VM {
             ctx,
             value_stack: Stack::new(),
             scope_stack: Stack::new(),
+            call_stack: Stack::new(),
             max_call_depth,
-            call_depth: 0,
         }
     }
 
@@ -77,7 +92,6 @@ impl VM {
     pub fn execute(&mut self, code: &Code, dis: bool) -> ExeResult {
         use Inst::*;
 
-        let max_call_depth = self.max_call_depth;
         let num_inst = code.len_chunk();
         let mut ip: usize = 0;
         let mut jump_ip = None;
@@ -178,17 +192,25 @@ impl VM {
                     self.handle_inplace_op(op)?;
                 }
                 // Functions
+                StoreLocal(index) => {
+                    let obj = self.pop_obj()?;
+                    // XXX: We have to pop the frame and put it back in
+                    //      order to mutate it. There's probably a
+                    //      better way to handle this.
+                    let mut frame = self.pop_call_frame()?;
+                    frame.set_local(*index, obj);
+                    self.call_stack.push(frame);
+                }
+                LoadLocal(index) => {
+                    let frame = self.call_stack.peek().expect("Empty call stack");
+                    let obj = frame.locals[*index].clone();
+                    self.push_temp(obj);
+                }
                 Call(n) => {
-                    self.call_depth += 1;
-                    if self.call_depth > max_call_depth {
-                        return Err(RuntimeErr::new_recursion_depth_exceeded(
-                            max_call_depth,
-                        ));
-                    }
                     self.handle_call(*n)?;
                 }
                 Return => {
-                    self.call_depth -= 1;
+                    self.call_stack.pop();
                 }
                 // Object construction
                 MakeString(n) => {
@@ -398,12 +420,33 @@ impl VM {
         callable.call(args, self)
     }
 
+    fn push_call_frame(&mut self, args: &Args) -> RuntimeResult {
+        if self.call_stack.size() == self.max_call_depth {
+            return Err(RuntimeErr::new_recursion_depth_exceeded(self.max_call_depth));
+        }
+        let stack_position = self.value_stack.size();
+        let frame = CallFrame::new(stack_position, args.clone());
+        self.call_stack.push(frame);
+        Ok(())
+    }
+
+    fn pop_call_frame(&mut self) -> Result<CallFrame, RuntimeErr> {
+        match self.call_stack.pop() {
+            Some(frame) => Ok(frame),
+            None => Err(RuntimeErr::new(RuntimeErrKind::EmptyCallStack)),
+        }
+    }
+
     pub fn call_builtin_func(
         &mut self,
         func: &BuiltinFunc,
         this: This,
         args: Args,
     ) -> RuntimeResult {
+        // NOTE: We create a call frame for builtin functions mainly
+        //       just to check for too much recursion. Builtin functions
+        //       don't use frame locals, so they're not passed in.
+        self.push_call_frame(&vec![])?;
         self.enter_scope();
         if this.is_some() {
             // NOTE: We assign `this` here so that if a user function is
@@ -416,10 +459,15 @@ impl VM {
         let return_val = (func.func)(this, args, self)?;
         self.push_return_val(return_val);
         self.exit_scopes(1);
+        // NOTE: We have to pop the frame for builtin functions since
+        //       they don't exit with a RETURN instruction like user
+        //       functions.
+        self.pop_call_frame()?;
         Ok(())
     }
 
     pub fn call_func(&mut self, func: &Func, this: This, args: Args) -> RuntimeResult {
+        self.push_call_frame(&args)?;
         self.enter_scope();
         if let Some(this_var) = this {
             self.ctx.declare_and_assign_var("this", this_var)?;
@@ -720,6 +768,20 @@ impl VM {
             BinaryOp(operator) => self.format_aligned("BINARY_OP", operator),
             CompareOp(operator) => self.format_aligned("COMPARE_OP", operator),
             InplaceOp(operator) => self.format_aligned("INPLACE_OP", operator),
+            StoreLocal(index) => {
+                let obj = self.peek_obj().unwrap();
+                let obj_str = self.obj_str(obj);
+                self.format_aligned("STORE_LOCAL", format!("{index} : {obj_str}"))
+            }
+            LoadLocal(index) => {
+                let obj_str = if let Some(frame) = self.call_stack.peek() {
+                    let obj = frame.locals.get(*index).unwrap();
+                    self.obj_str(obj.clone())
+                } else {
+                    "Empty call stack".to_string()
+                };
+                self.format_aligned("LOAD_LOCAL", format!("{index} : {obj_str}"))
+            }
             Call(n) => self.format_aligned("CALL", n),
             Return => "RETURN".to_string(),
             MakeString(n) => self.format_aligned("MAKE_STRING", n),

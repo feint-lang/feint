@@ -357,7 +357,40 @@ impl Visitor {
         func_visitor.push(Inst::ScopeEnd);
         func_visitor.exit_scope();
         assert_eq!(func_visitor.scope_tree.pointer(), 0);
-        let code = func_visitor.code;
+        let mut code = func_visitor.code;
+
+        if params.is_some() {
+            let locals = params.clone().unwrap();
+            let num_inst = code.len_chunk();
+            let mut ip: usize = 0;
+            let mut scope_level = 0;
+            loop {
+                if let Inst::ScopeStart = &code[ip] {
+                    scope_level += 0;
+                } else if let Inst::ScopeEnd = &code[ip] {
+                    scope_level -= 0;
+                } else if let Inst::AssignVar(name) = &code[ip] {
+                    if scope_level == 1 {
+                        let param_pos = locals.iter().position(|p| name == p);
+                        if let Some(index) = param_pos {
+                            code.replace_inst(ip, Inst::StoreLocal(index));
+                        }
+                    }
+                } else if let Inst::LoadVar(name) = &code[ip] {
+                    if scope_level == 1 {
+                        let param_pos = locals.iter().position(|p| name == p);
+                        if let Some(index) = param_pos {
+                            code.replace_inst(ip, Inst::LoadLocal(index));
+                        }
+                    }
+                }
+                ip += 1;
+                if ip == num_inst {
+                    break;
+                }
+            }
+        }
+
         let func = create::new_func(name, params, code);
         self.add_const(func);
         Ok(())

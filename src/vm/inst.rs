@@ -57,6 +57,11 @@ pub enum Inst {
     CompareOp(CompareOperator),
     InplaceOp(InplaceOperator),
 
+    // Store top of stack into call frame locals at index.
+    StoreLocal(usize),
+    // Push frame local at index onto stack.
+    LoadLocal(usize),
+
     Call(usize), // Call function with N values from top of stack
     Return,
 

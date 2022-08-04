@@ -5,7 +5,7 @@ use crate::compiler::CompErr;
 use crate::parser::ParseErr;
 use crate::types::ObjectRef;
 
-pub type CallDepth = u32;
+pub type CallDepth = usize;
 pub type ExeResult = Result<VMState, RuntimeErr>;
 pub type RuntimeResult = Result<(), RuntimeErr>;
 pub type RuntimeObjResult = Result<ObjectRef, RuntimeErr>;
@@ -104,6 +104,7 @@ pub enum RuntimeErrKind {
     ItemCannotBeSet(String, usize),
     IndexOutOfBounds(String, usize),
     NotCallable(String),
+    EmptyCallStack,
 
     // Move?
     CouldNotReadFile(String),
