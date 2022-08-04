@@ -343,7 +343,7 @@ impl Visitor {
         let return_nil = if let Some(last) = node.block.statements.last() {
             !matches!(last.kind, ast::StatementKind::Expr(_))
         } else {
-            true // XXX: This should never happen
+            unreachable!("Block for function contains no statements");
         };
         func_visitor.push(Inst::ScopeStart);
         func_visitor.enter_scope(ScopeKind::Func);
