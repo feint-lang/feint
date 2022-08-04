@@ -22,7 +22,7 @@ use super::result::{
 pub const DEFAULT_MAX_CALL_DEPTH: CallDepth =
     if cfg!(debug_assertions) { 256 } else { 1024 };
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum ValueStackKind {
     Constant(usize),
     Var(usize, String),
@@ -611,38 +611,53 @@ impl VM {
         eprintln!("{:0>4} {}", ip, formatted);
     }
 
+    fn obj_str(&self, obj: ObjectRef) -> String {
+        let obj = &*obj.read().unwrap();
+        let str = format!("{obj:?} {}", obj.class().read().unwrap());
+        str.replace('\n', "\\n").replace('\r', "\\r")
+    }
+
+    fn const_str(&self, index: usize) -> String {
+        match self.ctx.get_const(index) {
+            Ok(obj) => self.obj_str(obj.clone()),
+            Err(err) => format!("[COULD NOT LOAD CONSTANT AT {index}: {err}]"),
+        }
+    }
+
+    fn var_str(&mut self, name: &str) -> String {
+        match self.ctx.get_var(name) {
+            Ok(obj) => self.obj_str(obj.clone()),
+            Err(err) => format!("[COULD NOT LOAD VAR {name}: {err}]"),
+        }
+    }
+
     fn format_instruction(&mut self, chunk: &Chunk, inst: &Inst) -> String {
         use Inst::*;
-        use ValueStackKind::*;
-
-        let obj_str = |kind_opt: Option<&ValueStackKind>| match kind_opt {
-            Some(kind) => match self.get_obj(kind) {
-                Ok(obj) => {
-                    let obj = &*obj.read().unwrap();
-                    let str = format!("{obj:?} {}", obj.class().read().unwrap());
-                    str.replace('\n', "\\n").replace('\r', "\\r")
-                }
-                Err(err) => format!("[ERROR: Could not get object: {err}]"),
-            },
-            None => "[Object not found]".to_string(),
-        };
-
         match inst {
             NoOp => "NOOP".to_string(),
             Truncate(size) => self.format_aligned("TRUNCATE", format!("{size}")),
             LoadConst(index) => {
-                let obj_str = obj_str(Some(&Constant(*index)));
+                let obj_str = self.const_str(*index);
                 self.format_aligned("LOAD_CONST", format!("{index} : {obj_str}"))
             }
             ScopeStart => "SCOPE_START".to_string(),
             ScopeEnd => "SCOPE_END".to_string(),
             DeclareVar(name) => self.format_aligned("DECLARE_VAR", name),
             AssignVar(name) => {
-                let obj_str = obj_str(self.peek());
+                // NOTE: Assign the var so its value will be displayed
+                //       correctly. Put the value back so it can be
+                //       executed as usual.
+                if let Ok(obj) = self.pop_obj() {
+                    self.ctx
+                        .assign_var(name, obj.clone())
+                        .expect("Could not assign var");
+                    self.push_temp(obj);
+                }
+                let obj_str = self.var_str(name);
                 self.format_aligned("ASSIGN_VAR", format!("{name} = {obj_str}"))
             }
             LoadVar(name) => {
-                let obj_str = obj_str(self.peek());
+                let obj_str = self.var_str(name);
                 self.format_aligned("LOAD_VAR", format!("{name} = {obj_str}"))
             }
             Jump(addr, _) => self.format_aligned("JUMP", format!("{addr}",)),

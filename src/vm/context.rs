@@ -182,6 +182,12 @@ impl RuntimeContext {
         }
     }
 
+    /// Get var in current namespace or any ancestor namespace.
+    pub fn get_var(&mut self, name: &str) -> Result<ObjectRef, RuntimeErr> {
+        let depth = self.get_var_depth(name)?;
+        self.get_var_at_depth(depth, name)
+    }
+
     /// Get var from current namespace.
     pub fn get_var_in_current_namespace(
         &mut self,
