@@ -366,9 +366,9 @@ impl Visitor {
             let mut scope_level = 0;
             loop {
                 if let Inst::ScopeStart = &code[ip] {
-                    scope_level += 0;
+                    scope_level += 1;
                 } else if let Inst::ScopeEnd = &code[ip] {
-                    scope_level -= 0;
+                    scope_level -= 1;
                 } else if let Inst::AssignVar(name) = &code[ip] {
                     if scope_level == 1 {
                         let param_pos = locals.iter().position(|p| name == p);
