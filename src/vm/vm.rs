@@ -30,13 +30,14 @@ enum ValueStackKind {
     GlobalConstant(ObjectRef, usize),
     Constant(ObjectRef, usize),
     Var(ObjectRef, usize, String),
+    Local(ObjectRef, usize),
     Temp(ObjectRef),
     ReturnVal(ObjectRef),
 }
 
 struct CallFrame {
-    pub _stack_position: usize,
-    pub locals: Vec<ObjectRef>,
+    _stack_position: usize,
+    locals: Vec<ObjectRef>,
 }
 
 impl CallFrame {
@@ -44,7 +45,7 @@ impl CallFrame {
         Self { _stack_position, locals }
     }
 
-    pub fn set_local(&mut self, index: usize, obj: ObjectRef) {
+    pub fn set_local(&mut self, obj: ObjectRef, index: usize) {
         self.locals[index] = obj;
     }
 }
@@ -142,6 +143,24 @@ impl VM {
                     let depth = self.ctx.get_var_depth(name.as_str())?;
                     self.push_var(depth, name.clone())?;
                 }
+                // Code unit locals
+                StoreLocal(index) => {
+                    let obj = self.pop_obj()?;
+                    self.store_local(obj, *index)?;
+                }
+                LoadLocal(index) => {
+                    let frame = self.call_stack.peek().expect("Empty call stack");
+                    let obj = frame.locals[*index].clone();
+                    self.push_local(obj, *index);
+                }
+                AssignVarAndStoreLocal(name, index) => {
+                    let obj = self.pop_obj()?;
+                    // Assign var
+                    let depth = self.ctx.assign_var(name, obj.clone())?;
+                    self.push_var(depth, name.clone())?;
+                    // Store local
+                    self.store_local(obj, *index)?;
+                }
                 // Jumps
                 Jump(addr, scope_exit_count) => {
                     self.exit_scopes(*scope_exit_count);
@@ -192,20 +211,6 @@ impl VM {
                     self.handle_inplace_op(op)?;
                 }
                 // Functions
-                StoreLocal(index) => {
-                    let obj = self.pop_obj()?;
-                    // XXX: We have to pop the frame and put it back in
-                    //      order to mutate it. There's probably a
-                    //      better way to handle this.
-                    let mut frame = self.pop_call_frame()?;
-                    frame.set_local(*index, obj);
-                    self.call_stack.push(frame);
-                }
-                LoadLocal(index) => {
-                    let frame = self.call_stack.peek().expect("Empty call stack");
-                    let obj = frame.locals[*index].clone();
-                    self.push_temp(obj);
-                }
                 Call(n) => {
                     self.handle_call(*n)?;
                 }
@@ -290,6 +295,10 @@ impl VM {
                 break Ok(VMState::Idle);
             }
         }
+    }
+
+    pub fn halt(&mut self) {
+        // TODO: Not sure what this should do or if it's even needed
     }
 
     // Handlers --------------------------------------------------------
@@ -392,17 +401,27 @@ impl VM {
     /// be a variable.
     fn handle_inplace_op(&mut self, op: &InplaceOperator) -> RuntimeResult {
         use InplaceOperator::*;
+        use ValueStackKind::*;
         if let Some(kinds) = self.pop_n(2) {
-            if let ValueStackKind::Var(a, depth, name) = kinds.get(0).unwrap() {
-                let b = self.get_obj(kinds.get(1).unwrap());
+            let a_kind = kinds.get(0).unwrap();
+            let b = self.get_obj(kinds.get(1).unwrap());
+            let b = b.read().unwrap();
+            if let Var(a, depth, name) = a_kind {
                 let a = a.read().unwrap();
-                let b = b.read().unwrap();
                 let result = match op {
                     AddEqual => a.add(&*b)?,
                     SubEqual => a.sub(&*b)?,
                 };
                 self.ctx.assign_var_at_depth(*depth, name.as_str(), result)?;
                 self.push_var(*depth, name.clone())?;
+            } else if let Local(a, index) = a_kind {
+                let a = a.read().unwrap();
+                let result = match op {
+                    AddEqual => a.add(&*b)?,
+                    SubEqual => a.sub(&*b)?,
+                };
+                self.store_local(result.clone(), *index)?;
+                self.push_local(result, *index);
             } else {
                 let message = format!("Binary op: {}", op);
                 return Err(RuntimeErr::new(RuntimeErrKind::ExpectedVar(message)));
@@ -420,23 +439,6 @@ impl VM {
         callable.call(args, self)
     }
 
-    fn push_call_frame(&mut self, args: &Args) -> RuntimeResult {
-        if self.call_stack.size() == self.max_call_depth {
-            return Err(RuntimeErr::new_recursion_depth_exceeded(self.max_call_depth));
-        }
-        let stack_position = self.value_stack.size();
-        let frame = CallFrame::new(stack_position, args.clone());
-        self.call_stack.push(frame);
-        Ok(())
-    }
-
-    fn pop_call_frame(&mut self) -> Result<CallFrame, RuntimeErr> {
-        match self.call_stack.pop() {
-            Some(frame) => Ok(frame),
-            None => Err(RuntimeErr::new(RuntimeErrKind::EmptyCallStack)),
-        }
-    }
-
     pub fn call_builtin_func(
         &mut self,
         func: &BuiltinFunc,
@@ -446,7 +448,7 @@ impl VM {
         // NOTE: We create a call frame for builtin functions mainly
         //       just to check for too much recursion. Builtin functions
         //       don't use frame locals, so they're not passed in.
-        self.push_call_frame(&vec![])?;
+        self.push_call_frame(&vec![], &vec![])?;
         self.enter_scope();
         if this.is_some() {
             // NOTE: We assign `this` here so that if a user function is
@@ -467,7 +469,7 @@ impl VM {
     }
 
     pub fn call_func(&mut self, func: &Func, this: This, args: Args) -> RuntimeResult {
-        self.push_call_frame(&args)?;
+        self.push_call_frame(&args, &func.locals)?;
         self.enter_scope();
         if let Some(this_var) = this {
             self.ctx.declare_and_assign_var("this", this_var)?;
@@ -505,6 +507,8 @@ impl VM {
         Ok(())
     }
 
+    // Scopes ----------------------------------------------------------
+
     pub fn enter_scope(&mut self) {
         self.scope_stack.push(self.value_stack.size());
         self.ctx.enter_scope();
@@ -538,34 +542,22 @@ impl VM {
         self.ctx.exit_scopes(count);
     }
 
-    pub fn halt(&mut self) {
-        // TODO: Not sure what this should do or if it's even needed
-    }
-
     // Value stack -----------------------------------------------------
 
     fn push(&mut self, kind: ValueStackKind) {
         self.value_stack.push(kind);
     }
 
-    pub fn push_global_const(&mut self, index: usize) -> RuntimeResult {
+    fn push_global_const(&mut self, index: usize) -> RuntimeResult {
         let obj = self.ctx.get_global_const(index)?.clone();
         self.push(ValueStackKind::GlobalConstant(obj, index));
         Ok(())
     }
 
-    pub fn push_const(&mut self, code: &Code, index: usize) -> RuntimeResult {
+    fn push_const(&mut self, code: &Code, index: usize) -> RuntimeResult {
         let obj = code.get_const(index)?.clone();
         self.push(ValueStackKind::Constant(obj, index));
         Ok(())
-    }
-
-    pub fn push_return_val(&mut self, obj: ObjectRef) {
-        self.push(ValueStackKind::ReturnVal(obj));
-    }
-
-    pub fn push_temp(&mut self, obj: ObjectRef) {
-        self.push(ValueStackKind::Temp(obj));
     }
 
     fn push_var(&mut self, depth: usize, name: String) -> RuntimeResult {
@@ -574,11 +566,23 @@ impl VM {
         Ok(())
     }
 
+    fn push_local(&mut self, obj: ObjectRef, index: usize) {
+        self.push(ValueStackKind::Local(obj, index));
+    }
+
+    fn push_temp(&mut self, obj: ObjectRef) {
+        self.push(ValueStackKind::Temp(obj));
+    }
+
+    fn push_return_val(&mut self, obj: ObjectRef) {
+        self.push(ValueStackKind::ReturnVal(obj));
+    }
+
     fn pop(&mut self) -> Option<ValueStackKind> {
         self.value_stack.pop()
     }
 
-    pub fn pop_obj(&mut self) -> PopObjResult {
+    fn pop_obj(&mut self) -> PopObjResult {
         match self.pop() {
             Some(kind) => Ok(self.get_obj(&kind)),
             None => Err(RuntimeErr::new(RuntimeErrKind::EmptyStack)),
@@ -610,9 +614,44 @@ impl VM {
             GlobalConstant(obj, ..) => obj.clone(),
             Constant(obj, ..) => obj.clone(),
             Var(obj, ..) => obj.clone(),
+            Local(obj, ..) => obj.clone(),
             Temp(obj) => obj.clone(),
             ReturnVal(obj) => obj.clone(),
         }
+    }
+
+    // Call Stack ------------------------------------------------------
+
+    fn push_call_frame(
+        &mut self,
+        args: &Args,
+        locals: &Vec<ObjectRef>,
+    ) -> RuntimeResult {
+        if self.call_stack.size() == self.max_call_depth {
+            return Err(RuntimeErr::new_recursion_depth_exceeded(self.max_call_depth));
+        }
+        let stack_position = self.value_stack.size();
+        let mut all_locals = args.clone();
+        all_locals.extend(locals.clone());
+        let frame = CallFrame::new(stack_position, all_locals);
+        self.call_stack.push(frame);
+        Ok(())
+    }
+
+    fn pop_call_frame(&mut self) -> Result<CallFrame, RuntimeErr> {
+        match self.call_stack.pop() {
+            Some(frame) => Ok(frame),
+            None => Err(RuntimeErr::new(RuntimeErrKind::EmptyCallStack)),
+        }
+    }
+
+    fn store_local(&mut self, obj: ObjectRef, index: usize) -> RuntimeResult {
+        // XXX: We have to pop the frame and put it back in order to
+        //      mutate it. There's probably a better way to handle this.
+        let mut frame = self.pop_call_frame()?;
+        frame.set_local(obj, index);
+        self.call_stack.push(frame);
+        Ok(())
     }
 
     // Utilities -------------------------------------------------------
@@ -686,6 +725,12 @@ impl VM {
                 eprintln!();
             }
         }
+        for func in funcs.iter() {
+            eprintln!();
+            let func = func.read().unwrap();
+            let func = func.down_to_func().unwrap();
+            self.dis_functions(&func.code);
+        }
         num_funcs
     }
 
@@ -750,6 +795,25 @@ impl VM {
                 let obj_str = self.var_str(name);
                 self.format_aligned("LOAD_VAR", format!("{name} = {obj_str}"))
             }
+            StoreLocal(index) => {
+                let obj = self.peek_obj().unwrap();
+                let obj_str = self.obj_str(obj);
+                self.format_aligned("STORE_LOCAL", format!("{index} : {obj_str}"))
+            }
+            LoadLocal(index) => {
+                let obj_str = if let Some(frame) = self.call_stack.peek() {
+                    if let Some(obj) = frame.locals.get(*index) {
+                        self.obj_str(obj.clone())
+                    } else {
+                        format!("Locals index out of bounds: {index}")
+                    }
+                } else {
+                    "Empty call stack".to_string()
+                };
+                self.format_aligned("LOAD_LOCAL", format!("{index} : {obj_str}"))
+            }
+            AssignVarAndStoreLocal(name, index) => self
+                .format_aligned("ASSIGN_VAR_AND_LOAD_LOCAL", format!("{name}/{index}")),
             Jump(addr, _) => self.format_aligned("JUMP", format!("{addr}",)),
             JumpPushNil(addr, _) => {
                 self.format_aligned("JUMP_PUSH_NIL", format!("{addr}",))
@@ -768,20 +832,6 @@ impl VM {
             BinaryOp(operator) => self.format_aligned("BINARY_OP", operator),
             CompareOp(operator) => self.format_aligned("COMPARE_OP", operator),
             InplaceOp(operator) => self.format_aligned("INPLACE_OP", operator),
-            StoreLocal(index) => {
-                let obj = self.peek_obj().unwrap();
-                let obj_str = self.obj_str(obj);
-                self.format_aligned("STORE_LOCAL", format!("{index} : {obj_str}"))
-            }
-            LoadLocal(index) => {
-                let obj_str = if let Some(frame) = self.call_stack.peek() {
-                    let obj = frame.locals.get(*index).unwrap();
-                    self.obj_str(obj.clone())
-                } else {
-                    "Empty call stack".to_string()
-                };
-                self.format_aligned("LOAD_LOCAL", format!("{index} : {obj_str}"))
-            }
             Call(n) => self.format_aligned("CALL", n),
             Return => "RETURN".to_string(),
             MakeString(n) => self.format_aligned("MAKE_STRING", n),

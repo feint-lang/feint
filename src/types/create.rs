@@ -75,9 +75,10 @@ pub fn new_func<S: Into<String>>(
     name: S,
     params: Option<Vec<S>>,
     code: Code,
+    locals: Vec<ObjectRef>,
 ) -> ObjectRef {
     let params = collect_params(params);
-    Arc::new(RwLock::new(Func::new(name, params, code)))
+    Arc::new(RwLock::new(Func::new(name, params, code, locals)))
 }
 
 pub fn new_int<I: Into<BigInt>>(value: I) -> ObjectRef {
@@ -140,10 +141,7 @@ pub fn bool_obj_from_bool(value: bool) -> ObjectRef {
 /// Collect parameters for function types.
 fn collect_params<S: Into<String>>(params: Option<Vec<S>>) -> Params {
     if let Some(names) = params {
-        let mut params = vec![];
-        for name in names {
-            params.push(name.into());
-        }
+        let params = names.into_iter().map(|n| n.into()).collect();
         Some(params)
     } else {
         None

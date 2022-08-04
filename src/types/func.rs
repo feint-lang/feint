@@ -70,13 +70,19 @@ pub struct Func {
     pub params: Params,
     pub arity: Option<usize>,
     pub code: Code,
+    pub locals: Vec<ObjectRef>,
 }
 
 unsafe impl Send for Func {}
 unsafe impl Sync for Func {}
 
 impl Func {
-    pub fn new<S: Into<String>>(name: S, params: Params, code: Code) -> Self {
+    pub fn new<S: Into<String>>(
+        name: S,
+        params: Params,
+        code: Code,
+        locals: Vec<ObjectRef>,
+    ) -> Self {
         let mut ns = Namespace::new();
         let name = name.into();
         let arity = params.as_ref().map(|params| params.len());
@@ -87,7 +93,7 @@ impl Func {
         };
         ns.add_obj("$name", create::new_str(name.as_str()));
         ns.add_obj("$arity", arity_obj);
-        Self { namespace: ns, name, params, arity, code }
+        Self { namespace: ns, name, params, arity, code, locals }
     }
 }
 

@@ -29,6 +29,15 @@ pub enum Inst {
     AssignVar(String),
     LoadVar(String),
 
+    // Store top of stack into call frame locals at index.
+    StoreLocal(usize),
+    // Push frame local at index onto stack.
+    LoadLocal(usize),
+
+    // XXX: This is a bit of a hack to work around inner functions not
+    //      having access to their containing function's locals.
+    AssignVarAndStoreLocal(String, usize),
+
     // Jumps -----------------------------------------------------------
     //
     // NOTE: For all jump instructions, the last arg is the scope exit
@@ -56,11 +65,6 @@ pub enum Inst {
     BinaryOp(BinaryOperator),
     CompareOp(CompareOperator),
     InplaceOp(InplaceOperator),
-
-    // Store top of stack into call frame locals at index.
-    StoreLocal(usize),
-    // Push frame local at index onto stack.
-    LoadLocal(usize),
 
     Call(usize), // Call function with N values from top of stack
     Return,

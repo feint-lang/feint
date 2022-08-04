@@ -333,7 +333,7 @@ impl Visitor {
     }
 
     fn visit_func(&mut self, node: ast::Func, name: Option<String>) -> VisitResult {
-        let mut func_visitor = Visitor::new(vec![]);
+        let mut visitor = Visitor::new(vec![]);
         let name = if let Some(name) = name {
             self.has_main = name == "$main" && self.scope_tree.in_global_scope();
             name
@@ -346,22 +346,24 @@ impl Visitor {
         } else {
             unreachable!("Block for function contains no statements");
         };
-        func_visitor.push(Inst::ScopeStart);
-        func_visitor.enter_scope(ScopeKind::Func);
-        func_visitor.visit_statements(node.block.statements)?;
-        func_visitor.fix_jumps()?;
+        visitor.push(Inst::ScopeStart);
+        visitor.enter_scope(ScopeKind::Func);
+        visitor.visit_statements(node.block.statements)?;
+        visitor.fix_jumps()?;
         if return_nil {
-            func_visitor.push_nil();
+            visitor.push_nil();
         }
-        func_visitor.push(Inst::Return);
-        func_visitor.push(Inst::ScopeEnd);
-        func_visitor.exit_scope();
-        assert_eq!(func_visitor.scope_tree.pointer(), 0);
-        let mut code = func_visitor.code;
+        visitor.push(Inst::Return);
+        visitor.push(Inst::ScopeEnd);
+        visitor.exit_scope();
+        assert_eq!(visitor.scope_tree.pointer(), 0);
+        let mut code = visitor.code;
 
-        if params.is_some() {
-            let locals = params.clone().unwrap();
+        let locals = if params.is_some() {
             let num_inst = code.len_chunk();
+            let mut names = params.clone().unwrap();
+            let mut locals = vec![];
+            let mut assigned = vec![];
             let mut ip: usize = 0;
             let mut scope_level = 0;
             loop {
@@ -369,17 +371,36 @@ impl Visitor {
                     scope_level += 1;
                 } else if let Inst::ScopeEnd = &code[ip] {
                     scope_level -= 1;
-                } else if let Inst::AssignVar(name) = &code[ip] {
+                } else if let Inst::DeclareVar(name) = &code[ip] {
+                    // Create a local cell for the var
                     if scope_level == 1 {
-                        let param_pos = locals.iter().position(|p| name == p);
-                        if let Some(index) = param_pos {
-                            code.replace_inst(ip, Inst::StoreLocal(index));
+                        let pos = names.iter().position(|p| name == p);
+                        if pos.is_none() {
+                            names.push(name.clone());
+                            locals.push(create::new_nil());
                         }
                     }
-                } else if let Inst::LoadVar(name) = &code[ip] {
+                } else if let Inst::AssignVar(name) = &code[ip] {
                     if scope_level == 1 {
-                        let param_pos = locals.iter().position(|p| name == p);
-                        if let Some(index) = param_pos {
+                        let pos = names.iter().position(|p| name == p);
+                        if let Some(index) = pos {
+                            code.replace_inst(
+                                ip,
+                                Inst::AssignVarAndStoreLocal(name.clone(), index),
+                            );
+                        }
+                    } else {
+                        assigned.push((scope_level, name.clone()));
+                    }
+                } else if let Inst::LoadVar(name) = &code[ip] {
+                    if scope_level == 1
+                        || assigned
+                            .iter()
+                            .position(|(level, n)| level == &scope_level && n == name)
+                            .is_none()
+                    {
+                        let pos = names.iter().position(|p| name == p);
+                        if let Some(index) = pos {
                             code.replace_inst(ip, Inst::LoadLocal(index));
                         }
                     }
@@ -389,9 +410,12 @@ impl Visitor {
                     break;
                 }
             }
-        }
+            locals
+        } else {
+            vec![]
+        };
 
-        let func = create::new_func(name, params, code);
+        let func = create::new_func(name, params, code, locals);
         self.add_const(func);
         Ok(())
     }
