@@ -28,6 +28,7 @@
   - [x] Implement `continue`
 - [x] Implement function calls
   - [ ] Verify implementation
+  - [ ] Implement `return`
 - [x] Implement native functions
   - [x] Implement `print` function (`print` is currently implemented as a statement and has limited functionality)
 - [x] Implement `this` binding for functions

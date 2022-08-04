@@ -1,7 +1,7 @@
 # FeInt
 
-FeInt is a bytecode interpreter written in Rust. It's a learning project
-and is not meant for production use (or any use currently).
+FeInt is a stack-based, bytecode-style interpreter written in Rust.
+It's a learning project and is not meant for production use.
 
 ## Author
 
@@ -27,6 +27,10 @@ MIT. See the LICENSE file.
 - Custom types can implement operators by defining methods such as `+`
 - Only booleans, numbers, and `nil` can be used in boolean contexts by
   default; custom types can implement the `!!` operator
+
+## Memory Management
+
+TODO
 
 ## Builtin Types
 
@@ -94,12 +98,14 @@ In addition to blocks created with `block`, *all* blocks create a new
 scope.
 
 Blocks are denoted by `->` and always return (so to speak) a value,
-which may be `nil` (with the exception of a couple buggy cases with
-`jump`, labels, and `continue`)
+which may be `nil`.
 
 ## Conditionals
 
-NOTE: Only `nil`, booleans, and numbers can be used in boolean contexts.
+NOTE: By default, only `nil`, booleans, and numbers can be used in
+      boolean contexts. Custom types will be able to define a special
+      property name `!!` to allow instances to be used in boolean
+      contexts.
 
 ```
 # Block style
@@ -123,6 +129,21 @@ if true -> true    # result is true
 if false -> false  # result is nil
 ```
 
+## Match
+
+```
+x = "abc"
+result = match x ->
+    "a"   -> 1
+    "ab"  -> 2
+    "abc" -> 3
+    :     -> 4
+print(result)  # -> 3
+```
+
+The default branch is denoted by a single `:`. If there's no default
+branch and no match is found, the `match` block will return `nil`.
+
 ## Loops
 
 ```
@@ -133,18 +154,27 @@ loop ->
 
 # Loop from 0 up to, but not including, 10
 # Expression value is 9 (last value of i)
+#
+# TODO:
 loop i <- 0..10 ->
     i
 
 # Loop from 1 to 10, including 10
 # Expression value is 10 (last value of i)
+#
+# TODO:
 loop i <- 1...10 ->
     i
 
 # Loop until condition is met
-cond = false
+#
+# TODO: There's a bug in this example since `loop cond` checks the OUTER
+#       `cond`. This is due to how scopes work--the inner assignment
+#       creates a new scope-local var rather than reassigning the outer
+#       `cond`. A possible fix would be to add an `outer` keyword.
+cond = true
 loop cond ->
-    cond = true
+    cond = false
 ```
 
 ## Jumps
@@ -155,7 +185,7 @@ loop cond ->
 - Can't jump out of functions
 
 ```
-my_func (x) ->
+my_func = (x) ->
     if x ->
         jump exit
 
@@ -168,8 +198,9 @@ my_func (x) ->
 ## Functions
 
 - Lower snake case names only
+- Declared/assigned like other vars with `f = () -> ...` syntax
 - Value of last evaluated expression is returned
--
+- No explicit `return` is currently possible
 
 ```
 # Named function
@@ -210,12 +241,14 @@ MyType = () =>
     + = (other) ->
         MyType(this.value + other.value)
 
-    # $ indicates a special method
-    # $bool must return the bool value of the object
-    $bool = () ->
+    # !! must return the bool value of the object
+    !! = () ->
         this.value > 10
 
     # $string must return the string representation of the object
+    #
+    # NOTE: The $ prefix indicates a special method, similar to
+    #       dunder methods in Python (e.g., `__str__`)
     $string = () ->
         $"{this.value}"
 
