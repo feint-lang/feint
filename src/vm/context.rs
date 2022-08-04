@@ -33,8 +33,8 @@ impl RuntimeContext {
         self.add_global_const(create::new_true()); // 1
         self.add_global_const(create::new_false()); // 2
 
-        for i in 0..=256 {
-            self.add_global_const(create::new_int(i));
+        for int in create::SHARED_INTS.iter() {
+            self.add_global_const(int.clone());
         }
 
         // Enter global scope.

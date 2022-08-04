@@ -4,7 +4,8 @@
 use std::sync::{Arc, RwLock};
 
 use num_bigint::BigInt;
-use num_traits::{FromPrimitive, Num};
+use num_traits::{FromPrimitive, Num, Signed, ToPrimitive, Zero};
+
 use once_cell::sync::Lazy;
 
 use crate::vm::Code;
@@ -26,10 +27,23 @@ use super::tuple::Tuple;
 use super::result::Params;
 
 static NIL: Lazy<Arc<RwLock<Nil>>> = Lazy::new(|| Arc::new(RwLock::new(Nil::new())));
+
 static TRUE: Lazy<Arc<RwLock<Bool>>> =
     Lazy::new(|| Arc::new(RwLock::new(Bool::new(true))));
+
 static FALSE: Lazy<Arc<RwLock<Bool>>> =
     Lazy::new(|| Arc::new(RwLock::new(Bool::new(false))));
+
+pub static GLOBAL_INT_MAX: Lazy<BigInt> = Lazy::new(|| BigInt::from(256));
+
+pub static SHARED_INTS: Lazy<Vec<Arc<RwLock<Int>>>> = Lazy::new(|| {
+    let end = GLOBAL_INT_MAX.to_u32().unwrap();
+    (0..=end).map(|i| Arc::new(RwLock::new(Int::new(BigInt::from(i))))).collect()
+});
+
+pub fn in_shared_int_range(value: &BigInt) -> bool {
+    value.is_zero() || (value.is_positive() && value <= Lazy::force(&GLOBAL_INT_MAX))
+}
 
 // Builtin type constructors ---------------------------------------
 
@@ -83,7 +97,12 @@ pub fn new_func<S: Into<String>>(
 
 pub fn new_int<I: Into<BigInt>>(value: I) -> ObjectRef {
     let value = value.into();
-    Arc::new(RwLock::new(Int::new(value)))
+    if value.is_positive() && &value <= Lazy::force(&GLOBAL_INT_MAX) {
+        let index = value.to_usize().unwrap();
+        SHARED_INTS[index].clone()
+    } else {
+        Arc::new(RwLock::new(Int::new(value)))
+    }
 }
 
 pub fn new_int_from_string<S: Into<String>>(value: S) -> ObjectRef {
