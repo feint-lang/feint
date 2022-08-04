@@ -78,6 +78,7 @@ impl VM {
         use Inst::*;
 
         let max_call_depth = self.max_call_depth;
+        let num_inst = code.len_chunk();
         let mut ip: usize = 0;
         let mut jump_ip = None;
 
@@ -257,7 +258,7 @@ impl VM {
                 ip += 1;
             }
 
-            if ip == code.len_chunk() {
+            if ip == num_inst {
                 break Ok(VMState::Idle);
             }
         }
