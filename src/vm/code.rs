@@ -39,6 +39,10 @@ impl Code {
         self.chunk.len()
     }
 
+    pub fn iter_chunk(&self) -> Iter<'_, Inst> {
+        self.chunk.iter()
+    }
+
     pub fn push_inst(&mut self, inst: Inst) {
         self.chunk.push(inst)
     }
@@ -49,10 +53,6 @@ impl Code {
 
     pub fn get_inst(&mut self, index: usize) -> Option<&Inst> {
         self.chunk.get(index)
-    }
-
-    pub fn iter_inst(&self) -> Iter<'_, Inst> {
-        self.chunk.iter()
     }
 
     // Constants -------------------------------------------------------

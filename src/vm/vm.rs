@@ -2,8 +2,6 @@
 //! then, implicitly, goes idle until it's passed some instructions to
 //! execute. After instructions are executed, it goes back into idle
 //! mode.
-use std::fmt;
-
 use num_traits::ToPrimitive;
 
 use crate::types::{
@@ -90,7 +88,7 @@ impl VM {
     /// When a HALT instruction is encountered, the VM's state will be
     /// cleared; it can be "restarted" by passing more instructions to
     /// execute.
-    pub fn execute(&mut self, code: &Code, dis: bool) -> ExeResult {
+    pub fn execute(&mut self, code: &Code) -> ExeResult {
         use Inst::*;
 
         let num_inst = code.len_chunk();
@@ -258,9 +256,6 @@ impl VM {
                 // VM control
                 Halt(return_code) => {
                     self.halt();
-                    if dis {
-                        self.dis(ip, code);
-                    }
                     break Ok(VMState::Halted(*return_code));
                 }
                 HaltTop => {
@@ -273,15 +268,8 @@ impl VM {
                         }
                         None => 0,
                     };
-                    if dis {
-                        self.dis(ip, code);
-                    }
                     break Ok(VMState::Halted(return_code));
                 }
-            }
-
-            if dis {
-                self.dis(ip, code);
             }
 
             if let Some(new_ip) = jump_ip {
@@ -448,7 +436,7 @@ impl VM {
         // NOTE: We create a call frame for builtin functions mainly
         //       just to check for too much recursion. Builtin functions
         //       don't use frame locals, so they're not passed in.
-        self.push_call_frame(&vec![], &vec![])?;
+        self.push_call_frame(&vec![], &[])?;
         self.enter_scope();
         if this.is_some() {
             // NOTE: We assign `this` here so that if a user function is
@@ -475,7 +463,7 @@ impl VM {
             self.ctx.declare_and_assign_var("this", this_var)?;
         }
         self.check_call_args(func.name.as_str(), &func.params, &args)?;
-        self.execute(&func.code, false)?;
+        self.execute(&func.code)?;
         self.exit_scopes(1);
         Ok(())
     }
@@ -622,17 +610,15 @@ impl VM {
 
     // Call Stack ------------------------------------------------------
 
-    fn push_call_frame(
-        &mut self,
-        args: &Args,
-        locals: &Vec<ObjectRef>,
-    ) -> RuntimeResult {
+    fn push_call_frame(&mut self, args: &Args, locals: &[ObjectRef]) -> RuntimeResult {
         if self.call_stack.size() == self.max_call_depth {
             return Err(RuntimeErr::new_recursion_depth_exceeded(self.max_call_depth));
         }
         let stack_position = self.value_stack.size();
         let mut all_locals = args.clone();
-        all_locals.extend(locals.clone());
+        for local in locals {
+            all_locals.push(local.clone());
+        }
         let frame = CallFrame::new(stack_position, all_locals);
         self.call_stack.push(frame);
         Ok(())
@@ -686,183 +672,5 @@ impl VM {
                 eprintln!("{name} = {obj}");
             }
         }
-    }
-
-    // Disassembler ----------------------------------------------------
-    //
-    // This is done here because we need the VM context in order to show
-    // more useful info like jump targets, values, etc.
-
-    /// Disassemble a list of instructions.
-    pub fn dis_list(&mut self, code: &Code) -> ExeResult {
-        for (ip, _) in code.iter_inst().enumerate() {
-            self.dis(ip, code);
-        }
-        Ok(VMState::Halted(0))
-    }
-
-    /// Disassemble functions, returning the number of functions that
-    /// were disassembled.
-    pub fn dis_functions(&mut self, code: &Code) -> usize {
-        let mut funcs = vec![];
-        for obj_ref in code.iter_constants() {
-            let obj = obj_ref.read().unwrap();
-            let is_func = obj.down_to_func().is_some();
-            if is_func {
-                funcs.push(obj_ref.clone());
-            }
-        }
-        let num_funcs = funcs.len();
-        for (i, func_obj) in funcs.iter().enumerate() {
-            let func_obj = func_obj.read().unwrap();
-            let func = func_obj.down_to_func().unwrap();
-            let heading = format!("{func:?} ");
-            eprintln!("{:=<79}", heading);
-            if let Err(err) = self.dis_list(&func.code) {
-                eprintln!("Could not disassemble function {func}: {err}");
-            }
-            if num_funcs > 1 && i < (num_funcs - 1) {
-                eprintln!();
-            }
-        }
-        for func in funcs.iter() {
-            eprintln!();
-            let func = func.read().unwrap();
-            let func = func.down_to_func().unwrap();
-            self.dis_functions(&func.code);
-        }
-        num_funcs
-    }
-
-    /// Disassemble a single instruction.
-    pub fn dis(&mut self, ip: usize, code: &Code) {
-        let inst = &code[ip];
-        let formatted = self.format_instruction(code, inst);
-        eprintln!("{:0>4} {}", ip, formatted);
-    }
-
-    fn global_const_str(&self, index: usize) -> String {
-        match self.ctx.get_global_const(index) {
-            Ok(obj) => self.obj_str(obj.clone()),
-            Err(err) => format!("[COULD NOT LOAD GLOBAL CONSTANT AT {index}: {err}]"),
-        }
-    }
-
-    fn const_str(&self, code: &Code, index: usize) -> String {
-        match code.get_const(index) {
-            Ok(obj) => self.obj_str(obj.clone()),
-            Err(err) => format!("[COULD NOT LOAD CONSTANT AT {index}: {err}]"),
-        }
-    }
-
-    fn var_str(&mut self, name: &str) -> String {
-        match self.ctx.get_var(name) {
-            Ok(obj) => self.obj_str(obj.clone()),
-            Err(err) => format!("[COULD NOT LOAD VAR {name}: {err}]"),
-        }
-    }
-
-    fn obj_str(&self, obj: ObjectRef) -> String {
-        let obj = &*obj.read().unwrap();
-        let str = format!("{obj:?} {}", obj.class().read().unwrap());
-        str.replace('\n', "\\n").replace('\r', "\\r")
-    }
-
-    fn format_instruction(&mut self, code: &Code, inst: &Inst) -> String {
-        use Inst::*;
-        match inst {
-            NoOp => "NOOP".to_string(),
-            Truncate(size) => self.format_aligned("TRUNCATE", format!("{size}")),
-            LoadGlobalConst(index) => {
-                let obj_str = self.global_const_str(*index);
-                self.format_aligned("LOAD_GLOBAL_CONST", format!("{index} : {obj_str}"))
-            }
-            LoadNil => "LOAD_NIL".to_string(),
-            LoadTrue => "LOAD_TRUE".to_string(),
-            LoadFalse => "LOAD_FALSE".to_string(),
-            LoadConst(index) => {
-                let obj_str = self.const_str(code, *index);
-                self.format_aligned("LOAD_CONST", format!("{index} : {obj_str}"))
-            }
-            ScopeStart => "SCOPE_START".to_string(),
-            ScopeEnd => "SCOPE_END".to_string(),
-            DeclareVar(name) => self.format_aligned("DECLARE_VAR", name),
-            AssignVar(name) => {
-                let obj_str = self.var_str(name);
-                self.format_aligned("ASSIGN_VAR", format!("{name} = {obj_str}"))
-            }
-            LoadVar(name) => {
-                let obj_str = self.var_str(name);
-                self.format_aligned("LOAD_VAR", format!("{name} = {obj_str}"))
-            }
-            StoreLocal(index) => {
-                let obj = self.peek_obj().unwrap();
-                let obj_str = self.obj_str(obj);
-                self.format_aligned("STORE_LOCAL", format!("{index} : {obj_str}"))
-            }
-            LoadLocal(index) => {
-                let obj_str = if let Some(frame) = self.call_stack.peek() {
-                    if let Some(obj) = frame.locals.get(*index) {
-                        self.obj_str(obj.clone())
-                    } else {
-                        format!("Locals index out of bounds: {index}")
-                    }
-                } else {
-                    "Empty call stack".to_string()
-                };
-                self.format_aligned("LOAD_LOCAL", format!("{index} : {obj_str}"))
-            }
-            AssignVarAndStoreLocal(name, index) => self
-                .format_aligned("ASSIGN_VAR_AND_LOAD_LOCAL", format!("{name}/{index}")),
-            Jump(addr, _) => self.format_aligned("JUMP", format!("{addr}",)),
-            JumpPushNil(addr, _) => {
-                self.format_aligned("JUMP_PUSH_NIL", format!("{addr}",))
-            }
-            JumpIf(addr, _) => self.format_aligned("JUMP_IF", format!("{addr}",)),
-            JumpIfNot(addr, _) => {
-                self.format_aligned("JUMP_IF_NOT", format!("{addr}",))
-            }
-            JumpIfElse(if_addr, else_addr, _) => {
-                self.format_aligned("JUMP_IF_ELSE", format!("{if_addr} : {else_addr}"))
-            }
-            UnaryOp(operator) => self.format_aligned("UNARY_OP", operator),
-            UnaryCompareOp(operator) => {
-                self.format_aligned("UNARY_COMPARE_OP", operator)
-            }
-            BinaryOp(operator) => self.format_aligned("BINARY_OP", operator),
-            CompareOp(operator) => self.format_aligned("COMPARE_OP", operator),
-            InplaceOp(operator) => self.format_aligned("INPLACE_OP", operator),
-            Call(n) => self.format_aligned("CALL", n),
-            Return => "RETURN".to_string(),
-            MakeString(n) => self.format_aligned("MAKE_STRING", n),
-            MakeTuple(n) => self.format_aligned("MAKE_TUPLE", n),
-            Halt(code) => self.format_aligned("HALT", code),
-            HaltTop => {
-                if let Some(obj) = self.peek_obj() {
-                    let obj = obj.read().unwrap();
-                    self.format_aligned("HALT_TOP", obj.to_string())
-                } else {
-                    self.format_aligned("HALT_TOP", "[ERROR: empty stack]")
-                }
-            }
-            Placeholder(addr, inst, message) => {
-                let formatted_inst = self.format_instruction(code, inst);
-                self.format_aligned(
-                    "PLACEHOLDER",
-                    format!("{formatted_inst} @ {addr} ({message})"),
-                )
-            }
-            BreakPlaceholder(addr, _) => {
-                self.format_aligned("PLACEHOLDER", format!("BREAK @ {addr}"))
-            }
-            ContinuePlaceholder(addr, _) => {
-                self.format_aligned("PLACEHOLDER", format!("CONTINUE @ {addr}"))
-            }
-        }
-    }
-
-    /// Return a nicely formatted string of instructions.
-    fn format_aligned<T: fmt::Display>(&self, name: &str, value: T) -> String {
-        format!("{name: <w$}{value:}", w = 24)
     }
 }

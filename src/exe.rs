@@ -2,13 +2,14 @@
 use std::io::BufRead;
 
 use crate::compiler::{compile, CompErr, CompErrKind};
+use crate::dis;
 use crate::parser::{ParseErr, ParseErrKind, Parser};
 use crate::result::{ExeErr, ExeErrKind, ExeResult};
 use crate::scanner::{ScanErr, ScanErrKind, Scanner, Token};
 use crate::util::{
     source_from_file, source_from_stdin, source_from_text, Location, Source,
 };
-use crate::vm::{Code, RuntimeErr, RuntimeErrKind, VM};
+use crate::vm::{Code, RuntimeErr, RuntimeErrKind, VMState, VM};
 
 pub struct Executor<'a> {
     pub vm: &'a mut VM,
@@ -103,30 +104,19 @@ impl<'a> Executor<'a> {
                 return Err(ExeErr::new(ExeErrKind::CompErr(err.kind)));
             }
         };
-        self.execute_code(code)
+        if self.dis {
+            dis::dis(&code);
+            Ok(VMState::Halted(0))
+        } else {
+            self.execute_code(code)
+        }
     }
 
     /// Execute a code (a list of instructions).
     pub fn execute_code(&mut self, code: Code) -> ExeResult {
-        if self.dis {
-            eprintln!("{:=<79}", "INSTRUCTIONS ");
-        } else if self.debug {
-            eprintln!("{:=<79}", "OUTPUT ");
-        }
-
-        let result = self.vm.execute(&code, self.dis);
-
-        let num_funcs = if self.dis {
-            eprintln!();
-            self.vm.dis_functions(&code)
-        } else {
-            0
-        };
+        let result = self.vm.execute(&code);
 
         if self.debug {
-            if !self.dis || num_funcs > 0 {
-                eprintln!();
-            }
             eprintln!("{:=<79}", "STACK ");
             self.vm.display_stack();
             eprintln!("\n{:=<79}", "CONSTANTS ");

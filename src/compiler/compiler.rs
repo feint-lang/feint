@@ -401,10 +401,7 @@ impl Visitor {
                     }
                 } else if let Inst::LoadVar(name) = &code[ip] {
                     if scope_level == 1
-                        || assigned
-                            .iter()
-                            .position(|(level, n)| level == &scope_level && n == name)
-                            .is_none()
+                        || !assigned.iter().any(|(s, n)| s == &scope_level && n == name)
                     {
                         let pos = names.iter().position(|p| name == p);
                         if let Some(index) = pos {
