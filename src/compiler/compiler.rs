@@ -449,7 +449,10 @@ impl Visitor {
         if self.scope_tree.in_global_scope() {
             self.push(Inst::DeclareVar(name));
         } else {
-            self.scope_tree.add_local(name);
+            self.scope_tree.add_local(name.clone());
+            // XXX: This is a hack to allow inner functions access to
+            //      vars in the outer function scope.
+            self.push(Inst::DeclareVar(name));
         }
         Ok(())
     }
@@ -463,7 +466,12 @@ impl Visitor {
         if let Some(name) = lhs_expr.ident_name() {
             self.visit_expr(value_expr, Some(name.clone()))?;
             match self.scope_tree.find_local(name.as_str()) {
-                Some(index) => self.push(Inst::StoreLocal(index)),
+                Some(index) => {
+                    self.push(Inst::StoreLocal(index));
+                    // XXX: This is a hack to allow inner functions
+                    //      access to vars in the outer function scope.
+                    self.push(Inst::AssignVar(name));
+                }
                 None => self.push(Inst::AssignVar(name)),
             }
             Ok(())
