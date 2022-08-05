@@ -301,7 +301,9 @@ impl Expr {
     /// Check if expression is *any* type of identifier. If so, return
     /// its name.
     pub fn ident_name(&self) -> Option<String> {
-        self.is_ident().or(self.is_special_ident()).or(self.is_type_ident())
+        self.is_ident()
+            .or_else(|| self.is_special_ident())
+            .or_else(|| self.is_type_ident())
     }
 
     /// Check if expression is a regular identifier. If so, return its

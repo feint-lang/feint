@@ -23,17 +23,9 @@ pub enum Inst {
     ScopeEnd,
 
     DeclareVar(String),
+    AssignLocal(usize, String),
     AssignVar(String),
     LoadVar(String),
-
-    // Store top of stack into call frame locals at index.
-    StoreLocal(usize),
-    // Push frame local at index onto stack.
-    LoadLocal(usize),
-
-    // XXX: This is a bit of a hack to work around inner functions not
-    //      having access to their containing function's locals.
-    AssignVarAndStoreLocal(String, usize),
 
     // Jumps -----------------------------------------------------------
     //

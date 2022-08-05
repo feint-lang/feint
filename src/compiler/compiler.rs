@@ -29,6 +29,7 @@ struct Visitor {
     code: Code,
     scope_tree: ScopeTree,
     scope_depth: usize,
+    locals: Vec<(String, usize)>, // local name, scope depth
     has_main: bool,
     argv: Vec<String>,
 }
@@ -39,6 +40,7 @@ impl Visitor {
             code: Code::new(),
             scope_tree: ScopeTree::new(),
             scope_depth: 0,
+            locals: Vec::new(),
             has_main: false,
             argv,
         }
@@ -358,12 +360,20 @@ impl Visitor {
         } else {
             "<anonymous>".to_owned()
         };
-        let params = node.params;
         let return_nil = if let Some(last) = node.block.statements.last() {
             !matches!(last.kind, ast::StatementKind::Expr(_))
         } else {
             unreachable!("Block for function contains no statements");
         };
+        if node.params.is_some() {
+            node.params.clone().unwrap().iter().for_each(|nam| {
+                println!("add arg local {nam} for function {name}");
+                visitor.code.add_local(1, nam);
+            });
+        } else {
+            println!("add arg local $args for function {name}");
+            visitor.code.add_local(1, "$args");
+        }
         visitor.push(Inst::ScopeStart);
         visitor.enter_scope(ScopeKind::Func);
         visitor.visit_statements(node.block.statements)?;
@@ -375,62 +385,7 @@ impl Visitor {
         visitor.push(Inst::ScopeEnd);
         visitor.exit_scope();
         assert_eq!(visitor.scope_tree.pointer(), 0);
-        let mut code = visitor.code;
-
-        let locals = if params.is_some() {
-            let num_inst = code.len_chunk();
-            let mut names = params.clone().unwrap();
-            let mut locals = vec![];
-            let mut assigned = vec![];
-            let mut ip: usize = 0;
-            let mut scope_level = 0;
-            loop {
-                if let Inst::ScopeStart = &code[ip] {
-                    scope_level += 1;
-                } else if let Inst::ScopeEnd = &code[ip] {
-                    scope_level -= 1;
-                } else if let Inst::DeclareVar(name) = &code[ip] {
-                    // Create a local cell for the var
-                    if scope_level == 1 {
-                        let pos = names.iter().position(|p| name == p);
-                        if pos.is_none() {
-                            names.push(name.clone());
-                            locals.push(create::new_nil());
-                        }
-                    }
-                } else if let Inst::AssignVar(name) = &code[ip] {
-                    if scope_level == 1 {
-                        let pos = names.iter().position(|p| name == p);
-                        if let Some(index) = pos {
-                            code.replace_inst(
-                                ip,
-                                Inst::AssignVarAndStoreLocal(name.clone(), index),
-                            );
-                        }
-                    } else {
-                        assigned.push((scope_level, name.clone()));
-                    }
-                } else if let Inst::LoadVar(name) = &code[ip] {
-                    if scope_level == 1
-                        || !assigned.iter().any(|(s, n)| s == &scope_level && n == name)
-                    {
-                        let pos = names.iter().position(|p| name == p);
-                        if let Some(index) = pos {
-                            code.replace_inst(ip, Inst::LoadLocal(index));
-                        }
-                    }
-                }
-                ip += 1;
-                if ip == num_inst {
-                    break;
-                }
-            }
-            locals
-        } else {
-            vec![]
-        };
-
-        let func = create::new_func(name, params, code, locals);
+        let func = create::new_func(name, node.params, visitor.code);
         self.add_const(func);
         Ok(())
     }
@@ -496,7 +451,11 @@ impl Visitor {
         } else {
             return Err(CompErr::new_expected_ident());
         };
-        self.push(Inst::DeclareVar(name.clone()));
+        if self.scope_tree.in_global_scope() {
+            self.push(Inst::DeclareVar(name));
+        } else {
+            self.code.add_local(self.scope_depth, name.as_str());
+        }
         Ok(())
     }
 
@@ -508,7 +467,11 @@ impl Visitor {
         // TODO: Allow assignment to attributes
         if let Some(name) = lhs_expr.ident_name() {
             self.visit_expr(value_expr, Some(name.clone()))?;
-            self.push(Inst::AssignVar(name));
+            if self.scope_tree.in_global_scope() {
+                self.push(Inst::AssignVar(name));
+            } else {
+                self.push(Inst::AssignLocal(self.scope_depth, name));
+            }
             Ok(())
         } else {
             Err(CompErr::new_expected_ident())

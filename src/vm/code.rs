@@ -1,10 +1,13 @@
 use std::ops::Index;
 use std::slice::Iter;
 
-use crate::types::ObjectRef;
+use crate::types::{create, ObjectRef};
 
 use super::inst::Inst;
 use super::result::RuntimeErr;
+
+/// depth, name, value
+pub type Locals = Vec<(usize, String, ObjectRef)>;
 
 /// Represents a unit of code.
 pub struct Code {
@@ -22,7 +25,7 @@ impl Index<usize> for Code {
 
 impl Code {
     pub fn new() -> Self {
-        Self { chunk: Vec::new(), constants: Vec::new() }
+        Self { chunk: Vec::new(), constants: Vec::new(), locals: Vec::new() }
     }
 
     /// Initialize code object with a list of instructions, also known
@@ -73,5 +76,34 @@ impl Code {
 
     pub fn iter_constants(&self) -> Iter<'_, ObjectRef> {
         self.constants.iter()
+    }
+
+    // Locals ----------------------------------------------------------
+
+    pub fn clone_locals(&self) -> Vec<(usize, String, ObjectRef)> {
+        self.locals.clone()
+    }
+
+    /// Add local at depth with initial value of nil.
+    pub fn add_local(&mut self, depth: usize, name: &str) {
+        if self.find_local_at_depth(depth, name).is_none() {
+            self.locals.push((depth, name.to_string(), create::new_nil()))
+        }
+    }
+
+    pub fn find_local(&self, name: &str) -> Option<ObjectRef> {
+        self.locals
+            .iter()
+            .rev()
+            .position(|(_, n, _)| name == n)
+            .map(|i| self.locals[i].2.clone())
+    }
+
+    pub fn find_local_at_depth(&self, depth: usize, name: &str) -> Option<ObjectRef> {
+        self.locals
+            .iter()
+            .rev()
+            .position(|(d, n, _)| &depth == d && name == n)
+            .map(|i| self.locals[i].2.clone())
     }
 }

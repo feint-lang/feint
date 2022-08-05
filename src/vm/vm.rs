@@ -28,23 +28,18 @@ enum ValueStackKind {
     GlobalConstant(ObjectRef, usize),
     Constant(ObjectRef, usize),
     Var(ObjectRef, usize, String),
-    Local(ObjectRef, usize),
+    Local(ObjectRef, usize, String), // val, depth, name
     Temp(ObjectRef),
     ReturnVal(ObjectRef),
 }
 
 struct CallFrame {
     _stack_position: usize,
-    locals: Vec<ObjectRef>,
 }
 
 impl CallFrame {
-    pub fn new(_stack_position: usize, locals: Vec<ObjectRef>) -> Self {
-        Self { _stack_position, locals }
-    }
-
-    pub fn set_local(&mut self, obj: ObjectRef, index: usize) {
-        self.locals[index] = obj;
+    pub fn new(_stack_position: usize) -> Self {
+        Self { _stack_position }
     }
 }
 
@@ -77,12 +72,31 @@ impl VM {
     /// When a HALT instruction is encountered, the VM's state will be
     /// cleared; it can be "restarted" by passing more instructions to
     /// execute.
-    pub fn execute(&mut self, code: &Code) -> ExeResult {
+    pub fn execute(
+        &mut self,
+        code: &Code,
+        // Pass this when the unit of code is a user function
+        args: Option<(&Params, &Args)>,
+    ) -> ExeResult {
         use Inst::*;
 
         let num_inst = code.len_chunk();
         let mut ip: usize = 0;
         let mut jump_ip = None;
+        let mut locals = code.clone_locals();
+
+        if let Some((params, args)) = args {
+            if let Some(params) = params {
+                for (name, val) in params.iter().zip(args) {
+                    println!("bind {name} to {val:?}");
+                    self.set_local(&mut locals, &1usize, name, val.clone());
+                }
+            } else {
+                // let args = create::new_tuple(args.clone());
+                // println!("bind $args to {args:?}");
+                // self.set_local(&mut locals, &1usize, "$args", args);
+            }
+        }
 
         loop {
             match &code[ip] {
@@ -115,11 +129,16 @@ impl VM {
                 ScopeEnd => {
                     self.exit_scopes(1);
                 }
-                // Vars
+                // Vars (including locals)
                 DeclareVar(name) => {
                     if self.ctx.get_var_in_current_namespace(name).is_err() {
                         self.ctx.declare_var(name.as_str());
                     }
+                }
+                AssignLocal(depth, name) => {
+                    let obj = self.pop_obj()?;
+                    self.set_local(&mut locals, depth, name, obj.clone());
+                    self.push_local(obj, *depth, name);
                 }
                 AssignVar(name) => {
                     let obj = self.pop_obj()?;
@@ -127,26 +146,12 @@ impl VM {
                     self.push_var(depth, name.clone())?;
                 }
                 LoadVar(name) => {
-                    let depth = self.ctx.get_var_depth(name.as_str())?;
-                    self.push_var(depth, name.clone())?;
-                }
-                // Code unit locals
-                StoreLocal(index) => {
-                    let obj = self.pop_obj()?;
-                    self.store_local(obj, *index)?;
-                }
-                LoadLocal(index) => {
-                    let frame = self.call_stack.peek().expect("Empty call stack");
-                    let obj = frame.locals[*index].clone();
-                    self.push_local(obj, *index);
-                }
-                AssignVarAndStoreLocal(name, index) => {
-                    let obj = self.pop_obj()?;
-                    // Assign var
-                    let depth = self.ctx.assign_var(name, obj.clone())?;
-                    self.push_var(depth, name.clone())?;
-                    // Store local
-                    self.store_local(obj, *index)?;
+                    if let Some((depth, name, obj)) = self.find_local(&locals, name) {
+                        self.push_local(obj, depth, name)
+                    } else {
+                        let depth = self.ctx.get_var_depth(name.as_str())?;
+                        self.push_var(depth, name.clone())?;
+                    }
                 }
                 // Jumps
                 Jump(addr, scope_exit_count) => {
@@ -195,7 +200,7 @@ impl VM {
                     self.handle_compare_op(op)?;
                 }
                 InplaceOp(op) => {
-                    self.handle_inplace_op(op)?;
+                    self.handle_inplace_op(op, &mut locals)?;
                 }
                 // Functions
                 Call(n) => {
@@ -376,7 +381,11 @@ impl VM {
     /// Pop top two operands from stack, apply operation, assign result,
     /// and push temp result value onto stack. The first operand *must*
     /// be a variable.
-    fn handle_inplace_op(&mut self, op: &InplaceOperator) -> RuntimeResult {
+    fn handle_inplace_op(
+        &mut self,
+        op: &InplaceOperator,
+        locals: &mut [(usize, String, ObjectRef)],
+    ) -> RuntimeResult {
         use InplaceOperator::*;
         use ValueStackKind::*;
         if let Some(kinds) = self.pop_n(2) {
@@ -391,14 +400,14 @@ impl VM {
                 };
                 self.ctx.assign_var_at_depth(*depth, name.as_str(), result)?;
                 self.push_var(*depth, name.clone())?;
-            } else if let Local(a, index) = a_kind {
+            } else if let Local(a, depth, name) = a_kind {
                 let a = a.read().unwrap();
                 let result = match op {
                     AddEqual => a.add(&*b)?,
                     SubEqual => a.sub(&*b)?,
                 };
-                self.store_local(result.clone(), *index)?;
-                self.push_local(result, *index);
+                self.set_local(locals, depth, name, result.clone());
+                self.push_local(result, *depth, name);
             } else {
                 let message = format!("Binary op: {}", op);
                 return Err(RuntimeErr::new(RuntimeErrKind::ExpectedVar(message)));
@@ -423,9 +432,8 @@ impl VM {
         args: Args,
     ) -> RuntimeResult {
         // NOTE: We create a call frame for builtin functions mainly
-        //       just to check for too much recursion. Builtin functions
-        //       don't use frame locals, so they're not passed in.
-        self.push_call_frame(&vec![], &[])?;
+        //       just to check for too much recursion.
+        self.push_call_frame()?;
         self.enter_scope();
         if this.is_some() {
             // NOTE: We assign `this` here so that if a user function is
@@ -446,13 +454,13 @@ impl VM {
     }
 
     pub fn call_func(&mut self, func: &Func, this: This, args: Args) -> RuntimeResult {
-        self.push_call_frame(&args, &func.locals)?;
+        self.push_call_frame()?;
         self.enter_scope();
         if let Some(this_var) = this {
             self.ctx.declare_and_assign_var("this", this_var)?;
         }
         self.check_call_args(func.name.as_str(), &func.params, &args)?;
-        self.execute(&func.code)?;
+        self.execute(&func.code, Some((&func.params, &args)))?;
         self.exit_scopes(1);
         Ok(())
     }
@@ -479,9 +487,39 @@ impl VM {
             }
         } else {
             let args = create::new_tuple(args.clone());
+            println!("assign $args = {args:?}");
             self.ctx.declare_and_assign_var("$args", args)?;
         }
         Ok(())
+    }
+
+    // Locals ----------------------------------------------------------
+
+    fn find_local(
+        &self,
+        locals: &[(usize, String, ObjectRef)],
+        name: &str,
+    ) -> Option<(usize, String, ObjectRef)> {
+        locals
+            .iter()
+            .rev()
+            .position(|(_, n, _)| name == n)
+            .map(|index| locals[index].clone())
+    }
+
+    fn set_local(
+        &self,
+        locals: &mut [(usize, String, ObjectRef)],
+        depth: &usize,
+        name: &str,
+        val: ObjectRef,
+    ) {
+        let result = locals.iter().rev().position(|(d, n, _)| depth == d && name == n);
+        if let Some(index) = result {
+            locals[index] = (*depth, name.to_string(), val);
+        } else {
+            panic!("Could not set local {name} at depth {depth}");
+        }
     }
 
     // Scopes ----------------------------------------------------------
@@ -522,14 +560,14 @@ impl VM {
         Ok(())
     }
 
+    fn push_local<S: Into<String>>(&mut self, obj: ObjectRef, depth: usize, name: S) {
+        self.push(ValueStackKind::Local(obj, depth, name.into()));
+    }
+
     fn push_var(&mut self, depth: usize, name: String) -> RuntimeResult {
         let obj = self.ctx.get_var_at_depth(depth, name.as_str())?;
         self.push(ValueStackKind::Var(obj, depth, name));
         Ok(())
-    }
-
-    fn push_local(&mut self, obj: ObjectRef, index: usize) {
-        self.push(ValueStackKind::Local(obj, index));
     }
 
     fn push_temp(&mut self, obj: ObjectRef) {
@@ -584,16 +622,12 @@ impl VM {
 
     // Call Stack ------------------------------------------------------
 
-    fn push_call_frame(&mut self, args: &Args, locals: &[ObjectRef]) -> RuntimeResult {
+    fn push_call_frame(&mut self) -> RuntimeResult {
         if self.call_stack.size() == self.max_call_depth {
             return Err(RuntimeErr::new_recursion_depth_exceeded(self.max_call_depth));
         }
         let stack_position = self.value_stack.size();
-        let mut all_locals = args.clone();
-        for local in locals {
-            all_locals.push(local.clone());
-        }
-        let frame = CallFrame::new(stack_position, all_locals);
+        let frame = CallFrame::new(stack_position);
         self.call_stack.push(frame);
         Ok(())
     }
@@ -603,15 +637,6 @@ impl VM {
             Some(frame) => Ok(frame),
             None => Err(RuntimeErr::new(RuntimeErrKind::EmptyCallStack)),
         }
-    }
-
-    fn store_local(&mut self, obj: ObjectRef, index: usize) -> RuntimeResult {
-        // XXX: We have to pop the frame and put it back in order to
-        //      mutate it. There's probably a better way to handle this.
-        let mut frame = self.pop_call_frame()?;
-        frame.set_local(obj, index);
-        self.call_stack.push(frame);
-        Ok(())
     }
 
     // Utilities -------------------------------------------------------

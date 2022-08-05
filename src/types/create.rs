@@ -89,10 +89,9 @@ pub fn new_func<S: Into<String>>(
     name: S,
     params: Option<Vec<S>>,
     code: Code,
-    locals: Vec<ObjectRef>,
 ) -> ObjectRef {
     let params = collect_params(params);
-    Arc::new(RwLock::new(Func::new(name, params, code, locals)))
+    Arc::new(RwLock::new(Func::new(name, params, code)))
 }
 
 pub fn new_int<I: Into<BigInt>>(value: I) -> ObjectRef {

@@ -47,13 +47,9 @@ fn format_inst(code: &Code, inst: &Inst) -> String {
         ScopeStart => align("SCOPE_START", "->"),
         ScopeEnd => align("SCOPE_END", ""),
         DeclareVar(name) => align("DECLARE_VAR", name),
+        AssignLocal(depth, name) => align("ASSIGN_LOCAL", format!("{name} @ {depth}")),
         AssignVar(name) => align("ASSIGN_VAR", name),
         LoadVar(name) => align("LOAD_VAR", name),
-        StoreLocal(index) => align("STORE_LOCAL", index),
-        LoadLocal(index) => align("LOAD_LOCAL", index),
-        AssignVarAndStoreLocal(name, index) => {
-            align("ASSIGN_VAR_AND_LOAD_LOCAL", format!("{name}|{index}"))
-        }
         Jump(addr, _) => align("JUMP", format!("{addr}",)),
         JumpPushNil(addr, _) => align("JUMP_PUSH_NIL", format!("{addr}",)),
         JumpIf(addr, _) => align("JUMP_IF", format!("{addr}",)),

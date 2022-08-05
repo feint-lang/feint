@@ -468,7 +468,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
                     Token::Equal => {
                         let value = self.expr(infix_prec)?;
                         let end = value.end;
-                        if let Some(_) = lhs.ident_name() {
+                        if lhs.ident_name().is_some() {
                             ast::Expr::new_declaration_and_assignment(
                                 lhs, value, start, end,
                             )
