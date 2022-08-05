@@ -115,7 +115,8 @@ pub enum ExprKind {
     Loop(Box<Expr>, StatementBlock),
     Func(Func),
     Call(Call),
-    Assignment(Ident, Box<Expr>),
+    DeclarationAndAssignment(Box<Expr>, Box<Expr>),
+    Assignment(Box<Expr>, Box<Expr>),
     UnaryOp(UnaryOperator, Box<Expr>),
     UnaryCompareOp(UnaryCompareOperator, Box<Expr>),
     BinaryOp(Box<Expr>, BinaryOperator, Box<Expr>),
@@ -194,13 +195,33 @@ impl Expr {
         Self::new(ExprKind::Ident(ident), start, end)
     }
 
-    pub fn new_assignement(
-        ident: Ident,
-        expr: Expr,
+    pub fn new_declaration_and_assignment(
+        lhs_expr: Expr,
+        value_expr: Expr,
         start: Location,
         end: Location,
     ) -> Self {
-        Self::new(ExprKind::Assignment(ident, Box::new(expr)), start, end)
+        Self::new(
+            ExprKind::DeclarationAndAssignment(
+                Box::new(lhs_expr),
+                Box::new(value_expr),
+            ),
+            start,
+            end,
+        )
+    }
+
+    pub fn new_assignment(
+        lhs_expr: Expr,
+        value_expr: Expr,
+        start: Location,
+        end: Location,
+    ) -> Self {
+        Self::new(
+            ExprKind::Assignment(Box::new(lhs_expr), Box::new(value_expr)),
+            start,
+            end,
+        )
     }
 
     pub fn new_func(
@@ -277,7 +298,14 @@ impl Expr {
         }
     }
 
-    /// Check if expression is an identifier. If so, return its name.
+    /// Check if expression is *any* type of identifier. If so, return
+    /// its name.
+    pub fn ident_name(&self) -> Option<String> {
+        self.is_ident().or(self.is_special_ident()).or(self.is_type_ident())
+    }
+
+    /// Check if expression is a regular identifier. If so, return its
+    /// name.
     pub fn is_ident(&self) -> Option<String> {
         if let ExprKind::Ident(Ident { kind: IdentKind::Ident(name) }) = &self.kind {
             Some(name.clone())
@@ -322,6 +350,9 @@ impl fmt::Debug for ExprKind {
             Self::Literal(literal) => write!(f, "{literal:?}"),
             Self::FormatString(items) => write!(f, "{items:?}"),
             Self::Ident(ident) => write!(f, "{ident:?}"),
+            Self::DeclarationAndAssignment(ident, expr) => {
+                write!(f, "{ident:?} = {expr:?}")
+            }
             Self::Assignment(ident, expr) => write!(f, "{ident:?} = {expr:?}"),
             Self::Block(block) => write!(f, "{block:?}"),
             Self::Conditional(branches, default) => {

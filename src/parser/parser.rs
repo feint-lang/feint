@@ -466,12 +466,14 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
                 lhs = match op_token {
                     // Assignment
                     Token::Equal => {
-                        if let ast::ExprKind::Ident(ident) = lhs.kind {
-                            let value = self.expr(infix_prec)?;
-                            let end = value.end;
-                            ast::Expr::new_assignement(ident, value, start, end)
+                        let value = self.expr(infix_prec)?;
+                        let end = value.end;
+                        if let Some(_) = lhs.ident_name() {
+                            ast::Expr::new_declaration_and_assignment(
+                                lhs, value, start, end,
+                            )
                         } else {
-                            return Err(self.err(ParseErrKind::ExpectedIdent(start)));
+                            ast::Expr::new_assignment(lhs, value, start, end)
                         }
                     }
                     // Call

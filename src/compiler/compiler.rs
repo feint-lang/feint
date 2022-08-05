@@ -135,7 +135,13 @@ impl Visitor {
             Kind::Literal(literal) => self.visit_literal(literal)?,
             Kind::FormatString(items) => self.visit_format_string(items)?,
             Kind::Ident(ident) => self.visit_ident(ident)?,
-            Kind::Assignment(ident, expr) => self.visit_assignment(ident, *expr)?,
+            Kind::DeclarationAndAssignment(lhs_expr, value_expr) => {
+                self.visit_declaration(*lhs_expr.clone())?;
+                self.visit_assignment(*lhs_expr, *value_expr)?
+            }
+            Kind::Assignment(lhs_expr, value_expr) => {
+                self.visit_assignment(*lhs_expr, *value_expr)?
+            }
             Kind::Block(block) => self.visit_block(block)?,
             Kind::Conditional(branches, default) => {
                 self.visit_conditional(branches, default)?
@@ -209,11 +215,7 @@ impl Visitor {
         name_expr: ast::Expr,
     ) -> VisitResult {
         self.visit_expr(obj_expr, None)?;
-        if let Some(name) = name_expr.is_ident() {
-            self.visit_literal(ast::Literal::new_string(name))?;
-        } else if let Some(name) = name_expr.is_special_ident() {
-            self.visit_literal(ast::Literal::new_string(name))?;
-        } else if let Some(name) = name_expr.is_type_ident() {
+        if let Some(name) = name_expr.ident_name() {
             self.visit_literal(ast::Literal::new_string(name))?;
         } else {
             self.visit_expr(name_expr, None)?;
@@ -477,32 +479,40 @@ impl Visitor {
         }
     }
 
-    fn visit_assignment(
-        &mut self,
-        ident: ast::Ident,
-        value_expr: ast::Expr,
-    ) -> VisitResult {
-        use ast::IdentKind::{Ident, SpecialIdent};
-        let name = match ident.kind {
-            Ident(name) => {
-                if name == "this" {
-                    return Err(CompErr::new_cannot_assign_special_ident(name));
-                }
+    fn visit_declaration(&mut self, ident_expr: ast::Expr) -> VisitResult {
+        let name = if let Some(name) = ident_expr.is_ident() {
+            if name == "this" {
+                return Err(CompErr::new_cannot_assign_special_ident(name));
+            }
+            name
+        } else if let Some(name) = ident_expr.is_special_ident() {
+            if name == "$main" && self.scope_tree.in_global_scope() {
                 name
+            } else {
+                return Err(CompErr::new_cannot_assign_special_ident(name));
             }
-            SpecialIdent(name) => {
-                if name == "$main" && self.scope_tree.in_global_scope() {
-                    name
-                } else {
-                    return Err(CompErr::new_cannot_assign_special_ident(name));
-                }
-            }
-            _ => return Err(CompErr::new_expected_ident()),
+        } else if let Some(_name) = ident_expr.is_type_ident() {
+            todo!("Implement custom types")
+        } else {
+            return Err(CompErr::new_expected_ident());
         };
         self.push(Inst::DeclareVar(name.clone()));
-        self.visit_expr(value_expr, Some(name.clone()))?;
-        self.push(Inst::AssignVar(name));
         Ok(())
+    }
+
+    fn visit_assignment(
+        &mut self,
+        lhs_expr: ast::Expr,
+        value_expr: ast::Expr,
+    ) -> VisitResult {
+        // TODO: Allow assignment to attributes
+        if let Some(name) = lhs_expr.ident_name() {
+            self.visit_expr(value_expr, Some(name.clone()))?;
+            self.push(Inst::AssignVar(name));
+            Ok(())
+        } else {
+            Err(CompErr::new_expected_ident())
+        }
     }
 
     fn visit_compare_op(
@@ -523,6 +533,7 @@ impl Visitor {
         op: InplaceOperator,
         expr_b: ast::Expr,
     ) -> VisitResult {
+        // TODO: Allow in place attribute updates
         if expr_a.is_ident().is_none() {
             return Err(CompErr::new_expected_ident());
         }
