@@ -6,10 +6,7 @@ use crate::util::{
 #[derive(Debug, PartialEq)]
 pub enum Inst {
     NoOp,
-
-    // Truncate stack to the specified size, removing excess items from
-    // the top.
-    Truncate(usize),
+    Pop,
 
     // Global constants are shared globally by all code units.
     LoadGlobalConst(usize),

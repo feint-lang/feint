@@ -100,8 +100,8 @@ impl VM {
                 NoOp => {
                     // do nothing
                 }
-                Truncate(size) => {
-                    self.value_stack.truncate(*size);
+                Pop => {
+                    self.pop();
                 }
                 // Constants
                 LoadGlobalConst(index) => {

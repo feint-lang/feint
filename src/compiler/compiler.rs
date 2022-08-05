@@ -96,6 +96,9 @@ impl Visitor {
             Kind::Continue => self.visit_continue()?,
             Kind::Expr(expr) => self.visit_expr(expr, None)?,
         }
+        if self.scope_tree.in_global_scope() {
+            self.push(Inst::Pop);
+        }
         Ok(())
     }
 

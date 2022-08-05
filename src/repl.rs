@@ -144,7 +144,7 @@ impl<'a> Repl<'a> {
                     chunk.push(Inst::AssignVar(var.to_owned()));
                 }
             };
-            chunk.push(Inst::Truncate(0));
+            chunk.push(Inst::Pop);
             let code = Code::with_chunk(chunk);
             if let Err(err) = self.executor.execute_code(code, false) {
                 eprintln!("ERROR: Could not assign or print _:\n{err:?}");

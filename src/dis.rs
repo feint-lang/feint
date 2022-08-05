@@ -24,7 +24,7 @@ fn format_inst(code: &Code, inst: &Inst) -> String {
     use Inst::*;
     match inst {
         NoOp => align("NOOP", "ø"),
-        Truncate(size) => align("TRUNCATE", size),
+        Pop => align("POP", ""),
         LoadGlobalConst(index) => {
             let index = *index;
             let op_code = "LOAD_GLOBAL_CONST";
