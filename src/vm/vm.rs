@@ -53,11 +53,6 @@ pub struct VM {
     // The value stack contains "pointers" to the different value types:
     // constants, vars, temporaries, and return values.
     value_stack: Stack<ValueStackKind>,
-    // The scope stack contains value stack sizes. Each size is the size
-    // that the stack was just before a scope was entered. When a scope
-    // is exited, these sizes are used to truncate the value stack back
-    // to its previous size so that items can be freed.
-    scope_stack: Stack<usize>,
     // Pointer to stack position just before call.
     call_stack: Stack<CallFrame>,
     // Maximum depth of "call stack" (quotes because there's no explicit
@@ -73,13 +68,7 @@ impl Default for VM {
 
 impl VM {
     pub fn new(ctx: RuntimeContext, max_call_depth: CallDepth) -> Self {
-        VM {
-            ctx,
-            value_stack: Stack::new(),
-            scope_stack: Stack::new(),
-            call_stack: Stack::new(),
-            max_call_depth,
-        }
+        VM { ctx, value_stack: Stack::new(), call_stack: Stack::new(), max_call_depth }
     }
 
     /// Execute the specified instructions and return the VM's state. If
@@ -498,33 +487,18 @@ impl VM {
     // Scopes ----------------------------------------------------------
 
     pub fn enter_scope(&mut self) {
-        self.scope_stack.push(self.value_stack.size());
         self.ctx.enter_scope();
     }
 
-    /// When exiting a scope, we first save the top of the stack (which
-    /// is the "return value" of the scope), remove all stack values
-    /// added in the scope, and finally push the scope's "return value"
-    /// back onto the stack. After taking care of the VM stack, the
-    /// scope's namespace is then cleared and removed.
+    /// When exiting a scope, we first ensure the scope left a result
+    /// on the stack (or, at least, that the stack isn't empty) and then
+    /// clear the scope's namespace.
     pub fn exit_scopes(&mut self, count: usize) {
         if count == 0 {
             return;
         }
-        if count > 1 {
-            let drop_count = count - 1;
-            self.scope_stack.truncate(self.scope_stack.size() - drop_count);
-            self.value_stack.truncate(self.value_stack.size() - drop_count);
-        }
-        let return_val = self.pop_obj();
-        if let Some(size) = self.scope_stack.pop() {
-            self.value_stack.truncate(size);
-        } else {
-            panic!("Scope stack unexpectedly empty when exiting scope(s): {count}");
-        };
-        if let Ok(obj) = return_val {
-            self.push_temp(obj);
-        } else {
+        // Ensure the scope left a value on the stack.
+        if self.peek().is_none() {
             panic!("Value stack unexpectedly empty when exiting scope(s): {count}");
         }
         self.ctx.exit_scopes(count);
