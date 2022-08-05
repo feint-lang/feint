@@ -59,16 +59,25 @@ impl Visitor {
             self.push(Inst::LoadVar("$main".to_string()));
             self.push(Inst::Call(argc));
             self.push(Inst::Return);
+            self.push(Inst::Pop);
             self.push(Inst::HaltTop);
         } else {
+            self.push(Inst::Pop);
             self.push(Inst::Halt(0));
         }
         Ok(())
     }
 
     fn visit_statements(&mut self, statements: Vec<ast::Statement>) -> VisitResult {
-        for statement in statements {
-            self.visit_statement(statement)?;
+        let len = statements.len();
+        if len > 0 {
+            let last = len - 1;
+            for (i, statement) in statements.into_iter().enumerate() {
+                self.visit_statement(statement)?;
+                if i != last {
+                    self.push(Inst::Pop);
+                }
+            }
         }
         Ok(())
     }
@@ -95,9 +104,6 @@ impl Visitor {
             Kind::Break(expr) => self.visit_break(expr)?,
             Kind::Continue => self.visit_continue()?,
             Kind::Expr(expr) => self.visit_expr(expr, None)?,
-        }
-        if self.scope_tree.in_global_scope() {
-            self.push(Inst::Pop);
         }
         Ok(())
     }
