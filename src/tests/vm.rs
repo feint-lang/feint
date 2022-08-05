@@ -12,7 +12,7 @@ fn execute_simple_program() {
     code.push_inst(Inst::LoadConst(j));
     code.push_inst(Inst::BinaryOp(BinaryOperator::Add));
     code.push_inst(Inst::Halt(0));
-    if let Ok(result) = vm.execute(&code, None) {
+    if let Ok(result) = vm.execute(&code) {
         assert_eq!(result, VMState::Halted(0));
     }
 }

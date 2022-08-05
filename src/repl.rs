@@ -130,7 +130,7 @@ impl<'a> Repl<'a> {
             let var = "_";
             let mut chunk = vec![Inst::DeclareVar(var.to_owned())];
             match self.executor.vm.peek_obj() {
-                Some(val_ref) => {
+                Ok(val_ref) => {
                     chunk.push(Inst::AssignVar(var.to_owned()));
                     // Print the result if it's not nil
                     let val = &*val_ref.read().unwrap();
@@ -138,7 +138,7 @@ impl<'a> Repl<'a> {
                         eprintln!("{val:?}");
                     }
                 }
-                None => {
+                Err(_) => {
                     // Empty stack (error?)
                     chunk.push(Inst::LoadNil);
                     chunk.push(Inst::AssignVar(var.to_owned()));

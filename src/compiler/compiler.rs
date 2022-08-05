@@ -29,7 +29,6 @@ struct Visitor {
     code: Code,
     scope_tree: ScopeTree,
     scope_depth: usize,
-    locals: Vec<(String, usize)>, // local name, scope depth
     has_main: bool,
     argv: Vec<String>,
 }
@@ -40,7 +39,6 @@ impl Visitor {
             code: Code::new(),
             scope_tree: ScopeTree::new(),
             scope_depth: 0,
-            locals: Vec::new(),
             has_main: false,
             argv,
         }
@@ -75,8 +73,9 @@ impl Visitor {
         if len > 0 {
             let last = len - 1;
             for (i, statement) in statements.into_iter().enumerate() {
+                let is_assignment = statement.is_assignment();
                 self.visit_statement(statement)?;
-                if i != last {
+                if i != last && (!is_assignment || self.scope_tree.in_global_scope()) {
                     self.push(Inst::Pop);
                 }
             }
@@ -200,13 +199,18 @@ impl Visitor {
     }
 
     /// Visit identifier as expression (i.e., not as part of an
-    /// assignment).
+    /// assignment). Whenever possible, we prefer local variables.
     fn visit_ident(&mut self, node: ast::Ident) -> VisitResult {
-        type Kind = ast::IdentKind;
-        match node.kind {
-            Kind::Ident(name) => self.push(Inst::LoadVar(name)),
-            Kind::SpecialIdent(name) => self.push(Inst::LoadVar(name)),
-            Kind::TypeIdent(name) => self.push(Inst::LoadVar(name)),
+        let name = node.name();
+        if self.scope_tree.in_global_scope() {
+            self.push(Inst::LoadVar(name));
+        } else {
+            match self.scope_tree.find_local(name.as_str()) {
+                Some(index) => {
+                    self.push(Inst::LoadLocal(index));
+                }
+                None => self.push(Inst::LoadVar(name)),
+            }
         }
         Ok(())
     }
@@ -365,15 +369,6 @@ impl Visitor {
         } else {
             unreachable!("Block for function contains no statements");
         };
-        if node.params.is_some() {
-            node.params.clone().unwrap().iter().for_each(|nam| {
-                println!("add arg local {nam} for function {name}");
-                visitor.code.add_local(1, nam);
-            });
-        } else {
-            println!("add arg local $args for function {name}");
-            visitor.code.add_local(1, "$args");
-        }
         visitor.push(Inst::ScopeStart);
         visitor.enter_scope(ScopeKind::Func);
         visitor.visit_statements(node.block.statements)?;
@@ -454,7 +449,7 @@ impl Visitor {
         if self.scope_tree.in_global_scope() {
             self.push(Inst::DeclareVar(name));
         } else {
-            self.code.add_local(self.scope_depth, name.as_str());
+            self.scope_tree.add_local(name);
         }
         Ok(())
     }
@@ -467,10 +462,9 @@ impl Visitor {
         // TODO: Allow assignment to attributes
         if let Some(name) = lhs_expr.ident_name() {
             self.visit_expr(value_expr, Some(name.clone()))?;
-            if self.scope_tree.in_global_scope() {
-                self.push(Inst::AssignVar(name));
-            } else {
-                self.push(Inst::AssignLocal(self.scope_depth, name));
+            match self.scope_tree.find_local(name.as_str()) {
+                Some(index) => self.push(Inst::StoreLocal(index)),
+                None => self.push(Inst::AssignVar(name)),
             }
             Ok(())
         } else {
@@ -548,6 +542,10 @@ impl Visitor {
 
     /// Move up to the parent scope of the current scope.
     fn exit_scope(&mut self) {
+        let num_locals = self.scope_tree.num_locals();
+        if num_locals > 0 {
+            self.push(Inst::PopN(num_locals - 1))
+        }
         self.scope_tree.move_up();
         self.scope_depth -= 1;
     }

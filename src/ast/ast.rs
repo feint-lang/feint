@@ -74,6 +74,17 @@ impl Statement {
     pub fn new_expr(expr: Expr, start: Location, end: Location) -> Self {
         Self::new(StatementKind::Expr(expr), start, end)
     }
+
+    /// Check if statement is an assignment. This is used with local
+    /// assignments to skip popping the stack since the stack is used
+    /// to store locals.
+    pub fn is_assignment(&self) -> bool {
+        if let StatementKind::Expr(expr) = &self.kind {
+            expr.is_assignment()
+        } else {
+            false
+        }
+    }
 }
 
 impl fmt::Debug for Statement {
@@ -337,6 +348,11 @@ impl Expr {
             None
         }
     }
+
+    /// Check if expression is an assignment.
+    pub fn is_assignment(&self) -> bool {
+        matches!(self.kind, ExprKind::DeclarationAndAssignment(..))
+    }
 }
 
 impl fmt::Debug for Expr {
@@ -518,6 +534,16 @@ pub enum IdentKind {
 impl Ident {
     pub fn new(kind: IdentKind) -> Self {
         Self { kind }
+    }
+
+    /// Extract and return ident name for all ident types.
+    pub fn name(&self) -> String {
+        let name = match &self.kind {
+            IdentKind::Ident(name) => name,
+            IdentKind::SpecialIdent(name) => name,
+            IdentKind::TypeIdent(name) => name,
+        };
+        name.to_owned()
     }
 
     pub fn new_ident(name: String) -> Self {

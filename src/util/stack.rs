@@ -1,7 +1,7 @@
 use core::iter::Rev;
 use core::slice::Iter;
 use std::fmt;
-use std::ops::Index;
+use std::ops::{Index, IndexMut};
 
 #[derive(Debug)]
 pub struct Stack<T> {
@@ -13,6 +13,12 @@ impl<T> Index<usize> for Stack<T> {
 
     fn index(&self, index: usize) -> &Self::Output {
         &self.storage[index]
+    }
+}
+
+impl<T> IndexMut<usize> for Stack<T> {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.storage[index]
     }
 }
 

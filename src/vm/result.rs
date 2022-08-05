@@ -10,14 +10,27 @@ pub type ExeResult = Result<VMState, RuntimeErr>;
 pub type RuntimeResult = Result<(), RuntimeErr>;
 pub type RuntimeObjResult = Result<ObjectRef, RuntimeErr>;
 pub type RuntimeBoolResult = Result<bool, RuntimeErr>;
+pub type PopResult = Result<ValueStackKind, RuntimeErr>;
+pub type PopNResult = Result<Vec<ValueStackKind>, RuntimeErr>;
 pub type PopObjResult = Result<ObjectRef, RuntimeErr>;
 pub type PopNObjResult = Result<Vec<ObjectRef>, RuntimeErr>;
-pub type PeekObjResult = Option<ObjectRef>;
+pub type PeekResult<'a> = Result<&'a ValueStackKind, RuntimeErr>;
+pub type PeekObjResult = Result<ObjectRef, RuntimeErr>;
 
 #[derive(Debug, PartialEq)]
 pub enum VMState {
     Idle,
     Halted(u8),
+}
+
+#[derive(Clone, Debug)]
+pub enum ValueStackKind {
+    GlobalConstant(ObjectRef, usize),
+    Constant(ObjectRef, usize),
+    Var(ObjectRef, usize, String),
+    Local(ObjectRef, usize),
+    Temp(ObjectRef),
+    ReturnVal(ObjectRef),
 }
 
 // Runtime errors ------------------------------------------------------
@@ -30,6 +43,14 @@ pub struct RuntimeErr {
 impl RuntimeErr {
     pub fn new(kind: RuntimeErrKind) -> Self {
         Self { kind }
+    }
+
+    pub fn new_empty_statck() -> Self {
+        Self::new(RuntimeErrKind::EmptyStack)
+    }
+
+    pub fn new_not_enough_values_on_stack(n: usize) -> Self {
+        Self::new(RuntimeErrKind::NotEnoughValuesOnStack(n))
     }
 
     pub fn new_recursion_depth_exceeded(max_call_depth: CallDepth) -> Self {

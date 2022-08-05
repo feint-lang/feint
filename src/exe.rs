@@ -114,7 +114,7 @@ impl<'a> Executor<'a> {
 
     /// Execute a code (a list of instructions).
     pub fn execute_code(&mut self, code: Code, debug: bool) -> ExeResult {
-        let result = self.vm.execute(&code, None);
+        let result = self.vm.execute(&code);
 
         if debug {
             eprintln!("{:=<79}", "STACK ");

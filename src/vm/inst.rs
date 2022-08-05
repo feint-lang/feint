@@ -6,7 +6,9 @@ use crate::util::{
 #[derive(Debug, PartialEq)]
 pub enum Inst {
     NoOp,
+
     Pop,
+    PopN(usize),
 
     // Global constants are shared globally by all code units.
     LoadGlobalConst(usize),
@@ -22,8 +24,15 @@ pub enum Inst {
     ScopeStart,
     ScopeEnd,
 
+    // Store value at top of stack into local--pop top of stack and
+    // replace local value lower in stack with top of stack value.
+    StoreLocal(usize),
+
+    // Load local value onto top of stack--retrieve local value from
+    // lower in stack and push it to top of stack.
+    LoadLocal(usize),
+
     DeclareVar(String),
-    AssignLocal(usize, String),
     AssignVar(String),
     LoadVar(String),
 

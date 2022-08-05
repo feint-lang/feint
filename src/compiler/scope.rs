@@ -1,6 +1,6 @@
 //! The scope tree keeps track of nested scopes during compilation.
 //! Currently, it's only used resolve jump targets to labels.
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 pub struct ScopeTree {
     storage: Vec<Scope>,
@@ -62,14 +62,64 @@ impl ScopeTree {
         };
     }
 
+    /// Add local var to current scope.
+    pub fn add_local<S: Into<String>>(&mut self, name: S) {
+        let name = name.into();
+        if !self.current().locals.iter().any(|n| &name == n) {
+            self.current_mut().locals.push(name);
+        }
+    }
+
+    /// Number of local vars in current scope (not including ancestors).
+    /// This is used to pop the locals off the stack when exiting a
+    /// scope.
+    pub fn num_locals(&self) -> usize {
+        self.current().locals.len()
+    }
+
+    /// Find a local var in the current scope or any of its ancestor
+    /// scopes. The index returned is a pointer into the stack where
+    /// the local var lives at runtime.
+    pub fn find_local<S: Into<String>>(&self, name: S) -> Option<usize> {
+        let name = name.into();
+        let locals = self.flatten_locals();
+        let count = locals.len();
+        if count == 0 {
+            return None;
+        }
+        let last = count - 1;
+        locals.iter().rev().position(|n| &name == n).map(|i| last - i)
+    }
+
+    /// Flatten locals of current scope and its ancestors. Note that
+    /// the current scope's locals will be at the end and that searching
+    /// for a local needs to be done in reverse order.
+    fn flatten_locals(&self) -> Vec<String> {
+        let mut locals = VecDeque::new();
+        let mut scope = self.current();
+        loop {
+            locals.push_front(scope.locals.clone());
+            if let Some(parent_index) = scope.parent {
+                scope = &self.storage[parent_index];
+            } else {
+                break;
+            }
+        }
+        locals.into_iter().flatten().collect()
+    }
+
     // Add jump target and address to current scope
-    pub fn add_jump(&mut self, name: &str, addr: usize) -> Option<usize> {
-        self.current_mut().jumps.insert(name.to_owned(), addr)
+    pub fn add_jump<S: Into<String>>(&mut self, name: S, addr: usize) -> Option<usize> {
+        self.current_mut().jumps.insert(name.into(), addr)
     }
 
     // Add label name and address to current scope
-    pub fn add_label(&mut self, name: &str, addr: usize) -> Option<usize> {
-        self.current_mut().labels.insert(name.to_owned(), addr)
+    pub fn add_label<S: Into<String>>(
+        &mut self,
+        name: S,
+        addr: usize,
+    ) -> Option<usize> {
+        self.current_mut().labels.insert(name.into(), addr)
     }
 
     // -----------------------------------------------------------------
@@ -119,10 +169,11 @@ pub struct Scope {
     index: usize,
     parent: Option<usize>,
     children: Vec<usize>,
-    /// label name => label inst address
-    labels: HashMap<String, usize>,
+    locals: Vec<String>,
     /// target label name => jump inst address
     jumps: HashMap<String, usize>,
+    /// label name => label inst address
+    labels: HashMap<String, usize>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -139,8 +190,9 @@ impl Scope {
             index,
             parent,
             children: vec![],
-            labels: HashMap::new(),
+            locals: Vec::new(),
             jumps: HashMap::new(),
+            labels: HashMap::new(),
         }
     }
 

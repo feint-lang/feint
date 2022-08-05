@@ -25,6 +25,7 @@ fn format_inst(code: &Code, inst: &Inst) -> String {
     match inst {
         NoOp => align("NOOP", "ø"),
         Pop => align("POP", ""),
+        PopN(n) => align("POP_N", n),
         LoadGlobalConst(index) => {
             let index = *index;
             let op_code = "LOAD_GLOBAL_CONST";
@@ -46,8 +47,9 @@ fn format_inst(code: &Code, inst: &Inst) -> String {
         }
         ScopeStart => align("SCOPE_START", "->"),
         ScopeEnd => align("SCOPE_END", ""),
+        StoreLocal(index) => align("STORE_LOCAL", index),
+        LoadLocal(index) => align("LOAD_LOCAL", index),
         DeclareVar(name) => align("DECLARE_VAR", name),
-        AssignLocal(depth, name) => align("ASSIGN_LOCAL", format!("{name} @ {depth}")),
         AssignVar(name) => align("ASSIGN_VAR", name),
         LoadVar(name) => align("LOAD_VAR", name),
         Jump(addr, _) => align("JUMP", format!("{addr}",)),

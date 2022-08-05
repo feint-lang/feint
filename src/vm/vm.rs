@@ -11,27 +11,18 @@ use crate::util::{
     BinaryOperator, CompareOperator, InplaceOperator, Stack, UnaryCompareOperator,
     UnaryOperator,
 };
+use crate::vm::result::PeekResult;
 
 use super::code::Code;
 use super::context::RuntimeContext;
 use super::inst::Inst;
 use super::result::{
-    CallDepth, ExeResult, PeekObjResult, PopNObjResult, PopObjResult, RuntimeErr,
-    RuntimeErrKind, RuntimeResult, VMState,
+    CallDepth, ExeResult, PeekObjResult, PopNObjResult, PopNResult, PopObjResult,
+    PopResult, RuntimeErr, RuntimeErrKind, RuntimeResult, VMState, ValueStackKind,
 };
 
 pub const DEFAULT_MAX_CALL_DEPTH: CallDepth =
     if cfg!(debug_assertions) { 256 } else { 1024 };
-
-#[derive(Clone, Debug)]
-enum ValueStackKind {
-    GlobalConstant(ObjectRef, usize),
-    Constant(ObjectRef, usize),
-    Var(ObjectRef, usize, String),
-    Local(ObjectRef, usize, String), // val, depth, name
-    Temp(ObjectRef),
-    ReturnVal(ObjectRef),
-}
 
 struct CallFrame {
     _stack_position: usize,
@@ -72,31 +63,12 @@ impl VM {
     /// When a HALT instruction is encountered, the VM's state will be
     /// cleared; it can be "restarted" by passing more instructions to
     /// execute.
-    pub fn execute(
-        &mut self,
-        code: &Code,
-        // Pass this when the unit of code is a user function
-        args: Option<(&Params, &Args)>,
-    ) -> ExeResult {
+    pub fn execute(&mut self, code: &Code) -> ExeResult {
         use Inst::*;
 
         let num_inst = code.len_chunk();
         let mut ip: usize = 0;
         let mut jump_ip = None;
-        let mut locals = code.clone_locals();
-
-        if let Some((params, args)) = args {
-            if let Some(params) = params {
-                for (name, val) in params.iter().zip(args) {
-                    println!("bind {name} to {val:?}");
-                    self.set_local(&mut locals, &1usize, name, val.clone());
-                }
-            } else {
-                // let args = create::new_tuple(args.clone());
-                // println!("bind $args to {args:?}");
-                // self.set_local(&mut locals, &1usize, "$args", args);
-            }
-        }
 
         loop {
             match &code[ip] {
@@ -104,7 +76,10 @@ impl VM {
                     // do nothing
                 }
                 Pop => {
-                    self.pop();
+                    self.pop()?;
+                }
+                PopN(n) => {
+                    self.pop_n(*n)?;
                 }
                 // Constants
                 LoadGlobalConst(index) => {
@@ -129,16 +104,21 @@ impl VM {
                 ScopeEnd => {
                     self.exit_scopes(1);
                 }
-                // Vars (including locals)
+                // Locals
+                StoreLocal(index) => {
+                    let obj = self.peek_obj()?;
+                    self.value_stack[*index] = ValueStackKind::Local(obj, *index);
+                }
+                LoadLocal(index) => {
+                    let kind = self.value_stack[*index].clone();
+                    let obj = self.get_obj(&kind);
+                    self.push_local(obj, *index);
+                }
+                // Vars
                 DeclareVar(name) => {
                     if self.ctx.get_var_in_current_namespace(name).is_err() {
                         self.ctx.declare_var(name.as_str());
                     }
-                }
-                AssignLocal(depth, name) => {
-                    let obj = self.pop_obj()?;
-                    self.set_local(&mut locals, depth, name, obj.clone());
-                    self.push_local(obj, *depth, name);
                 }
                 AssignVar(name) => {
                     let obj = self.pop_obj()?;
@@ -146,12 +126,8 @@ impl VM {
                     self.push_var(depth, name.clone())?;
                 }
                 LoadVar(name) => {
-                    if let Some((depth, name, obj)) = self.find_local(&locals, name) {
-                        self.push_local(obj, depth, name)
-                    } else {
-                        let depth = self.ctx.get_var_depth(name.as_str())?;
-                        self.push_var(depth, name.clone())?;
-                    }
+                    let depth = self.ctx.get_var_depth(name.as_str())?;
+                    self.push_var(depth, name.clone())?;
                 }
                 // Jumps
                 Jump(addr, scope_exit_count) => {
@@ -200,7 +176,7 @@ impl VM {
                     self.handle_compare_op(op)?;
                 }
                 InplaceOp(op) => {
-                    self.handle_inplace_op(op, &mut locals)?;
+                    self.handle_inplace_op(op)?;
                 }
                 // Functions
                 Call(n) => {
@@ -381,39 +357,31 @@ impl VM {
     /// Pop top two operands from stack, apply operation, assign result,
     /// and push temp result value onto stack. The first operand *must*
     /// be a variable.
-    fn handle_inplace_op(
-        &mut self,
-        op: &InplaceOperator,
-        locals: &mut [(usize, String, ObjectRef)],
-    ) -> RuntimeResult {
+    fn handle_inplace_op(&mut self, op: &InplaceOperator) -> RuntimeResult {
         use InplaceOperator::*;
         use ValueStackKind::*;
-        if let Some(kinds) = self.pop_n(2) {
-            let a_kind = kinds.get(0).unwrap();
-            let b = self.get_obj(kinds.get(1).unwrap());
-            let b = b.read().unwrap();
-            if let Var(a, depth, name) = a_kind {
-                let a = a.read().unwrap();
-                let result = match op {
-                    AddEqual => a.add(&*b)?,
-                    SubEqual => a.sub(&*b)?,
-                };
-                self.ctx.assign_var_at_depth(*depth, name.as_str(), result)?;
-                self.push_var(*depth, name.clone())?;
-            } else if let Local(a, depth, name) = a_kind {
-                let a = a.read().unwrap();
-                let result = match op {
-                    AddEqual => a.add(&*b)?,
-                    SubEqual => a.sub(&*b)?,
-                };
-                self.set_local(locals, depth, name, result.clone());
-                self.push_local(result, *depth, name);
-            } else {
-                let message = format!("Binary op: {}", op);
-                return Err(RuntimeErr::new(RuntimeErrKind::ExpectedVar(message)));
-            }
+        let kinds = self.pop_n(2)?;
+        let a_kind = kinds.get(0).unwrap();
+        let b = self.get_obj(kinds.get(1).unwrap());
+        let b = b.read().unwrap();
+        if let Var(a, depth, name) = a_kind {
+            let a = a.read().unwrap();
+            let result = match op {
+                AddEqual => a.add(&*b)?,
+                SubEqual => a.sub(&*b)?,
+            };
+            self.ctx.assign_var_at_depth(*depth, name.as_str(), result)?;
+            self.push_var(*depth, name.clone())?;
+        } else if let Local(a, index) = a_kind {
+            let a = a.read().unwrap();
+            let result = match op {
+                AddEqual => a.add(&*b)?,
+                SubEqual => a.sub(&*b)?,
+            };
+            self.push_and_store_local(result, *index);
         } else {
-            return Err(RuntimeErr::new(RuntimeErrKind::NotEnoughValuesOnStack(2)));
+            let message = format!("Binary op: {}", op);
+            return Err(RuntimeErr::new(RuntimeErrKind::ExpectedVar(message)));
         }
         Ok(())
     }
@@ -460,7 +428,7 @@ impl VM {
             self.ctx.declare_and_assign_var("this", this_var)?;
         }
         self.check_call_args(func.name.as_str(), &func.params, &args)?;
-        self.execute(&func.code, Some((&func.params, &args)))?;
+        self.execute(&func.code)?;
         self.exit_scopes(1);
         Ok(())
     }
@@ -487,39 +455,9 @@ impl VM {
             }
         } else {
             let args = create::new_tuple(args.clone());
-            println!("assign $args = {args:?}");
             self.ctx.declare_and_assign_var("$args", args)?;
         }
         Ok(())
-    }
-
-    // Locals ----------------------------------------------------------
-
-    fn find_local(
-        &self,
-        locals: &[(usize, String, ObjectRef)],
-        name: &str,
-    ) -> Option<(usize, String, ObjectRef)> {
-        locals
-            .iter()
-            .rev()
-            .position(|(_, n, _)| name == n)
-            .map(|index| locals[index].clone())
-    }
-
-    fn set_local(
-        &self,
-        locals: &mut [(usize, String, ObjectRef)],
-        depth: &usize,
-        name: &str,
-        val: ObjectRef,
-    ) {
-        let result = locals.iter().rev().position(|(d, n, _)| depth == d && name == n);
-        if let Some(index) = result {
-            locals[index] = (*depth, name.to_string(), val);
-        } else {
-            panic!("Could not set local {name} at depth {depth}");
-        }
     }
 
     // Scopes ----------------------------------------------------------
@@ -536,7 +474,7 @@ impl VM {
             return;
         }
         // Ensure the scope left a value on the stack.
-        if self.peek().is_none() {
+        if self.peek().is_err() {
             panic!("Value stack unexpectedly empty when exiting scope(s): {count}");
         }
         self.ctx.exit_scopes(count);
@@ -560,8 +498,13 @@ impl VM {
         Ok(())
     }
 
-    fn push_local<S: Into<String>>(&mut self, obj: ObjectRef, depth: usize, name: S) {
-        self.push(ValueStackKind::Local(obj, depth, name.into()));
+    fn push_local(&mut self, obj: ObjectRef, index: usize) {
+        self.push(ValueStackKind::Local(obj, index));
+    }
+
+    fn push_and_store_local(&mut self, obj: ObjectRef, index: usize) {
+        self.value_stack[index] = ValueStackKind::Local(obj.clone(), index);
+        self.push_local(obj, index);
     }
 
     fn push_var(&mut self, depth: usize, name: String) -> RuntimeResult {
@@ -578,34 +521,41 @@ impl VM {
         self.push(ValueStackKind::ReturnVal(obj));
     }
 
-    fn pop(&mut self) -> Option<ValueStackKind> {
-        self.value_stack.pop()
+    fn pop(&mut self) -> PopResult {
+        match self.value_stack.pop() {
+            Some(kind) => Ok(kind),
+            None => Err(RuntimeErr::new_empty_statck()),
+        }
     }
 
     fn pop_obj(&mut self) -> PopObjResult {
-        match self.pop() {
-            Some(kind) => Ok(self.get_obj(&kind)),
-            None => Err(RuntimeErr::new(RuntimeErrKind::EmptyStack)),
-        }
+        let kind = self.pop()?;
+        Ok(self.get_obj(&kind))
     }
 
-    fn pop_n(&mut self, n: usize) -> Option<Vec<ValueStackKind>> {
-        self.value_stack.pop_n(n)
+    fn pop_n(&mut self, n: usize) -> PopNResult {
+        match self.value_stack.pop_n(n) {
+            Some(kinds) => Ok(kinds),
+            None => Err(RuntimeErr::new_not_enough_values_on_stack(n)),
+        }
     }
 
     fn pop_n_obj(&mut self, n: usize) -> PopNObjResult {
-        match self.pop_n(n) {
-            Some(kinds) => Ok(kinds.iter().map(|k| self.get_obj(k)).collect()),
-            None => Err(RuntimeErr::new(RuntimeErrKind::NotEnoughValuesOnStack(n))),
+        let kinds = self.pop_n(n)?;
+        let objects = kinds.iter().map(|k| self.get_obj(k)).collect();
+        Ok(objects)
+    }
+
+    fn peek(&self) -> PeekResult {
+        match self.value_stack.peek() {
+            Some(kind) => Ok(kind),
+            None => Err(RuntimeErr::new_empty_statck()),
         }
     }
 
-    fn peek(&self) -> Option<&ValueStackKind> {
-        self.value_stack.peek()
-    }
-
     pub fn peek_obj(&mut self) -> PeekObjResult {
-        self.peek().map(|kind| self.get_obj(kind))
+        let kind = self.peek()?;
+        Ok(self.get_obj(kind))
     }
 
     fn get_obj(&self, kind: &ValueStackKind) -> ObjectRef {
