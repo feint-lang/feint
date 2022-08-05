@@ -108,21 +108,17 @@ impl<'a> Executor<'a> {
             dis::dis(&code);
             Ok(VMState::Halted(0))
         } else {
-            self.execute_code(code)
+            self.execute_code(code, self.debug)
         }
     }
 
     /// Execute a code (a list of instructions).
-    pub fn execute_code(&mut self, code: Code) -> ExeResult {
+    pub fn execute_code(&mut self, code: Code, debug: bool) -> ExeResult {
         let result = self.vm.execute(&code);
 
-        if self.debug {
+        if debug {
             eprintln!("{:=<79}", "STACK ");
             self.vm.display_stack();
-            eprintln!("\n{:=<79}", "CONSTANTS ");
-            self.vm.display_constants();
-            eprintln!("\n{:=<79}", "VARS ");
-            self.vm.display_vars();
             eprintln!("\n{:=<79}", "VM STATE ");
             eprintln!("{:?}", result);
         }

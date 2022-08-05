@@ -100,7 +100,6 @@ impl<'a> Repl<'a> {
                 eprintln!(".help  -> show help");
                 eprintln!(".exit  -> exit");
                 eprintln!(".stack -> show VM stack (top first)");
-                eprintln!(".constants -> show constants");
                 eprintln!(".emacs -> switch to emacs-style input (default)");
                 eprintln!(".vi    -> switch to vi-style input");
                 eprintln!("{:=>72}", "");
@@ -113,14 +112,6 @@ impl<'a> Repl<'a> {
             ".exit" | ".quit" => return Some(Ok(None)),
             ".stack" => {
                 self.executor.vm.display_stack();
-                return None;
-            }
-            ".constants" => {
-                self.executor.vm.display_constants();
-                return None;
-            }
-            ".vars" => {
-                self.executor.vm.display_vars();
                 return None;
             }
             ".emacs" => {
@@ -155,7 +146,7 @@ impl<'a> Repl<'a> {
             };
             chunk.push(Inst::Truncate(0));
             let code = Code::with_chunk(chunk);
-            if let Err(err) = self.executor.execute_code(code) {
+            if let Err(err) = self.executor.execute_code(code, false) {
                 eprintln!("ERROR: Could not assign or print _:\n{err:?}");
             }
             return self.vm_state_to_exit_result(vm_state);

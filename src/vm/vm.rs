@@ -653,24 +653,4 @@ impl VM {
             eprintln!("{:0>8} {:?}", i, obj);
         }
     }
-
-    /// Show constants.
-    pub fn display_constants(&self) {
-        for (index, obj) in self.ctx.iter_constants().enumerate() {
-            let obj = obj.read().unwrap();
-            eprintln!("{index:0>8} {obj}");
-        }
-    }
-
-    /// Show vars.
-    pub fn display_vars(&self) {
-        let mut entries = self.ctx.iter_vars().collect::<Vec<_>>();
-        entries.sort_by_key(|(n, _)| n.as_str());
-        for (name, obj) in entries.iter() {
-            let obj = obj.read().unwrap();
-            if obj.module_name() != "builtins" {
-                eprintln!("{name} = {obj}");
-            }
-        }
-    }
 }
