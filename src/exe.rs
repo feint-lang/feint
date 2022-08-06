@@ -118,12 +118,17 @@ impl<'a> Executor<'a> {
             dis::dis(&code);
             Ok(VMState::Halted(0))
         } else {
-            self.execute_code(code, self.debug)
+            self.execute_code(code, self.debug, source)
         }
     }
 
     /// Execute a code (a list of instructions).
-    pub fn execute_code(&mut self, code: Code, debug: bool) -> ExeResult {
+    pub fn execute_code<T: BufRead>(
+        &mut self,
+        code: Code,
+        debug: bool,
+        source: &mut Source<T>,
+    ) -> ExeResult {
         let result = self.vm.execute(&code);
 
         if debug {
@@ -134,7 +139,10 @@ impl<'a> Executor<'a> {
         }
 
         result.map_err(|err| {
-            self.print_err_line(0, "<line not available (TODO)>");
+            let start = self.vm.loc.0;
+            let line =
+                source.get_line(start.line).unwrap_or("<source line not available>");
+            self.print_err_line(start.line, line);
             self.handle_runtime_err(&err);
             ExeErr::new(ExeErrKind::RuntimeErr(err.kind))
         })
@@ -146,10 +154,16 @@ impl<'a> Executor<'a> {
         eprintln!("\n  Error in {file_name} on line {line_no}:\n\n    |\n    |{line}");
     }
 
-    fn print_err_message(&self, message: String, loc: Location) {
+    fn print_err_message(&self, message: String, start: Location, end: Location) {
         if !message.is_empty() {
-            let marker_loc = if loc.col == 0 { 0 } else { loc.col - 1 };
-            eprintln!("    |{:>marker_loc$}^\n\n  {}\n", "", message);
+            let start_pos = if start.col == 0 { 0 } else { start.col - 1 };
+            let marker = if start == end {
+                format!("{:>start_pos$}^", "")
+            } else {
+                let end_pos = if end.col == 0 { 0 } else { end.col - start.col };
+                format!("{:>start_pos$}^{:^>end_pos$}", "", "")
+            };
+            eprintln!("    |{marker}\n\n  {message}\n");
         }
     }
 
@@ -215,7 +229,7 @@ impl<'a> Executor<'a> {
                 format!("Unhandled scan error at {loc}: {kind:?}")
             }
         };
-        self.print_err_message(message, loc);
+        self.print_err_message(message, loc, loc);
     }
 
     fn ignore_parse_err(&self, err: &ParseErr) -> bool {
@@ -271,7 +285,7 @@ impl<'a> Executor<'a> {
             SyntaxErr(loc) => (*loc, format!("Syntax error at {loc}",)),
             kind => (Location::new(0, 0), format!("Unhandled parse error: {:?}", kind)),
         };
-        self.print_err_message(message, loc);
+        self.print_err_message(message, loc, loc);
     }
 
     fn handle_comp_err(&self, err: &CompErr) {
@@ -304,6 +318,7 @@ impl<'a> Executor<'a> {
 
     fn handle_runtime_err(&self, err: &RuntimeErr) {
         use RuntimeErrKind::*;
+        let (start, end) = self.vm.loc;
         let message = match &err.kind {
             RecursionDepthExceeded(max_call_depth) => {
                 format!("Maximum recursion depth of {max_call_depth} was exceeded")
@@ -328,6 +343,6 @@ impl<'a> Executor<'a> {
             NotCallable(type_name) => format!("Object is not callable: {type_name}"),
             kind => format!("Unhandled runtime error: {:?}", kind),
         };
-        eprintln!("    |\n\n  {}", message);
+        self.print_err_message(message, start, end);
     }
 }

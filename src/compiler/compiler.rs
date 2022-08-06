@@ -75,6 +75,7 @@ impl Visitor {
             let in_global_scope = self.scope_tree.in_global_scope();
             for (i, statement) in statements.into_iter().enumerate() {
                 let is_assignment = statement.is_assignment();
+                self.push(Inst::StatementStart(statement.start, statement.end));
                 self.visit_statement(statement)?;
                 if i != last && (in_global_scope || !is_assignment) {
                     self.push(Inst::Pop);

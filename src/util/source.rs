@@ -56,13 +56,13 @@ pub fn source_from_stdin() -> Source<BufReader<io::Stdin>> {
 /// - Panics when lines are too long.
 pub struct Source<T: BufRead> {
     stream: Take<T>,
-    /// String buffer the source reader reads into.
+    /// String buffer the source reader reads lines into.
     buffer: String,
     /// The queue of characters for the current line.
     queue: VecDeque<char>,
     pub line_no: usize,
     pub col: usize,
-    pub current_line: Option<String>,
+    pub lines: Vec<String>,
     pub current_char: Option<char>,
     // Indicates whether a newline was added because the source didn't
     // end with one.
@@ -77,7 +77,7 @@ impl<T: BufRead> Source<T> {
             queue: VecDeque::with_capacity(INITIAL_CAPACITY),
             line_no: 0,
             col: 0,
-            current_line: None,
+            lines: Vec::with_capacity(INITIAL_CAPACITY),
             current_char: None,
             newline_added: false,
         };
@@ -85,12 +85,19 @@ impl<T: BufRead> Source<T> {
         source
     }
 
-    pub fn get_current_line(&self) -> Option<&str> {
-        if let Some(line) = &self.current_line {
+    pub fn get_line(&self, line_no: usize) -> Option<&str> {
+        if line_no == 0 {
+            return None;
+        }
+        if let Some(line) = &self.lines.get(line_no - 1) {
             Some(line.as_str())
         } else {
             None
         }
+    }
+
+    pub fn get_current_line(&self) -> Option<&str> {
+        self.lines.last().map(|line| line.as_str())
     }
 
     fn fill_queue(&mut self) {
@@ -108,7 +115,7 @@ impl<T: BufRead> Source<T> {
                     self.line_no += 1;
                     self.col = 0;
                     // Store unmodified copy of current line.
-                    self.current_line = Some(self.buffer.clone());
+                    self.lines.push(self.buffer.clone());
                     self.queue.extend(self.buffer.chars());
                     if self.queue.back() == Some(&'\n') {
                         if self.queue.len() > 1 {
@@ -175,7 +182,7 @@ impl<T: BufRead> Iterator for Source<T> {
 }
 
 /// Represents a line and column in the source.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Location {
     pub line: usize,
     pub col: usize,

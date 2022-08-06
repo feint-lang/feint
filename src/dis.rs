@@ -38,6 +38,11 @@ fn format_inst(code: &Code, inst: &Inst) -> String {
         LoadNil => align("LOAD_NIL", "nil"),
         LoadTrue => align("LOAD_TRUE", "true"),
         LoadFalse => align("LOAD_FALSE", "false"),
+        ScopeStart => align("SCOPE_START", "->"),
+        ScopeEnd => align("SCOPE_END", ""),
+        StatementStart(start, end) => {
+            align("STATEMENT_START", format!("{start} -> {end}"))
+        }
         LoadConst(index) => {
             let constant = match code.get_const(*index) {
                 Ok(obj) => obj.read().unwrap().to_string(),
@@ -45,8 +50,6 @@ fn format_inst(code: &Code, inst: &Inst) -> String {
             };
             align("LOAD_CONST", format!("{index} ({constant})"))
         }
-        ScopeStart => align("SCOPE_START", "->"),
-        ScopeEnd => align("SCOPE_END", ""),
         StoreLocal(index) => align("STORE_LOCAL", index),
         LoadLocal(index) => align("LOAD_LOCAL", index),
         DeclareVar(name) => align("DECLARE_VAR", name),

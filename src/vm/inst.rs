@@ -1,5 +1,5 @@
 use crate::util::{
-    BinaryOperator, CompareOperator, InplaceOperator, UnaryCompareOperator,
+    BinaryOperator, CompareOperator, InplaceOperator, Location, UnaryCompareOperator,
     UnaryOperator,
 };
 
@@ -18,11 +18,13 @@ pub enum Inst {
     LoadTrue,  // 1
     LoadFalse, // 2
 
-    // Other constants are local to a given code unit.
-    LoadConst(usize),
-
     ScopeStart,
     ScopeEnd,
+
+    StatementStart(Location, Location),
+
+    // Other constants are local to a given code unit.
+    LoadConst(usize),
 
     // Store value at top of stack into local--pop top of stack and
     // replace local value lower in stack with top of stack value.

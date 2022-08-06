@@ -8,8 +8,8 @@ use crate::types::{
     create, Args, BuiltinFunc, Func, ObjectRef, ObjectTraitExt, Params, This,
 };
 use crate::util::{
-    BinaryOperator, CompareOperator, InplaceOperator, Stack, UnaryCompareOperator,
-    UnaryOperator,
+    BinaryOperator, CompareOperator, InplaceOperator, Location, Stack,
+    UnaryCompareOperator, UnaryOperator,
 };
 use crate::vm::result::PeekResult;
 
@@ -49,8 +49,10 @@ pub struct VM {
     call_stack: Stack<CallFrame>,
     call_stack_size: usize,
     // Maximum depth of "call stack" (quotes because there's no explicit
-    // call stack)
+    // call stack).
     max_call_depth: CallDepth,
+    // The location of the current statement. Used for error reporting.
+    pub loc: (Location, Location),
 }
 
 impl Default for VM {
@@ -68,6 +70,7 @@ impl VM {
             call_stack: Stack::with_capacity(max_call_depth),
             call_stack_size: 0,
             max_call_depth,
+            loc: (Location::default(), Location::default()),
         }
     }
 
@@ -110,15 +113,18 @@ impl VM {
                 LoadFalse => {
                     self.push_global_const(2)?;
                 }
-                LoadConst(index) => {
-                    self.push_const(code, *index)?;
-                }
                 // Scopes
                 ScopeStart => {
                     self.enter_scope();
                 }
                 ScopeEnd => {
                     self.exit_scope();
+                }
+                StatementStart(start, end) => {
+                    self.loc = (*start, *end);
+                }
+                LoadConst(index) => {
+                    self.push_const(code, *index)?;
                 }
                 // Locals
                 StoreLocal(index) => {
