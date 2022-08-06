@@ -53,6 +53,15 @@ pub fn new_nil() -> ObjectRef {
 }
 
 #[inline]
+pub fn new_bool(val: bool) -> ObjectRef {
+    if val {
+        new_true()
+    } else {
+        new_false()
+    }
+}
+
+#[inline]
 pub fn new_true() -> ObjectRef {
     TRUE.clone()
 }
@@ -146,15 +155,6 @@ pub fn new_custom_instance(
 }
 
 // Utilities -------------------------------------------------------
-
-/// Convert Rust bool to builtin Bool object
-pub fn bool_obj_from_bool(value: bool) -> ObjectRef {
-    if value {
-        new_true()
-    } else {
-        new_false()
-    }
-}
 
 /// Collect parameters for function types.
 fn collect_params<S: Into<String>>(params: Option<Vec<S>>) -> Params {

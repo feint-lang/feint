@@ -365,7 +365,7 @@ impl VM {
             AsBool => a.bool_val()?,
             Not => a.not()?,
         };
-        let obj = create::bool_obj_from_bool(result);
+        let obj = create::new_bool(result);
         self.push_temp(obj);
         Ok(())
     }
@@ -434,7 +434,7 @@ impl VM {
             GreaterThan => a.greater_than(b)?,
             GreaterThanOrEqual => a.greater_than(b)? || a.is_equal(b),
         };
-        let obj = create::bool_obj_from_bool(result);
+        let obj = create::new_bool(result);
         self.push_temp(obj);
         Ok(())
     }
