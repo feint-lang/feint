@@ -155,10 +155,10 @@ impl RuntimeContext {
     /// Get the depth of the namespace where the specified var is
     /// defined.
     pub fn get_var_depth(&mut self, name: &str) -> Result<usize, RuntimeErr> {
+        let ns_stack = &self.namespace_stack;
         let mut var_depth = self.current_depth;
         loop {
-            let namespace = &self.namespace_stack[var_depth];
-            if namespace.get_obj(name).is_some() {
+            if ns_stack[var_depth].get_obj(name).is_some() {
                 break Ok(var_depth);
             }
             if var_depth == 0 {

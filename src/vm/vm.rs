@@ -54,6 +54,7 @@ pub struct VM {
     // Call stack. We manually track the size to avoid calling len().
     call_stack: Stack<CallFrame>,
     call_stack_size: usize,
+    call_frame_pointer: usize,
     // Maximum depth of "call stack" (quotes because there's no explicit
     // call stack).
     max_call_depth: CallDepth,
@@ -82,6 +83,7 @@ impl VM {
             value_stack: Stack::with_capacity(max_call_depth * 8),
             call_stack: Stack::with_capacity(max_call_depth),
             call_stack_size: 0,
+            call_frame_pointer: 0,
             max_call_depth,
             loc: (Location::default(), Location::default()),
             handle_sigint: sigint_flag.load(Ordering::Relaxed),
@@ -104,7 +106,7 @@ impl VM {
         let mut sigint_counter = 0u32;
 
         let num_inst = code.len_chunk();
-        let frame_pointer = self.call_frame_pointer();
+        let frame_pointer = self.call_frame_pointer;
         let mut ip: usize = 0;
         let mut jump_ip = None;
 
@@ -544,24 +546,20 @@ impl VM {
         let frame = CallFrame::new(stack_position);
         self.call_stack.push(frame);
         self.call_stack_size += 1;
+        self.call_frame_pointer = stack_position;
         Ok(())
     }
 
     fn pop_call_frame(&mut self) -> Result<CallFrame, RuntimeErr> {
         match self.call_stack.pop() {
             Some(frame) => {
-                self.call_stack_size -= 1;
+                let size = self.call_stack_size - 1;
+                self.call_stack_size = size;
+                self.call_frame_pointer =
+                    if size == 0 { 0 } else { self.call_stack[size - 1].stack_pointer };
                 Ok(frame)
             }
             None => Err(RuntimeErr::new(RuntimeErrKind::EmptyCallStack)),
-        }
-    }
-
-    fn call_frame_pointer(&self) -> usize {
-        if self.call_stack_size == 0 {
-            0
-        } else {
-            self.call_stack[self.call_stack_size - 1].stack_pointer
         }
     }
 
@@ -628,7 +626,7 @@ impl VM {
 
     fn push_and_store_local(&mut self, obj: ObjectRef, index: usize) {
         use ValueStackKind::Local;
-        let frame_pointer = self.call_frame_pointer();
+        let frame_pointer = self.call_frame_pointer;
         self.push_local(obj.clone(), index);
         self.value_stack[frame_pointer + index] = Local(obj, index);
     }

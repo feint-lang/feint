@@ -33,11 +33,7 @@ impl Namespace {
     }
 
     pub fn get_obj(&self, name: &str) -> Option<ObjectRef> {
-        if let Some(obj) = self.objects.get(name) {
-            Some(obj.clone())
-        } else {
-            None
-        }
+        self.objects.get(name).cloned()
     }
 
     /// Add an object, settings its initial value as specified (usually
