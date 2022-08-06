@@ -1,7 +1,7 @@
 //! # FeInt REPL
-use rustyline::config::Configurer;
 use std::path::Path;
 
+use rustyline::config::Configurer;
 use rustyline::error::ReadlineError;
 
 use crate::exe::Executor;
@@ -10,11 +10,12 @@ use crate::result::{ExeErr, ExeErrKind, ExitResult};
 use crate::scanner::ScanErrKind;
 use crate::types::create;
 use crate::util::source_from_text;
-use crate::vm::{Code, Inst, VMState, VM};
+use crate::vm::{Code, Inst, RuntimeContext, VMState, VM};
 
 /// Run FeInt REPL until user exits.
 pub fn run(history_path: Option<&Path>, dis: bool, debug: bool) -> ExitResult {
-    let mut vm = VM::default();
+    let mut vm = VM::new(RuntimeContext::new(), 256);
+    vm.handle_sigint();
     let executor = Executor::new(&mut vm, true, dis, debug);
     let mut repl = Repl::new(history_path, executor);
     repl.run()
@@ -58,8 +59,13 @@ impl<'a> Repl<'a> {
                         None => (),
                     }
                 }
-                // User hit Ctrl-C or Ctrl-D.
-                Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => {
+                // User hit Ctrl-C
+                Err(ReadlineError::Interrupted) => {
+                    println!("Use Ctrl-D or .exit to exit");
+                    self.executor.vm.halt();
+                }
+                // User hit Ctrl-D
+                Err(ReadlineError::Eof) => {
                     self.executor.vm.halt();
                     break Ok(None);
                 }

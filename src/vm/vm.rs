@@ -2,6 +2,12 @@
 //! then, implicitly, goes idle until it's passed some instructions to
 //! execute. After instructions are executed, it goes back into idle
 //! mode.
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
+
+use ctrlc;
 use num_traits::ToPrimitive;
 
 use crate::types::{
@@ -53,7 +59,13 @@ pub struct VM {
     max_call_depth: CallDepth,
     // The location of the current statement. Used for error reporting.
     loc: (Location, Location),
+    // SIGINT (Ctrl-C) handling.
+    handle_sigint: bool, // whether the VM should handle SIGINT
+    sigint_flag: Arc<AtomicBool>, // indicates SIGINT was sent
 }
+
+unsafe impl Send for VM {}
+unsafe impl Sync for VM {}
 
 impl Default for VM {
     fn default() -> Self {
@@ -63,6 +75,7 @@ impl Default for VM {
 
 impl VM {
     pub fn new(ctx: RuntimeContext, max_call_depth: CallDepth) -> Self {
+        let sigint_flag = Arc::new(AtomicBool::new(false));
         VM {
             ctx,
             scope_stack: Stack::with_capacity(max_call_depth),
@@ -71,6 +84,8 @@ impl VM {
             call_stack_size: 0,
             max_call_depth,
             loc: (Location::default(), Location::default()),
+            handle_sigint: sigint_flag.load(Ordering::Relaxed),
+            sigint_flag,
         }
     }
 
@@ -83,6 +98,10 @@ impl VM {
     pub fn execute(&mut self, code: &Code) -> ExeResult {
         use Inst::*;
         use ValueStackKind::Local;
+
+        let handle_sigint = self.handle_sigint;
+        let sigint_flag = self.sigint_flag.clone();
+        let mut sigint_counter = 0u32;
 
         let num_inst = code.len_chunk();
         let frame_pointer = self.call_frame_pointer();
@@ -269,6 +288,18 @@ impl VM {
                 ip += 1;
             }
 
+            if handle_sigint {
+                sigint_counter += 1;
+                // TODO: Maybe use a different value and/or make it
+                //       configurable.
+                if sigint_counter == 1024 {
+                    if sigint_flag.load(Ordering::Relaxed) {
+                        break Ok(VMState::Idle);
+                    }
+                    sigint_counter = 0;
+                }
+            }
+
             if ip == num_inst {
                 break Ok(VMState::Idle);
             }
@@ -282,6 +313,16 @@ impl VM {
 
     pub fn halt(&mut self) {
         // TODO: Not sure what this should do or if it's even needed
+    }
+
+    pub fn handle_sigint(&mut self) {
+        let flag = self.sigint_flag.clone();
+        self.handle_sigint = true;
+        if let Err(err) = ctrlc::set_handler(move || {
+            flag.store(true, Ordering::Relaxed);
+        }) {
+            eprintln!("Could not install SIGINT handler: {err}");
+        }
     }
 
     // Handlers --------------------------------------------------------
