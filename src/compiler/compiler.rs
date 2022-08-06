@@ -14,10 +14,14 @@ use super::scope::{Scope, ScopeKind, ScopeTree};
 // Compiler ------------------------------------------------------------
 
 /// Compile AST to code object.
-pub fn compile(program: ast::Program, argv: Vec<&str>) -> CompResult {
+pub fn compile(
+    program: ast::Program,
+    argv: Vec<&str>,
+    keep_top_on_halt: bool,
+) -> CompResult {
     let argv = argv.into_iter().map(|a| a.to_owned()).collect();
     let mut visitor = Visitor::new(argv);
-    visitor.visit_program(program)?;
+    visitor.visit_program(program, keep_top_on_halt)?;
     Ok(visitor.code)
 }
 
@@ -46,7 +50,11 @@ impl Visitor {
 
     // Visitors --------------------------------------------------------
 
-    fn visit_program(&mut self, node: ast::Program) -> VisitResult {
+    fn visit_program(
+        &mut self,
+        node: ast::Program,
+        keep_top_on_halt: bool,
+    ) -> VisitResult {
         if node.statements.is_empty() {
             self.push(Inst::Halt(0));
             return Ok(());
@@ -66,7 +74,9 @@ impl Visitor {
             self.push(Inst::Pop);
             self.push(Inst::HaltTop);
         } else {
-            self.push(Inst::Pop);
+            if !keep_top_on_halt {
+                self.push(Inst::Pop);
+            }
             self.push(Inst::Halt(0));
         }
         Ok(())

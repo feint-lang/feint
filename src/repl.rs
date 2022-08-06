@@ -8,7 +8,6 @@ use crate::exe::Executor;
 use crate::parser::ParseErrKind;
 use crate::result::{ExeErr, ExeErrKind, ExitResult};
 use crate::scanner::ScanErrKind;
-use crate::types::create;
 use crate::util::source_from_text;
 use crate::vm::{Code, Inst, RuntimeContext, VMState, VM};
 
@@ -16,7 +15,7 @@ use crate::vm::{Code, Inst, RuntimeContext, VMState, VM};
 pub fn run(history_path: Option<&Path>, dis: bool, debug: bool) -> ExitResult {
     let mut vm = VM::new(RuntimeContext::new(), 256);
     vm.install_sigint_handler();
-    let executor = Executor::new(&mut vm, true, dis, debug);
+    let executor = Executor::new(&mut vm, true, true, dis, debug);
     let mut repl = Repl::new(history_path, executor);
     repl.run()
 }
@@ -135,31 +134,30 @@ impl<'a> Repl<'a> {
 
         if let Ok(vm_state) = result {
             // Assign _ to value at top of stack
-            let var = "_";
-            let mut chunk = vec![Inst::DeclareVar(var.to_owned())];
-            let result = match self.executor.vm.peek_obj() {
+            match self.executor.vm.peek_obj() {
                 Ok(val_ref) => {
-                    chunk.push(Inst::AssignVar(var.to_owned()));
                     // Print the result if it's not nil
                     let val = &*val_ref.read().unwrap();
                     if !val.is_nil() {
                         eprintln!("{val:?}");
                     }
-                    val_ref.clone()
+                    // Assign result to _
+                    let var = "_";
+                    let code = Code::with_chunk(vec![
+                        Inst::DeclareVar(var.to_owned()),
+                        Inst::AssignVar(var.to_owned()),
+                        Inst::Pop,
+                    ]);
+                    let source_text = format!("_ = {}", val);
+                    let mut source = source_from_text(source_text.as_str());
+                    let result = self.executor.execute_code(code, false, &mut source);
+                    if let Err(err) = result {
+                        eprintln!("ERROR: Could not assign or print _:\n{err:?}");
+                    }
                 }
-                Err(_) => {
-                    // Empty stack (error?)
-                    chunk.push(Inst::LoadNil);
-                    chunk.push(Inst::AssignVar(var.to_owned()));
-                    create::new_nil()
+                Err(err) => {
+                    eprintln!("ERROR: {err}");
                 }
-            };
-            chunk.push(Inst::Pop);
-            let code = Code::with_chunk(chunk);
-            let source_text = format!("_ = {}", result.read().unwrap());
-            let mut source = source_from_text(source_text.as_str());
-            if let Err(err) = self.executor.execute_code(code, false, &mut source) {
-                eprintln!("ERROR: Could not assign or print _:\n{err:?}");
             }
             return self.vm_state_to_exit_result(vm_state);
         }

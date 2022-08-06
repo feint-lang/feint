@@ -14,20 +14,35 @@ use crate::vm::{Code, RuntimeErr, RuntimeErrKind, VMState, VM};
 pub struct Executor<'a> {
     pub vm: &'a mut VM,
     incremental: bool,
+    keep_top_on_halt: bool,
     dis: bool,
     debug: bool,
     current_file_name: &'a str,
 }
 
 impl<'a> Executor<'a> {
-    pub fn new(vm: &'a mut VM, incremental: bool, dis: bool, debug: bool) -> Self {
-        Self { vm, incremental, dis, debug, current_file_name: "<none>" }
+    pub fn new(
+        vm: &'a mut VM,
+        incremental: bool,
+        keep_top_on_halt: bool,
+        dis: bool,
+        debug: bool,
+    ) -> Self {
+        Self {
+            vm,
+            incremental,
+            keep_top_on_halt,
+            dis,
+            debug,
+            current_file_name: "<none>",
+        }
     }
 
     pub fn default(vm: &'a mut VM) -> Self {
         Self {
             vm,
             incremental: false,
+            keep_top_on_halt: false,
             dis: false,
             debug: false,
             current_file_name: "<default>",
@@ -101,7 +116,7 @@ impl<'a> Executor<'a> {
                 };
             }
         };
-        let code = match compile(program, argv) {
+        let code = match compile(program, argv, self.keep_top_on_halt) {
             Ok(code) => code,
             Err(err) => {
                 if !self.ignore_comp_err(&err) {

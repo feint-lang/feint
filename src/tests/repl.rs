@@ -35,9 +35,10 @@ fn eval_if_with_no_block() {
 }
 
 // Utilities -----------------------------------------------------------
+
 fn eval(input: &str) {
     let mut vm = VM::default();
-    let executor = Executor::new(&mut vm, false, false, false);
+    let executor = Executor::new(&mut vm, false, false, false, false);
     let mut repl = Repl::new(None, executor);
     match repl.eval(input, true) {
         Some(Ok(_)) => assert!(false),
