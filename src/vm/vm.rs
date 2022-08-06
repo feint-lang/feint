@@ -25,22 +25,29 @@ pub const DEFAULT_MAX_CALL_DEPTH: CallDepth =
     if cfg!(debug_assertions) { 256 } else { 1024 };
 
 struct CallFrame {
-    _stack_position: usize,
+    stack_pointer: usize,
 }
 
 impl CallFrame {
-    pub fn new(_stack_position: usize) -> Self {
-        Self { _stack_position }
+    pub fn new(stack_position: usize) -> Self {
+        Self { stack_pointer: stack_position }
     }
 }
 
 pub struct VM {
     pub ctx: RuntimeContext,
+    // The scope stack contains pointers into the value stack. When a
+    // scope is entered, the current, pre-scope stack position is
+    // recorded. When a scope is exited, its corresponding pointer is
+    // used to truncate the value stack, removing all temporaries and
+    // locals introduced by the scope.
+    scope_stack: Stack<usize>,
     // The value stack contains "pointers" to the different value types:
     // constants, vars, temporaries, and return values.
     value_stack: Stack<ValueStackKind>,
-    // Pointer to stack position just before call.
+    // Call stack. We manually track the size to avoid calling len().
     call_stack: Stack<CallFrame>,
+    call_stack_size: usize,
     // Maximum depth of "call stack" (quotes because there's no explicit
     // call stack)
     max_call_depth: CallDepth,
@@ -54,7 +61,14 @@ impl Default for VM {
 
 impl VM {
     pub fn new(ctx: RuntimeContext, max_call_depth: CallDepth) -> Self {
-        VM { ctx, value_stack: Stack::new(), call_stack: Stack::new(), max_call_depth }
+        VM {
+            ctx,
+            scope_stack: Stack::with_capacity(max_call_depth),
+            value_stack: Stack::with_capacity(max_call_depth * 8),
+            call_stack: Stack::with_capacity(max_call_depth),
+            call_stack_size: 0,
+            max_call_depth,
+        }
     }
 
     /// Execute the specified instructions and return the VM's state. If
@@ -65,8 +79,10 @@ impl VM {
     /// execute.
     pub fn execute(&mut self, code: &Code) -> ExeResult {
         use Inst::*;
+        use ValueStackKind::Local;
 
         let num_inst = code.len_chunk();
+        let frame_pointer = self.call_frame_pointer();
         let mut ip: usize = 0;
         let mut jump_ip = None;
 
@@ -102,15 +118,15 @@ impl VM {
                     self.enter_scope();
                 }
                 ScopeEnd => {
-                    self.exit_scopes(1);
+                    self.exit_scope();
                 }
                 // Locals
                 StoreLocal(index) => {
                     let obj = self.peek_obj()?;
-                    self.value_stack[*index] = ValueStackKind::Local(obj, *index);
+                    self.value_stack[frame_pointer + *index] = Local(obj, *index);
                 }
                 LoadLocal(index) => {
-                    let kind = self.value_stack[*index].clone();
+                    let kind = self.value_stack[frame_pointer + index].clone();
                     let obj = self.get_obj(&kind);
                     self.push_local(obj, *index);
                 }
@@ -183,7 +199,8 @@ impl VM {
                     self.handle_call(*n)?;
                 }
                 Return => {
-                    self.call_stack.pop();
+                    // XXX: What should this do, if anything? Currently,
+                    //      it serves only serves as a marker.
                 }
                 // Object construction
                 MakeString(n) => {
@@ -399,8 +416,6 @@ impl VM {
         this: This,
         args: Args,
     ) -> RuntimeResult {
-        // NOTE: We create a call frame for builtin functions mainly
-        //       just to check for too much recursion.
         self.push_call_frame()?;
         self.enter_scope();
         if this.is_some() {
@@ -413,10 +428,7 @@ impl VM {
         self.check_call_args(func.name.as_str(), &func.params, &args)?;
         let return_val = (func.func)(this, args, self)?;
         self.push_return_val(return_val);
-        self.exit_scopes(1);
-        // NOTE: We have to pop the frame for builtin functions since
-        //       they don't exit with a RETURN instruction like user
-        //       functions.
+        self.exit_scope();
         self.pop_call_frame()?;
         Ok(())
     }
@@ -425,11 +437,24 @@ impl VM {
         self.push_call_frame()?;
         self.enter_scope();
         if let Some(this_var) = this {
+            self.push_and_store_local(this_var.clone(), 0);
             self.ctx.declare_and_assign_var("this", this_var)?;
+        } else {
+            self.push_and_store_local(create::new_nil(), 0);
+            self.ctx.declare_and_assign_var("this", create::new_nil())?;
         }
         self.check_call_args(func.name.as_str(), &func.params, &args)?;
+        if func.params.is_some() {
+            for (index, arg) in args.iter().enumerate() {
+                self.push_and_store_local(arg.clone(), index);
+            }
+        } else {
+            let args = create::new_tuple(args);
+            self.push_and_store_local(args, 0);
+        }
         self.execute(&func.code)?;
-        self.exit_scopes(1);
+        self.exit_scope();
+        self.pop_call_frame()?;
         Ok(())
     }
 
@@ -460,24 +485,74 @@ impl VM {
         Ok(())
     }
 
+    // Call Stack ------------------------------------------------------
+
+    fn push_call_frame(&mut self) -> RuntimeResult {
+        if self.call_stack_size == self.max_call_depth {
+            return Err(RuntimeErr::new_recursion_depth_exceeded(self.max_call_depth));
+        }
+        let stack_position = self.value_stack.size();
+        let frame = CallFrame::new(stack_position);
+        self.call_stack.push(frame);
+        self.call_stack_size += 1;
+        Ok(())
+    }
+
+    fn pop_call_frame(&mut self) -> Result<CallFrame, RuntimeErr> {
+        match self.call_stack.pop() {
+            Some(frame) => {
+                self.call_stack_size -= 1;
+                Ok(frame)
+            }
+            None => Err(RuntimeErr::new(RuntimeErrKind::EmptyCallStack)),
+        }
+    }
+
+    fn call_frame_pointer(&self) -> usize {
+        if self.call_stack_size == 0 {
+            0
+        } else {
+            self.call_stack[self.call_stack_size - 1].stack_pointer
+        }
+    }
+
     // Scopes ----------------------------------------------------------
 
-    pub fn enter_scope(&mut self) {
+    fn enter_scope(&mut self) {
+        self.scope_stack.push(self.value_stack.size());
         self.ctx.enter_scope();
     }
 
-    /// When exiting a scope, we first ensure the scope left a result
-    /// on the stack (or, at least, that the stack isn't empty) and then
-    /// clear the scope's namespace.
-    pub fn exit_scopes(&mut self, count: usize) {
-        if count == 0 {
-            return;
-        }
+    /// When exiting a scope, we first save the top of the stack (which
+    /// is the "return value" of the scope), remove all stack values
+    /// added in the scope, including locals, and finally push the
+    /// scope's "return value" back onto the stack. Finally, the scope's
+    /// namespace is then cleared and removed.
+    fn exit_scope(&mut self) {
+        let return_val = self.pop_obj();
+        if let Some(pointer) = self.scope_stack.pop() {
+            self.value_stack.truncate(pointer);
+        } else {
+            panic!("Scope stack unexpectedly empty when exiting scope");
+        };
         // Ensure the scope left a value on the stack.
-        if self.peek().is_err() {
-            panic!("Value stack unexpectedly empty when exiting scope(s): {count}");
+        if let Ok(obj) = return_val {
+            self.push_return_val(obj);
+        } else {
+            panic!("Value stack unexpectedly empty when exiting scope");
         }
-        self.ctx.exit_scopes(count);
+        // Clear scope namespaces.
+        self.ctx.exit_scope();
+    }
+
+    /// This is a convenience for jumping out multiple scopes when
+    /// jumping.
+    fn exit_scopes(&mut self, count: usize) {
+        if count > 0 {
+            for _ in 0..count {
+                self.exit_scope();
+            }
+        }
     }
 
     // Value stack -----------------------------------------------------
@@ -503,8 +578,10 @@ impl VM {
     }
 
     fn push_and_store_local(&mut self, obj: ObjectRef, index: usize) {
-        self.value_stack[index] = ValueStackKind::Local(obj.clone(), index);
-        self.push_local(obj, index);
+        use ValueStackKind::Local;
+        let frame_pointer = self.call_frame_pointer();
+        self.push_local(obj.clone(), index);
+        self.value_stack[frame_pointer + index] = Local(obj, index);
     }
 
     fn push_var(&mut self, depth: usize, name: String) -> RuntimeResult {
@@ -567,25 +644,6 @@ impl VM {
             Local(obj, ..) => obj.clone(),
             Temp(obj) => obj.clone(),
             ReturnVal(obj) => obj.clone(),
-        }
-    }
-
-    // Call Stack ------------------------------------------------------
-
-    fn push_call_frame(&mut self) -> RuntimeResult {
-        if self.call_stack.size() == self.max_call_depth {
-            return Err(RuntimeErr::new_recursion_depth_exceeded(self.max_call_depth));
-        }
-        let stack_position = self.value_stack.size();
-        let frame = CallFrame::new(stack_position);
-        self.call_stack.push(frame);
-        Ok(())
-    }
-
-    fn pop_call_frame(&mut self) -> Result<CallFrame, RuntimeErr> {
-        match self.call_stack.pop() {
-            Some(frame) => Ok(frame),
-            None => Err(RuntimeErr::new(RuntimeErrKind::EmptyCallStack)),
         }
     }
 

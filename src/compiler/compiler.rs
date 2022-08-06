@@ -69,13 +69,14 @@ impl Visitor {
     }
 
     fn visit_statements(&mut self, statements: Vec<ast::Statement>) -> VisitResult {
-        let len = statements.len();
-        if len > 0 {
-            let last = len - 1;
+        let num_statements = statements.len();
+        if num_statements > 0 {
+            let last = num_statements - 1;
+            let in_global_scope = self.scope_tree.in_global_scope();
             for (i, statement) in statements.into_iter().enumerate() {
                 let is_assignment = statement.is_assignment();
                 self.visit_statement(statement)?;
-                if i != last && (!is_assignment || self.scope_tree.in_global_scope()) {
+                if i != last && (in_global_scope || !is_assignment) {
                     self.push(Inst::Pop);
                 }
             }
@@ -231,8 +232,8 @@ impl Visitor {
     }
 
     fn visit_block(&mut self, node: ast::StatementBlock) -> VisitResult {
-        self.push(Inst::ScopeStart);
         self.enter_scope(ScopeKind::Block);
+        self.push(Inst::ScopeStart);
         self.visit_statements(node.statements)?;
         self.push(Inst::ScopeEnd);
         self.exit_scope();
@@ -369,8 +370,17 @@ impl Visitor {
         } else {
             unreachable!("Block for function contains no statements");
         };
-        visitor.push(Inst::ScopeStart);
         visitor.enter_scope(ScopeKind::Func);
+        visitor.push(Inst::ScopeStart);
+        // Add locals for function parameters
+        visitor.scope_tree.add_local("this");
+        if node.params.is_some() {
+            node.params.clone().unwrap().iter().for_each(|name| {
+                visitor.scope_tree.add_local(name);
+            });
+        } else {
+            visitor.scope_tree.add_local("$args");
+        }
         visitor.visit_statements(node.block.statements)?;
         visitor.fix_jumps()?;
         if return_nil {
@@ -550,10 +560,6 @@ impl Visitor {
 
     /// Move up to the parent scope of the current scope.
     fn exit_scope(&mut self) {
-        let num_locals = self.scope_tree.num_locals();
-        if num_locals > 0 {
-            self.push(Inst::PopN(num_locals - 1))
-        }
         self.scope_tree.move_up();
         self.scope_depth -= 1;
     }

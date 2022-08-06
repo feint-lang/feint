@@ -81,12 +81,6 @@ impl RuntimeContext {
         self.current_depth -= 1;
     }
 
-    pub fn exit_scopes(&mut self, count: usize) {
-        for _ in 0..count {
-            self.exit_scope();
-        }
-    }
-
     // Global Constants ------------------------------------------------
     //
     // Global constants are allocated during compilation, are immutable,

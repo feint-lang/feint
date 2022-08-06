@@ -27,6 +27,10 @@ impl<T> Stack<T> {
         Stack { storage: Vec::new() }
     }
 
+    pub fn with_capacity(capacity: usize) -> Self {
+        Stack { storage: Vec::with_capacity(capacity) }
+    }
+
     pub fn push(&mut self, item: T) {
         self.storage.push(item);
     }
@@ -62,6 +66,10 @@ impl<T> Stack<T> {
     #[cfg(test)]
     pub fn clear(&mut self) {
         self.storage.clear()
+    }
+
+    pub fn truncate(&mut self, len: usize) {
+        self.storage.truncate(len)
     }
 
     pub fn iter(&self) -> Rev<Iter<T>> {

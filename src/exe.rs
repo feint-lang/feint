@@ -24,6 +24,16 @@ impl<'a> Executor<'a> {
         Self { vm, incremental, dis, debug, current_file_name: "<none>" }
     }
 
+    pub fn default(vm: &'a mut VM) -> Self {
+        Self {
+            vm,
+            incremental: false,
+            dis: false,
+            debug: false,
+            current_file_name: "<default>",
+        }
+    }
+
     /// Execute source from file.
     pub fn execute_file(&mut self, file_path: &'a str, argv: Vec<&str>) -> ExeResult {
         match source_from_file(file_path) {

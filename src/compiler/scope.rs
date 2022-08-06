@@ -70,13 +70,6 @@ impl ScopeTree {
         }
     }
 
-    /// Number of local vars in current scope (not including ancestors).
-    /// This is used to pop the locals off the stack when exiting a
-    /// scope.
-    pub fn num_locals(&self) -> usize {
-        self.current().locals.len()
-    }
-
     /// Find a local var in the current scope or any of its ancestor
     /// scopes. The index returned is a pointer into the stack where
     /// the local var lives at runtime.
