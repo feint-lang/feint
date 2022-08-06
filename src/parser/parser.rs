@@ -146,7 +146,14 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
         let start = token.start;
         let end = token.end; // Default end location for simple expressions
         let expr = match token.token {
-            LParen => self.parenthesized(start)?,
+            LParen => {
+                let expr = self.parenthesized(start, false)?;
+                if self.peek_token_is_scope_start()? {
+                    self.func(expr, start)?
+                } else {
+                    expr
+                }
+            }
             Nil => ast::Expr::new_nil(start, end),
             True => ast::Expr::new_true(start, end),
             False => ast::Expr::new_false(start, end),
@@ -187,37 +194,35 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
     /// 2. A tuple such as `(1,)` or `(1, 2)`.
     /// 3. One of the above followed by `->`, indicating that the
     ///    parenthesized expression is a function parameter list.
-    fn parenthesized(&mut self, start: Location) -> ExprResult {
+    fn parenthesized(&mut self, start: Location, force_tuple: bool) -> ExprResult {
         use Token::{Comma, RParen};
-        let expr = if self.next_token_is(&RParen)? {
-            // () is parsed as a tuple with 0 items
-            ast::Expr::new_tuple(vec![], start, self.loc())
-        } else {
-            let first_item = self.expr(0)?;
-            if self.peek_token_is(&Comma)? {
-                let mut items = vec![first_item];
-                loop {
-                    if self.next_token_is(&RParen)? {
-                        break;
-                    }
-                    self.expect_token(&Comma)?;
-                    if self.next_token_is(&RParen)? {
-                        break;
-                    }
-                    let item = self.expr(0)?;
-                    items.push(item);
+        if self.next_token_is(&RParen)? {
+            return Ok(ast::Expr::new_tuple(vec![], start, self.loc()));
+        }
+        let first_item = self.expr(0)?;
+        let expr = if self.peek_token_is(&Comma)? {
+            let mut items = vec![first_item];
+            loop {
+                if self.next_token_is(&RParen)? {
+                    break;
                 }
-                ast::Expr::new_tuple(items, start, self.loc())
+                self.expect_token(&Comma)?;
+                if self.next_token_is(&RParen)? {
+                    break;
+                }
+                let item = self.expr(0)?;
+                items.push(item);
+            }
+            ast::Expr::new_tuple(items, start, self.loc())
+        } else {
+            self.expect_token(&RParen)?;
+            if force_tuple {
+                ast::Expr::new_tuple(vec![first_item], start, self.loc())
             } else {
-                self.expect_token(&RParen)?;
                 first_item
             }
         };
-        if self.peek_token_is_scope_start()? {
-            self.func(expr, start)
-        } else {
-            Ok(expr)
-        }
+        Ok(expr)
     }
 
     /// Handle format strings (AKA $ strings).
@@ -418,12 +423,13 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
 
     /// Handle function call.
     fn call(&mut self, callable: ast::Expr, args_start: Location) -> ExprResult {
-        let args = self.parenthesized(args_start)?;
+        let args = self.parenthesized(args_start, true)?;
         let start = callable.start;
         let end = args.end;
-        let args = match args.kind {
-            ast::ExprKind::Tuple(items) => items,
-            _ => vec![args],
+        let args = if let ast::ExprKind::Tuple(items) = args.kind {
+            items
+        } else {
+            panic!("Expected args to be a tuple; got {args:?}");
         };
         Ok(ast::Expr::new_call(callable, args, start, end))
     }
