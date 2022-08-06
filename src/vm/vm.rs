@@ -97,9 +97,6 @@ impl VM {
                 Pop => {
                     self.pop()?;
                 }
-                PopN(n) => {
-                    self.pop_n(*n)?;
-                }
                 // Constants
                 LoadGlobalConst(index) => {
                     self.push_global_const(*index)?;

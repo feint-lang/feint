@@ -115,7 +115,8 @@ impl<'a> Executor<'a> {
             }
         };
         if self.dis {
-            dis::dis(&code);
+            let mut disassembler = dis::Disassembler::new();
+            disassembler.disassemble(&code);
             Ok(VMState::Halted(0))
         } else {
             self.execute_code(code, self.debug, source)

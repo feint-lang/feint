@@ -8,7 +8,6 @@ pub enum Inst {
     NoOp,
 
     Pop,
-    PopN(usize),
 
     // Global constants are shared globally by all code units.
     LoadGlobalConst(usize),

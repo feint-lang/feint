@@ -47,6 +47,10 @@ impl Visitor {
     // Visitors --------------------------------------------------------
 
     fn visit_program(&mut self, node: ast::Program) -> VisitResult {
+        if node.statements.is_empty() {
+            self.push(Inst::Halt(0));
+            return Ok(());
+        }
         self.visit_statements(node.statements)?;
         assert_eq!(self.scope_tree.pointer(), 0);
         self.fix_jumps()?;

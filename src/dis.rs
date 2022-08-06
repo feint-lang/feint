@@ -1,87 +1,122 @@
-use crate::vm::{Code, Inst};
 use std::fmt;
 
-pub fn dis(code: &Code) {
-    for (ip, inst) in code.iter_chunk().enumerate() {
-        println!("{ip:0>4} {}", format_inst(code, inst));
-    }
-    for obj_ref in code.iter_constants() {
-        let obj = obj_ref.read().unwrap();
-        if let Some(func) = obj.down_to_func() {
-            println!();
-            let heading = format!("{func:?} ");
-            println!("{:=<79}", heading);
-            dis(&func.code);
-        }
-    }
+use crate::vm::{Code, Inst};
+
+pub struct Disassembler {
+    curr_line_no: usize,
+    new_line: bool,
 }
 
-fn align<T: fmt::Display>(name: &str, value: T) -> String {
-    format!("{name: <w$}{value:}", w = 32)
-}
+impl Disassembler {
+    pub fn new() -> Self {
+        Self { curr_line_no: 0, new_line: false }
+    }
 
-fn format_inst(code: &Code, inst: &Inst) -> String {
-    use Inst::*;
-    match inst {
-        NoOp => align("NOOP", "ø"),
-        Pop => align("POP", ""),
-        PopN(n) => align("POP_N", n),
-        LoadGlobalConst(index) => {
-            let index = *index;
-            let op_code = "LOAD_GLOBAL_CONST";
-            if (3..=259).contains(&index) {
-                align(op_code, (index - 3).to_string())
+    pub fn disassemble(&mut self, code: &Code) {
+        use Inst::*;
+        let width = 8;
+        let iter = code.iter_chunk().enumerate();
+        println!("{: <width$}    {:<width$}    INSTRUCTION", "LINE", "IP");
+        for (ip, inst) in iter {
+            let line = self.format_inst(code, inst);
+            let line_no = if matches!(inst, Halt(_) | Pop | ScopeStart | ScopeEnd) {
+                println!();
+                "".to_string()
+            } else if self.new_line {
+                println!();
+                self.new_line = false;
+                self.curr_line_no.to_string()
             } else {
-                align(op_code, "[unknown]")
+                "".to_string()
+            };
+            println!("{line_no: <width$}    {ip:0>width$}    {line}");
+        }
+        for obj_ref in code.iter_constants() {
+            let obj = obj_ref.read().unwrap();
+            if let Some(func) = obj.down_to_func() {
+                println!();
+                let heading = format!("{func:?} ");
+                println!("{:=<79}", heading);
+                self.disassemble(&func.code);
             }
         }
-        LoadNil => align("LOAD_NIL", "nil"),
-        LoadTrue => align("LOAD_TRUE", "true"),
-        LoadFalse => align("LOAD_FALSE", "false"),
-        ScopeStart => align("SCOPE_START", "->"),
-        ScopeEnd => align("SCOPE_END", ""),
-        StatementStart(start, end) => {
-            align("STATEMENT_START", format!("{start} -> {end}"))
-        }
-        LoadConst(index) => {
-            let constant = match code.get_const(*index) {
-                Ok(obj) => obj.read().unwrap().to_string(),
-                Err(err) => err.to_string(),
-            };
-            align("LOAD_CONST", format!("{index} ({constant})"))
-        }
-        StoreLocal(index) => align("STORE_LOCAL", index),
-        LoadLocal(index) => align("LOAD_LOCAL", index),
-        DeclareVar(name) => align("DECLARE_VAR", name),
-        AssignVar(name) => align("ASSIGN_VAR", name),
-        LoadVar(name) => align("LOAD_VAR", name),
-        Jump(addr, _) => align("JUMP", format!("{addr}",)),
-        JumpPushNil(addr, _) => align("JUMP_PUSH_NIL", format!("{addr}",)),
-        JumpIf(addr, _) => align("JUMP_IF", format!("{addr}",)),
-        JumpIfNot(addr, _) => align("JUMP_IF_NOT", format!("{addr}",)),
-        JumpIfElse(if_addr, else_addr, _) => {
-            align("JUMP_IF_ELSE", format!("{if_addr} : {else_addr}"))
-        }
-        UnaryOp(op) => align("UNARY_OP", op),
-        UnaryCompareOp(op) => align("UNARY_COMPARE_OP", op),
-        BinaryOp(op) => align("BINARY_OP", op),
-        CompareOp(op) => align("COMPARE_OP", op),
-        InplaceOp(op) => align("INPLACE_OP", op),
-        Call(num_args) => align("CALL", num_args),
-        Return => align("RETURN", ""),
-        MakeString(n) => align("MAKE_STRING", n),
-        MakeTuple(n) => align("MAKE_TUPLE", n),
-        Halt(code) => align("HALT", code),
-        HaltTop => align("HALT_TOP", ""),
-        // None of the following should ever appear in the list. If they
-        // do, something has gone horribly wrong.
-        Placeholder(addr, inst, message) => {
-            let formatted_inst = format_inst(code, inst);
-            align("PLACEHOLDER", format!("{formatted_inst} @ {addr} ({message})"))
-        }
-        BreakPlaceholder(addr, _) => align("PLACEHOLDER", format!("BREAK @ {addr}")),
-        ContinuePlaceholder(addr, _) => {
-            align("PLACEHOLDER", format!("CONTINUE @ {addr}"))
+    }
+
+    /// Align instruction name and any additional data, such as a
+    /// constant index, var name, etc.
+    fn align<T: fmt::Display>(&self, name: &str, value: T) -> String {
+        format!("{name: <w$}{value:}", w = 24)
+    }
+
+    fn format_inst(&mut self, code: &Code, inst: &Inst) -> String {
+        use Inst::*;
+        match inst {
+            NoOp => self.align("NOOP", "ø"),
+            Pop => self.align("POP", ""),
+            LoadGlobalConst(index) => {
+                let index = *index;
+                let op_code = "LOAD_GLOBAL_CONST";
+                if (3..=259).contains(&index) {
+                    self.align(op_code, (index - 3).to_string())
+                } else {
+                    self.align(op_code, "[unknown]")
+                }
+            }
+            LoadNil => self.align("LOAD_NIL", "nil"),
+            LoadTrue => self.align("LOAD_TRUE", "true"),
+            LoadFalse => self.align("LOAD_FALSE", "false"),
+            ScopeStart => self.align("SCOPE_START", "->"),
+            ScopeEnd => self.align("SCOPE_END", ""),
+            StatementStart(start, _) => {
+                self.new_line = true;
+                self.curr_line_no = start.line;
+                self.align("STATEMENT_START", "")
+            }
+            LoadConst(index) => {
+                let constant = match code.get_const(*index) {
+                    Ok(obj) => obj.read().unwrap().to_string(),
+                    Err(err) => err.to_string(),
+                };
+                self.align("LOAD_CONST", format!("{index} ({constant})"))
+            }
+            StoreLocal(index) => self.align("STORE_LOCAL", index),
+            LoadLocal(index) => self.align("LOAD_LOCAL", index),
+            DeclareVar(name) => self.align("DECLARE_VAR", name),
+            AssignVar(name) => self.align("ASSIGN_VAR", name),
+            LoadVar(name) => self.align("LOAD_VAR", name),
+            Jump(addr, _) => self.align("JUMP", format!("{addr}",)),
+            JumpPushNil(addr, _) => self.align("JUMP_PUSH_NIL", format!("{addr}",)),
+            JumpIf(addr, _) => self.align("JUMP_IF", format!("{addr}",)),
+            JumpIfNot(addr, _) => self.align("JUMP_IF_NOT", format!("{addr}",)),
+            JumpIfElse(if_addr, else_addr, _) => {
+                self.align("JUMP_IF_ELSE", format!("{if_addr} : {else_addr}"))
+            }
+            UnaryOp(op) => self.align("UNARY_OP", op),
+            UnaryCompareOp(op) => self.align("UNARY_COMPARE_OP", op),
+            BinaryOp(op) => self.align("BINARY_OP", op),
+            CompareOp(op) => self.align("COMPARE_OP", op),
+            InplaceOp(op) => self.align("INPLACE_OP", op),
+            Call(num_args) => self.align("CALL", num_args),
+            Return => self.align("RETURN", ""),
+            MakeString(n) => self.align("MAKE_STRING", n),
+            MakeTuple(n) => self.align("MAKE_TUPLE", n),
+            Halt(code) => self.align("HALT", code),
+            HaltTop => self.align("HALT_TOP", ""),
+            // None of the following should ever appear in the list. If they
+            // do, something has gone horribly wrong.
+            Placeholder(addr, inst, message) => {
+                let formatted_inst = self.format_inst(code, inst);
+                self.align(
+                    "PLACEHOLDER",
+                    format!("{formatted_inst} @ {addr} ({message})"),
+                )
+            }
+            BreakPlaceholder(addr, _) => {
+                self.align("PLACEHOLDER", format!("BREAK @ {addr}"))
+            }
+            ContinuePlaceholder(addr, _) => {
+                self.align("PLACEHOLDER", format!("CONTINUE @ {addr}"))
+            }
         }
     }
 }
