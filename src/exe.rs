@@ -140,7 +140,7 @@ impl<'a> Executor<'a> {
         }
 
         result.map_err(|err| {
-            let start = self.vm.loc.0;
+            let start = self.vm.loc().0;
             let line =
                 source.get_line(start.line).unwrap_or("<source line not available>");
             self.print_err_line(start.line, line);
@@ -319,7 +319,7 @@ impl<'a> Executor<'a> {
 
     fn handle_runtime_err(&self, err: &RuntimeErr) {
         use RuntimeErrKind::*;
-        let (start, end) = self.vm.loc;
+        let (start, end) = self.vm.loc();
         let message = match &err.kind {
             RecursionDepthExceeded(max_call_depth) => {
                 format!("Maximum recursion depth of {max_call_depth} was exceeded")

@@ -35,7 +35,7 @@ impl CallFrame {
 }
 
 pub struct VM {
-    pub ctx: RuntimeContext,
+    ctx: RuntimeContext,
     // The scope stack contains pointers into the value stack. When a
     // scope is entered, the current, pre-scope stack position is
     // recorded. When a scope is exited, its corresponding pointer is
@@ -52,7 +52,7 @@ pub struct VM {
     // call stack).
     max_call_depth: CallDepth,
     // The location of the current statement. Used for error reporting.
-    pub loc: (Location, Location),
+    loc: (Location, Location),
 }
 
 impl Default for VM {
@@ -273,6 +273,11 @@ impl VM {
                 break Ok(VMState::Idle);
             }
         }
+    }
+
+    /// Get location of current statement (start and end).
+    pub fn loc(&self) -> (Location, Location) {
+        self.loc
     }
 
     pub fn halt(&mut self) {
