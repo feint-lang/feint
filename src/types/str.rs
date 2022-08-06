@@ -24,8 +24,27 @@ pub struct StrType {
 impl StrType {
     pub fn new() -> Self {
         let mut ns = Namespace::new();
+
         ns.add_obj("$name", create::new_str("Str"));
         ns.add_obj("$full_name", create::new_str("builtins.Str"));
+
+        ns.add_obj(
+            "starts_with",
+            create::new_builtin_func(
+                "starts_with",
+                Some(vec!["prefix"]),
+                |this, args, _| {
+                    let this = this.expect("Expected this");
+                    let this = this.read().unwrap();
+                    let this = this.down_to_str().unwrap();
+                    let arg = args.get(0).unwrap();
+                    let arg = arg.read().unwrap();
+                    let arg = arg.down_to_str().unwrap();
+                    Ok(create::new_bool(this.value.starts_with(&arg.value)))
+                },
+            ),
+        );
+
         Self { namespace: ns }
     }
 }
@@ -70,7 +89,10 @@ pub struct Str {
 
 impl Str {
     pub fn new<S: Into<String>>(value: S) -> Self {
-        Self { namespace: Namespace::new(), value: value.into() }
+        let mut ns = Namespace::new();
+        let value = value.into();
+        ns.add_obj("length", create::new_int(value.len()));
+        Self { namespace: ns, value }
     }
 
     pub fn value(&self) -> &str {
