@@ -296,6 +296,7 @@ impl VM {
                 //       configurable.
                 if sigint_counter == 1024 {
                     if sigint_flag.load(Ordering::Relaxed) {
+                        self.handle_sigint();
                         break Ok(VMState::Idle);
                     }
                     sigint_counter = 0;
@@ -308,16 +309,16 @@ impl VM {
         }
     }
 
+    pub fn halt(&mut self) {
+        // TODO: Not sure what this should do or if it's even needed
+    }
+
     /// Get location of current statement (start and end).
     pub fn loc(&self) -> (Location, Location) {
         self.loc
     }
 
-    pub fn halt(&mut self) {
-        // TODO: Not sure what this should do or if it's even needed
-    }
-
-    pub fn handle_sigint(&mut self) {
+    pub fn install_sigint_handler(&mut self) {
         let flag = self.sigint_flag.clone();
         self.handle_sigint = true;
         if let Err(err) = ctrlc::set_handler(move || {
@@ -325,6 +326,22 @@ impl VM {
         }) {
             eprintln!("Could not install SIGINT handler: {err}");
         }
+    }
+
+    fn handle_sigint(&mut self) {
+        self.sigint_flag.store(false, Ordering::Relaxed);
+        self.reset();
+    }
+
+    /// Reset all internal state.
+    fn reset(&mut self) {
+        self.scope_stack.truncate(0);
+        self.value_stack.truncate(0);
+        self.call_stack.truncate(0);
+        self.call_stack_size = 0;
+        self.call_frame_pointer = 0;
+        self.loc = (Location::default(), Location::default());
+        self.ctx.exit_all_scopes();
     }
 
     // Handlers --------------------------------------------------------

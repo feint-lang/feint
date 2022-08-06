@@ -15,7 +15,7 @@ use crate::vm::{Code, Inst, RuntimeContext, VMState, VM};
 /// Run FeInt REPL until user exits.
 pub fn run(history_path: Option<&Path>, dis: bool, debug: bool) -> ExitResult {
     let mut vm = VM::new(RuntimeContext::new(), 256);
-    vm.handle_sigint();
+    vm.install_sigint_handler();
     let executor = Executor::new(&mut vm, true, dis, debug);
     let mut repl = Repl::new(history_path, executor);
     repl.run()

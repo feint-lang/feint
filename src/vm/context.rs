@@ -81,6 +81,12 @@ impl RuntimeContext {
         self.current_depth -= 1;
     }
 
+    pub fn exit_all_scopes(&mut self) {
+        while self.current_depth != 0 {
+            self.exit_scope();
+        }
+    }
+
     // Global Constants ------------------------------------------------
     //
     // Global constants are allocated during compilation, are immutable,
