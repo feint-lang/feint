@@ -531,7 +531,7 @@ impl VM {
         self.assign_call_args(&func.params, &args)?;
         if func.params.is_some() {
             for (index, arg) in args.iter().enumerate() {
-                self.push_and_store_local(arg.clone(), index);
+                self.push_and_store_local(arg.clone(), index + 1);
             }
         } else {
             let args = create::new_tuple(args);
