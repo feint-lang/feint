@@ -102,8 +102,8 @@ impl ScopeTree {
     }
 
     // Add jump target and address to current scope
-    pub fn add_jump<S: Into<String>>(&mut self, name: S, addr: usize) -> Option<usize> {
-        self.current_mut().jumps.insert(name.into(), addr)
+    pub fn add_jump<S: Into<String>>(&mut self, name: S, addr: usize) {
+        self.current_mut().jumps.push((name.into(), addr))
     }
 
     // Add label name and address to current scope
@@ -164,7 +164,7 @@ pub struct Scope {
     children: Vec<usize>,
     locals: Vec<String>,
     /// target label name => jump inst address
-    jumps: HashMap<String, usize>,
+    jumps: Vec<(String, usize)>,
     /// label name => label inst address
     labels: HashMap<String, usize>,
 }
@@ -184,7 +184,7 @@ impl Scope {
             parent,
             children: vec![],
             locals: Vec::new(),
-            jumps: HashMap::new(),
+            jumps: Vec::new(),
             labels: HashMap::new(),
         }
     }
@@ -197,7 +197,7 @@ impl Scope {
         self.children.is_empty()
     }
 
-    pub fn jumps(&self) -> &HashMap<String, usize> {
+    pub fn jumps(&self) -> &Vec<(String, usize)> {
         &self.jumps
     }
 
@@ -212,10 +212,13 @@ impl Scope {
     ) -> Option<(usize, usize)> {
         let jump_addr = match jump_addr {
             Some(addr) => addr,
-            None => match self.jumps.get(name) {
-                Some(addr) => addr,
-                None => panic!("Jump does not exist in scope: {}", name),
-            },
+            None => {
+                if let Some(pos) = self.jumps.iter().position(|(n, _)| n == name) {
+                    &self.jumps[pos].1
+                } else {
+                    panic!("Jump does not exist in scope: {}", name)
+                }
+            }
         };
 
         if let Some(label_addr) = self.labels.get(name) {

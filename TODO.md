@@ -14,7 +14,7 @@
   - [x] Fix `label: <expr>` syntax (this used to work but was broken
     recently)
 - [x] Implement `jump` (jump *forward* to label)
-  - Allow multiple `jump`s to the same label in a given scope
+  - [x] Allow multiple `jump`s to the same label in a given scope
 - [x] Implement conditionals (can be used as ternary too)
 - [x] Implement `match`
 - [ ] Implement range
