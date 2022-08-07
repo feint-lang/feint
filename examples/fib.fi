@@ -10,5 +10,5 @@ fib = (n) ->
         : -> fib(n - 1) + fib(n - 2)
 
 $main = (...) ->
-    n = if $args.length -> Int.new($args.0) else -> 10
     print(fib(n))
+    n = if $args.is_empty() -> 50 else -> Int.new($args.0)

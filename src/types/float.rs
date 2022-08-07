@@ -149,10 +149,6 @@ impl ObjectTrait for Float {
         Ok(create::new_float(-*self.value()))
     }
 
-    fn bool_val(&self) -> RuntimeBoolResult {
-        Ok(*self.value() != 0.0)
-    }
-
     fn is_equal(&self, rhs: &dyn ObjectTrait) -> bool {
         if let Some(rhs) = rhs.down_to_float() {
             self.is(rhs) || self.value() == rhs.value()

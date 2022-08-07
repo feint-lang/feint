@@ -3,7 +3,7 @@ use std::fmt;
 use std::sync::{Arc, RwLock};
 
 use num_bigint::BigInt;
-use num_traits::{FromPrimitive, ToPrimitive, Zero};
+use num_traits::{FromPrimitive, ToPrimitive};
 
 use once_cell::sync::Lazy;
 
@@ -165,10 +165,6 @@ impl ObjectTrait for Int {
 
     fn negate(&self) -> RuntimeObjResult {
         Ok(create::new_int(-self.value.clone()))
-    }
-
-    fn bool_val(&self) -> RuntimeBoolResult {
-        Ok(!self.value().is_zero())
     }
 
     fn is_equal(&self, rhs: &dyn ObjectTrait) -> bool {

@@ -44,6 +44,17 @@ impl TupleType {
 
         ns.add_entry(make_meth!(
             Tuple,
+            is_empty,
+            Some(vec![]) as Option<Vec<&str>>,
+            |this: ObjectRef, _, _| {
+                let this = use_this!(this);
+                let this = this.down_to_tuple().unwrap();
+                Ok(create::new_bool(this.len() == 0))
+            }
+        ));
+
+        ns.add_entry(make_meth!(
+            Tuple,
             map,
             Some(vec!["map_fn"]),
             |this: ObjectRef, args: Args, vm: &mut VM| {

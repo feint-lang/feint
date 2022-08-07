@@ -25,8 +25,8 @@ MIT. See the LICENSE file.
 - Implicit return of last evaluated expression (like Rust); this applies
   to *all* blocks/scopes
 - Custom types can implement operators by defining methods such as `+`
-- Only booleans, numbers, and `nil` can be used in boolean contexts by
-  default; custom types can implement the `!!` operator
+- Only booleans and `nil` can be used in boolean contexts by default;
+  custom types can implement the `!!` operator
 
 ## Memory Management
 
@@ -102,23 +102,22 @@ which may be `nil`.
 
 ## Conditionals
 
-NOTE: By default, only `nil`, booleans, and numbers can be used in
-      boolean contexts. Custom types will be able to define a special
-      property name `!!` to allow instances to be used in boolean
-      contexts.
+NOTE: By default, only booleans and `nil` can be used in boolean
+      contexts. Custom types will be able to define a special property
+      name `!!` to allow instances to be used in boolean contexts.
 
 ```
 # Block style
 if true ->
     true
-else if 0 ->
+else if 0 > 1 ->
     0
 else ->
     false
 
 # Inline style
 if true -> true
-else if 0 -> 0
+else if 0 > 1 -> 0
 else -> false
 
 # Ternary style
