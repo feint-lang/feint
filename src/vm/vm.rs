@@ -682,7 +682,7 @@ impl VM {
         }
     }
 
-    fn pop_obj(&mut self) -> PopObjResult {
+    pub fn pop_obj(&mut self) -> PopObjResult {
         let kind = self.pop()?;
         Ok(self.get_obj(&kind))
     }

@@ -121,11 +121,12 @@ impl ListType {
                 let this = this.down_to_list().unwrap();
                 let map_fn = use_arg!(args, 0);
                 let items = this.items.read().unwrap();
+                let mut results = vec![];
                 for (i, item) in items.iter().enumerate() {
-                    let i = create::new_int(i);
-                    map_fn.call(vec![item.clone(), i], vm)?;
+                    map_fn.call(vec![item.clone(), create::new_int(i)], vm)?;
+                    results.push(vm.pop_obj()?);
                 }
-                Ok(create::new_nil())
+                Ok(create::new_tuple(results))
             }
         ));
 
