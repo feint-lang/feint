@@ -32,12 +32,12 @@ impl TupleType {
         ns.add_obj("$full_name", create::new_str("builtins.Tuple"));
 
         ns.add_entry(make_meth!(
-            List,
+            Tuple,
             length,
             Some(vec![]) as Option<Vec<&str>>,
             |this: ObjectRef, _, _| {
                 let this = use_this!(this);
-                let this = this.down_to_list().unwrap();
+                let this = this.down_to_tuple().unwrap();
                 Ok(create::new_int(this.len()))
             }
         ));
