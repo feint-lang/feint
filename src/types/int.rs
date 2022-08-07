@@ -7,10 +7,11 @@ use num_traits::{FromPrimitive, ToPrimitive, Zero};
 
 use once_cell::sync::Lazy;
 
-use crate::builtin_funcs::int;
-use crate::vm::{RuntimeBoolResult, RuntimeErr, RuntimeObjResult};
+use crate::vm::{RuntimeBoolResult, RuntimeErr, RuntimeObjResult, VM};
 
 use super::create;
+use super::meth::{make_meth, use_arg};
+use super::result::{Args, This};
 use super::util::{eq_int_float, gt_int_float, lt_int_float};
 
 use super::base::{ObjectRef, ObjectTrait, ObjectTraitExt, TypeRef, TypeTrait};
@@ -32,12 +33,31 @@ unsafe impl Sync for IntType {}
 impl IntType {
     pub fn new() -> Self {
         let mut ns = Namespace::new();
+
         ns.add_obj("$name", create::new_str("Int"));
         ns.add_obj("$full_name", create::new_str("builtins.Int"));
-        ns.add_obj(
-            "new",
-            create::new_builtin_func("new", Some(vec!["value"]), int::new),
-        );
+
+        ns.add_entry(make_meth!(
+            IntType,
+            new,
+            Some(vec!["value"]),
+            |_, args: Args, _| {
+                let arg = use_arg!(args, 0);
+                let int = if let Some(val) = arg.get_int_val() {
+                    create::new_int(val.clone())
+                } else if let Some(val) = arg.get_float_val() {
+                    create::new_int(BigInt::from_f64(*val).unwrap())
+                } else if let Some(val) = arg.get_str_val() {
+                    create::new_int_from_string(val)
+                } else {
+                    let message =
+                        format!("Int.new() expected number or string; got {arg}");
+                    return Err(RuntimeErr::new_type_err(message));
+                };
+                Ok(int)
+            }
+        ));
+
         Self { namespace: ns }
     }
 }

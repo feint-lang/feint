@@ -221,12 +221,26 @@ pub trait ObjectTrait {
 
     // Type checkers ---------------------------------------------------
 
+    make_type_checker!(is_type_type, TypeType);
+    make_type_checker!(is_bool_type, BoolType);
+    make_type_checker!(is_bound_func_type, BoundFuncType);
+    make_type_checker!(is_builtin_func_type, BuiltinFuncType);
+    make_type_checker!(is_float_type, FloatType);
+    make_type_checker!(is_func_type, FuncType);
+    make_type_checker!(is_int_type, IntType);
+    make_type_checker!(is_mod_type, ModuleType);
+    make_type_checker!(is_nil_type, NilType);
+    make_type_checker!(is_str_type, StrType);
+    make_type_checker!(is_tuple_type, TupleType);
+
+    make_type_checker!(is_type, Type);
     make_type_checker!(is_bool, Bool);
     make_type_checker!(is_bound_func, BoundFunc);
     make_type_checker!(is_builtin_func, BuiltinFunc);
     make_type_checker!(is_float, Float);
     make_type_checker!(is_func, Func);
     make_type_checker!(is_int, Int);
+    make_type_checker!(is_mod, Module);
     make_type_checker!(is_nil, Nil);
     make_type_checker!(is_str, Str);
     make_type_checker!(is_tuple, Tuple);
@@ -234,6 +248,18 @@ pub trait ObjectTrait {
     // Downcasters -----------------------------------------------------
     //
     // These downcast object refs to their concrete types.
+
+    make_down_to!(down_to_type_type, TypeType);
+    make_down_to!(down_to_bool_type, BoolType);
+    make_down_to!(down_to_bound_func_type, BoundFuncType);
+    make_down_to!(down_to_builtin_func_type, BuiltinFuncType);
+    make_down_to!(down_to_float_type, FloatType);
+    make_down_to!(down_to_func_type, FuncType);
+    make_down_to!(down_to_int_type, IntType);
+    make_down_to!(down_to_mod_type, ModuleType);
+    make_down_to!(down_to_nil_type, NilType);
+    make_down_to!(down_to_str_type, StrType);
+    make_down_to!(down_to_tuple_type, TupleType);
 
     make_down_to!(down_to_type, Type);
     make_down_to!(down_to_bool, Bool);
@@ -243,7 +269,6 @@ pub trait ObjectTrait {
     make_down_to!(down_to_func, Func);
     make_down_to!(down_to_int, Int);
     make_down_to!(down_to_mod, Module);
-    make_down_to!(down_to_ns, Namespace);
     make_down_to!(down_to_nil, Nil);
     make_down_to!(down_to_str, Str);
     make_down_to!(down_to_tuple, Tuple);

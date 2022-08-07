@@ -4,9 +4,11 @@ use std::sync::{Arc, RwLock};
 
 use once_cell::sync::Lazy;
 
-use crate::vm::{RuntimeBoolResult, RuntimeErr, RuntimeObjResult};
+use crate::vm::{RuntimeBoolResult, RuntimeErr, RuntimeObjResult, VM};
 
 use super::create;
+use super::meth::{make_meth, use_arg, use_arg_str, use_this};
+use super::result::{Args, This};
 
 use super::base::{ObjectRef, ObjectTrait, ObjectTraitExt, TypeRef, TypeTrait};
 use super::class::TYPE_TYPE;
@@ -28,22 +30,18 @@ impl StrType {
         ns.add_obj("$name", create::new_str("Str"));
         ns.add_obj("$full_name", create::new_str("builtins.Str"));
 
-        ns.add_obj(
-            "starts_with",
-            create::new_builtin_func(
-                "starts_with",
-                Some(vec!["prefix"]),
-                |this, args, _| {
-                    let this = this.expect("Expected this");
-                    let this = this.read().unwrap();
-                    let this = this.down_to_str().unwrap();
-                    let arg = args.get(0).unwrap();
-                    let arg = arg.read().unwrap();
-                    let arg = arg.down_to_str().unwrap();
-                    Ok(create::new_bool(this.value.starts_with(&arg.value)))
-                },
-            ),
-        );
+        ns.add_entry(make_meth!(
+            Str,
+            starts_with,
+            Some(vec!["prefix"]),
+            |this: ObjectRef, args: Args, _| {
+                let this = use_this!(this);
+                let this = this.down_to_str().unwrap();
+                let arg = use_arg!(args, 0);
+                let prefix = use_arg_str!(arg);
+                Ok(create::new_bool(this.value.starts_with(prefix)))
+            }
+        ));
 
         Self { namespace: ns }
     }

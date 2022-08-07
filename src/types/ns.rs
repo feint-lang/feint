@@ -42,6 +42,13 @@ impl Namespace {
         self.objects.insert(name.into(), obj);
     }
 
+    /// This is a special case of `add_obj` that accepts an "entry"
+    /// instead of a separate name and object, where an "entry" is a
+    /// 2-tuple containing the name and object.
+    pub fn add_entry<S: Into<String>>(&mut self, entry: (S, ObjectRef)) {
+        self.objects.insert(entry.0.into(), entry.1);
+    }
+
     /// Set an object's value. This will only succeed if the object
     /// already exists in the namespace.
     pub fn set_obj(&mut self, name: &str, obj: ObjectRef) -> bool {

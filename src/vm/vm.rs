@@ -492,7 +492,7 @@ impl VM {
             let this_var = this.clone().unwrap().clone();
             self.ctx.declare_and_assign_var("this", this_var)?;
         }
-        self.check_call_args(func.name.as_str(), &func.params, &args)?;
+        self.assign_call_args(&func.params, &args)?;
         let result = (func.func)(this, args, self);
         match result {
             Ok(return_val) => {
@@ -518,7 +518,7 @@ impl VM {
             self.push_and_store_local(create::new_nil(), 0);
             self.ctx.declare_and_assign_var("this", create::new_nil())?;
         }
-        self.check_call_args(func.name.as_str(), &func.params, &args)?;
+        self.assign_call_args(&func.params, &args)?;
         if func.params.is_some() {
             for (index, arg) in args.iter().enumerate() {
                 self.push_and_store_local(arg.clone(), index);
@@ -541,23 +541,10 @@ impl VM {
         }
     }
 
-    /// Check call args to ensure they're valid. If they are, bind them
-    /// to names in the call scope (if `bind` is specified).
-    pub fn check_call_args(
-        &mut self,
-        name: &str,
-        params: &Params,
-        args: &Args,
-    ) -> RuntimeResult {
+    /// Declare and assign vars corresponding to a call's args in the
+    /// call's scope. This makes the args accessible to inner functions.
+    pub fn assign_call_args(&mut self, params: &Params, args: &Args) -> RuntimeResult {
         if let Some(params) = &params {
-            let arity = params.len();
-            let num_args = args.len();
-            if num_args != arity {
-                let ess = if arity == 1 { "" } else { "s" };
-                return Err(RuntimeErr::new_type_err(format!(
-                    "{name}() expected {arity} arg{ess}; got {num_args}"
-                )));
-            }
             for (name, arg) in params.iter().zip(args) {
                 self.ctx.declare_and_assign_var(name, arg.clone())?;
             }

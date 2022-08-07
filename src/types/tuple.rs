@@ -8,7 +8,8 @@ use once_cell::sync::Lazy;
 use crate::vm::{RuntimeErr, VM};
 
 use super::create;
-use super::result::{Args, CallResult, GetAttrResult, This};
+use super::meth::{make_meth, use_arg, use_this};
+use super::result::{Args, GetAttrResult, This};
 
 use super::base::{ObjectRef, ObjectTrait, ObjectTraitExt, TypeRef, TypeTrait};
 use super::class::TYPE_TYPE;
@@ -26,9 +27,26 @@ pub struct TupleType {
 impl TupleType {
     pub fn new() -> Self {
         let mut ns = Namespace::new();
+
         ns.add_obj("$name", create::new_str("Tuple"));
         ns.add_obj("$full_name", create::new_str("builtins.Tuple"));
-        ns.add_obj("map", create::new_builtin_func("map", Some(vec!["map_fn"]), map));
+
+        ns.add_entry(make_meth!(
+            Tuple,
+            map,
+            Some(vec!["map_fn"]),
+            |this: ObjectRef, args: Args, vm: &mut VM| {
+                let this = use_this!(this);
+                let this = this.down_to_tuple().unwrap();
+                let map_fn = use_arg!(args, 0);
+                for (i, item) in this.iter().enumerate() {
+                    let i = create::new_int(i);
+                    map_fn.call(vec![item.clone(), i], vm)?;
+                }
+                Ok(create::new_nil())
+            }
+        ));
+
         Self { namespace: ns }
     }
 }
@@ -153,27 +171,5 @@ impl fmt::Display for Tuple {
 impl fmt::Debug for Tuple {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{self}")
-    }
-}
-
-// Methods -------------------------------------------------------------
-
-pub fn map(this: This, args: Args, vm: &mut VM) -> CallResult {
-    let this = this.expect("Expected this");
-    let this = this.read().unwrap();
-    if let Some(tuple) = this.down_to_tuple() {
-        let map_fn = args.get(0).unwrap();
-        let map_fn = map_fn.read().unwrap();
-        for (i, item) in tuple.iter().enumerate() {
-            let i = create::new_int(i);
-            map_fn.call(vec![item.clone(), i], vm)?;
-        }
-        Ok(create::new_nil())
-    } else {
-        let message = format!(
-            "map() expected a tuple as its first arg; got {:?}",
-            this.type_obj()
-        );
-        Err(RuntimeErr::new_type_err(message))
     }
 }

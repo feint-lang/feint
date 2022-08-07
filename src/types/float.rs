@@ -5,10 +5,11 @@ use std::sync::{Arc, RwLock};
 use num_traits::ToPrimitive;
 use once_cell::sync::Lazy;
 
-use crate::builtin_funcs::float;
-use crate::vm::{RuntimeBoolResult, RuntimeErr, RuntimeObjResult};
+use crate::vm::{RuntimeBoolResult, RuntimeErr, RuntimeObjResult, VM};
 
 use super::create;
+use super::meth::{make_meth, use_arg};
+use super::result::{Args, This};
 use super::util::{eq_int_float, gt_int_float, lt_int_float};
 
 use super::base::{ObjectRef, ObjectTrait, ObjectTraitExt, TypeRef, TypeTrait};
@@ -30,12 +31,31 @@ unsafe impl Sync for FloatType {}
 impl FloatType {
     pub fn new() -> Self {
         let mut ns = Namespace::new();
+
         ns.add_obj("$name", create::new_str("Float"));
         ns.add_obj("$full_name", create::new_str("builtins.Float"));
-        ns.add_obj(
-            "new",
-            create::new_builtin_func("map", Some(vec!["value"]), float::new),
-        );
+
+        ns.add_entry(make_meth!(
+            FloatType,
+            new,
+            Some(vec!["value"]),
+            |_, args: Args, _| {
+                let arg = use_arg!(args, 0);
+                let float = if let Some(val) = arg.get_float_val() {
+                    create::new_float(*val)
+                } else if let Some(val) = arg.get_int_val() {
+                    create::new_float(val.to_f64().unwrap())
+                } else if let Some(val) = arg.get_str_val() {
+                    create::new_float_from_string(val)
+                } else {
+                    let message =
+                        format!("Float new expected string or float; got {arg}");
+                    return Err(RuntimeErr::new_type_err(message));
+                };
+                Ok(float)
+            }
+        ));
+
         Self { namespace: ns }
     }
 }

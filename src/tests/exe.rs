@@ -1,13 +1,16 @@
 use crate::exe::Executor;
-use crate::result::ExeErrKind;
+use crate::result::{ExeErrKind, ExeResult};
 use crate::vm::{RuntimeContext, RuntimeErrKind, VM};
 
-#[test]
-fn test_recursive_func() {
-    let mut vm = VM::new(RuntimeContext::new(), 8);
+fn execute(source: &str) -> ExeResult {
+    let mut vm = VM::new(RuntimeContext::new(), 16);
     let mut exe = Executor::default(&mut vm);
-    let source = "f = () -> f()\nf()";
-    let result = exe.execute_text(source, None);
+    exe.execute_text(source, None)
+}
+
+#[test]
+fn test_too_much_recursion() {
+    let result = execute("f = () -> f()\nf()");
     assert!(result.is_err());
     let err = result.unwrap_err();
     assert!(matches!(
