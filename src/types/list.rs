@@ -52,9 +52,23 @@ impl ListType {
             }
         ));
 
+        // Push item and return it.
         ns.add_entry(make_meth!(
             List,
             push,
+            Some(vec!["item"]),
+            |this: ObjectRef, args: Args, _| {
+                let this = use_this!(this);
+                let this = this.down_to_list().unwrap();
+                let arg = args[0].clone();
+                this.push(arg.clone());
+                Ok(arg)
+            }
+        ));
+
+        ns.add_entry(make_meth!(
+            List,
+            extend,
             None as Option<Vec<&str>>,
             |this: ObjectRef, args: Args, _| {
                 let this = use_this!(this);
@@ -170,6 +184,13 @@ impl List {
     pub fn push(&self, item: ObjectRef) {
         let items = &mut self.items.write().unwrap();
         items.push(item);
+    }
+
+    pub fn extend(&self, new_items: Vec<ObjectRef>) {
+        let items = &mut self.items.write().unwrap();
+        for item in new_items {
+            items.push(item);
+        }
     }
 
     pub fn pop(&self) -> Option<ObjectRef> {

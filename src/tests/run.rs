@@ -58,9 +58,9 @@ mod list {
     }
 
     #[test]
-    fn test_push_many() {
+    fn test_extend() {
         assert_result_is_ok(run_text(
-            "l = []\nl.push(1, 'a', 2, ())\nprint(l.length() == 4)",
+            "l = []\nl.extend(1, 'a', 2, ())\nprint(l.length() == 4)",
         ));
     }
 
