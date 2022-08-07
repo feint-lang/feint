@@ -4,6 +4,8 @@ use std::sync::{Arc, RwLock};
 
 use once_cell::sync::Lazy;
 
+use crate::vm::RuntimeBoolResult;
+
 use super::create;
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
@@ -89,6 +91,10 @@ impl ObjectTrait for Nil {
 
     fn namespace(&self) -> &Namespace {
         &self.namespace
+    }
+
+    fn bool_val(&self) -> RuntimeBoolResult {
+        Ok(false)
     }
 }
 
