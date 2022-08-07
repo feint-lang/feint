@@ -175,7 +175,7 @@ impl VM {
                     jump_ip = Some(*addr);
                 }
                 JumpPushNil(addr, scope_exit_count) => {
-                    self.push_const(code, 0)?;
+                    self.push_global_const(0)?;
                     self.exit_scopes(*scope_exit_count);
                     jump_ip = Some(*addr);
                 }
