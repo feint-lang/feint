@@ -1,0 +1,32 @@
+# Objects are instances of a type
+print("Type of 1:", type_of(1))
+print("ID of 1:", obj_id(1))
+
+# Integers from 0 to 256 are singletons
+print("ID of 1 (same as above):", obj_id(1))
+
+# Types are also objects (singletons)
+print("Type of Type:", type_of(Type))
+print("Type of type of Type:", type_of(type_of((Type))))
+print("ID of type:", obj_id(Type))
+
+# Every object has a unique ID
+print("ID of ID of 1:", obj_id(obj_id(1)))
+print("Type of ID of 1:", type_of(obj_id(1)))
+
+# Create new instances using `new` constructor
+print("Int from '100':", Int.new("100"))
+new = Int.new
+print("Int from reference to Int.new:", new(101))
+
+# Map over tuple
+print("Tuple (1, 2) mapped to print:", (1, 2).map(print))
+print("Tuple (1, 2) mapped to `item * 2`:", (1, 2).map((item, i) -> item * 2))
+
+print()
+
+# Read file as text
+print(read_file("examples/builtins.fi"))
+
+# Read file as lines (and print the first line)
+print(read_file_lines("examples/builtins.fi").0)
