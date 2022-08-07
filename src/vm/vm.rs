@@ -333,14 +333,13 @@ impl VM {
         self.reset();
     }
 
-    /// Reset all internal state.
+    /// Reset internal state.
     fn reset(&mut self) {
         self.scope_stack.truncate(0);
         self.value_stack.truncate(0);
         self.call_stack.truncate(0);
         self.call_stack_size = 0;
         self.call_frame_pointer = 0;
-        self.loc = (Location::default(), Location::default());
         self.ctx.exit_all_scopes();
     }
 
@@ -494,11 +493,19 @@ impl VM {
             self.ctx.declare_and_assign_var("this", this_var)?;
         }
         self.check_call_args(func.name.as_str(), &func.params, &args)?;
-        let return_val = (func.func)(this, args, self)?;
-        self.push_return_val(return_val);
-        self.exit_scope();
-        self.pop_call_frame()?;
-        Ok(())
+        let result = (func.func)(this, args, self);
+        match result {
+            Ok(return_val) => {
+                self.push_return_val(return_val);
+                self.exit_scope();
+                self.pop_call_frame()?;
+                Ok(())
+            }
+            Err(err) => {
+                self.reset();
+                Err(err)
+            }
+        }
     }
 
     pub fn call_func(&mut self, func: &Func, this: This, args: Args) -> RuntimeResult {
@@ -520,10 +527,18 @@ impl VM {
             let args = create::new_tuple(args);
             self.push_and_store_local(args, 0);
         }
-        self.execute(&func.code)?;
-        self.exit_scope();
-        self.pop_call_frame()?;
-        Ok(())
+        let result = self.execute(&func.code);
+        match result {
+            Ok(_) => {
+                self.exit_scope();
+                self.pop_call_frame()?;
+                Ok(())
+            }
+            Err(err) => {
+                self.reset();
+                Err(err)
+            }
+        }
     }
 
     /// Check call args to ensure they're valid. If they are, bind them
@@ -557,6 +572,7 @@ impl VM {
 
     fn push_call_frame(&mut self) -> RuntimeResult {
         if self.call_stack_size == self.max_call_depth {
+            self.reset();
             return Err(RuntimeErr::new_recursion_depth_exceeded(self.max_call_depth));
         }
         let stack_position = self.value_stack.size();

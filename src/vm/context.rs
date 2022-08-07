@@ -116,8 +116,11 @@ impl RuntimeContext {
         namespace.add_obj(name, initial);
     }
 
-    /// Assign value to var. This looks up the var by name in the
-    /// current namespace and updates its value.
+    /// Assign value to var in *current* namespace. This looks up the
+    /// var by name in the current namespace, updates its value, and
+    /// returns the depth of the namespace where the var lives. If the
+    /// var doesn't exist in the current namespace, an error is returned
+    /// instead (indicating an internal error).
     pub fn assign_var(
         &mut self,
         name: &str,
