@@ -32,7 +32,7 @@ function e
     cargo build --release
     for f in examples/*.fi
         echo -n "> $f";
-        ./target/release/feint -m 16 "$f" 1>/dev/null
+        ./target/release/feint "$f" 1>/dev/null
         echo -- " -> $status"
     end
 end
