@@ -44,6 +44,7 @@ pub enum Token {
     Comma, // ,
 
     EqualEqualEqual,    // ===
+    NotEqualEqual,      // !==
     EqualEqual,         // ==
     NotEqual,           // !=
     And,                // &&
@@ -135,6 +136,7 @@ impl Token {
             Self::Comma => ",",
 
             Self::EqualEqualEqual => "===",
+            Self::NotEqualEqual => "!==",
             Self::EqualEqual => "==",
             Self::NotEqual => "!=",
             Self::And => "&&",

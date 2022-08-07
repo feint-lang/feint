@@ -433,6 +433,7 @@ impl VM {
         let b = &*b;
         let result = match op {
             Is => a.is(b),
+            IsNot => !a.is(b),
             IsEqual => a.is_equal(b),
             NotEqual => a.not_equal(b),
             And => a.and(b)?,

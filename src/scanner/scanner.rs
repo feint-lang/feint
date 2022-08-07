@@ -157,6 +157,9 @@ impl<'a, T: BufRead> Scanner<'a, T> {
                 return self.handle_scope_start(start);
             }
             Some(('-', _, _)) => Minus,
+            Some(('!', Some('='), Some('='))) => {
+                self.consume_two_chars_and_return_token(NotEqualEqual)
+            }
             Some(('!', Some('='), _)) => self.consume_char_and_return_token(NotEqual),
             Some(('!', _, _)) => self.handle_bang()?,
             Some(('.', Some('.'), Some('.'))) => {
@@ -414,7 +417,6 @@ impl<'a, T: BufRead> Scanner<'a, T> {
         let loc = Location::new(line, 1);
         let next_level = self.get_next_indent_level()?;
         if next_level > self.indent_level {
-            println!("{loc}");
             return Err(ScanErr::new(ErrKind::UnexpectedIndent(next_level), loc));
         }
         self.set_indent_level(next_level, loc)
