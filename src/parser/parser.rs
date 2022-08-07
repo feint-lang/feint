@@ -154,6 +154,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
                     expr
                 }
             }
+            LBracket => self.list(start)?,
             Nil => ast::Expr::new_nil(start, end),
             True => ast::Expr::new_true(start, end),
             False => ast::Expr::new_false(start, end),
@@ -221,6 +222,33 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
             } else {
                 first_item
             }
+        };
+        Ok(expr)
+    }
+
+    fn list(&mut self, start: Location) -> ExprResult {
+        use Token::{Comma, RBracket};
+        if self.next_token_is(&RBracket)? {
+            return Ok(ast::Expr::new_list(vec![], start, self.loc()));
+        }
+        let first_item = self.expr(0)?;
+        let expr = if self.peek_token_is(&Comma)? {
+            let mut items = vec![first_item];
+            loop {
+                if self.next_token_is(&RBracket)? {
+                    break;
+                }
+                self.expect_token(&Comma)?;
+                if self.next_token_is(&RBracket)? {
+                    break;
+                }
+                let item = self.expr(0)?;
+                items.push(item);
+            }
+            ast::Expr::new_list(items, start, self.loc())
+        } else {
+            self.expect_token(&RBracket)?;
+            ast::Expr::new_list(vec![first_item], start, self.loc())
         };
         Ok(expr)
     }

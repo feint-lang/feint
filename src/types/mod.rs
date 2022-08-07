@@ -17,6 +17,7 @@ mod custom;
 mod float;
 mod func;
 mod int;
+mod list;
 mod meth;
 mod module;
 mod nil;

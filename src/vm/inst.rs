@@ -71,6 +71,7 @@ pub enum Inst {
     // These make compound objects from the top N items on the stack.
     MakeString(usize),
     MakeTuple(usize),
+    MakeList(usize),
 
     Placeholder(usize, Box<Inst>, String),
     BreakPlaceholder(usize, usize), // address, scope depth

@@ -18,6 +18,7 @@ use super::custom::{CustomObj, CustomType};
 use super::float::Float;
 use super::func::Func;
 use super::int::Int;
+use super::list::List;
 use super::module::Module;
 use super::nil::Nil;
 use super::ns::Namespace;
@@ -122,6 +123,10 @@ pub fn new_int_from_string<S: Into<String>>(value: S) -> ObjectRef {
         let value = BigInt::from_f64(value).unwrap();
         new_int(value)
     }
+}
+
+pub fn new_list(items: Vec<ObjectRef>) -> ObjectRef {
+    Arc::new(RwLock::new(List::new(items)))
 }
 
 pub fn new_module<S: Into<String>>(name: S, ns: Namespace) -> Arc<RwLock<Module>> {

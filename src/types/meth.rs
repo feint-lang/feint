@@ -52,6 +52,7 @@ macro_rules! make_meth {
                     "FloatType" => this.is_float_type(),
                     "FuncType" => this.is_func_type(),
                     "IntType" => this.is_int_type(),
+                    "ListType" => this.is_list_type(),
                     "ModuleType" => this.is_mod_type(),
                     "NilType" => this.is_nil_type(),
                     "StrType" => this.is_str_type(),
@@ -65,6 +66,7 @@ macro_rules! make_meth {
                     "Float" => this.is_float(),
                     "Func" => this.is_func(),
                     "Int" => this.is_int(),
+                    "List" => this.is_list(),
                     "Module" => this.is_mod(),
                     "Nil" => this.is_nil(),
                     "Str" => this.is_str(),
@@ -148,7 +150,19 @@ macro_rules! use_arg_str {
     }};
 }
 
+macro_rules! use_arg_usize {
+    ( $arg:ident ) => {{
+        if let Some(val) = $arg.get_usize_val() {
+            val
+        } else {
+            let msg = format!("Expected index; got {}", $arg.class().read().unwrap());
+            return Err(RuntimeErr::new_type_err(msg));
+        }
+    }};
+}
+
 pub(crate) use make_meth;
 pub(crate) use use_arg;
 pub(crate) use use_arg_str;
+pub(crate) use use_arg_usize;
 pub(crate) use use_this;

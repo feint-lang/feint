@@ -32,6 +32,17 @@ impl TupleType {
         ns.add_obj("$full_name", create::new_str("builtins.Tuple"));
 
         ns.add_entry(make_meth!(
+            List,
+            length,
+            Some(vec![]) as Option<Vec<&str>>,
+            |this: ObjectRef, _, _| {
+                let this = use_this!(this);
+                let this = this.down_to_list().unwrap();
+                Ok(create::new_int(this.len()))
+            }
+        ));
+
+        ns.add_entry(make_meth!(
             Tuple,
             map,
             Some(vec!["map_fn"]),
@@ -91,9 +102,7 @@ pub struct Tuple {
 
 impl Tuple {
     pub fn new(items: Vec<ObjectRef>) -> Self {
-        let mut ns = Namespace::new();
-        ns.add_obj("length", create::new_int(items.len()));
-        Self { namespace: ns, items }
+        Self { namespace: Namespace::new(), items }
     }
 
     pub fn iter(&self) -> Iter<'_, ObjectRef> {

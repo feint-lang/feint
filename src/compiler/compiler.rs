@@ -149,6 +149,7 @@ impl Visitor {
         type Kind = ast::ExprKind;
         match node.kind {
             Kind::Tuple(items) => self.visit_tuple(items)?,
+            Kind::List(items) => self.visit_list(items)?,
             Kind::Literal(literal) => self.visit_literal(literal)?,
             Kind::FormatString(items) => self.visit_format_string(items)?,
             Kind::Ident(ident) => self.visit_ident(ident)?,
@@ -179,6 +180,13 @@ impl Visitor {
         let num_items = items.len();
         self.visit_exprs(items)?;
         self.push(Inst::MakeTuple(num_items));
+        Ok(())
+    }
+
+    fn visit_list(&mut self, items: Vec<ast::Expr>) -> VisitResult {
+        let num_items = items.len();
+        self.visit_exprs(items)?;
+        self.push(Inst::MakeList(num_items));
         Ok(())
     }
 

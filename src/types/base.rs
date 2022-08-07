@@ -20,6 +20,7 @@ use super::custom::{CustomObj, CustomType};
 use super::float::{Float, FloatType};
 use super::func::{Func, FuncType};
 use super::int::{Int, IntType};
+use super::list::{List, ListType};
 use super::module::{Module, ModuleType};
 use super::nil::{Nil, NilType};
 use super::ns::Namespace;
@@ -80,7 +81,7 @@ macro_rules! make_down_to {
 /// used only for types that have a simple inner value that's exposed
 /// through a `value()` method.
 macro_rules! make_value_extractor {
-    ( $func:ident, $ty:ty, $val_ty:ty, $op:ident) => {
+    ( $func:ident, $ty:ty, $val_ty:ty ) => {
         fn $func(&self) -> Option<$val_ty> {
             self.as_any().downcast_ref::<$ty>().map(|obj| obj.value())
         }
@@ -228,6 +229,7 @@ pub trait ObjectTrait {
     make_type_checker!(is_float_type, FloatType);
     make_type_checker!(is_func_type, FuncType);
     make_type_checker!(is_int_type, IntType);
+    make_type_checker!(is_list_type, ListType);
     make_type_checker!(is_mod_type, ModuleType);
     make_type_checker!(is_nil_type, NilType);
     make_type_checker!(is_str_type, StrType);
@@ -240,6 +242,7 @@ pub trait ObjectTrait {
     make_type_checker!(is_float, Float);
     make_type_checker!(is_func, Func);
     make_type_checker!(is_int, Int);
+    make_type_checker!(is_list, List);
     make_type_checker!(is_mod, Module);
     make_type_checker!(is_nil, Nil);
     make_type_checker!(is_str, Str);
@@ -255,6 +258,7 @@ pub trait ObjectTrait {
     make_down_to!(down_to_builtin_func_type, BuiltinFuncType);
     make_down_to!(down_to_float_type, FloatType);
     make_down_to!(down_to_func_type, FuncType);
+    make_down_to!(down_to_list_type, ListType);
     make_down_to!(down_to_int_type, IntType);
     make_down_to!(down_to_mod_type, ModuleType);
     make_down_to!(down_to_nil_type, NilType);
@@ -268,6 +272,7 @@ pub trait ObjectTrait {
     make_down_to!(down_to_float, Float);
     make_down_to!(down_to_func, Func);
     make_down_to!(down_to_int, Int);
+    make_down_to!(down_to_list, List);
     make_down_to!(down_to_mod, Module);
     make_down_to!(down_to_nil, Nil);
     make_down_to!(down_to_str, Str);
@@ -277,9 +282,10 @@ pub trait ObjectTrait {
     //
     // These extract the inner value from an object.
 
-    make_value_extractor!(get_float_val, Float, &f64, clone);
-    make_value_extractor!(get_int_val, Int, &BigInt, clone);
-    make_value_extractor!(get_str_val, Str, &str, to_owned);
+    make_value_extractor!(get_bool_val, Bool, &bool);
+    make_value_extractor!(get_float_val, Float, &f64);
+    make_value_extractor!(get_int_val, Int, &BigInt);
+    make_value_extractor!(get_str_val, Str, &str);
 
     fn get_usize_val(&self) -> Option<usize> {
         if let Some(int) = self.get_int_val() {
@@ -424,6 +430,7 @@ impl fmt::Display for dyn ObjectTrait {
             FloatType,
             FuncType,
             IntType,
+            ListType,
             ModuleType,
             NilType,
             StrType,
@@ -440,6 +447,7 @@ impl fmt::Display for dyn ObjectTrait {
             Float,
             Func,
             Int,
+            List,
             Module,
             Nil,
             Str,
@@ -462,6 +470,7 @@ impl fmt::Debug for dyn ObjectTrait {
             FloatType,
             FuncType,
             IntType,
+            ListType,
             ModuleType,
             NilType,
             StrType,
@@ -478,6 +487,7 @@ impl fmt::Debug for dyn ObjectTrait {
             Float,
             Func,
             Int,
+            List,
             Module,
             Nil,
             Str,

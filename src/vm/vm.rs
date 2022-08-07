@@ -246,6 +246,15 @@ impl VM {
                     let tuple = create::new_tuple(items);
                     self.push_temp(tuple);
                 }
+                MakeList(n) => {
+                    let objects = self.pop_n_obj(*n)?;
+                    let mut items = vec![];
+                    for obj in objects {
+                        items.push(obj.clone());
+                    }
+                    let list = create::new_list(items);
+                    self.push_temp(list);
+                }
                 // Placeholders
                 Placeholder(addr, inst, message) => {
                     self.halt();

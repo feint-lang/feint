@@ -2,7 +2,7 @@ use crate::result::ExitResult;
 use crate::run;
 
 fn run_text(source: &str) -> ExitResult {
-    run::run_text(source, 16, false, true)
+    run::run_text(source, 16, false, false)
 }
 
 fn assert_result_is_ok(result: ExitResult) {
@@ -22,6 +22,15 @@ mod basics {
     }
 }
 
+mod float {
+    use super::*;
+
+    #[test]
+    fn test_new() {
+        assert_result_is_ok(run_text("Float.new(1)"));
+    }
+}
+
 mod int {
     use super::*;
 
@@ -31,12 +40,33 @@ mod int {
     }
 }
 
-mod float {
+mod list {
     use super::*;
 
     #[test]
-    fn test_new() {
-        assert_result_is_ok(run_text("Float.new(1)"));
+    fn test_equal() {
+        assert_result_is_ok(run_text("print([] == [])"));
+        assert_result_is_ok(run_text("print([1] == [1.0])"));
+        assert_result_is_ok(run_text("print([1, 'a'] == [1, 'a'])"));
+    }
+
+    #[test]
+    fn test_push() {
+        assert_result_is_ok(run_text(
+            "l = []\nl.push(1)\nl.push('a')\nprint(l.length() == 2)",
+        ));
+    }
+
+    #[test]
+    fn test_push_many() {
+        assert_result_is_ok(run_text(
+            "l = []\nl.push(1, 'a', 2, ())\nprint(l.length() == 4)",
+        ));
+    }
+
+    #[test]
+    fn test_pop() {
+        assert_result_is_ok(run_text("l = [1]\nl.pop()\nprint(l.length() == 0)"));
     }
 }
 

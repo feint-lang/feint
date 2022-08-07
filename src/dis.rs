@@ -100,6 +100,7 @@ impl Disassembler {
             Return => self.align("RETURN", ""),
             MakeString(n) => self.align("MAKE_STRING", n),
             MakeTuple(n) => self.align("MAKE_TUPLE", n),
+            MakeList(n) => self.align("MAKE_LIST", n),
             Halt(code) => self.align("HALT", code),
             HaltTop => self.align("HALT_TOP", ""),
             // None of the following should ever appear in the list. If they

@@ -118,6 +118,7 @@ pub struct Expr {
 #[derive(Clone, PartialEq)]
 pub enum ExprKind {
     Tuple(Vec<Expr>),
+    List(Vec<Expr>),
     Literal(Literal),
     FormatString(Vec<Expr>),
     Ident(Ident),
@@ -142,6 +143,10 @@ impl Expr {
 
     pub fn new_tuple(items: Vec<Expr>, start: Location, end: Location) -> Self {
         Self::new(ExprKind::Tuple(items), start, end)
+    }
+
+    pub fn new_list(items: Vec<Expr>, start: Location, end: Location) -> Self {
+        Self::new(ExprKind::List(items), start, end)
     }
 
     fn new_literal(literal: Literal, start: Location, end: Location) -> Self {
@@ -364,7 +369,8 @@ impl fmt::Debug for Expr {
 impl fmt::Debug for ExprKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Tuple(items) => write!(f, "{items:?}"),
+            Self::Tuple(items) => write!(f, "({items:?})"),
+            Self::List(items) => write!(f, "[{items:?}]"),
             Self::Literal(literal) => write!(f, "{literal:?}"),
             Self::FormatString(items) => write!(f, "{items:?}"),
             Self::Ident(ident) => write!(f, "{ident:?}"),

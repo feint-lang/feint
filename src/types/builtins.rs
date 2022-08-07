@@ -14,6 +14,7 @@ use super::class::TYPE_TYPE;
 use super::float::FLOAT_TYPE;
 use super::func::FUNC_TYPE;
 use super::int::INT_TYPE;
+use super::list::LIST_TYPE;
 use super::module::{Module, MODULE_TYPE};
 use super::nil::NIL_TYPE;
 use super::ns::Namespace;
@@ -31,6 +32,7 @@ pub static BUILTINS: Lazy<Arc<RwLock<Module>>> = Lazy::new(|| {
     ns.add_obj("Func", FUNC_TYPE.clone());
     ns.add_obj("Float", FLOAT_TYPE.clone());
     ns.add_obj("Int", INT_TYPE.clone());
+    ns.add_obj("List", LIST_TYPE.clone());
     ns.add_obj("Module", MODULE_TYPE.clone());
     ns.add_obj("Nil", NIL_TYPE.clone());
     ns.add_obj("Str", STR_TYPE.clone());
