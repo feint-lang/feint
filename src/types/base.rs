@@ -82,7 +82,7 @@ macro_rules! make_down_to {
 macro_rules! make_value_extractor {
     ( $func:ident, $ty:ty, $val_ty:ty, $op:ident) => {
         fn $func(&self) -> Option<$val_ty> {
-            self.as_any().downcast_ref::<$ty>().map(|obj| obj.value().$op())
+            self.as_any().downcast_ref::<$ty>().map(|obj| obj.value())
         }
     };
 }
@@ -252,9 +252,9 @@ pub trait ObjectTrait {
     //
     // These extract the inner value from an object.
 
-    make_value_extractor!(get_float_val, Float, f64, clone);
-    make_value_extractor!(get_int_val, Int, BigInt, clone);
-    make_value_extractor!(get_str_val, Str, String, to_owned);
+    make_value_extractor!(get_float_val, Float, &f64, clone);
+    make_value_extractor!(get_int_val, Int, &BigInt, clone);
+    make_value_extractor!(get_str_val, Str, &str, to_owned);
 
     fn get_usize_val(&self) -> Option<usize> {
         if let Some(int) = self.get_int_val() {

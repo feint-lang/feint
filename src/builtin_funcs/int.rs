@@ -8,9 +8,9 @@ pub fn new(_this: This, args: Args, _vm: &mut VM) -> CallResult {
     let arg = args.get(0).unwrap();
     let arg = arg.read().unwrap();
     let int = if let Some(val) = arg.get_int_val() {
-        create::new_int(val)
+        create::new_int(val.clone())
     } else if let Some(val) = arg.get_float_val() {
-        create::new_int(BigInt::from_f64(val).unwrap())
+        create::new_int(BigInt::from_f64(*val).unwrap())
     } else if let Some(val) = arg.get_str_val() {
         create::new_int_from_string(val)
     } else {
