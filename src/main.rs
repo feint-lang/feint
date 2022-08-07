@@ -49,7 +49,7 @@ fn main() -> ExitCode {
                 .long("max-call-depth")
                 .default_value(default_max_call_depth.as_str())
                 .value_parser(value_parser!(CallDepth))
-                .help("Maximum call/recursion depth [1024]"),
+                .help("Maximum call/recursion depth"),
         )
         .arg(
             Arg::new("dis")

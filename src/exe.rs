@@ -314,7 +314,10 @@ impl<'a> Executor<'a> {
                 format!("label not found in scope: {name}")
             }
             CannotJumpOutOfFunc(name) => {
-                format!("Cannot jump out of function: label {name} not found or defined in outer scope")
+                format!(
+                    "Cannot jump out of function: label {name} not found or defined in \
+                    outer scope"
+                )
             }
             DuplicateLabelInScope(name) => {
                 format!("duplicate label in scope: {name}")
@@ -337,7 +340,10 @@ impl<'a> Executor<'a> {
         let (start, end) = self.vm.loc();
         let message = match &err.kind {
             RecursionDepthExceeded(max_call_depth) => {
-                format!("Maximum recursion depth of {max_call_depth} was exceeded")
+                format!(
+                    "Maximum recursion depth of {max_call_depth} was exceeded; use the \
+                    --max-call-depth option to raise the limit"
+                )
             }
             NameErr(message) => format!("Name error: {message}"),
             TypeErr(message) => format!("Type error: {message}"),
