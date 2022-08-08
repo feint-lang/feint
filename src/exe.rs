@@ -5,7 +5,7 @@ use crate::compiler::{compile, CompErr, CompErrKind};
 use crate::dis;
 use crate::parser::{ParseErr, ParseErrKind, Parser};
 use crate::result::{ExeErr, ExeErrKind, ExeResult};
-use crate::scanner::{ScanErr, ScanErrKind, Scanner, Token};
+use crate::scanner::{ScanErr, ScanErrKind, Scanner, Token, TokenWithLocation};
 use crate::util::{
     source_from_file, source_from_stdin, source_from_text, Location, Source,
 };
@@ -105,9 +105,10 @@ impl<'a> Executor<'a> {
                     }
                     _ => {
                         if !self.ignore_parse_err(&err) {
+                            let loc = self.get_parse_err_loc(&err);
                             self.print_err_line(
-                                source.line_no,
-                                source.get_current_line().unwrap_or("<none>"),
+                                loc.line,
+                                source.get_line(loc.line).unwrap_or("<none>"),
                             );
                             self.handle_parse_err(&err);
                         }
@@ -248,6 +249,29 @@ impl<'a> Executor<'a> {
         self.print_err_message(message, loc, loc);
     }
 
+    fn get_parse_err_loc(&self, err: &ParseErr) -> Location {
+        use ParseErrKind::*;
+        let loc = match &err.kind {
+            MismatchedBracket(loc) => loc,
+            SyntaxErr(loc) => loc,
+            ExpectedBlock(loc) => loc,
+            ExpectedExpr(loc) => loc,
+            ExpectedIdent(loc) => loc,
+            ExpectedOperand(loc) => loc,
+            ExpectedToken(loc, _) => loc,
+            UnexpectedBlock(loc) => loc,
+            UnexpectedToken(twl) => &twl.start,
+            UnexpectedBreak(loc) => loc,
+            UnexpectedContinue(loc) => loc,
+            InlineMatchNotAllowed(loc) => loc,
+            MatchDefaultMustBeLast(loc) => loc,
+            ScanErr(_) => {
+                unreachable!("Handle ScanErr before calling get_parse_err_loc")
+            }
+        };
+        *loc
+    }
+
     fn ignore_parse_err(&self, err: &ParseErr) -> bool {
         use ParseErrKind::*;
         self.incremental && matches!(&err.kind, ExpectedBlock(_))
@@ -255,51 +279,47 @@ impl<'a> Executor<'a> {
 
     fn handle_parse_err(&self, err: &ParseErr) {
         use ParseErrKind::*;
-        let (loc, message) = match &err.kind {
+        let loc = self.get_parse_err_loc(err);
+        let message = match &err.kind {
             ScanErr(_) => {
-                unreachable!("Handle ScanErr before calling handle_parse_err");
+                unreachable!("Handle ScanErr before calling handle_parse_err")
+            }
+            UnexpectedToken(TokenWithLocation {
+                token: Token::EndOfStatement, ..
+            }) => {
+                format!("Syntax error at {loc} (unexpected end of statement)")
             }
             UnexpectedToken(token) => {
-                let loc = token.start;
-                let token = &token.token;
-                if token == &Token::EndOfStatement {
-                    (loc, format!("Syntax error at {loc} (unexpected end of statement)"))
-                } else {
-                    (loc, format!("Parse error: unexpected token at {loc}: {token:?}"))
-                }
+                format!("Parse error: unexpected token at {loc}: {:?}", token.token)
             }
             ExpectedBlock(loc) => {
-                (*loc, format!("Parse error: expected indented block at {loc}"))
+                format!("Parse error: expected indented block at {loc}")
             }
             ExpectedToken(loc, token) => {
-                (*loc, format!("Parse error: expected token '{token}' at {loc}"))
+                format!("Parse error: expected token '{token}' at {loc}")
             }
             ExpectedExpr(loc) => {
-                (*loc, format!("Parse error: expected expression at {loc}",))
+                format!("Parse error: expected expression at {loc}")
             }
             ExpectedIdent(loc) => {
-                (*loc, format!("Parse error: expected identifier at {loc}",))
+                format!("Parse error: expected identifier at {loc}")
             }
-            UnexpectedBreak(loc) => (
-                *loc,
+            UnexpectedBreak(loc) => {
                 format!(
                     "Parse error: unexpected break at {loc} (break must be in a loop)"
-                ),
-            ),
-            UnexpectedContinue(loc) => (
-                *loc,
-                format!(
-                    "Parse error: unexpected continue at {loc} (continue must be in a loop)"
-                ),
-            ),
-            InlineMatchNotAllowed(loc) => (
-                *loc, "Parse error: match blocks must be idented".to_string(),
-            ),
-            MatchDefaultMustBeLast(loc) => (
-                *loc, "Parse error: extra match arm found after default match arm".to_string(),
-            ),
-            SyntaxErr(loc) => (*loc, format!("Syntax error at {loc}",)),
-            kind => (Location::new(0, 0), format!("Unhandled parse error: {:?}", kind)),
+                )
+            }
+            UnexpectedContinue(loc) => {
+                format!("Parse error: unexpected continue at {loc} (continue must be in a loop)")
+            }
+            InlineMatchNotAllowed(_) => {
+                "Parse error: match blocks must be indented".to_string()
+            }
+            MatchDefaultMustBeLast(_) => {
+                "Parse error: extra match arm found after default match arm".to_string()
+            }
+            SyntaxErr(loc) => format!("Syntax error at {loc}"),
+            kind => format!("Unhandled parse error: {:?}", kind),
         };
         self.print_err_message(message, loc, loc);
     }
@@ -310,18 +330,11 @@ impl<'a> Executor<'a> {
             UnhandledExpr(start, end) => {
                 format!("unhandled expression at {start} -> {end}")
             }
-            LabelNotFoundInScope(name) => {
-                format!("label not found in scope: {name}")
-            }
-            CannotJumpOutOfFunc(name) => {
-                format!(
-                    "Cannot jump out of function: label {name} not found or defined in \
-                    outer scope"
-                )
-            }
-            DuplicateLabelInScope(name) => {
-                format!("duplicate label in scope: {name}")
-            }
+            LabelNotFoundInScope(name) => format!("label not found in scope: {name}"),
+            CannotJumpOutOfFunc(name) => format!(
+                "Cannot jump out of function: label {name} not found or defined in outer scope"
+            ),
+            DuplicateLabelInScope(name) => format!("duplicate label in scope: {name}"),
             ExpectedIdent => "expected identifier".to_string(),
             CannotAssignSpecialIdent(name) => {
                 format!("cannot assign to special name: {name}")
