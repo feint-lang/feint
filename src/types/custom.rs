@@ -40,16 +40,16 @@ unsafe impl Send for CustomType {}
 unsafe impl Sync for CustomType {}
 
 impl TypeTrait for CustomType {
-    fn module(&self) -> ObjectRef {
-        self.module.clone()
-    }
-
     fn name(&self) -> &str {
         self.name.as_str()
     }
 
     fn full_name(&self) -> &str {
         self.full_name.as_str()
+    }
+
+    fn module(&self) -> ObjectRef {
+        self.module.clone()
     }
 }
 

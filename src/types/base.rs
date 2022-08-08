@@ -36,11 +36,12 @@ pub type ObjectRef = Arc<RwLock<dyn ObjectTrait>>;
 /// Each type implementation will be instantiated exactly once (i.e.,
 /// types are singletons). Example: `IntType`.
 pub trait TypeTrait {
+    fn name(&self) -> &str;
+    fn full_name(&self) -> &str;
+
     fn module(&self) -> ObjectRef {
         BUILTINS.clone()
     }
-    fn name(&self) -> &str;
-    fn full_name(&self) -> &str;
 
     fn id(&self) -> usize {
         let p = self as *const Self;
@@ -121,22 +122,6 @@ macro_rules! make_bin_op {
 pub trait ObjectTrait {
     fn as_any(&self) -> &dyn Any;
 
-    fn module(&self) -> ObjectRef {
-        let class = self.class();
-        let class = class.read().unwrap();
-        class.module().clone()
-    }
-
-    fn module_name(&self) -> String {
-        let module = self.module();
-        let module = module.read().unwrap();
-        if let Some(module) = module.down_to_mod() {
-            String::from(module.name())
-        } else {
-            String::from("[unknown module]")
-        }
-    }
-
     /// Get an instance's type as a type. This is needed to retrieve
     /// type level attributes.
     fn class(&self) -> TypeRef;
@@ -155,6 +140,22 @@ pub trait ObjectTrait {
 
     fn id_obj(&self) -> ObjectRef {
         create::new_int(self.id())
+    }
+
+    fn module(&self) -> ObjectRef {
+        let class = self.class();
+        let class = class.read().unwrap();
+        class.module().clone()
+    }
+
+    fn module_name(&self) -> String {
+        let module = self.module();
+        let module = module.read().unwrap();
+        if let Some(module) = module.down_to_mod() {
+            String::from(module.name())
+        } else {
+            String::from("[unknown module]")
+        }
     }
 
     // Attributes (accessed by name) -----------------------------------
