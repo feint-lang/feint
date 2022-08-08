@@ -1,0 +1,28 @@
+self_referential = (n) ->
+    if n == 0 ->
+        [0]
+    else ->
+        items = self_referential(n - 1)
+        # NOTE: `List.extend()` returns `this`
+        items.extend(n)
+
+print(self_referential(3))  # -> [0, 1, 2, 3]
+
+# Same as above but using match
+f = (n) ->
+    match n ->
+        0 -> [0]
+        : -> f(n - 1).extend(n)
+
+print(f(3))  # -> [0, 1, 2, 3]
+
+# TODO: Implement closures
+# This will throw a name error because `captured` isn't actual captured
+make_closure = (captured) ->
+    closure = () -> print(captured)
+
+closure_1 = make_closure("x")
+closure_2 = make_closure("y")
+
+closure_1()  # -> "x"
+closure_2()  # -> "y"
