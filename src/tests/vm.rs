@@ -1,4 +1,4 @@
-use crate::types::{create, ObjectTraitExt, TypeTraitExt};
+use crate::types::create;
 use crate::util::BinaryOperator;
 use crate::vm::*;
 

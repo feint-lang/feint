@@ -14,7 +14,7 @@ use super::meth::{make_meth, use_arg};
 use super::result::{Args, This};
 use super::util::{eq_int_float, gt_int_float, lt_int_float};
 
-use super::base::{ObjectRef, ObjectTrait, ObjectTraitExt, TypeRef, TypeTrait};
+use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
 use super::class::TYPE_TYPE;
 use super::ns::Namespace;
 

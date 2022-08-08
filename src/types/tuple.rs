@@ -11,7 +11,7 @@ use super::create;
 use super::meth::{make_meth, use_arg, use_this};
 use super::result::{Args, GetAttrResult, This};
 
-use super::base::{ObjectRef, ObjectTrait, ObjectTraitExt, TypeRef, TypeTrait};
+use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
 use super::class::TYPE_TYPE;
 use super::ns::Namespace;
 

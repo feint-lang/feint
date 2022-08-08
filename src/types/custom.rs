@@ -5,7 +5,7 @@ use std::sync::{Arc, RwLock};
 use super::create;
 use super::result::SetAttrResult;
 
-use super::base::{ObjectRef, ObjectTrait, ObjectTraitExt, TypeRef, TypeTrait};
+use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
 use super::class::TYPE_TYPE;
 use super::module::Module;
 use super::ns::Namespace;

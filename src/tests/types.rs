@@ -1,4 +1,4 @@
-use crate::types::{create, Namespace, ObjectTrait, ObjectTraitExt, TypeTraitExt};
+use crate::types::{create, Namespace, ObjectTrait};
 
 mod float {
     use super::*;

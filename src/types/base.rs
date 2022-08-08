@@ -48,15 +48,11 @@ pub trait TypeTrait {
         let p = self as *const Self;
         p as *const () as usize
     }
-}
 
-pub trait TypeTraitExt: TypeTrait {
-    fn is(&self, other: &Self) -> bool {
+    fn is(&self, other: &dyn TypeTrait) -> bool {
         self.id() == other.id()
     }
 }
-
-impl<T: TypeTrait + ?Sized> TypeTraitExt for T {}
 
 // Object Trait --------------------------------------------------------
 
@@ -312,10 +308,12 @@ pub trait ObjectTrait {
 
     // Binary operations -----------------------------------------------
 
+    fn is(&self, other: &dyn ObjectTrait) -> bool {
+        self.id() == other.id()
+    }
+
     fn is_equal(&self, rhs: &dyn ObjectTrait) -> bool {
-        // This duplicates ObjectExt::is(), but that method can't be
-        // used here.
-        self.id() == rhs.id()
+        self.is(rhs)
     }
 
     fn not_equal(&self, rhs: &dyn ObjectTrait) -> bool {
@@ -364,14 +362,6 @@ pub trait ObjectTrait {
         RuntimeErr::new_not_callable(self.class().read().unwrap().full_name())
     }
 }
-
-pub trait ObjectTraitExt: ObjectTrait {
-    fn is(&self, other: &Self) -> bool {
-        self.id() == other.id()
-    }
-}
-
-impl<T: ObjectTrait + ?Sized> ObjectTraitExt for T {}
 
 // Display -------------------------------------------------------------
 

@@ -1,4 +1,4 @@
-pub(crate) use base::{ObjectRef, ObjectTrait, ObjectTraitExt};
+pub(crate) use base::{ObjectRef, ObjectTrait};
 pub(crate) use builtin_func::{BuiltinFn, BuiltinFunc};
 pub(crate) use builtins::BUILTINS;
 pub(crate) use func::Func;
@@ -13,6 +13,7 @@ mod bound_func;
 mod builtin_func;
 mod builtins;
 mod class;
+mod closure;
 mod custom;
 mod float;
 mod func;
@@ -26,6 +27,3 @@ mod result;
 mod str;
 mod tuple;
 mod util;
-
-#[cfg(test)]
-pub(crate) use base::TypeTraitExt;

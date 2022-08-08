@@ -8,7 +8,7 @@ use crate::vm::{RuntimeBoolResult, RuntimeErr};
 
 use super::create;
 
-use super::base::{ObjectRef, ObjectTrait, ObjectTraitExt, TypeRef, TypeTrait};
+use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
 use super::class::TYPE_TYPE;
 use super::ns::Namespace;
 

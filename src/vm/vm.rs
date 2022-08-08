@@ -10,9 +10,7 @@ use std::sync::{
 use ctrlc;
 use num_traits::ToPrimitive;
 
-use crate::types::{
-    create, Args, BuiltinFunc, Func, ObjectRef, ObjectTraitExt, Params, This,
-};
+use crate::types::{create, Args, BuiltinFunc, Func, ObjectRef, Params, This};
 use crate::util::{
     BinaryOperator, CompareOperator, InplaceOperator, Location, Stack,
     UnaryCompareOperator, UnaryOperator,
