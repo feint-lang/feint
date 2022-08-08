@@ -21,6 +21,28 @@ impl ParseErr {
     pub fn new(kind: ParseErrKind) -> Self {
         Self { kind }
     }
+
+    pub fn loc(&self) -> Location {
+        use ParseErrKind::*;
+        let loc = match &self.kind {
+            MismatchedBracket(loc) => loc,
+            SyntaxErr(loc) => loc,
+            ExpectedBlock(loc) => loc,
+            ExpectedExpr(loc) => loc,
+            ExpectedIdent(loc) => loc,
+            ExpectedOperand(loc) => loc,
+            ExpectedToken(loc, _) => loc,
+            UnexpectedBlock(loc) => loc,
+            UnexpectedToken(twl) => &twl.start,
+            UnexpectedBreak(loc) => loc,
+            UnexpectedContinue(loc) => loc,
+            InlineMatchNotAllowed(loc) => loc,
+            MatchDefaultMustBeLast(loc) => loc,
+            // TODO: Extract from ScanErr?
+            ScanErr(_) => return Location::default(),
+        };
+        *loc
+    }
 }
 
 #[derive(Clone, Debug)]

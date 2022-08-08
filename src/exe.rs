@@ -105,7 +105,7 @@ impl<'a> Executor<'a> {
                     }
                     _ => {
                         if !self.ignore_parse_err(&err) {
-                            let loc = self.get_parse_err_loc(&err);
+                            let loc = err.loc();
                             self.print_err_line(
                                 loc.line,
                                 source.get_line(loc.line).unwrap_or("<none>"),
@@ -249,29 +249,6 @@ impl<'a> Executor<'a> {
         self.print_err_message(message, loc, loc);
     }
 
-    fn get_parse_err_loc(&self, err: &ParseErr) -> Location {
-        use ParseErrKind::*;
-        let loc = match &err.kind {
-            MismatchedBracket(loc) => loc,
-            SyntaxErr(loc) => loc,
-            ExpectedBlock(loc) => loc,
-            ExpectedExpr(loc) => loc,
-            ExpectedIdent(loc) => loc,
-            ExpectedOperand(loc) => loc,
-            ExpectedToken(loc, _) => loc,
-            UnexpectedBlock(loc) => loc,
-            UnexpectedToken(twl) => &twl.start,
-            UnexpectedBreak(loc) => loc,
-            UnexpectedContinue(loc) => loc,
-            InlineMatchNotAllowed(loc) => loc,
-            MatchDefaultMustBeLast(loc) => loc,
-            ScanErr(_) => {
-                unreachable!("Handle ScanErr before calling get_parse_err_loc")
-            }
-        };
-        *loc
-    }
-
     fn ignore_parse_err(&self, err: &ParseErr) -> bool {
         use ParseErrKind::*;
         self.incremental && matches!(&err.kind, ExpectedBlock(_))
@@ -279,7 +256,7 @@ impl<'a> Executor<'a> {
 
     fn handle_parse_err(&self, err: &ParseErr) {
         use ParseErrKind::*;
-        let loc = self.get_parse_err_loc(err);
+        let loc = err.loc();
         let message = match &err.kind {
             ScanErr(_) => {
                 unreachable!("Handle ScanErr before calling handle_parse_err")
