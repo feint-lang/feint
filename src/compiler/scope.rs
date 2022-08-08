@@ -67,10 +67,10 @@ impl ScopeTree {
     }
 
     /// Add local var to current scope.
-    pub fn add_local<S: Into<String>>(&mut self, name: S) {
+    pub fn add_local<S: Into<String>>(&mut self, name: S, assigned: bool) {
         let name = name.into();
         if !self.current().locals.iter().any(|(n, _)| &name == n) {
-            self.current_mut().locals.push((name, false));
+            self.current_mut().locals.push((name, assigned));
         }
     }
 

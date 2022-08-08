@@ -32,11 +32,12 @@ pub const DEFAULT_MAX_CALL_DEPTH: CallDepth =
 
 struct CallFrame {
     stack_pointer: usize,
+    this: This,
 }
 
 impl CallFrame {
-    pub fn new(stack_pointer: usize) -> Self {
-        Self { stack_pointer }
+    pub fn new(stack_pointer: usize, this: This) -> Self {
+        Self { stack_pointer, this }
     }
 }
 
@@ -530,15 +531,8 @@ impl VM {
         this: This,
         args: Args,
     ) -> RuntimeResult {
-        self.push_call_frame()?;
+        self.push_call_frame(this.clone())?;
         self.enter_scope();
-        if this.is_some() {
-            // NOTE: We assign `this` here so that if a user function is
-            //       passed into a builtin function the user function
-            //       can access it.
-            let this_var = this.clone().unwrap().clone();
-            self.ctx.declare_and_assign_var("this", this_var)?;
-        }
         self.assign_call_args(&func.params, &args)?;
         let result = (func.func)(this, args, self);
         match result {
@@ -556,14 +550,16 @@ impl VM {
     }
 
     pub fn call_func(&mut self, func: &Func, this: This, args: Args) -> RuntimeResult {
-        self.push_call_frame()?;
+        self.push_call_frame(this.clone())?;
         self.enter_scope();
         if let Some(this_var) = this {
             self.push_and_store_local(this_var.clone(), 0);
-            self.ctx.declare_and_assign_var("this", this_var)?;
         } else {
-            self.push_and_store_local(create::new_nil(), 0);
-            self.ctx.declare_and_assign_var("this", create::new_nil())?;
+            if let Some(this_var) = self.find_this() {
+                self.push_and_store_local(this_var, 0);
+            } else {
+                self.push_and_store_local(create::new_nil(), 0);
+            }
         }
         self.assign_call_args(&func.params, &args)?;
         if func.params.is_some() {
@@ -604,13 +600,13 @@ impl VM {
 
     // Call Stack ------------------------------------------------------
 
-    fn push_call_frame(&mut self) -> RuntimeResult {
+    fn push_call_frame(&mut self, this: This) -> RuntimeResult {
         if self.call_stack_size == self.max_call_depth {
             self.reset();
             return Err(RuntimeErr::new_recursion_depth_exceeded(self.max_call_depth));
         }
         let stack_position = self.value_stack.size();
-        let frame = CallFrame::new(stack_position);
+        let frame = CallFrame::new(stack_position, this);
         self.call_stack.push(frame);
         self.call_stack_size += 1;
         self.call_frame_pointer = stack_position;
@@ -628,6 +624,16 @@ impl VM {
             }
             None => Err(RuntimeErr::new(RuntimeErrKind::EmptyCallStack)),
         }
+    }
+
+    /// Look up call chain for `this`.
+    fn find_this(&self) -> Option<ObjectRef> {
+        for frame in self.call_stack.iter().rev() {
+            if frame.this.is_some() {
+                return frame.this.clone();
+            }
+        }
+        None
     }
 
     // Scopes ----------------------------------------------------------

@@ -409,13 +409,13 @@ impl Visitor {
         visitor.enter_scope(ScopeKind::Func);
         visitor.push(Inst::ScopeStart);
         // Add locals for function parameters
-        visitor.scope_tree.add_local("this");
+        visitor.scope_tree.add_local("this", true);
         if node.params.is_some() {
             node.params.clone().unwrap().iter().for_each(|name| {
-                visitor.scope_tree.add_local(name);
+                visitor.scope_tree.add_local(name, false);
             });
         } else {
-            visitor.scope_tree.add_local("$args");
+            visitor.scope_tree.add_local("$args", false);
         }
         visitor.visit_statements(node.block.statements)?;
         visitor.fix_jumps()?;
@@ -506,7 +506,7 @@ impl Visitor {
         if self.scope_tree.in_global_scope() {
             self.push(Inst::DeclareVar(name));
         } else {
-            self.scope_tree.add_local(name.clone());
+            self.scope_tree.add_local(name.clone(), false);
         }
         Ok(())
     }
