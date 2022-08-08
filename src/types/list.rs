@@ -71,12 +71,13 @@ impl ListType {
             extend,
             None as Option<Vec<&str>>,
             |this: ObjectRef, args: Args, _| {
+                let return_val = this.clone();
                 let this = use_this!(this);
                 let this = this.down_to_list().unwrap();
                 for arg in args {
                     this.push(arg);
                 }
-                Ok(create::new_nil())
+                Ok(return_val)
             }
         ));
 
