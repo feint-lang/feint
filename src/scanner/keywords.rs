@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 
 use super::{Token, Token::*};
 
-lazy_static! {
-    /// Map of keywords to their respective Tokens.
-    pub static ref KEYWORDS: HashMap<&'static str, Token> = [
+/// Map of keywords to their respective Tokens.
+pub static KEYWORDS: Lazy<HashMap<&'static str, Token>> = Lazy::new(|| {
+    [
         ("nil", Nil),
         ("true", True),
         ("false", False),
@@ -26,5 +26,5 @@ lazy_static! {
     ]
     .iter()
     .cloned()
-    .collect();
-}
+    .collect()
+});
