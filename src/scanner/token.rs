@@ -76,6 +76,7 @@ pub enum Token {
     Loop,          // ??? (while true, like Rust)
     Break,         // break
     Continue,      // continue
+    Return,        // return
     Jump,          // jump label
     Label(String), // label:
 
@@ -168,6 +169,7 @@ impl Token {
             Self::Loop => "loop",
             Self::Break => "break",
             Self::Continue => "continue",
+            Self::Return => "return",
             Self::Jump => "jump",
             Self::Label(_name) => "label",
 

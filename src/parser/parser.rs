@@ -28,6 +28,7 @@ pub struct Parser<I: Iterator<Item = ScanTokenResult>> {
     current_token: Option<TokenWithLocation>,
     token_stream: Peekable<I>,
     lookahead_queue: VecDeque<TokenWithLocation>,
+    func_level: u8,
     loop_level: u8,
 }
 
@@ -37,6 +38,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
             current_token: None,
             token_stream: token_iter.peekable(),
             lookahead_queue: VecDeque::new(),
+            func_level: 0,
             loop_level: 0,
         }
     }
@@ -71,7 +73,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
     /// certain cases, multiple statements may be returned (e.g.,
     /// loops).
     fn statement(&mut self) -> StatementResult {
-        use Token::{Break, Continue, EndOfStatement, Jump, Label};
+        use Token::{Break, Continue, EndOfStatement, Jump, Label, Return};
         let token = self.expect_next_token()?;
         let start = token.start;
         let statement = match token.token {
@@ -79,6 +81,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
             Label(name) => self.label(name, start)?,
             Break => self.break_(start)?,
             Continue => self.continue_(start, token.end)?,
+            Return => self.return_(start)?,
             _ => {
                 self.lookahead_queue.push_front(token);
                 let expr = self.expr(0)?;
@@ -105,12 +108,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
 
     /// Handle label statement.
     fn label(&mut self, name: String, start: Location) -> StatementResult {
-        let expr = match self.peek_token()? {
-            Some(TokenWithLocation { token: Token::EndOfStatement, .. }) | None => {
-                ast::Expr::new_nil(start, start)
-            }
-            _ => self.expr(0)?,
-        };
+        let expr = self.next_expr_or_nil(start)?;
         let end = expr.end;
         Ok(ast::Statement::new_label(name, expr, start, end))
     }
@@ -120,12 +118,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
         if self.loop_level == 0 {
             return Err(self.err(ParseErrKind::UnexpectedBreak(start)));
         }
-        let expr = match self.peek_token()? {
-            Some(TokenWithLocation { token: Token::EndOfStatement, .. }) | None => {
-                ast::Expr::new_nil(start, start)
-            }
-            _ => self.expr(0)?,
-        };
+        let expr = self.next_expr_or_nil(start)?;
         let end = expr.end;
         Ok(ast::Statement::new_break(expr, start, end))
     }
@@ -136,6 +129,16 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
             return Err(self.err(ParseErrKind::UnexpectedContinue(start)));
         }
         Ok(ast::Statement::new_continue(start, end))
+    }
+
+    /// Handle `return`.
+    fn return_(&mut self, start: Location) -> StatementResult {
+        if self.func_level == 0 {
+            return Err(self.err(ParseErrKind::UnexpectedReturn(start)));
+        }
+        let expr = self.next_expr_or_nil(start)?;
+        let end = expr.end;
+        Ok(ast::Statement::new_return(expr, start, end))
     }
 
     /// Get the next expression, possibly recurring to handle nested
@@ -412,6 +415,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
 
     /// Handle function definition.
     fn func(&mut self, params_expr: ast::Expr, start: Location) -> ExprResult {
+        self.func_level += 1;
         let params_opt = match params_expr.kind {
             // Function has multiple parameters.
             ast::ExprKind::Tuple(items) => Some(items),
@@ -442,6 +446,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
         };
         let block = self.block()?;
         let def_end = block.end;
+        self.func_level -= 1;
         // NOTE: The name for a func will be set later if the function
         //       is assigned to a var. Since this is done at compile
         //       time, the function will retain its initial name even
@@ -681,6 +686,18 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
         } else {
             Ok(false)
         }
+    }
+
+    /// Get the next expression if available, otherwise return a nil
+    /// expression.
+    fn next_expr_or_nil(&mut self, start: Location) -> ExprResult {
+        let expr = match self.peek_token()? {
+            Some(TokenWithLocation { token: Token::EndOfStatement, .. }) | None => {
+                ast::Expr::new_nil(start, start)
+            }
+            _ => self.expr(0)?,
+        };
+        Ok(expr)
     }
 
     /// Get location of current token.

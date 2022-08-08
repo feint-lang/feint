@@ -35,8 +35,8 @@ struct CallFrame {
 }
 
 impl CallFrame {
-    pub fn new(stack_position: usize) -> Self {
-        Self { stack_pointer: stack_position }
+    pub fn new(stack_pointer: usize) -> Self {
+        Self { stack_pointer }
     }
 }
 
@@ -271,6 +271,11 @@ impl VM {
                 ContinuePlaceholder(addr, _) => {
                     self.halt();
                     eprintln!("Continue placeholder at {addr} was not updated");
+                    break Ok(VMState::Halted(255));
+                }
+                ReturnPlaceholder(addr, _) => {
+                    self.halt();
+                    eprintln!("Return placeholder at {addr} was not updated");
                     break Ok(VMState::Halted(255));
                 }
                 // VM control

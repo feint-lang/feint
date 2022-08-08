@@ -289,6 +289,9 @@ impl<'a> Executor<'a> {
             UnexpectedContinue(loc) => {
                 format!("Parse error: unexpected continue at {loc} (continue must be in a loop)")
             }
+            UnexpectedReturn(loc) => {
+                format!("Parse error: unexpected return at {loc} (return must be in a function)")
+            }
             InlineMatchNotAllowed(_) => {
                 "Parse error: match blocks must be indented".to_string()
             }

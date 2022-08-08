@@ -118,6 +118,9 @@ impl Disassembler {
             ContinuePlaceholder(addr, _) => {
                 self.align("PLACEHOLDER", format!("CONTINUE @ {addr}"))
             }
+            ReturnPlaceholder(addr, _) => {
+                self.align("PLACEHOLDER", format!("RETURN @ {addr}"))
+            }
         }
     }
 }

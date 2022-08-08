@@ -36,6 +36,7 @@ impl ParseErr {
             UnexpectedToken(twl) => &twl.start,
             UnexpectedBreak(loc) => loc,
             UnexpectedContinue(loc) => loc,
+            UnexpectedReturn(loc) => loc,
             InlineMatchNotAllowed(loc) => loc,
             MatchDefaultMustBeLast(loc) => loc,
             // TODO: Extract from ScanErr?
@@ -65,6 +66,7 @@ pub enum ParseErrKind {
 
     UnexpectedBreak(Location),
     UnexpectedContinue(Location),
+    UnexpectedReturn(Location),
 
     InlineMatchNotAllowed(Location),
     MatchDefaultMustBeLast(Location),

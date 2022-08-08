@@ -66,7 +66,7 @@ pub enum Inst {
     InplaceOp(InplaceOperator),
 
     Call(usize), // Call function with N values from top of stack
-    Return,
+    Return,      // Return is a no-op jump target
 
     // These make compound objects from the top N items on the stack.
     MakeString(usize),
@@ -74,8 +74,12 @@ pub enum Inst {
     MakeList(usize),
 
     Placeholder(usize, Box<Inst>, String),
-    BreakPlaceholder(usize, usize), // address, scope depth
-    ContinuePlaceholder(usize, usize), // address, scope depth
+    BreakPlaceholder(usize, usize), // jump address, scope depth
+    ContinuePlaceholder(usize, usize), // jump address, scope depth
+
+    // NOTE: This is used for explicit return statements. It will be
+    //       replaced with a jump to a RETURN target.
+    ReturnPlaceholder(usize, usize), // jump address, scope depth
 
     Halt(u8),
     HaltTop,

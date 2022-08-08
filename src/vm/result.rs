@@ -49,6 +49,10 @@ impl RuntimeErr {
         Self::new(RuntimeErrKind::EmptyStack)
     }
 
+    pub fn new_empty_call_statck() -> Self {
+        Self::new(RuntimeErrKind::EmptyCallStack)
+    }
+
     pub fn new_not_enough_values_on_stack(n: usize) -> Self {
         Self::new(RuntimeErrKind::NotEnoughValuesOnStack(n))
     }

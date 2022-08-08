@@ -199,7 +199,6 @@ my_func = (x) ->
 - Lower snake case names only
 - Declared/assigned like other vars with `f = () -> ...` syntax
 - Value of last evaluated expression is returned
-- No explicit `return` is currently possible
 
 ```
 # Named function

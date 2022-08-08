@@ -120,6 +120,7 @@ impl Visitor {
             }
             Kind::Break(expr) => self.visit_break(expr)?,
             Kind::Continue => self.visit_continue()?,
+            Kind::Return(expr) => self.visit_return(expr)?,
             Kind::Expr(expr) => self.visit_expr(expr, None)?,
         }
         Ok(())
@@ -133,6 +134,12 @@ impl Visitor {
 
     fn visit_continue(&mut self) -> VisitResult {
         self.push(Inst::ContinuePlaceholder(self.len(), self.scope_depth));
+        Ok(())
+    }
+
+    fn visit_return(&mut self, expr: ast::Expr) -> VisitResult {
+        self.visit_expr(expr, None)?;
+        self.push(Inst::ReturnPlaceholder(self.len(), self.scope_depth));
         Ok(())
     }
 
@@ -365,14 +372,14 @@ impl Visitor {
         // Set address of breaks and continues.
         for addr in loop_addr..after_addr {
             let inst = &self.code[addr];
-            if let Inst::BreakPlaceholder(break_addr, depth) = inst {
+            if let Inst::BreakPlaceholder(inst_addr, depth) = inst {
                 self.code.replace_inst(
-                    *break_addr,
+                    *inst_addr,
                     Inst::Jump(after_addr, depth - loop_scope_depth),
                 );
-            } else if let Inst::ContinuePlaceholder(continue_addr, depth) = inst {
+            } else if let Inst::ContinuePlaceholder(inst_addr, depth) = inst {
                 self.code.replace_inst(
-                    *continue_addr,
+                    *inst_addr,
                     Inst::JumpPushNil(loop_addr, depth - loop_scope_depth),
                 );
             }
@@ -410,9 +417,20 @@ impl Visitor {
             visitor.push_nil();
         }
         visitor.push(Inst::Return);
+        let return_addr = visitor.len();
         visitor.push(Inst::ScopeEnd);
         visitor.exit_scope();
         assert_eq!(visitor.scope_tree.pointer(), 0);
+        // NOTE: Explicit return statements need to jump to the end
+        //       of the function so the its scope can be exited.
+        for addr in 0..return_addr {
+            let inst = &visitor.code[addr];
+            if let Inst::ReturnPlaceholder(inst_addr, depth) = inst {
+                visitor
+                    .code
+                    .replace_inst(*inst_addr, Inst::Jump(return_addr, depth - 1));
+            }
+        }
         let func = create::new_func(name, node.params, visitor.code);
         self.add_const(func);
         Ok(())

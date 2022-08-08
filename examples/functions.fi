@@ -16,6 +16,14 @@ f = (n) ->
 
 print(f(3))  # -> [0, 1, 2, 3]
 
+returns = (n) ->
+    if n > 1 ->
+        return "explicit"
+    "implicit"
+
+print(returns(2))  # -> "explicit"
+print(returns(1))  # -> "implicit"
+
 # TODO: Implement closures
 # This will throw a name error because `captured` isn't actual captured
 make_closure = (captured) ->

@@ -46,6 +46,7 @@ pub enum StatementKind {
     Label(String, Expr),
     Break(Expr),
     Continue,
+    Return(Expr),
     Expr(Expr),
 }
 
@@ -69,6 +70,10 @@ impl Statement {
 
     pub fn new_continue(start: Location, end: Location) -> Self {
         Self::new(StatementKind::Continue, start, end)
+    }
+
+    pub fn new_return(expr: Expr, start: Location, end: Location) -> Self {
+        Self::new(StatementKind::Return(expr), start, end)
     }
 
     pub fn new_expr(expr: Expr, start: Location, end: Location) -> Self {
@@ -102,6 +107,7 @@ impl fmt::Debug for StatementKind {
             }
             Self::Jump(label_index) => write!(f, "Jump: {}", label_index),
             Self::Break(expr) => write!(f, "break {expr:?}"),
+            Self::Return(expr) => write!(f, "return {expr:?}"),
             Self::Continue => write!(f, "Continue"),
         }
     }
