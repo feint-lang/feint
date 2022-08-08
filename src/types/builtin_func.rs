@@ -29,10 +29,13 @@ unsafe impl Sync for BuiltinFuncType {}
 
 impl BuiltinFuncType {
     pub fn new() -> Self {
-        let mut ns = Namespace::new();
-        ns.add_obj("$name", create::new_str("BuiltinFunc"));
-        ns.add_obj("$full_name", create::new_str("builtins.BuiltinFunc"));
-        Self { namespace: ns }
+        Self {
+            namespace: Namespace::with_entries(vec![
+                // Class Attributes
+                ("$name", create::new_str("BuiltinFunc")),
+                ("$full_name", create::new_str("builtins.BuiltinFunc")),
+            ]),
+        }
     }
 }
 
@@ -79,17 +82,20 @@ unsafe impl Sync for BuiltinFunc {}
 
 impl BuiltinFunc {
     pub fn new<S: Into<String>>(name: S, params: Params, func: BuiltinFn) -> Self {
-        let mut ns = Namespace::new();
         let name = name.into();
         let arity = params.as_ref().map(|params| params.len());
-        let arity_obj = if let Some(int) = arity {
-            create::new_int(int)
-        } else {
-            create::new_nil()
-        };
-        ns.add_obj("$name", create::new_str(name.as_str()));
-        ns.add_obj("$arity", arity_obj);
-        Self { namespace: ns, name, params, arity, func }
+        let arity_obj = arity.map_or_else(create::new_nil, |len| create::new_int(len));
+        Self {
+            namespace: Namespace::with_entries(vec![
+                // Instance Attributes
+                ("$name", create::new_str(name.as_str())),
+                ("$arity", arity_obj),
+            ]),
+            name,
+            params,
+            arity,
+            func,
+        }
     }
 }
 

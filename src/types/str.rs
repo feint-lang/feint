@@ -25,25 +25,25 @@ pub struct StrType {
 
 impl StrType {
     pub fn new() -> Self {
-        let mut ns = Namespace::new();
-
-        ns.add_obj("$name", create::new_str("Str"));
-        ns.add_obj("$full_name", create::new_str("builtins.Str"));
-
-        ns.add_entry(make_meth!(
-            Str,
-            starts_with,
-            Some(vec!["prefix"]),
-            |this: ObjectRef, args: Args, _| {
-                let this = use_this!(this);
-                let this = this.down_to_str().unwrap();
-                let arg = use_arg!(args, 0);
-                let prefix = use_arg_str!(arg);
-                Ok(create::new_bool(this.value.starts_with(prefix)))
-            }
-        ));
-
-        Self { namespace: ns }
+        Self {
+            namespace: Namespace::with_entries(vec![
+                // Class Attributes
+                ("$name", create::new_str("Str")),
+                ("$full_name", create::new_str("builtins.Str")),
+                make_meth!(
+                    Str,
+                    starts_with,
+                    Some(vec!["prefix"]),
+                    |this: ObjectRef, args: Args, _| {
+                        let this = use_this!(this);
+                        let this = this.down_to_str().unwrap();
+                        let arg = use_arg!(args, 0);
+                        let prefix = use_arg_str!(arg);
+                        Ok(create::new_bool(this.value.starts_with(prefix)))
+                    }
+                ),
+            ]),
+        }
     }
 }
 
@@ -87,10 +87,14 @@ pub struct Str {
 
 impl Str {
     pub fn new<S: Into<String>>(value: S) -> Self {
-        let mut ns = Namespace::new();
         let value = value.into();
-        ns.add_obj("length", create::new_int(value.len()));
-        Self { namespace: ns, value }
+        Self {
+            namespace: Namespace::with_entries(vec![
+                // Instance Attributes
+                ("len", create::new_int(value.len())),
+            ]),
+            value,
+        }
     }
 
     pub fn value(&self) -> &str {

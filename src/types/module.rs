@@ -24,10 +24,13 @@ unsafe impl Sync for ModuleType {}
 
 impl ModuleType {
     pub fn new() -> Self {
-        let mut ns = Namespace::new();
-        ns.add_obj("$name", create::new_str("Module"));
-        ns.add_obj("$full_name", create::new_str("builtins.Module"));
-        Self { namespace: ns }
+        Self {
+            namespace: Namespace::with_entries(vec![
+                // Class Attributes
+                ("$name", create::new_str("Module")),
+                ("$full_name", create::new_str("builtins.Module")),
+            ]),
+        }
     }
 }
 

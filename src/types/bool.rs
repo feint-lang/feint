@@ -26,10 +26,13 @@ unsafe impl Sync for BoolType {}
 
 impl BoolType {
     pub fn new() -> Self {
-        let mut ns = Namespace::new();
-        ns.add_obj("$name", create::new_str("Bool"));
-        ns.add_obj("$full_name", create::new_str("builtins.Bool"));
-        Self { namespace: ns }
+        Self {
+            namespace: Namespace::with_entries(vec![
+                // Class Attributes
+                ("$name", create::new_str("Bool")),
+                ("$full_name", create::new_str("builtins.Bool")),
+            ]),
+        }
     }
 }
 

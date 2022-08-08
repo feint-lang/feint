@@ -26,52 +26,51 @@ pub struct TupleType {
 
 impl TupleType {
     pub fn new() -> Self {
-        let mut ns = Namespace::new();
-
-        ns.add_obj("$name", create::new_str("Tuple"));
-        ns.add_obj("$full_name", create::new_str("builtins.Tuple"));
-
-        ns.add_entry(make_meth!(
-            Tuple,
-            length,
-            Some(vec![]) as Option<Vec<&str>>,
-            |this: ObjectRef, _, _| {
-                let this = use_this!(this);
-                let this = this.down_to_tuple().unwrap();
-                Ok(create::new_int(this.len()))
-            }
-        ));
-
-        ns.add_entry(make_meth!(
-            Tuple,
-            is_empty,
-            Some(vec![]) as Option<Vec<&str>>,
-            |this: ObjectRef, _, _| {
-                let this = use_this!(this);
-                let this = this.down_to_tuple().unwrap();
-                Ok(create::new_bool(this.len() == 0))
-            }
-        ));
-
-        ns.add_entry(make_meth!(
-            Tuple,
-            map,
-            Some(vec!["map_fn"]),
-            |this: ObjectRef, args: Args, vm: &mut VM| {
-                let this = use_this!(this);
-                let this = this.down_to_tuple().unwrap();
-                let map_fn = use_arg!(args, 0);
-                let items = &this.items;
-                let mut results = vec![];
-                for (i, item) in items.iter().enumerate() {
-                    map_fn.call(vec![item.clone(), create::new_int(i)], vm)?;
-                    results.push(vm.pop_obj()?);
-                }
-                Ok(create::new_tuple(results))
-            }
-        ));
-
-        Self { namespace: ns }
+        Self {
+            namespace: Namespace::with_entries(vec![
+                // Class Attributes
+                ("$name", create::new_str("Tuple")),
+                ("$full_name", create::new_str("builtins.Tuple")),
+                // Instance Methods
+                make_meth!(
+                    Tuple,
+                    length,
+                    Some(vec![]) as Option<Vec<&str>>,
+                    |this: ObjectRef, _, _| {
+                        let this = use_this!(this);
+                        let this = this.down_to_tuple().unwrap();
+                        Ok(create::new_int(this.len()))
+                    }
+                ),
+                make_meth!(
+                    Tuple,
+                    is_empty,
+                    Some(vec![]) as Option<Vec<&str>>,
+                    |this: ObjectRef, _, _| {
+                        let this = use_this!(this);
+                        let this = this.down_to_tuple().unwrap();
+                        Ok(create::new_bool(this.len() == 0))
+                    }
+                ),
+                make_meth!(
+                    Tuple,
+                    map,
+                    Some(vec!["map_fn"]),
+                    |this: ObjectRef, args: Args, vm: &mut VM| {
+                        let this = use_this!(this);
+                        let this = this.down_to_tuple().unwrap();
+                        let map_fn = use_arg!(args, 0);
+                        let items = &this.items;
+                        let mut results = vec![];
+                        for (i, item) in items.iter().enumerate() {
+                            map_fn.call(vec![item.clone(), create::new_int(i)], vm)?;
+                            results.push(vm.pop_obj()?);
+                        }
+                        Ok(create::new_tuple(results))
+                    }
+                ),
+            ]),
+        }
     }
 }
 

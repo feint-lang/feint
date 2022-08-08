@@ -23,10 +23,13 @@ pub struct TypeType {
 
 impl TypeType {
     pub fn new() -> Self {
-        let mut ns = Namespace::new();
-        ns.add_obj("$name", create::new_str("Type"));
-        ns.add_obj("$full_name", create::new_str("builtins.Type"));
-        Self { namespace: ns }
+        Self {
+            namespace: Namespace::with_entries(vec![
+                // Class Attributes
+                ("$name", create::new_str("Type")),
+                ("$full_name", create::new_str("builtins.Type")),
+            ]),
+        }
     }
 }
 

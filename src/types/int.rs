@@ -32,33 +32,29 @@ unsafe impl Sync for IntType {}
 
 impl IntType {
     pub fn new() -> Self {
-        let mut ns = Namespace::new();
-
-        ns.add_obj("$name", create::new_str("Int"));
-        ns.add_obj("$full_name", create::new_str("builtins.Int"));
-
-        ns.add_entry(make_meth!(
-            IntType,
-            new,
-            Some(vec!["value"]),
-            |_, args: Args, _| {
-                let arg = use_arg!(args, 0);
-                let int = if let Some(val) = arg.get_int_val() {
-                    create::new_int(val.clone())
-                } else if let Some(val) = arg.get_float_val() {
-                    create::new_int(BigInt::from_f64(*val).unwrap())
-                } else if let Some(val) = arg.get_str_val() {
-                    create::new_int_from_string(val)
-                } else {
-                    let message =
-                        format!("Int.new() expected number or string; got {arg}");
-                    return Err(RuntimeErr::new_type_err(message));
-                };
-                Ok(int)
-            }
-        ));
-
-        Self { namespace: ns }
+        Self {
+            namespace: Namespace::with_entries(vec![
+                // Class Attributes
+                ("$name", create::new_str("Int")),
+                ("$full_name", create::new_str("builtins.Int")),
+                // Class Methods
+                make_meth!(IntType, new, Some(vec!["value"]), |_, args: Args, _| {
+                    let arg = use_arg!(args, 0);
+                    let int = if let Some(val) = arg.get_int_val() {
+                        create::new_int(val.clone())
+                    } else if let Some(val) = arg.get_float_val() {
+                        create::new_int(BigInt::from_f64(*val).unwrap())
+                    } else if let Some(val) = arg.get_str_val() {
+                        create::new_int_from_string(val)
+                    } else {
+                        let message =
+                            format!("Int.new() expected number or string; got {arg}");
+                        return Err(RuntimeErr::new_type_err(message));
+                    };
+                    Ok(int)
+                }),
+            ]),
+        }
     }
 }
 

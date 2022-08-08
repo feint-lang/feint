@@ -27,10 +27,13 @@ unsafe impl Sync for FuncType {}
 
 impl FuncType {
     pub fn new() -> Self {
-        let mut ns = Namespace::new();
-        ns.add_obj("$name", create::new_str("Func"));
-        ns.add_obj("$full_name", create::new_str("builtins.Func"));
-        Self { namespace: ns }
+        Self {
+            namespace: Namespace::with_entries(vec![
+                // Class Attributes
+                ("$name", create::new_str("Func")),
+                ("$full_name", create::new_str("builtins.Func")),
+            ]),
+        }
     }
 }
 
@@ -77,17 +80,20 @@ unsafe impl Sync for Func {}
 
 impl Func {
     pub fn new<S: Into<String>>(name: S, params: Params, code: Code) -> Self {
-        let mut ns = Namespace::new();
         let name = name.into();
         let arity = params.as_ref().map(|params| params.len());
-        let arity_obj = if let Some(int) = arity {
-            create::new_int(int)
-        } else {
-            create::new_nil()
-        };
-        ns.add_obj("$name", create::new_str(name.as_str()));
-        ns.add_obj("$arity", arity_obj);
-        Self { namespace: ns, name, params, arity, code }
+        let arity_obj = arity.map_or_else(create::new_nil, |len| create::new_int(len));
+        Self {
+            namespace: Namespace::with_entries(vec![
+                // Instance Attributes
+                ("$name", create::new_str(name.as_str())),
+                ("$arity", arity_obj),
+            ]),
+            name,
+            params,
+            arity,
+            code,
+        }
     }
 }
 

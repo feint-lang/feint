@@ -30,33 +30,29 @@ unsafe impl Sync for FloatType {}
 
 impl FloatType {
     pub fn new() -> Self {
-        let mut ns = Namespace::new();
-
-        ns.add_obj("$name", create::new_str("Float"));
-        ns.add_obj("$full_name", create::new_str("builtins.Float"));
-
-        ns.add_entry(make_meth!(
-            FloatType,
-            new,
-            Some(vec!["value"]),
-            |_, args: Args, _| {
-                let arg = use_arg!(args, 0);
-                let float = if let Some(val) = arg.get_float_val() {
-                    create::new_float(*val)
-                } else if let Some(val) = arg.get_int_val() {
-                    create::new_float(val.to_f64().unwrap())
-                } else if let Some(val) = arg.get_str_val() {
-                    create::new_float_from_string(val)
-                } else {
-                    let message =
-                        format!("Float new expected string or float; got {arg}");
-                    return Err(RuntimeErr::new_type_err(message));
-                };
-                Ok(float)
-            }
-        ));
-
-        Self { namespace: ns }
+        Self {
+            namespace: Namespace::with_entries(vec![
+                // Class Attributes
+                ("$name", create::new_str("Float")),
+                ("$full_name", create::new_str("builtins.Float")),
+                // Class Methods
+                make_meth!(FloatType, new, Some(vec!["value"]), |_, args: Args, _| {
+                    let arg = use_arg!(args, 0);
+                    let float = if let Some(val) = arg.get_float_val() {
+                        create::new_float(*val)
+                    } else if let Some(val) = arg.get_int_val() {
+                        create::new_float(val.to_f64().unwrap())
+                    } else if let Some(val) = arg.get_str_val() {
+                        create::new_float_from_string(val)
+                    } else {
+                        let message =
+                            format!("Float new expected string or float; got {arg}");
+                        return Err(RuntimeErr::new_type_err(message));
+                    };
+                    Ok(float)
+                }),
+            ]),
+        }
     }
 }
 

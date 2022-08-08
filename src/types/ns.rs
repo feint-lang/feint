@@ -20,6 +20,14 @@ impl Namespace {
         Self { objects: HashMap::new() }
     }
 
+    pub fn with_entries<S: Into<String>>(entries: Vec<(S, ObjectRef)>) -> Self {
+        let mut ns = Self::new();
+        for entry in entries.into_iter() {
+            ns.add_entry(entry);
+        }
+        ns
+    }
+
     pub fn clear(&mut self) {
         self.objects.clear()
     }

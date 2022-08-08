@@ -24,10 +24,13 @@ unsafe impl Sync for BoundFuncType {}
 
 impl BoundFuncType {
     pub fn new() -> Self {
-        let mut ns = Namespace::new();
-        ns.add_obj("$name", create::new_str("BoundFunc"));
-        ns.add_obj("$full_name", create::new_str("builtins.BoundFunc"));
-        Self { namespace: ns }
+        Self {
+            namespace: Namespace::with_entries(vec![
+                // Class Attributes
+                ("$name", create::new_str("BoundFunc")),
+                ("$full_name", create::new_str("builtins.BoundFunc")),
+            ]),
+        }
     }
 }
 
