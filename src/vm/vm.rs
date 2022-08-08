@@ -176,7 +176,7 @@ impl VM {
                 }
                 JumpIf(addr, scope_exit_count) => {
                     self.exit_scopes(*scope_exit_count);
-                    let obj = self.pop_obj()?;
+                    let obj = self.peek_obj()?;
                     let obj = obj.read().unwrap();
                     if obj.bool_val()? {
                         jump_ip = Some(*addr);
@@ -184,7 +184,7 @@ impl VM {
                 }
                 JumpIfNot(addr, scope_exit_count) => {
                     self.exit_scopes(*scope_exit_count);
-                    let obj = self.pop_obj()?;
+                    let obj = self.peek_obj()?;
                     let obj = obj.read().unwrap();
                     if !obj.bool_val()? {
                         jump_ip = Some(*addr);
