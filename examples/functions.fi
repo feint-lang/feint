@@ -24,6 +24,14 @@ returns = (n) ->
 print(returns(2))  # -> "explicit"
 print(returns(1))  # -> "implicit"
 
+# In the assigment `x = x`, the RHS x refers to the global x
+x = 1
+f = () ->
+    x = x
+    x += 2
+print(f())  # -> 3 (x in f())
+print(x)    # -> 1 (global x)
+
 # TODO: Implement closures
 # This will throw a name error because `captured` isn't actual captured
 make_closure = (captured) ->

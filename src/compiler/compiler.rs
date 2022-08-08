@@ -236,9 +236,15 @@ impl Visitor {
         if self.scope_tree.in_global_scope() {
             self.push(Inst::LoadVar(name));
         } else {
-            match self.scope_tree.find_local(name.as_str()) {
-                Some(index) => {
+            match self.scope_tree.find_local(name.as_str(), false) {
+                Some((index, true)) => {
+                    // Local exists and has been assigned
                     self.push(Inst::LoadLocal(index));
+                }
+                Some((_, false)) => {
+                    // Local exists but has not been assigned (e.g.,
+                    // `f = () -> x = x` where RHS `x` is a global.
+                    self.push(Inst::LoadVar(name));
                 }
                 None => self.push(Inst::LoadVar(name)),
             }
@@ -501,9 +507,6 @@ impl Visitor {
             self.push(Inst::DeclareVar(name));
         } else {
             self.scope_tree.add_local(name.clone());
-            // XXX: This is a hack to allow inner functions access to
-            //      vars in the outer function scope.
-            self.push(Inst::DeclareVar(name));
         }
         Ok(())
     }
@@ -516,12 +519,9 @@ impl Visitor {
         // TODO: Allow assignment to attributes
         if let Some(name) = lhs_expr.ident_name() {
             self.visit_expr(value_expr, Some(name.clone()))?;
-            match self.scope_tree.find_local(name.as_str()) {
-                Some(index) => {
+            match self.scope_tree.find_local(name.as_str(), true) {
+                Some((index, _)) => {
                     self.push(Inst::StoreLocal(index));
-                    // XXX: This is a hack to allow inner functions
-                    //      access to vars in the outer function scope.
-                    self.push(Inst::AssignVar(name));
                 }
                 None => self.push(Inst::AssignVar(name)),
             }

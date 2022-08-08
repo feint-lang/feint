@@ -34,6 +34,10 @@ impl ScopeTree {
         &mut self.storage[self.pointer]
     }
 
+    pub fn scope_mut(&mut self, index: usize) -> &mut Scope {
+        &mut self.storage[index]
+    }
+
     /// Add nested scope to current scope then make the new scope the
     /// current scope.
     pub fn add(&mut self, kind: ScopeKind) -> usize {
@@ -65,40 +69,62 @@ impl ScopeTree {
     /// Add local var to current scope.
     pub fn add_local<S: Into<String>>(&mut self, name: S) {
         let name = name.into();
-        if !self.current().locals.iter().any(|n| &name == n) {
-            self.current_mut().locals.push(name);
+        if !self.current().locals.iter().any(|(n, _)| &name == n) {
+            self.current_mut().locals.push((name, false));
         }
     }
 
-    /// Find a local var in the current scope or any of its ancestor
-    /// scopes. The index returned is a pointer into the stack where
-    /// the local var lives at runtime.
-    pub fn find_local<S: Into<String>>(&self, name: S) -> Option<usize> {
+    /// Find a local var in current scope or any of its ancestor scopes.
+    /// The index returned is a pointer into the stack where the local
+    /// var lives at runtime. If the local is found, a flag indicating
+    /// whether it has been assigned is also returned.
+    pub fn find_local<S: Into<String>>(
+        &mut self,
+        name: S,
+        mark_assigned: bool,
+    ) -> Option<(usize, bool)> {
         let name = name.into();
-        let locals = self.flatten_locals();
-        let count = locals.len();
-        if count == 0 {
-            return None;
-        }
-        let last = count - 1;
-        locals.iter().rev().position(|n| &name == n).map(|i| last - i)
-    }
 
-    /// Flatten locals of current scope and its ancestors. Note that
-    /// the current scope's locals will be at the end and that searching
-    /// for a local needs to be done in reverse order.
-    fn flatten_locals(&self) -> Vec<String> {
+        // Flatten locals of current scope and its ancestors. The
+        // current scope's locals will be at the end and the search
+        // must proceed from the end.
         let mut locals = VecDeque::new();
         let mut scope = self.current();
+        let mut count = 0;
         loop {
-            locals.push_front(scope.locals.clone());
+            let scope_index = scope.index;
+            let mut scope_locals = vec![];
+            for (local_index, local) in scope.locals.iter().enumerate() {
+                scope_locals.push((scope_index, local_index, &local.0, local.1));
+                count += 1;
+            }
+            locals.push_front(scope_locals);
             if let Some(parent_index) = scope.parent {
                 scope = &self.storage[parent_index];
             } else {
                 break;
             }
         }
-        locals.into_iter().flatten().collect()
+
+        if count == 0 {
+            return None;
+        }
+
+        let iter = locals.into_iter().flatten().rev();
+        let mut index = count;
+
+        for (scope_index, local_index, local_name, assigned) in iter {
+            index -= 1;
+            if local_name == &name {
+                if mark_assigned {
+                    let found_scope = self.scope_mut(scope_index);
+                    found_scope.locals[local_index] = (name, true);
+                }
+                return Some((index, assigned));
+            }
+        }
+
+        None
     }
 
     // Add jump target and address to current scope
@@ -162,7 +188,7 @@ pub struct Scope {
     index: usize,
     parent: Option<usize>,
     children: Vec<usize>,
-    locals: Vec<String>,
+    locals: Vec<(String, bool)>, // name, assigned
     /// target label name => jump inst address
     jumps: Vec<(String, usize)>,
     /// label name => label inst address
