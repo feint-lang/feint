@@ -16,6 +16,7 @@ use super::bool::{Bool, BoolType};
 use super::bound_func::{BoundFunc, BoundFuncType};
 use super::builtin_func::{BuiltinFunc, BuiltinFuncType};
 use super::class::{Type, TypeType};
+use super::closure::{Closure, ClosureType};
 use super::custom::{CustomObj, CustomType};
 use super::float::{Float, FloatType};
 use super::func::{Func, FuncType};
@@ -224,6 +225,7 @@ pub trait ObjectTrait {
     make_type_checker!(is_bool_type, BoolType);
     make_type_checker!(is_bound_func_type, BoundFuncType);
     make_type_checker!(is_builtin_func_type, BuiltinFuncType);
+    make_type_checker!(is_closure_type, ClosureType);
     make_type_checker!(is_float_type, FloatType);
     make_type_checker!(is_func_type, FuncType);
     make_type_checker!(is_int_type, IntType);
@@ -237,6 +239,7 @@ pub trait ObjectTrait {
     make_type_checker!(is_bool, Bool);
     make_type_checker!(is_bound_func, BoundFunc);
     make_type_checker!(is_builtin_func, BuiltinFunc);
+    make_type_checker!(is_closure, Closure);
     make_type_checker!(is_float, Float);
     make_type_checker!(is_func, Func);
     make_type_checker!(is_int, Int);
@@ -254,6 +257,7 @@ pub trait ObjectTrait {
     make_down_to!(down_to_bool_type, BoolType);
     make_down_to!(down_to_bound_func_type, BoundFuncType);
     make_down_to!(down_to_builtin_func_type, BuiltinFuncType);
+    make_down_to!(down_to_closure_type, ClosureType);
     make_down_to!(down_to_float_type, FloatType);
     make_down_to!(down_to_func_type, FuncType);
     make_down_to!(down_to_list_type, ListType);
@@ -267,6 +271,7 @@ pub trait ObjectTrait {
     make_down_to!(down_to_bool, Bool);
     make_down_to!(down_to_bound_func, BoundFunc);
     make_down_to!(down_to_builtin_func, BuiltinFunc);
+    make_down_to!(down_to_closure, Closure);
     make_down_to!(down_to_float, Float);
     make_down_to!(down_to_func, Func);
     make_down_to!(down_to_int, Int);
@@ -320,6 +325,8 @@ pub trait ObjectTrait {
         !self.is_equal(rhs)
     }
 
+    make_bin_op!(and, "&&", RuntimeBoolResult);
+    make_bin_op!(or, "||", RuntimeBoolResult);
     make_bin_op!(less_than, "<", RuntimeBoolResult);
     make_bin_op!(greater_than, ">", RuntimeBoolResult);
 
@@ -330,32 +337,14 @@ pub trait ObjectTrait {
     make_bin_op!(floor_div, "//", RuntimeObjResult);
     make_bin_op!(add, "+", RuntimeObjResult);
     make_bin_op!(sub, "-", RuntimeObjResult);
-    make_bin_op!(and, "&&", RuntimeBoolResult);
-    make_bin_op!(or, "||", RuntimeBoolResult);
 
     // Call ------------------------------------------------------------
 
     // This is here so that functions can be called directly, in
     // particular so that user functions can be called from builtin
     // functions.
-    fn call(&self, args: Args, vm: &mut VM) -> RuntimeResult {
-        if let Some(bound_func) = self.down_to_bound_func() {
-            let func = bound_func.func.read().unwrap();
-            let this = Some(bound_func.this.clone());
-            if let Some(func) = func.down_to_builtin_func() {
-                vm.call_builtin_func(func, this, args)
-            } else if let Some(func) = func.down_to_func() {
-                vm.call_func(func, this, args)
-            } else {
-                Err(self.not_callable())
-            }
-        } else if let Some(func) = self.down_to_builtin_func() {
-            vm.call_builtin_func(func, None, args)
-        } else if let Some(func) = self.down_to_func() {
-            vm.call_func(func, None, args)
-        } else {
-            Err(self.not_callable())
-        }
+    fn call(&self, _args: Args, _vm: &mut VM) -> RuntimeResult {
+        Err(self.not_callable())
     }
 
     fn not_callable(&self) -> RuntimeErr {
@@ -418,6 +407,7 @@ impl fmt::Display for dyn ObjectTrait {
             BoolType,
             BoundFuncType,
             BuiltinFuncType,
+            ClosureType,
             CustomType,
             FloatType,
             FuncType,
@@ -435,6 +425,7 @@ impl fmt::Display for dyn ObjectTrait {
             Bool,
             BoundFunc,
             BuiltinFunc,
+            Closure,
             CustomObj,
             Float,
             Func,
@@ -458,6 +449,7 @@ impl fmt::Debug for dyn ObjectTrait {
             BoolType,
             BoundFuncType,
             BuiltinFuncType,
+            ClosureType,
             CustomType,
             FloatType,
             FuncType,
@@ -475,6 +467,7 @@ impl fmt::Debug for dyn ObjectTrait {
             Bool,
             BoundFunc,
             BuiltinFunc,
+            Closure,
             CustomObj,
             Float,
             Func,

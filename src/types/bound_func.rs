@@ -2,6 +2,8 @@ use std::any::Any;
 use std::fmt;
 use std::sync::{Arc, RwLock};
 
+use crate::types::Args;
+use crate::vm::{RuntimeResult, VM};
 use once_cell::sync::Lazy;
 
 use super::create;
@@ -98,6 +100,18 @@ impl ObjectTrait for BoundFunc {
 
     fn namespace(&self) -> &Namespace {
         &self.namespace
+    }
+
+    fn call(&self, args: Args, vm: &mut VM) -> RuntimeResult {
+        let func_ref = self.func.read().unwrap();
+        if let Some(func) = func_ref.down_to_builtin_func() {
+            let this = Some(self.this.clone());
+            vm.call_builtin_func(func, this, args)
+        } else if let Some(closure) = func_ref.down_to_closure() {
+            closure.call(args, vm)
+        } else {
+            Err(self.not_callable())
+        }
     }
 }
 

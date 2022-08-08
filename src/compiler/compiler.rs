@@ -438,7 +438,8 @@ impl Visitor {
             }
         }
         let func = create::new_func(name, node.params, visitor.code);
-        self.add_const(func);
+        let index = self.code.add_const(func);
+        self.push(Inst::MakeClosure(index));
         Ok(())
     }
 
@@ -506,7 +507,7 @@ impl Visitor {
         if self.scope_tree.in_global_scope() {
             self.push(Inst::DeclareVar(name));
         } else {
-            self.scope_tree.add_local(name.clone(), false);
+            self.scope_tree.add_local(name, false);
         }
         Ok(())
     }
@@ -585,9 +586,10 @@ impl Visitor {
 
     // Code unit constants ---------------------------------------------
 
-    fn add_const(&mut self, val: ObjectRef) {
+    fn add_const(&mut self, val: ObjectRef) -> usize {
         let index = self.code.add_const(val);
         self.push(Inst::LoadConst(index));
+        index
     }
 
     // Scopes ----------------------------------------------------------

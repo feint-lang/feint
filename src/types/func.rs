@@ -7,11 +7,11 @@ use once_cell::sync::Lazy;
 use crate::vm::Code;
 
 use super::create;
+use super::result::Params;
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
 use super::class::TYPE_TYPE;
 use super::ns::Namespace;
-use super::result::Params;
 
 // Function Type -------------------------------------------------------
 

@@ -11,6 +11,7 @@ use super::bool::BOOL_TYPE;
 use super::bound_func::BOUND_FUNC_TYPE;
 use super::builtin_func::BUILTIN_FUNC_TYPE;
 use super::class::TYPE_TYPE;
+use super::closure::CLOSURE_TYPE;
 use super::float::FLOAT_TYPE;
 use super::func::FUNC_TYPE;
 use super::int::INT_TYPE;
@@ -29,6 +30,7 @@ pub static BUILTINS: Lazy<Arc<RwLock<Module>>> = Lazy::new(|| {
     ns.add_obj("Bool", BOOL_TYPE.clone());
     ns.add_obj("BoundFunc", BOUND_FUNC_TYPE.clone());
     ns.add_obj("BuiltinFunc", BUILTIN_FUNC_TYPE.clone());
+    ns.add_obj("Closure", CLOSURE_TYPE.clone());
     ns.add_obj("Func", FUNC_TYPE.clone());
     ns.add_obj("Float", FLOAT_TYPE.clone());
     ns.add_obj("Int", INT_TYPE.clone());

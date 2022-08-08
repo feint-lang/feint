@@ -4,14 +4,14 @@ use std::sync::{Arc, RwLock};
 
 use once_cell::sync::Lazy;
 
-use crate::vm::VM;
+use crate::vm::{RuntimeResult, VM};
 
 use super::create;
+use super::result::{Args, CallResult, Params, This};
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
 use super::class::TYPE_TYPE;
 use super::ns::Namespace;
-use super::result::{Args, CallResult, Params, This};
 
 pub type BuiltinFn = fn(This, Args, &mut VM) -> CallResult;
 
@@ -118,6 +118,10 @@ impl ObjectTrait for BuiltinFunc {
 
     fn namespace(&self) -> &Namespace {
         &self.namespace
+    }
+
+    fn call(&self, args: Args, vm: &mut VM) -> RuntimeResult {
+        vm.call_builtin_func(self, None, args)
     }
 }
 

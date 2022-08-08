@@ -250,6 +250,11 @@ impl VM {
                     let list = create::new_list(items);
                     self.push_temp(list);
                 }
+                MakeClosure(index) => {
+                    let obj = code.get_const(*index)?.clone();
+                    let closure = create::new_closure(obj);
+                    self.push_temp(closure);
+                }
                 // Placeholders
                 Placeholder(addr, inst, message) => {
                     self.halt();
@@ -443,7 +448,7 @@ impl VM {
                 };
                 let bind = {
                     let obj = obj_ref.read().unwrap();
-                    obj.is_builtin_func() || obj.is_func()
+                    obj.is_builtin_func() || obj.is_closure()
                 };
                 if bind {
                     // If `b` in `a.b` is a function, bind `b` to `a`.
@@ -552,12 +557,10 @@ impl VM {
         self.enter_scope();
         if let Some(this_var) = this {
             self.push_and_store_local(this_var.clone(), 0);
+        } else if let Some(this_var) = self.find_this() {
+            self.push_and_store_local(this_var, 0);
         } else {
-            if let Some(this_var) = self.find_this() {
-                self.push_and_store_local(this_var, 0);
-            } else {
-                self.push_and_store_local(create::new_nil(), 0);
-            }
+            self.push_and_store_local(create::new_nil(), 0);
         }
         self.assign_call_args(&func.params, &args)?;
         if func.params.is_some() {

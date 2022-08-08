@@ -73,6 +73,9 @@ pub enum Inst {
     MakeTuple(usize),
     MakeList(usize),
 
+    // Make function closure for constant.
+    MakeClosure(usize),
+
     Placeholder(usize, Box<Inst>, String),
     BreakPlaceholder(usize, usize), // jump address, scope depth
     ContinuePlaceholder(usize, usize), // jump address, scope depth

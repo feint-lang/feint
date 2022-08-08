@@ -14,6 +14,7 @@ use super::base::ObjectRef;
 use super::bool::Bool;
 use super::bound_func::BoundFunc;
 use super::builtin_func::{BuiltinFn, BuiltinFunc};
+use super::closure::Closure;
 use super::custom::{CustomObj, CustomType};
 use super::float::Float;
 use super::func::Func;
@@ -83,6 +84,10 @@ pub fn new_builtin_func<S: Into<String>>(
 ) -> ObjectRef {
     let params = collect_params(params);
     Arc::new(RwLock::new(BuiltinFunc::new(name, params, func)))
+}
+
+pub fn new_closure(func: ObjectRef) -> ObjectRef {
+    Arc::new(RwLock::new(Closure::new(func)))
 }
 
 pub fn new_float(value: f64) -> ObjectRef {
