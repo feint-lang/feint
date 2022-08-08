@@ -142,6 +142,10 @@ impl TypeTrait for ListType {
     fn full_name(&self) -> &str {
         "builtins.List"
     }
+
+    fn namespace(&self) -> &Namespace {
+        &self.namespace
+    }
 }
 
 impl ObjectTrait for ListType {

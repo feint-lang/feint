@@ -47,6 +47,10 @@ impl TypeTrait for BuiltinFuncType {
     fn full_name(&self) -> &str {
         "builtins.BuiltinFunc"
     }
+
+    fn namespace(&self) -> &Namespace {
+        &self.namespace
+    }
 }
 
 impl ObjectTrait for BuiltinFuncType {

@@ -38,6 +38,7 @@ pub type ObjectRef = Arc<RwLock<dyn ObjectTrait>>;
 pub trait TypeTrait {
     fn name(&self) -> &str;
     fn full_name(&self) -> &str;
+    fn namespace(&self) -> &Namespace;
 
     fn module(&self) -> ObjectRef {
         BUILTINS.clone()

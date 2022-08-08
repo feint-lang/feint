@@ -44,6 +44,10 @@ impl TypeTrait for NilType {
     fn full_name(&self) -> &str {
         "builtins.Nil"
     }
+
+    fn namespace(&self) -> &Namespace {
+        &self.namespace
+    }
 }
 
 impl ObjectTrait for NilType {

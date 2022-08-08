@@ -48,6 +48,10 @@ impl TypeTrait for CustomType {
         self.full_name.as_str()
     }
 
+    fn namespace(&self) -> &Namespace {
+        &self.namespace
+    }
+
     fn module(&self) -> ObjectRef {
         self.module.clone()
     }

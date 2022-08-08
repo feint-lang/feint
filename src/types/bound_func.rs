@@ -42,6 +42,10 @@ impl TypeTrait for BoundFuncType {
     fn full_name(&self) -> &str {
         "builtins.BoundFunc"
     }
+
+    fn namespace(&self) -> &Namespace {
+        &self.namespace
+    }
 }
 
 impl ObjectTrait for BoundFuncType {

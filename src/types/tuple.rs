@@ -85,6 +85,10 @@ impl TypeTrait for TupleType {
     fn full_name(&self) -> &str {
         "builtins.Tuple"
     }
+
+    fn namespace(&self) -> &Namespace {
+        &self.namespace
+    }
 }
 
 impl ObjectTrait for TupleType {

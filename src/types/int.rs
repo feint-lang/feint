@@ -66,6 +66,10 @@ impl TypeTrait for IntType {
     fn full_name(&self) -> &str {
         "builtins.Int"
     }
+
+    fn namespace(&self) -> &Namespace {
+        &self.namespace
+    }
 }
 
 impl ObjectTrait for IntType {

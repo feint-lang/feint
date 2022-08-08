@@ -44,6 +44,10 @@ impl TypeTrait for TypeType {
     fn full_name(&self) -> &str {
         "builtins.Type"
     }
+
+    fn namespace(&self) -> &Namespace {
+        &self.namespace
+    }
 }
 
 impl ObjectTrait for TypeType {

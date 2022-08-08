@@ -44,6 +44,10 @@ impl TypeTrait for BoolType {
     fn full_name(&self) -> &str {
         "builtins.Bool"
     }
+
+    fn namespace(&self) -> &Namespace {
+        &self.namespace
+    }
 }
 
 impl ObjectTrait for BoolType {

@@ -58,6 +58,10 @@ impl TypeTrait for StrType {
     fn full_name(&self) -> &str {
         "builtins.Str"
     }
+
+    fn namespace(&self) -> &Namespace {
+        &self.namespace
+    }
 }
 
 impl ObjectTrait for StrType {

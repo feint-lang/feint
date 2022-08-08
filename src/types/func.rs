@@ -45,6 +45,10 @@ impl TypeTrait for FuncType {
     fn full_name(&self) -> &str {
         "builtins.Func"
     }
+
+    fn namespace(&self) -> &Namespace {
+        &self.namespace
+    }
 }
 
 impl ObjectTrait for FuncType {

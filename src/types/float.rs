@@ -64,6 +64,10 @@ impl TypeTrait for FloatType {
     fn full_name(&self) -> &str {
         "builtins.Float"
     }
+
+    fn namespace(&self) -> &Namespace {
+        &self.namespace
+    }
 }
 
 impl ObjectTrait for FloatType {

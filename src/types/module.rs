@@ -42,6 +42,10 @@ impl TypeTrait for ModuleType {
     fn full_name(&self) -> &str {
         "builtins.Module"
     }
+
+    fn namespace(&self) -> &Namespace {
+        &self.namespace
+    }
 }
 
 impl ObjectTrait for ModuleType {
