@@ -55,6 +55,10 @@ impl<T> Stack<T> {
         self.storage.last()
     }
 
+    pub fn peek_at(&self, index: usize) -> Option<&T> {
+        self.storage.get(index)
+    }
+
     pub fn is_empty(&self) -> bool {
         self.storage.is_empty()
     }

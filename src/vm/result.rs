@@ -45,16 +45,16 @@ impl RuntimeErr {
         Self { kind }
     }
 
-    pub fn new_empty_statck() -> Self {
+    pub fn new_empty_stack() -> Self {
         Self::new(RuntimeErrKind::EmptyStack)
-    }
-
-    pub fn new_empty_call_statck() -> Self {
-        Self::new(RuntimeErrKind::EmptyCallStack)
     }
 
     pub fn new_not_enough_values_on_stack(n: usize) -> Self {
         Self::new(RuntimeErrKind::NotEnoughValuesOnStack(n))
+    }
+
+    pub fn new_empty_call_stack() -> Self {
+        Self::new(RuntimeErrKind::EmptyCallStack)
     }
 
     pub fn new_recursion_depth_exceeded(max_call_depth: CallDepth) -> Self {
@@ -114,6 +114,8 @@ impl fmt::Display for RuntimeErr {
 pub enum RuntimeErrKind {
     EmptyStack,
     NotEnoughValuesOnStack(usize),
+    EmptyCallStack,
+    FrameIndexOutOfBounds(usize),
     RecursionDepthExceeded(CallDepth),
     ObjectNotFound(usize),
     ExpectedVar(String),
@@ -129,7 +131,6 @@ pub enum RuntimeErrKind {
     ItemCannotBeSet(String, usize),
     IndexOutOfBounds(String, usize),
     NotCallable(String),
-    EmptyCallStack,
 
     // Move?
     CouldNotReadFile(String),

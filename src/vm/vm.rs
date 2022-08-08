@@ -99,7 +99,6 @@ impl VM {
     /// execute.
     pub fn execute(&mut self, code: &Code) -> ExeResult {
         use Inst::*;
-        use ValueStackKind::Local;
 
         let handle_sigint = self.handle_sigint;
         let sigint_flag = self.sigint_flag.clone();
@@ -146,13 +145,10 @@ impl VM {
                 }
                 // Locals
                 StoreLocal(index) => {
-                    let obj = self.peek_obj()?;
-                    self.value_stack[frame_pointer + *index] = Local(obj, *index);
+                    self.handle_store_local(frame_pointer, *index)?;
                 }
                 LoadLocal(index) => {
-                    let kind = self.value_stack[frame_pointer + index].clone();
-                    let obj = self.get_obj(&kind);
-                    self.push_local(obj, *index);
+                    self.handle_load_local(frame_pointer, *index)?;
                 }
                 // Vars
                 DeclareVar(name) => {
@@ -358,6 +354,42 @@ impl VM {
     }
 
     // Handlers --------------------------------------------------------
+
+    /// Store top of stack to local.
+    fn handle_store_local(
+        &mut self,
+        frame_pointer: usize,
+        index: usize,
+    ) -> RuntimeResult {
+        let frame_index = frame_pointer + index;
+        if frame_index < self.value_stack.size() {
+            let obj = self.peek_obj()?;
+            self.value_stack[frame_index] = ValueStackKind::Local(obj, index);
+        } else {
+            return Err(RuntimeErr::new(RuntimeErrKind::FrameIndexOutOfBounds(
+                frame_index,
+            )));
+        }
+        Ok(())
+    }
+
+    /// Load local onto stack.
+    fn handle_load_local(
+        &mut self,
+        frame_pointer: usize,
+        index: usize,
+    ) -> RuntimeResult {
+        let frame_index = frame_pointer + index;
+        if let Some(kind) = self.value_stack.peek_at(frame_index) {
+            let obj = self.get_obj(kind);
+            self.push_local(obj, index);
+        } else {
+            return Err(RuntimeErr::new(RuntimeErrKind::FrameIndexOutOfBounds(
+                frame_index,
+            )));
+        }
+        Ok(())
+    }
 
     fn handle_unary_op(&mut self, op: &UnaryOperator) -> RuntimeResult {
         use UnaryOperator::*;
@@ -683,7 +715,7 @@ impl VM {
     fn pop(&mut self) -> PopResult {
         match self.value_stack.pop() {
             Some(kind) => Ok(kind),
-            None => Err(RuntimeErr::new_empty_statck()),
+            None => Err(RuntimeErr::new_empty_stack()),
         }
     }
 
@@ -708,7 +740,7 @@ impl VM {
     fn peek(&self) -> PeekResult {
         match self.value_stack.peek() {
             Some(kind) => Ok(kind),
-            None => Err(RuntimeErr::new_empty_statck()),
+            None => Err(RuntimeErr::new_empty_stack()),
         }
     }
 
