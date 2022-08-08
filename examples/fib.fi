@@ -2,14 +2,14 @@
 #       cache entry.
 cache = [0, 0, 1]
 
-fib = (n) ->
+fib_if = (n) ->
     if n == 0 ->
         0
     else if n == 1 ->
         1
     else ->
         c = cache.get(n)
-        if c === nil -> cache.push(fib(n - 2) + fib(n - 1))
+        if c === nil -> cache.push(fib_if(n - 2) + fib_if(n - 1))
         else -> c
 
 fib_match = (n) ->
@@ -19,7 +19,7 @@ fib_match = (n) ->
         : ->
             c = cache.get(n)
             match c ->
-                nil -> cache.push(fib(n - 2) + fib(n - 1))
+                nil -> cache.push(fib_match(n - 2) + fib_match(n - 1))
                 :   -> c
 
 # Keep for benchmarking
