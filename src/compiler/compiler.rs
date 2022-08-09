@@ -442,10 +442,10 @@ impl Visitor {
         visitor.scope_tree.add_local("this", true);
         if node.params.is_some() {
             node.params.clone().unwrap().iter().for_each(|name| {
-                visitor.scope_tree.add_local(name, false);
+                visitor.scope_tree.add_local(name, true);
             });
         } else {
-            visitor.scope_tree.add_local("$args", false);
+            visitor.scope_tree.add_local("$args", true);
         }
         visitor.visit_statements(node.block.statements)?;
         visitor.fix_jumps()?;
