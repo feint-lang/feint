@@ -270,9 +270,19 @@ impl ObjectTrait for List {
 
 impl fmt::Display for List {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let this_id = self.id();
         let items = self.items.read().unwrap();
-        let items: Vec<String> =
-            items.iter().map(|item| format!("{:?}", &*item.read().unwrap())).collect();
+        let items: Vec<String> = items
+            .iter()
+            .map(|item| {
+                let item = item.read().unwrap();
+                if item.id() == this_id {
+                    "[...]".to_owned()
+                } else {
+                    format!("{:?}", &*item)
+                }
+            })
+            .collect();
         let items_str = items.join(", ");
         write!(f, "[{}]", items_str)
     }
