@@ -20,6 +20,10 @@ alias r="cargo run --"
 alias c="cargo run -- -c"
 alias d="cargo run -- --dis --debug"
 
+# trace
+# use RUST_LOG=feint::compiler,feint::vm=trace or the like to limit output
+alias l="RUST_LOG=feint=trace cargo run --"
+
 # run release binary
 alias f="./target/release/feint"
 alias bf="cargo build --release && ./target/release/feint"

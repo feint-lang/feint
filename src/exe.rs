@@ -131,12 +131,14 @@ impl<'a> Executor<'a> {
             }
         };
         if self.dis {
+            log::trace!("BEGIN: disassemble code ====================");
             let mut disassembler = dis::Disassembler::new();
             disassembler.disassemble(&code);
             if self.debug {
                 println!();
                 self.display_stack();
             }
+            log::trace!("END: disassemble code ======================");
             Ok(VMState::Halted(0))
         } else {
             self.execute_code(code, self.debug, source)
@@ -150,19 +152,22 @@ impl<'a> Executor<'a> {
         debug: bool,
         source: &mut Source<T>,
     ) -> ExeResult {
+        log::trace!("BEGIN: execute code ============================");
         let result = self.vm.execute(&code);
         if debug {
             self.display_stack();
             self.display_vm_state(&result);
         }
-        result.map_err(|err| {
+        let result = result.map_err(|err| {
             let start = self.vm.loc().0;
             let line =
                 source.get_line(start.line).unwrap_or("<source line not available>");
             self.print_err_line(start.line, line);
             self.handle_runtime_err(&err);
             ExeErr::new(ExeErrKind::RuntimeErr(err.kind))
-        })
+        });
+        log::trace!("END: execute code ==============================");
+        result
     }
 
     fn display_stack(&self) {

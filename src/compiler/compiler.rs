@@ -19,9 +19,12 @@ pub fn compile(
     argv: Vec<&str>,
     keep_top_on_halt: bool,
 ) -> CompResult {
+    log::trace!("BEGIN: compile");
     let argv = argv.into_iter().map(|a| a.to_owned()).collect();
+    log::trace!("ARGV: {argv:?}");
     let mut visitor = Visitor::new(argv);
     visitor.visit_program(program, keep_top_on_halt)?;
+    log::trace!("END: compile");
     Ok(visitor.code)
 }
 
@@ -161,6 +164,7 @@ impl Visitor {
             Kind::FormatString(items) => self.visit_format_string(items)?,
             Kind::Ident(ident) => self.visit_ident(ident)?,
             Kind::DeclarationAndAssignment(lhs_expr, value_expr) => {
+                log::trace!("BEGIN: declare and assign {lhs_expr:?} = {value_expr:?}");
                 self.visit_declaration(*lhs_expr.clone())?;
                 self.visit_assignment(*lhs_expr, *value_expr)?
             }
@@ -488,6 +492,7 @@ impl Visitor {
     }
 
     fn visit_declaration(&mut self, ident_expr: ast::Expr) -> VisitResult {
+        log::trace!("BEGIN: declaration of {ident_expr:?}");
         let name = if let Some(name) = ident_expr.is_ident() {
             if name == "this" {
                 return Err(CompErr::new_cannot_assign_special_ident(name));
@@ -495,6 +500,7 @@ impl Visitor {
             name
         } else if let Some(name) = ident_expr.is_special_ident() {
             if name == "$main" && self.scope_tree.in_global_scope() {
+                log::trace!("FOUND $main");
                 name
             } else {
                 return Err(CompErr::new_cannot_assign_special_ident(name));
@@ -505,8 +511,10 @@ impl Visitor {
             return Err(CompErr::new_expected_ident());
         };
         if self.scope_tree.in_global_scope() {
+            log::trace!("DECLARE GLOBAL: {name}");
             self.push(Inst::DeclareVar(name));
         } else {
+            log::trace!("DECLARE (ADD) LOCAL: {name}");
             self.scope_tree.add_local(name, false);
         }
         Ok(())
@@ -518,13 +526,18 @@ impl Visitor {
         value_expr: ast::Expr,
     ) -> VisitResult {
         // TODO: Allow assignment to attributes
+        log::trace!("BEGIN: assignment {lhs_expr:?} = {value_expr:?}");
         if let Some(name) = lhs_expr.ident_name() {
             self.visit_expr(value_expr, Some(name.clone()))?;
             match self.scope_tree.find_local(name.as_str(), true) {
                 Some((index, _)) => {
+                    log::trace!("ASSIGN (STORE) LOCAL: {name} @ {index}");
                     self.push(Inst::StoreLocal(index));
                 }
-                None => self.push(Inst::AssignVar(name)),
+                None => {
+                    log::trace!("ASSIGN VAR: {name}");
+                    self.push(Inst::AssignVar(name))
+                }
             }
             Ok(())
         } else {

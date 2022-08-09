@@ -28,8 +28,10 @@ pub struct Parser<I: Iterator<Item = ScanTokenResult>> {
     current_token: Option<TokenWithLocation>,
     token_stream: Peekable<I>,
     lookahead_queue: VecDeque<TokenWithLocation>,
-    func_level: u8,
-    loop_level: u8,
+    statement_level: u32,
+    expr_level: u32,
+    func_level: u32,
+    loop_level: u32,
 }
 
 impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
@@ -38,6 +40,8 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
             current_token: None,
             token_stream: token_iter.peekable(),
             lookahead_queue: VecDeque::new(),
+            statement_level: 0,
+            expr_level: 0,
             func_level: 0,
             loop_level: 0,
         }
@@ -48,8 +52,10 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
     /// Parse token stream a produce a program, which is a sequence of
     /// statements.
     pub fn parse(&mut self) -> ParseResult {
+        log::trace!("BEGIN: program");
         let statements = self.statements()?;
         let program = ast::Program::new(statements);
+        log::trace!("END: program");
         Ok(program)
     }
 
@@ -73,6 +79,9 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
     /// certain cases, multiple statements may be returned (e.g.,
     /// loops).
     fn statement(&mut self) -> StatementResult {
+        let level = self.statement_level;
+        log::trace!("BEGIN {level}: statement");
+        self.statement_level += 1;
         use Token::{Break, Continue, EndOfStatement, Jump, Label, Return};
         let token = self.expect_next_token()?;
         let start = token.start;
@@ -90,6 +99,8 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
             }
         };
         self.expect_token(&EndOfStatement)?;
+        self.statement_level -= 1;
+        log::trace!("END {level}: statement = {statement:?}");
         Ok(statement)
     }
 
@@ -144,6 +155,9 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
     /// Get the next expression, possibly recurring to handle nested
     /// expressions, unary & binary expressions, blocks, functions, etc.
     fn expr(&mut self, prec: u8) -> ExprResult {
+        let level = self.expr_level;
+        log::trace!("BEGIN {level}: expr");
+        self.expr_level += 1;
         use Token::*;
         let token = self.expect_next_token()?;
         let start = token.start;
@@ -189,6 +203,8 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
         // expression will be parsed and returned. Otherwise, the
         // expression will be returned as is.
         let expr = self.maybe_binary_expr(prec, expr)?;
+        self.expr_level -= 1;
+        log::trace!("END {level}: expr = {expr:?}");
         Ok(expr)
     }
 
@@ -199,12 +215,17 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
     /// 3. One of the above followed by `->`, indicating that the
     ///    parenthesized expression is a function parameter list.
     fn parenthesized(&mut self, start: Location, force_tuple: bool) -> ExprResult {
+        let level = self.expr_level;
+        log::trace!("BEGIN {level}: parenthesized expr");
         use Token::{Comma, RParen};
         if self.next_token_is(&RParen)? {
+            log::trace!("PARENTHESIZED: is empty tuple");
             return Ok(ast::Expr::new_tuple(vec![], start, self.loc()));
         }
+        log::trace!("PARENTHESIZED: get first item");
         let first_item = self.expr(0)?;
         let expr = if self.peek_token_is(&Comma)? {
+            log::trace!("PARENTHESIZED: is tuple");
             let mut items = vec![first_item];
             loop {
                 if self.next_token_is(&RParen)? {
@@ -219,6 +240,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
             }
             ast::Expr::new_tuple(items, start, self.loc())
         } else {
+            log::trace!("PARENTHESIZED: is single item (not tuple)");
             self.expect_token(&RParen)?;
             if force_tuple {
                 ast::Expr::new_tuple(vec![first_item], start, self.loc())
@@ -226,6 +248,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
                 first_item
             }
         };
+        log::trace!("END {level}: parenthesized expr");
         Ok(expr)
     }
 
@@ -488,6 +511,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
     /// RHS expression and return a binary expression. If not, just
     /// return the original expr.
     fn maybe_binary_expr(&mut self, prec: u8, mut lhs: ast::Expr) -> ExprResult {
+        log::trace!("BEGIN: maybe binary expr {lhs:?}");
         use ParseErrKind::ExpectedOperand;
         let start = lhs.start;
         loop {
@@ -505,26 +529,38 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
                 lhs = match op_token {
                     // Assignment
                     Token::Equal => {
+                        log::trace!("BINOP: assignment");
+                        log::trace!("ASSIGNMENT: get value expr");
                         let value = self.expr(infix_prec)?;
                         let end = value.end;
                         if lhs.ident_name().is_some() {
+                            log::trace!("ASSIGN TO IDENT: {lhs:?} = {value:?}");
                             ast::Expr::new_declaration_and_assignment(
                                 lhs, value, start, end,
                             )
                         } else {
+                            log::trace!(
+                                "ASSIGN TO OTHER (non-ident): {lhs:?} = {value:?}"
+                            );
                             ast::Expr::new_assignment(lhs, value, start, end)
                         }
                     }
                     // Call
-                    Token::LParen => self.call(lhs, infix_token.start)?,
+                    Token::LParen => {
+                        log::trace!("BINOP: call {lhs:?}");
+                        self.call(lhs, infix_token.start)?
+                    }
                     // Binary operation
                     _ => {
+                        log::trace!("BINOP: get right-hand side");
                         let rhs = self.expr(infix_prec)?;
+                        log::trace!("BINOP: {lhs:?} {op_token} {rhs:?}");
                         let end = rhs.end;
                         ast::Expr::new_binary_op(lhs, op_token, rhs, start, end)
                     }
                 }
             } else {
+                log::trace!("END: not binary expr");
                 break Ok(lhs);
             }
         }

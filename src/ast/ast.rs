@@ -28,7 +28,7 @@ impl fmt::Debug for Program {
             .iter()
             .map(|statement| format!("{:?}", statement))
             .collect();
-        write!(f, "{}", items.join("\n"))
+        write!(f, "{}", items.join(" ; "))
     }
 }
 
@@ -94,21 +94,21 @@ impl Statement {
 
 impl fmt::Debug for Statement {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Statement[{}, {}]({:?})", self.start, self.end, self.kind)
+        write!(f, "< {:?} >", self.kind)
     }
 }
 
 impl fmt::Debug for StatementKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Expr(expr) => write!(f, "Expr({:?})", expr),
+            Self::Expr(expr) => write!(f, "{:?}", expr),
             Self::Label(label_index, expr) => {
-                write!(f, "Label: {} {expr:?}", label_index)
+                write!(f, "label: {label_index} {expr:?}")
             }
-            Self::Jump(label_index) => write!(f, "Jump: {}", label_index),
+            Self::Jump(label_index) => write!(f, "jump: {label_index}",),
             Self::Break(expr) => write!(f, "break {expr:?}"),
             Self::Return(expr) => write!(f, "return {expr:?}"),
-            Self::Continue => write!(f, "Continue"),
+            Self::Continue => write!(f, "continue"),
         }
     }
 }
@@ -368,7 +368,7 @@ impl Expr {
 
 impl fmt::Debug for Expr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "[{}, {}] {:?}", self.start, self.end, self.kind)
+        write!(f, "{{ {:?} }}", self.kind)
     }
 }
 
@@ -384,11 +384,11 @@ impl fmt::Debug for ExprKind {
                 write!(f, "{ident:?} = {expr:?}")
             }
             Self::Assignment(ident, expr) => write!(f, "{ident:?} = {expr:?}"),
-            Self::Block(block) => write!(f, "{block:?}"),
+            Self::Block(block) => write!(f, "block {block:?}"),
             Self::Conditional(branches, default) => {
                 write!(f, "{branches:?} {default:?}")
             }
-            Self::Loop(expr, block) => write!(f, "loop {expr:?}\n{block:?}"),
+            Self::Loop(expr, block) => write!(f, "loop {expr:?} {block:?}"),
             Self::Func(func) => write!(f, "{func:?}"),
             Self::Call(func) => write!(f, "{func:?}"),
             Self::UnaryOp(op, a) => write!(f, "({op:?}{a:?})"),
@@ -421,7 +421,7 @@ impl fmt::Debug for StatementBlock {
             .iter()
             .map(|statement| format!("{:?}", statement))
             .collect();
-        write!(f, "Block ->\n    {}", items.join("\n    "))
+        write!(f, "-> {}", items.join(" ; "))
     }
 }
 
@@ -440,7 +440,12 @@ impl Func {
 
 impl fmt::Debug for Func {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Function")
+        let params = if let Some(params) = &self.params {
+            params.join(", ")
+        } else {
+            "...".to_owned()
+        };
+        write!(f, "func ({}) {:?}", params, self.block)
     }
 }
 
@@ -459,7 +464,7 @@ impl Call {
 
 impl fmt::Debug for Call {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Call ({})", self.args.len())
+        write!(f, "call ({})", self.args.len())
     }
 }
 
@@ -526,7 +531,7 @@ impl fmt::Debug for LiteralKind {
             Self::Float(value) => value.to_string(),
             Self::String(value) => value.clone(),
         };
-        write!(f, "{}", string)
+        write!(f, "{string}")
     }
 }
 
@@ -573,7 +578,7 @@ impl Ident {
 
 impl fmt::Debug for Ident {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self.kind)
+        write!(f, "{}", self.name())
     }
 }
 

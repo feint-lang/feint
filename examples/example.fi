@@ -70,7 +70,6 @@ print(func_with_return_type())
 
 loops = () ->
     i = 0
-
     loop ->
         print(i)
         i += 1
