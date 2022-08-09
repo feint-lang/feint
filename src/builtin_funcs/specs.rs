@@ -15,7 +15,7 @@ pub fn get_builtin_func_specs<'a>() -> Vec<(&'a str, Option<Vec<&'a str>>, Built
         // Print
         ("print", None, print),
         // Type
-        ("type_of", None, type_of),
-        ("obj_id", None, obj_id),
+        ("type_of", Some(vec!["object"]), type_of),
+        ("obj_id", Some(vec!["object"]), obj_id),
     ]
 }
