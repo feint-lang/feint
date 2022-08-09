@@ -397,25 +397,32 @@ impl VM {
 
     fn handle_unary_op(&mut self, op: &UnaryOperator) -> RuntimeResult {
         use UnaryOperator::*;
-        let a = self.pop_obj()?;
+        let a_kind = self.pop()?;
+        let a_ref = self.get_obj(&a_kind);
         let result = match op {
-            Plus => a, // no-op
-            Negate => a.read().unwrap().negate()?,
+            Plus => a_ref, // no-op
+            Negate => a_ref.read().unwrap().negate()?,
         };
+        if let ValueStackKind::Local(a, index) = a_kind {
+            self.push_and_store_local(a, index);
+        }
         self.push_temp(result);
         Ok(())
     }
 
     fn handle_unary_compare_op(&mut self, op: &UnaryCompareOperator) -> RuntimeResult {
         use UnaryCompareOperator::*;
-        let a = self.pop_obj()?;
-        let a = a.read().unwrap();
+        let a_kind = self.pop()?;
+        let a_ref = self.get_obj(&a_kind);
+        let a = a_ref.read().unwrap();
         let result = match op {
             AsBool => a.bool_val()?,
             Not => a.not()?,
         };
-        let obj = create::new_bool(result);
-        self.push_temp(obj);
+        if let ValueStackKind::Local(a, index) = a_kind {
+            self.push_and_store_local(a, index);
+        }
+        self.push_temp(create::new_bool(result));
         Ok(())
     }
 
@@ -423,9 +430,9 @@ impl VM {
     /// result value onto stack.
     fn handle_binary_op(&mut self, op: &BinaryOperator) -> RuntimeResult {
         use BinaryOperator::*;
-        let operands = self.pop_n_obj(2)?;
-        let a_ref = operands.get(0).unwrap();
-        let b_ref = operands.get(1).unwrap();
+        let b_ref = self.pop_obj()?;
+        let a_kind = self.pop()?;
+        let a_ref = self.get_obj(&a_kind);
         let a = a_ref.read().unwrap();
         let b = b_ref.read().unwrap();
         let b = &*b;
@@ -458,6 +465,9 @@ impl VM {
                 }
             }
         };
+        if let ValueStackKind::Local(a, index) = a_kind {
+            self.push_and_store_local(a, index);
+        }
         self.push_temp(result);
         Ok(())
     }
@@ -466,9 +476,10 @@ impl VM {
     /// temp value onto stack.
     fn handle_compare_op(&mut self, op: &CompareOperator) -> RuntimeResult {
         use CompareOperator::*;
-        let operands = self.pop_n_obj(2)?;
-        let a_ref = operands.get(0).unwrap();
-        let b_ref = operands.get(1).unwrap();
+        // Get RHS (b) first because we need to know if LHS (a) is a local
+        let b_ref = self.pop_obj()?;
+        let a_kind = self.pop()?;
+        let a_ref = self.get_obj(&a_kind);
         let a = a_ref.read().unwrap();
         let b = b_ref.read().unwrap();
         let b = &*b;
@@ -484,8 +495,10 @@ impl VM {
             GreaterThan => a.greater_than(b)?,
             GreaterThanOrEqual => a.greater_than(b)? || a.is_equal(b),
         };
-        let obj = create::new_bool(result);
-        self.push_temp(obj);
+        if let ValueStackKind::Local(a, index) = a_kind {
+            self.push_and_store_local(a, index);
+        }
+        self.push_temp(create::new_bool(result));
         Ok(())
     }
 
@@ -494,26 +507,21 @@ impl VM {
     /// be a variable.
     fn handle_inplace_op(&mut self, op: &InplaceOperator) -> RuntimeResult {
         use InplaceOperator::*;
-        use ValueStackKind::*;
-        let kinds = self.pop_n(2)?;
-        let a_kind = kinds.get(0).unwrap();
-        let b = self.get_obj(kinds.get(1).unwrap());
-        let b = b.read().unwrap();
-        if let Var(a, depth, name) = a_kind {
-            let a = a.read().unwrap();
-            let result = match op {
-                AddEqual => a.add(&*b)?,
-                SubEqual => a.sub(&*b)?,
-            };
-            self.ctx.assign_var_at_depth(*depth, name.as_str(), result)?;
-            self.push_var(*depth, name.clone())?;
-        } else if let Local(a, index) = a_kind {
-            let a = a.read().unwrap();
-            let result = match op {
-                AddEqual => a.add(&*b)?,
-                SubEqual => a.sub(&*b)?,
-            };
-            self.push_and_store_local(result, *index);
+        let b_ref = self.pop_obj()?;
+        let a_kind = self.pop()?;
+        let a_ref = self.get_obj(&a_kind);
+        let a = a_ref.read().unwrap();
+        let b = b_ref.read().unwrap();
+        let b = &*b;
+        let result = match op {
+            AddEqual => a.add(&*b)?,
+            SubEqual => a.sub(&*b)?,
+        };
+        if let ValueStackKind::Var(_, depth, name) = a_kind {
+            self.ctx.assign_var_at_depth(depth, name.as_str(), result)?;
+            self.push_var(depth, name)?;
+        } else if let ValueStackKind::Local(_, index) = a_kind {
+            self.push_and_store_local(result, index);
         } else {
             let message = format!("Binary op: {}", op);
             return Err(RuntimeErr::new(RuntimeErrKind::ExpectedVar(message)));
@@ -778,7 +786,7 @@ impl VM {
         for (i, kind) in self.value_stack.iter().enumerate() {
             let obj = self.get_obj(kind);
             let obj = &*obj.read().unwrap();
-            eprintln!("{:0>8} {:?}", i, obj);
+            eprintln!("{:0>8} {:?}{}", i, obj, if i == 0 { " [TOP]" } else { "" });
         }
     }
 }
