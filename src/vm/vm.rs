@@ -548,6 +548,7 @@ impl VM {
     ) -> RuntimeResult {
         log::trace!("BEGIN: call {} with this: {}", func.name, this_to_str(&this));
         log::trace!("ARGS: {}", args_to_str(&args));
+        self.check_call_args(&func.name, &func.params, &this, &args)?;
         self.push_call_frame(this.clone())?;
         self.enter_scope();
         self.assign_call_args(&func.params, &args)?;
@@ -569,6 +570,7 @@ impl VM {
     pub fn call_func(&mut self, func: &Func, this: This, args: Args) -> RuntimeResult {
         log::trace!("BEGIN: call {} with this: {}", func.name, this_to_str(&this));
         log::trace!("ARGS: {}", args_to_str(&args));
+        self.check_call_args(&func.name, &func.params, &this, &args)?;
         self.push_call_frame(this.clone())?;
         self.enter_scope();
         if let Some(this_var) = this {
@@ -599,6 +601,38 @@ impl VM {
                 Err(err)
             }
         }
+    }
+
+    /// Ensure correct number of args were passed.
+    fn check_call_args(
+        &self,
+        name: &str,
+        params: &Params,
+        this: &This,
+        args: &Args,
+    ) -> RuntimeResult {
+        if let Some(params) = params {
+            let arity = params.len();
+            let n_args = args.len();
+            if n_args != arity {
+                let ess = if arity == 1 { "" } else { "s" };
+                let msg = format!(
+                    "{}{}() expected {arity} arg{ess}; got {n_args}",
+                    this.clone().map_or_else(
+                        || "".to_owned(),
+                        |this| {
+                            let this = this.read().unwrap();
+                            let class = this.class();
+                            let class = class.read().unwrap();
+                            format!("{}.", class.name())
+                        }
+                    ),
+                    name
+                );
+                return Err(RuntimeErr::new_type_err(msg));
+            }
+        }
+        Ok(())
     }
 
     /// Declare and assign vars corresponding to a call's args in the

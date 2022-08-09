@@ -88,20 +88,6 @@ macro_rules! make_meth {
                     return Err(RuntimeErr::new_type_err(msg));
                 }
 
-                if let Some(params) = $params {
-                    let arity = params.len();
-                    let argc = args.len();
-                    if argc != arity {
-                        let ess = if arity == 1 { "" } else { "s" };
-                        let msg = format!(
-                            "Method {}.{}() expected {arity} arg{ess}; got {argc}",
-                            stringify!($ty),
-                            stringify!($name),
-                        );
-                        return Err(RuntimeErr::new_type_err(msg));
-                    }
-                }
-
                 $func(this_ref.clone(), args, vm)
             }
         )
