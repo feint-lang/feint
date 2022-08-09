@@ -79,7 +79,7 @@ fn parse_inline_block() {
                     start: Location::new(1, 10),
                     end: Location::new(1, 13),
                 }],
-                start: Location::new(1, 10),
+                start: Location::new(1, 1),
                 end: Location::new(1, 13),
             }),
             start: Location::new(1, 1),
@@ -88,7 +88,7 @@ fn parse_inline_block() {
         start: Location::new(1, 1),
         end: Location::new(1, 13),
     };
-    assert_eq!(*parsed, expected);
+    assert_eq!(expected, *parsed);
 }
 
 #[test]
@@ -114,7 +114,7 @@ fn parse_inline_block_in_parens() {
                     start: Location::new(1, 11),
                     end: Location::new(1, 14),
                 }],
-                start: Location::new(1, 11),
+                start: Location::new(1, 2),
                 end: Location::new(1, 14),
             }),
             start: Location::new(1, 2),

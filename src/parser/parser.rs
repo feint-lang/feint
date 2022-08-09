@@ -181,7 +181,8 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
             Str(string) => ast::Expr::new_string(string, start, end),
             FormatStr(tokens) => self.format_string(tokens, start, end)?,
             Block => {
-                let block = self.block()?;
+                let block = self.block(start)?;
+                let start = block.start;
                 let end = block.end;
                 ast::Expr::new_block(block, start, end)
             }
@@ -322,7 +323,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
     }
 
     /// Handle `block ->`, `if <expr> ->`, etc.
-    fn block(&mut self) -> BlockResult {
+    fn block(&mut self, start: Location) -> BlockResult {
         use ParseErrKind::{ExpectedBlock, ExpectedToken};
         use Token::{InlineScopeEnd, InlineScopeStart, ScopeEnd, ScopeStart};
         let statements = if self.next_token_is(&ScopeStart)? {
@@ -339,7 +340,6 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
         } else {
             return Err(self.err(ExpectedToken(self.next_loc(), ScopeStart)));
         };
-        let start = statements[0].start;
         let end = statements[statements.len() - 1].end;
         Ok(ast::StatementBlock::new(statements, start, end))
     }
@@ -350,18 +350,18 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
         let mut branches = vec![];
         let mut end;
         let cond = self.expr(0)?;
-        let block = self.block()?;
+        let block = self.block(cond.end)?;
         end = block.end;
         branches.push((cond, block));
         while let true = self.next_tokens_are(vec![&EndOfStatement, &Else, &If])? {
             let cond = self.expr(0)?;
-            let block = self.block()?;
+            let block = self.block(cond.end)?;
             end = block.end;
             branches.push((cond, block))
         }
         let default = match self.next_tokens_are(vec![&EndOfStatement, &Else])? {
             true => {
-                let block = self.block()?;
+                let block = self.block(self.loc())?;
                 end = block.end;
                 Some(block)
             }
@@ -389,7 +389,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
                     break;
                 }
                 if self.next_token_is(&Colon)? {
-                    let block = self.block()?;
+                    let block = self.block(start)?;
                     end = block.end;
                     default = Some(block);
                     self.expect_token(&EndOfStatement)?;
@@ -407,7 +407,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
                         start,
                         rhs_end,
                     );
-                    let block = self.block()?;
+                    let block = self.block(start)?;
                     end = block.end;
                     branches.push((cond, block));
                     self.expect_token(&EndOfStatement)?;
@@ -430,7 +430,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
             true => ast::Expr::new_true(self.next_loc(), self.next_loc()),
             false => self.expr(0)?,
         };
-        let block = self.block()?;
+        let block = self.block(start)?;
         let end = block.end;
         self.loop_level -= 1;
         Ok(ast::Expr::new_loop(cond, block, start, end))
@@ -467,7 +467,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
         } else {
             None
         };
-        let block = self.block()?;
+        let block = self.block(start)?;
         let def_end = block.end;
         self.func_level -= 1;
         // NOTE: The name for a func will be set later if the function
