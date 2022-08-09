@@ -11,7 +11,7 @@ use super::int::Int;
 pub fn this_to_str(this: &This) -> String {
     let t = this.clone().unwrap_or_else(create::new_nil);
     let t = t.read().unwrap();
-    t.to_string()
+    format!("{t} {}", t.class().read().unwrap())
 }
 
 /// Given a list of args (`ObjectRef`s), return a string joining them

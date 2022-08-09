@@ -535,6 +535,7 @@ impl VM {
         let callable = self.pop_obj()?;
         let callable = callable.read().unwrap();
         log::trace!("HANDLE CALL: callable = {:?}", &*callable);
+        log::trace!("STACK BEFORE POPPING {num_args} ARG(s):\n{}", self.format_stack());
         let args = if num_args > 0 { self.pop_n_obj(num_args)? } else { vec![] };
         callable.call(args, self)
     }
@@ -545,7 +546,7 @@ impl VM {
         this: This,
         args: Args,
     ) -> RuntimeResult {
-        log::trace!("BEGIN: call {} with this={}", func.name, this_to_str(&this));
+        log::trace!("BEGIN: call {} with this: {}", func.name, this_to_str(&this));
         log::trace!("ARGS: {}", args_to_str(&args));
         self.push_call_frame(this.clone())?;
         self.enter_scope();
@@ -566,7 +567,7 @@ impl VM {
     }
 
     pub fn call_func(&mut self, func: &Func, this: This, args: Args) -> RuntimeResult {
-        log::trace!("BEGIN: call {} with this={}", func.name, this_to_str(&this));
+        log::trace!("BEGIN: call {} with this: {}", func.name, this_to_str(&this));
         log::trace!("ARGS: {}", args_to_str(&args));
         self.push_call_frame(this.clone())?;
         self.enter_scope();
@@ -787,13 +788,21 @@ impl VM {
 
     /// Show the contents of the stack (top first).
     pub fn display_stack(&self) {
+        eprintln!("{}", self.format_stack());
+    }
+
+    pub fn format_stack(&self) -> String {
         if self.value_stack.is_empty() {
-            return eprintln!("[EMPTY]");
+            return "[EMPTY]".to_owned();
         }
+        let mut items = vec![];
         for (i, kind) in self.value_stack.iter().enumerate() {
             let obj = self.get_obj(kind);
             let obj = &*obj.read().unwrap();
-            eprintln!("{:0>8} {:?}{}", i, obj, if i == 0 { " [TOP]" } else { "" });
+            let string =
+                format!("{:0>8} {:?}{}", i, obj, if i == 0 { " [TOP]" } else { "" });
+            items.push(string)
         }
+        items.join("\n")
     }
 }

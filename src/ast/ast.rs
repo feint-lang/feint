@@ -94,7 +94,7 @@ impl Statement {
 
 impl fmt::Debug for Statement {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "< {:?} >", self.kind)
+        write!(f, "< {:?} [{}]:[{}] >", self.kind, self.start, self.end)
     }
 }
 
@@ -364,7 +364,7 @@ impl Expr {
 
 impl fmt::Debug for Expr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{{ {:?} }}", self.kind)
+        write!(f, "{{ {:?} [{}]:[{}] }}", self.kind, self.start, self.end)
     }
 }
 
