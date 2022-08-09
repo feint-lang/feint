@@ -4,6 +4,7 @@ pub(crate) use builtins::BUILTINS;
 pub(crate) use func::Func;
 pub(crate) use ns::Namespace;
 pub(crate) use result::{Args, CallResult, Params, This};
+pub(crate) use util::{args_to_str, this_to_str};
 
 pub(crate) mod create;
 

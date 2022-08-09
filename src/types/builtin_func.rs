@@ -8,6 +8,7 @@ use crate::vm::{RuntimeResult, VM};
 
 use super::create;
 use super::result::{Args, CallResult, Params, This};
+use super::util::args_to_str;
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
 use super::class::TYPE_TYPE;
@@ -121,6 +122,8 @@ impl ObjectTrait for BuiltinFunc {
     }
 
     fn call(&self, args: Args, vm: &mut VM) -> RuntimeResult {
+        log::trace!("BEGIN: call {self}");
+        log::trace!("ARGS: {}", args_to_str(&args));
         vm.call_builtin_func(self, None, args)
     }
 }

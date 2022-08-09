@@ -10,6 +10,7 @@ use std::sync::{
 use ctrlc;
 use num_traits::ToPrimitive;
 
+use crate::types::{args_to_str, this_to_str};
 use crate::types::{create, Args, BuiltinFunc, Func, ObjectRef, Params, This};
 use crate::util::{
     BinaryOperator, CompareOperator, InplaceOperator, Location, Stack,
@@ -533,6 +534,7 @@ impl VM {
     fn handle_call(&mut self, num_args: usize) -> RuntimeResult {
         let callable = self.pop_obj()?;
         let callable = callable.read().unwrap();
+        log::trace!("HANDLE CALL: callable = {:?}", &*callable);
         let args = if num_args > 0 { self.pop_n_obj(num_args)? } else { vec![] };
         callable.call(args, self)
     }
@@ -543,6 +545,8 @@ impl VM {
         this: This,
         args: Args,
     ) -> RuntimeResult {
+        log::trace!("BEGIN: call {} with this={}", func.name, this_to_str(&this));
+        log::trace!("ARGS: {}", args_to_str(&args));
         self.push_call_frame(this.clone())?;
         self.enter_scope();
         self.assign_call_args(&func.params, &args)?;
@@ -562,6 +566,8 @@ impl VM {
     }
 
     pub fn call_func(&mut self, func: &Func, this: This, args: Args) -> RuntimeResult {
+        log::trace!("BEGIN: call {} with this={}", func.name, this_to_str(&this));
+        log::trace!("ARGS: {}", args_to_str(&args));
         self.push_call_frame(this.clone())?;
         self.enter_scope();
         if let Some(this_var) = this {

@@ -8,6 +8,7 @@ use crate::vm::{RuntimeResult, VM};
 
 use super::create;
 use super::result::Args;
+use super::util::args_to_str;
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
 use super::class::TYPE_TYPE;
@@ -105,6 +106,8 @@ impl ObjectTrait for Closure {
     fn call(&self, args: Args, vm: &mut VM) -> RuntimeResult {
         let func_ref = self.func.read().unwrap();
         if let Some(func) = func_ref.down_to_func() {
+            log::trace!("BEGIN: call closure {func}");
+            log::trace!("ARGS: {}", args_to_str(&args));
             vm.call_func(func, None, args)
         } else {
             Err(self.not_callable())

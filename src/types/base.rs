@@ -11,6 +11,7 @@ use crate::vm::{RuntimeBoolResult, RuntimeErr, RuntimeObjResult, RuntimeResult, 
 use super::builtins::BUILTINS;
 use super::create;
 use super::result::{Args, GetAttrResult, SetAttrResult};
+use super::util::args_to_str;
 
 use super::bool::{Bool, BoolType};
 use super::bound_func::{BoundFunc, BoundFuncType};
@@ -343,7 +344,9 @@ pub trait ObjectTrait {
     // This is here so that functions can be called directly, in
     // particular so that user functions can be called from builtin
     // functions.
-    fn call(&self, _args: Args, _vm: &mut VM) -> RuntimeResult {
+    fn call(&self, args: Args, _vm: &mut VM) -> RuntimeResult {
+        log::trace!("BEGIN: base call");
+        log::trace!("ARGS: {}", args_to_str(&args));
         Err(self.not_callable())
     }
 
