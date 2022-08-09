@@ -19,7 +19,7 @@ impl Disassembler {
         println!("{: <width$}    {:<width$}    INSTRUCTION", "LINE", "IP");
         for (ip, inst) in iter {
             let line = self.format_inst(code, inst);
-            let line_no = if matches!(inst, Halt(_) | Pop | ScopeStart | ScopeEnd) {
+            let line_no = if matches!(inst, Halt(_) | Pop) {
                 println!();
                 "".to_string()
             } else if self.new_line {
@@ -68,7 +68,7 @@ impl Disassembler {
             ScopeStart => self.align("SCOPE_START", "->"),
             ScopeEnd => self.align("SCOPE_END", ""),
             StatementStart(start, _) => {
-                self.new_line = true;
+                self.new_line = start.line != self.curr_line_no;
                 self.curr_line_no = start.line;
                 self.align("STATEMENT_START", "")
             }

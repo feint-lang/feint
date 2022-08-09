@@ -6,7 +6,7 @@ use crate::parser::ParseErr;
 use crate::types::ObjectRef;
 
 pub type CallDepth = usize;
-pub type ExeResult = Result<VMState, RuntimeErr>;
+pub type VMExeResult = Result<VMState, RuntimeErr>;
 pub type RuntimeResult = Result<(), RuntimeErr>;
 pub type RuntimeObjResult = Result<ObjectRef, RuntimeErr>;
 pub type RuntimeBoolResult = Result<bool, RuntimeErr>;

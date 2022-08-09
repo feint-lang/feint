@@ -7,6 +7,7 @@ pub(crate) use inst::Inst;
 pub(crate) use result::VMState;
 pub(crate) use result::{
     RuntimeBoolResult, RuntimeErr, RuntimeErrKind, RuntimeObjResult, RuntimeResult,
+    VMExeResult,
 };
 
 mod code;

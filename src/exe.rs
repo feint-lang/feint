@@ -9,7 +9,7 @@ use crate::scanner::{ScanErr, ScanErrKind, Scanner, Token, TokenWithLocation};
 use crate::util::{
     source_from_file, source_from_stdin, source_from_text, Location, Source,
 };
-use crate::vm::{Code, RuntimeErr, RuntimeErrKind, VMState, VM};
+use crate::vm::{Code, RuntimeErr, RuntimeErrKind, VMExeResult, VMState, VM};
 
 pub struct Executor<'a> {
     pub vm: &'a mut VM,
@@ -133,6 +133,10 @@ impl<'a> Executor<'a> {
         if self.dis {
             let mut disassembler = dis::Disassembler::new();
             disassembler.disassemble(&code);
+            if self.debug {
+                println!();
+                self.display_stack();
+            }
             Ok(VMState::Halted(0))
         } else {
             self.execute_code(code, self.debug, source)
@@ -147,14 +151,10 @@ impl<'a> Executor<'a> {
         source: &mut Source<T>,
     ) -> ExeResult {
         let result = self.vm.execute(&code);
-
         if debug {
-            eprintln!("{:=<79}", "STACK ");
-            self.vm.display_stack();
-            eprintln!("\n{:=<79}", "VM STATE ");
-            eprintln!("{:?}", result);
+            self.display_stack();
+            self.display_vm_state(&result);
         }
-
         result.map_err(|err| {
             let start = self.vm.loc().0;
             let line =
@@ -163,6 +163,16 @@ impl<'a> Executor<'a> {
             self.handle_runtime_err(&err);
             ExeErr::new(ExeErrKind::RuntimeErr(err.kind))
         })
+    }
+
+    fn display_stack(&self) {
+        eprintln!("{:=<79}", "STACK ");
+        self.vm.display_stack();
+    }
+
+    fn display_vm_state(&self, result: &VMExeResult) {
+        eprintln!("\n{:=<79}", "VM STATE ");
+        eprintln!("{:?}", result);
     }
 
     fn print_err_line(&self, line_no: usize, line: &str) {

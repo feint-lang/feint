@@ -21,8 +21,8 @@ use super::code::Code;
 use super::context::RuntimeContext;
 use super::inst::Inst;
 use super::result::{
-    CallDepth, ExeResult, PeekObjResult, PopNObjResult, PopNResult, PopObjResult,
-    PopResult, RuntimeErr, RuntimeErrKind, RuntimeResult, VMState, ValueStackKind,
+    CallDepth, PeekObjResult, PopNObjResult, PopNResult, PopObjResult, PopResult,
+    RuntimeErr, RuntimeErrKind, RuntimeResult, VMExeResult, VMState, ValueStackKind,
 };
 
 pub const DEFAULT_MAX_CALL_DEPTH: CallDepth =
@@ -96,7 +96,7 @@ impl VM {
     /// When a HALT instruction is encountered, the VM's state will be
     /// cleared; it can be "restarted" by passing more instructions to
     /// execute.
-    pub fn execute(&mut self, code: &Code) -> ExeResult {
+    pub fn execute(&mut self, code: &Code) -> VMExeResult {
         use Inst::*;
 
         let handle_sigint = self.handle_sigint;
