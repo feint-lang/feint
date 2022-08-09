@@ -30,8 +30,10 @@ pub fn get_operator_precedence(token: &Token) -> (u8, u8) {
     use Token::*;
     match token {
         Equal                            // a = b
-        | MinusEqual                     // a -= b
-        | PlusEqual          => (0, 1),  // a += b
+        | MulEqual                       // a *= b
+        | DivEqual                       // a /= b
+        | PlusEqual                      // a -= b
+        | MinusEqual         => (0, 1),  // a += b
         
         | Or                 => (0, 2),  // a || b
         | And                => (0, 3),  // a && b

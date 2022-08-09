@@ -506,7 +506,6 @@ impl VM {
     /// and push temp result value onto stack. The first operand *must*
     /// be a variable.
     fn handle_inplace_op(&mut self, op: &InplaceOperator) -> RuntimeResult {
-        use InplaceOperator::*;
         let b_ref = self.pop_obj()?;
         let a_kind = self.pop()?;
         let a_ref = self.get_obj(&a_kind);
@@ -514,8 +513,10 @@ impl VM {
         let b = b_ref.read().unwrap();
         let b = &*b;
         let result = match op {
-            AddEqual => a.add(&*b)?,
-            SubEqual => a.sub(&*b)?,
+            InplaceOperator::Mul => a.mul(&*b)?,
+            InplaceOperator::Div => a.div(&*b)?,
+            InplaceOperator::Add => a.add(&*b)?,
+            InplaceOperator::Sub => a.sub(&*b)?,
         };
         if let ValueStackKind::Var(_, depth, name) = a_kind {
             self.ctx.assign_var_at_depth(depth, name.as_str(), result)?;

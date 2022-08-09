@@ -186,15 +186,19 @@ impl fmt::Debug for CompareOperator {
 /// Inplace binary operators (e.g. +=)
 #[derive(Clone, PartialEq)]
 pub enum InplaceOperator {
-    AddEqual,
-    SubEqual,
+    Mul,
+    Div,
+    Add,
+    Sub,
 }
 
 impl InplaceOperator {
     pub fn from_token(token: &Token) -> Result<Self, String> {
         let op = match token {
-            Token::PlusEqual => Self::AddEqual,
-            Token::MinusEqual => Self::SubEqual,
+            Token::MulEqual => Self::Mul,
+            Token::DivEqual => Self::Div,
+            Token::PlusEqual => Self::Add,
+            Token::MinusEqual => Self::Sub,
             _ => return Err(format!("Unknown inplace operator: {token}")),
         };
         Ok(op)
@@ -204,8 +208,10 @@ impl InplaceOperator {
 impl fmt::Display for InplaceOperator {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let string = match self {
-            Self::AddEqual => "+=",
-            Self::SubEqual => "-=",
+            Self::Mul => "*=",
+            Self::Div => "/=",
+            Self::Add => "+=",
+            Self::Sub => "-=",
         };
         write!(f, "{string}")
     }
