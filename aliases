@@ -27,12 +27,12 @@ alias bf="cargo build --release && ./target/release/feint"
 # profile
 alias p="cargo flamegraph --root --"
 
-# run all examples and show exit code
+# run each example and show its exit code
 function e
-    cargo build --release
+    cargo build
     for f in examples/*.fi
         echo -n "> $f";
-        ./target/release/feint "$f" 1>/dev/null
+        ./target/debug/feint "$f" 1>/dev/null
         echo -- " -> $status"
     end
 end
