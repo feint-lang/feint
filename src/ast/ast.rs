@@ -308,16 +308,12 @@ impl Expr {
         matches!(&self.kind, ExprKind::Literal(Literal { kind: LiteralKind::Ellipsis }))
     }
 
-    /// Check if expression is `true` literal or `1`.
-    pub fn is_true(&self) -> bool {
-        use LiteralKind::{Bool, Int};
-        if let ExprKind::Literal(Literal { kind: Bool(val) }) = &self.kind {
-            *val
-        } else if let ExprKind::Literal(Literal { kind: Int(val) }) = &self.kind {
-            *val == BigInt::from(1)
-        } else {
-            false
-        }
+    /// Check if expression is `false`.
+    pub fn is_false(&self) -> bool {
+        matches!(
+            &self.kind,
+            ExprKind::Literal(Literal { kind: LiteralKind::Bool(false) })
+        )
     }
 
     /// Check if expression is *any* type of identifier. If so, return

@@ -293,21 +293,23 @@ impl Visitor {
         let mut jump_out_addrs: Vec<usize> = vec![];
 
         for (expr, block) in branches {
+            self.enter_scope(ScopeKind::Block);
+            self.push(Inst::ScopeStart);
+
             // Evaluate branch expression.
             self.visit_expr(expr, None)?;
 
-            // Placeholder for jump depending on result of branch expr.
+            // Placeholder for jump if branch condition is false.
             let jump_index = self.len();
             self.push(Inst::Placeholder(
                 jump_index,
-                Box::new(Inst::JumpIfElse(0, 0, 0)),
+                Box::new(Inst::JumpIfNot(0, 0)),
                 "Branch condition jump not set".to_owned(),
             ));
 
-            // Start of branch block (jump target if branch condition is
-            // true).
-            let block_addr = jump_index + 1;
-            self.visit_block(block)?;
+            // Branch selected. Execute body.
+            self.visit_statements(block.statements)?;
+            self.push(Inst::ScopeEnd);
 
             // Placeholder for jump out of conditional suite if this
             // branch is selected.
@@ -320,10 +322,11 @@ impl Visitor {
             ));
 
             // Jump target if branch condition is false.
-            let next_addr = self.len();
+            // NOTE: Jump to SCOPE_END for this branch!
+            self.code.replace_inst(jump_index, Inst::JumpIfNot(self.len(), 0));
 
-            self.code
-                .replace_inst(jump_index, Inst::JumpIfElse(block_addr, next_addr, 0));
+            self.push(Inst::ScopeEnd);
+            self.exit_scope();
         }
 
         // Default block (if present).
@@ -349,43 +352,65 @@ impl Visitor {
         expr: ast::Expr,
         block: ast::StatementBlock,
     ) -> VisitResult {
+        use ast::ExprKind::DeclarationAndAssignment;
+
+        // Enter scope *before* loop condition.
+        self.enter_scope(ScopeKind::Block);
+        self.push(Inst::ScopeStart);
+
         let loop_scope_depth = self.scope_depth;
-        let loop_addr = self.len();
-        let true_cond = expr.is_true();
-        let jump_out_index = if true_cond {
-            // Skip evaluation since we know it will always succeed.
-            self.push(Inst::NoOp);
-            0
+
+        // Evaluate loop expression. If the expression is an assignment,
+        // evaluate the value of the local var instead.
+        let loop_addr = if let DeclarationAndAssignment(lhs, val) = expr.kind {
+            self.visit_declaration(*lhs.clone())?;
+            self.visit_assignment(*lhs, *val)?;
+            let loop_addr = self.len();
+            self.push(Inst::LoadLocal(0));
+            loop_addr
         } else {
-            // Evaluate loop expression on every iteration.
-            self.visit_expr(expr, None)?;
-            // Placeholder for jump-out if result is false.
-            let jump_out_index = self.len();
-            self.push(Inst::Placeholder(
-                jump_out_index,
-                Box::new(Inst::JumpIfNot(0, 0)),
-                "Jump-out for loop not set".to_owned(),
-            ));
-            jump_out_index
+            let loop_addr = self.len();
+            if expr.is_false() {
+                self.push_nil();
+            } else {
+                self.visit_expr(expr, None)?;
+            }
+            loop_addr
         };
+
+        // Placeholder for jump-out if loop expression evaluates false.
+        let jump_out_addr = self.len();
+        self.push(Inst::Placeholder(
+            jump_out_addr,
+            Box::new(Inst::JumpIfNot(0, 0)),
+            "Jump-out for loop not set".to_owned(),
+        ));
+
         // Run the loop body.
-        self.visit_block(block)?;
+        let block_start_addr = self.len();
+        self.visit_statements(block.statements)?;
+        let block_end_addr = self.len();
+
         // Jump to top of loop.
         self.push(Inst::Jump(loop_addr, 0));
-        // Jump-out address.
-        let after_addr = self.len();
-        // Set address of jump-out placeholder (not needed if loop
-        // expression is always true).
-        if !true_cond {
-            self.code.replace_inst(jump_out_index, Inst::JumpIfNot(after_addr, 0));
-        }
+
+        // Jump-out target address.
+        let jump_out_target = self.len();
+
+        // NOTE: Exit scope *after* jumping out.
+        self.push(Inst::ScopeEnd);
+        self.exit_scope();
+
+        // Set target of jump-out placeholder.
+        self.code.replace_inst(jump_out_addr, Inst::JumpIfNot(jump_out_target, 0));
+
         // Set address of breaks and continues.
-        for addr in loop_addr..after_addr {
+        for addr in block_start_addr..=block_end_addr {
             let inst = &self.code[addr];
             if let Inst::BreakPlaceholder(inst_addr, depth) = inst {
                 self.code.replace_inst(
                     *inst_addr,
-                    Inst::Jump(after_addr, depth - loop_scope_depth),
+                    Inst::Jump(jump_out_target, depth - loop_scope_depth),
                 );
             } else if let Inst::ContinuePlaceholder(inst_addr, depth) = inst {
                 self.code.replace_inst(
@@ -394,6 +419,7 @@ impl Visitor {
                 );
             }
         }
+
         Ok(())
     }
 

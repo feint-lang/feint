@@ -174,6 +174,12 @@ loop i <- 1...10 ->
 cond = true
 loop cond ->
     cond = false
+    
+# Another fix for the above example would be to pull the outer cond into
+# the loop's scope as a local variable:
+cond = true
+loop cond = cond ->
+    cond = false
 ```
 
 ## Jumps
