@@ -29,7 +29,7 @@ macro_rules! make_meth {
         stringify!($name),
 
         create::new_builtin_func(
-            stringify!($name), $params,|this_opt: This, args: Args, vm: &mut VM| {
+            stringify!($name), $params, |this_opt: This, args: Args, vm: &mut VM| {
                 if this_opt.is_none() {
                     let msg = format!(
                         "Method {}.{}() expected receiver",

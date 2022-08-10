@@ -24,7 +24,7 @@ pub struct TypeType {
 impl TypeType {
     pub fn new() -> Self {
         Self {
-            namespace: Namespace::with_entries(vec![
+            namespace: Namespace::with_entries(&[
                 // Class Attributes
                 ("$name", create::new_str("Type")),
                 ("$full_name", create::new_str("builtins.Type")),

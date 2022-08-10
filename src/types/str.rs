@@ -26,14 +26,14 @@ pub struct StrType {
 impl StrType {
     pub fn new() -> Self {
         Self {
-            namespace: Namespace::with_entries(vec![
+            namespace: Namespace::with_entries(&[
                 // Class Attributes
                 ("$name", create::new_str("Str")),
                 ("$full_name", create::new_str("builtins.Str")),
                 make_meth!(
                     Str,
                     starts_with,
-                    vec!["prefix"],
+                    &["prefix"],
                     |this: ObjectRef, args: Args, _| {
                         let this = use_this!(this);
                         let this = this.down_to_str().unwrap();
@@ -90,10 +90,9 @@ pub struct Str {
 }
 
 impl Str {
-    pub fn new<S: Into<String>>(value: S) -> Self {
-        let value = value.into();
+    pub fn new(value: String) -> Self {
         Self {
-            namespace: Namespace::with_entries(vec![
+            namespace: Namespace::with_entries(&[
                 // Instance Attributes
                 ("len", create::new_int(value.len())),
             ]),

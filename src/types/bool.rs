@@ -27,7 +27,7 @@ unsafe impl Sync for BoolType {}
 impl BoolType {
     pub fn new() -> Self {
         Self {
-            namespace: Namespace::with_entries(vec![
+            namespace: Namespace::with_entries(&[
                 // Class Attributes
                 ("$name", create::new_str("Bool")),
                 ("$full_name", create::new_str("builtins.Bool")),

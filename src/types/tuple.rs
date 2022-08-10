@@ -27,17 +27,17 @@ pub struct TupleType {
 impl TupleType {
     pub fn new() -> Self {
         Self {
-            namespace: Namespace::with_entries(vec![
+            namespace: Namespace::with_entries(&[
                 // Class Attributes
                 ("$name", create::new_str("Tuple")),
                 ("$full_name", create::new_str("builtins.Tuple")),
                 // Instance Methods
-                make_meth!(Tuple, length, vec![], |this: ObjectRef, _, _| {
+                make_meth!(Tuple, length, &[], |this: ObjectRef, _, _| {
                     let this = use_this!(this);
                     let this = this.down_to_tuple().unwrap();
                     Ok(create::new_int(this.len()))
                 }),
-                make_meth!(Tuple, is_empty, vec![], |this: ObjectRef, _, _| {
+                make_meth!(Tuple, is_empty, &[], |this: ObjectRef, _, _| {
                     let this = use_this!(this);
                     let this = this.down_to_tuple().unwrap();
                     Ok(create::new_bool(this.len() == 0))
@@ -45,7 +45,7 @@ impl TupleType {
                 make_meth!(
                     Tuple,
                     map,
-                    vec!["map_fn"],
+                    &["map_fn"],
                     |this: ObjectRef, args: Args, vm: &mut VM| {
                         let this = use_this!(this);
                         let this = this.down_to_tuple().unwrap();

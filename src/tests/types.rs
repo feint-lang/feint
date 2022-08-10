@@ -41,8 +41,7 @@ mod list {
 
     #[test]
     fn test_push_exists() {
-        let items = vec![];
-        let obj_ref = create::new_list(items);
+        let obj_ref = create::new_list(vec![]);
         let list = obj_ref.read().unwrap();
         let push = list.get_attr("push");
         assert!(push.is_ok());

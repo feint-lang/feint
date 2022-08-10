@@ -27,7 +27,7 @@ unsafe impl Sync for NilType {}
 impl NilType {
     pub fn new() -> Self {
         Self {
-            namespace: Namespace::with_entries(vec![
+            namespace: Namespace::with_entries(&[
                 // Class Attributes
                 ("$name", create::new_str("Nil")),
                 ("$full_name", create::new_str("builtins.Nil")),

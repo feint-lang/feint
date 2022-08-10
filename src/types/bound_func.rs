@@ -29,7 +29,7 @@ unsafe impl Sync for BoundFuncType {}
 impl BoundFuncType {
     pub fn new() -> Self {
         Self {
-            namespace: Namespace::with_entries(vec![
+            namespace: Namespace::with_entries(&[
                 // Class Attributes
                 ("$name", create::new_str("BoundFunc")),
                 ("$full_name", create::new_str("builtins.BoundFunc")),

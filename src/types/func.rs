@@ -29,7 +29,7 @@ unsafe impl Sync for FuncType {}
 impl FuncType {
     pub fn new() -> Self {
         Self {
-            namespace: Namespace::with_entries(vec![
+            namespace: Namespace::with_entries(&[
                 // Class Attributes
                 ("$name", create::new_str("Func")),
                 ("$full_name", create::new_str("builtins.Func")),
@@ -83,10 +83,9 @@ unsafe impl Send for Func {}
 unsafe impl Sync for Func {}
 
 impl Func {
-    pub fn new<S: Into<String>>(name: S, params: Params, code: Code) -> Self {
-        let name = name.into();
+    pub fn new(name: String, params: Params, code: Code) -> Self {
         Self {
-            namespace: Namespace::with_entries(vec![
+            namespace: Namespace::with_entries(&[
                 // Instance Attributes
                 ("$name", create::new_str(name.as_str())),
             ]),

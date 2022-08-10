@@ -20,11 +20,10 @@ pub struct CustomType {
 }
 
 impl CustomType {
-    pub fn new<S: Into<String>>(module: Arc<RwLock<Module>>, name: S) -> Self {
-        let name = name.into();
+    pub fn new(module: Arc<RwLock<Module>>, name: String) -> Self {
         let full_name = format!("{}.{name}", module.read().unwrap().name());
         Self {
-            namespace: Namespace::with_entries(vec![
+            namespace: Namespace::with_entries(&[
                 // Class Attributes
                 ("$name", create::new_str(name.as_str())),
                 ("$full_name", create::new_str(full_name.as_str())),

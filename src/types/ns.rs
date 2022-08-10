@@ -20,11 +20,9 @@ impl Namespace {
         Self { objects: HashMap::new() }
     }
 
-    pub fn with_entries<S: Into<String>>(entries: Vec<(S, ObjectRef)>) -> Self {
+    pub fn with_entries(entries: &[(&str, ObjectRef)]) -> Self {
         let mut ns = Self::new();
-        for entry in entries.into_iter() {
-            ns.add_entry(entry);
-        }
+        ns.add_entries(entries);
         ns
     }
 
@@ -55,6 +53,10 @@ impl Namespace {
     /// 2-tuple containing the name and object.
     pub fn add_entry<S: Into<String>>(&mut self, entry: (S, ObjectRef)) {
         self.objects.insert(entry.0.into(), entry.1);
+    }
+
+    pub fn add_entries(&mut self, entries: &[(&str, ObjectRef)]) {
+        self.objects.extend(entries.iter().map(|(k, v)| (k.to_string(), v.clone())));
     }
 
     /// Set an object's value. This will only succeed if the object

@@ -32,7 +32,7 @@ unsafe impl Sync for BuiltinFuncType {}
 impl BuiltinFuncType {
     pub fn new() -> Self {
         Self {
-            namespace: Namespace::with_entries(vec![
+            namespace: Namespace::with_entries(&[
                 // Class Attributes
                 ("$name", create::new_str("BuiltinFunc")),
                 ("$full_name", create::new_str("builtins.BuiltinFunc")),
@@ -86,10 +86,9 @@ unsafe impl Send for BuiltinFunc {}
 unsafe impl Sync for BuiltinFunc {}
 
 impl BuiltinFunc {
-    pub fn new<S: Into<String>>(name: S, params: Params, func: BuiltinFn) -> Self {
-        let name = name.into();
+    pub fn new(name: String, params: Params, func: BuiltinFn) -> Self {
         Self {
-            namespace: Namespace::with_entries(vec![
+            namespace: Namespace::with_entries(&[
                 // Instance Attributes
                 ("$name", create::new_str(name.as_str())),
             ]),

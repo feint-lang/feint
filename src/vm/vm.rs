@@ -526,7 +526,7 @@ impl VM {
     ) -> RuntimeResult {
         log::trace!("BEGIN: call {} with this: {}", func.name(), this_to_str(&this));
         log::trace!("ARGS: {}", args_to_str(&args));
-        let args = self.check_call_args(func, &this, &args)?;
+        let args = self.check_call_args(func, &this, args)?;
         self.push_call_frame(this.clone())?;
         let result = (func.func)(this, args, self);
         match result {
@@ -545,7 +545,7 @@ impl VM {
     pub fn call_func(&mut self, func: &Func, this: This, args: Args) -> RuntimeResult {
         log::trace!("BEGIN: call {} with this: {}", func.name(), this_to_str(&this));
         log::trace!("ARGS: {}", args_to_str(&args));
-        let args = self.check_call_args(func, &this, &args)?;
+        let args = self.check_call_args(func, &this, args)?;
         self.enter_scope();
         self.push_call_frame(this.clone())?;
         if let Some(this_var) = this {
@@ -579,7 +579,7 @@ impl VM {
         &self,
         func: &dyn FuncTrait,
         this: &This,
-        args: &Args,
+        args: Args,
     ) -> Result<Args, RuntimeErr> {
         let name = func.name();
         let arity = func.arity();
@@ -590,13 +590,14 @@ impl VM {
             for arg in args.iter().take(var_args_index) {
                 new_args.push(arg.clone());
             }
-            let var_args = args.iter().skip(var_args_index).cloned().collect();
+            let var_args: Vec<ObjectRef> =
+                args.iter().skip(var_args_index).cloned().collect();
             let var_args = create::new_tuple(var_args);
             new_args.push(var_args);
             Ok(new_args)
         } else {
             self.check_arity(name, arity, args.len(), this)?;
-            Ok(args.clone())
+            Ok(args)
         }
     }
 

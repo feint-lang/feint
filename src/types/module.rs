@@ -25,7 +25,7 @@ unsafe impl Sync for ModuleType {}
 impl ModuleType {
     pub fn new() -> Self {
         Self {
-            namespace: Namespace::with_entries(vec![
+            namespace: Namespace::with_entries(&[
                 // Class Attributes
                 ("$name", create::new_str("Module")),
                 ("$full_name", create::new_str("builtins.Module")),
@@ -77,8 +77,8 @@ unsafe impl Send for Module {}
 unsafe impl Sync for Module {}
 
 impl Module {
-    pub fn new<S: Into<String>>(name: S, namespace: Namespace) -> Self {
-        Self { namespace, name: name.into() }
+    pub fn new(name: String, namespace: Namespace) -> Self {
+        Self { namespace, name }
     }
 
     pub fn name(&self) -> &str {

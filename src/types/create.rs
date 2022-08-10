@@ -79,13 +79,9 @@ pub fn new_bound_func(func: ObjectRef, this: ObjectRef) -> ObjectRef {
     Arc::new(RwLock::new(BoundFunc::new(func, this)))
 }
 
-pub fn new_builtin_func<S: Into<String>>(
-    name: S,
-    params: Vec<S>,
-    func: BuiltinFn,
-) -> ObjectRef {
-    let params = collect_params(params);
-    Arc::new(RwLock::new(BuiltinFunc::new(name, params, func)))
+pub fn new_builtin_func(name: &str, params: &[&str], func: BuiltinFn) -> ObjectRef {
+    let params = params.iter().map(|n| n.to_string()).collect();
+    Arc::new(RwLock::new(BuiltinFunc::new(name.to_owned(), params, func)))
 }
 
 pub fn new_closure(func: ObjectRef) -> ObjectRef {
@@ -102,8 +98,10 @@ pub fn new_float_from_string<S: Into<String>>(value: S) -> ObjectRef {
     new_float(value)
 }
 
-pub fn new_func<S: Into<String>>(name: S, params: Vec<S>, code: Code) -> ObjectRef {
-    let params = collect_params(params);
+/// NOTE: User functions are created in the compiler where name and
+///       params are already owned, so we don't do any conversion here
+///       like with builtin functions above.
+pub fn new_func(name: String, params: Params, code: Code) -> ObjectRef {
     Arc::new(RwLock::new(Func::new(name, params, code)))
 }
 
@@ -138,11 +136,11 @@ pub fn new_map(entries: Vec<(String, ObjectRef)>) -> ObjectRef {
 }
 
 pub fn new_module<S: Into<String>>(name: S, ns: Namespace) -> Arc<RwLock<Module>> {
-    Arc::new(RwLock::new(Module::new(name, ns)))
+    Arc::new(RwLock::new(Module::new(name.into(), ns)))
 }
 
 pub fn new_str<S: Into<String>>(value: S) -> ObjectRef {
-    Arc::new(RwLock::new(Str::new(value)))
+    Arc::new(RwLock::new(Str::new(value.into())))
 }
 
 pub fn new_tuple(items: Vec<ObjectRef>) -> ObjectRef {
@@ -156,7 +154,7 @@ pub fn new_custom_type(
     module: Arc<RwLock<Module>>,
     name: &str,
 ) -> Arc<RwLock<CustomType>> {
-    Arc::new(RwLock::new(CustomType::new(module, name)))
+    Arc::new(RwLock::new(CustomType::new(module, name.into())))
 }
 
 #[allow(dead_code)]
@@ -165,11 +163,4 @@ pub fn new_custom_instance(
     attrs: Namespace,
 ) -> ObjectRef {
     Arc::new(RwLock::new(CustomObj::new(class, attrs)))
-}
-
-// Utilities -------------------------------------------------------
-
-/// Collect parameters for function types.
-fn collect_params<S: Into<String>>(params: Vec<S>) -> Params {
-    params.into_iter().map(|n| n.into()).collect()
 }
