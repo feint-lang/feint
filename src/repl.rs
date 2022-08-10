@@ -150,7 +150,7 @@ impl<'a> Repl<'a> {
                     ]);
                     let source_text = format!("_ = {}", val);
                     let mut source = source_from_text(source_text.as_str());
-                    let result = self.executor.execute_code(code, false, &mut source);
+                    let result = self.executor.execute_code(&code, false, &mut source);
                     if let Err(err) = result {
                         eprintln!("ERROR: Could not assign or print _:\n{err:?}");
                     }

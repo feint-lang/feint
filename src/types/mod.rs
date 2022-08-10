@@ -1,6 +1,5 @@
 pub(crate) use base::{ObjectRef, ObjectTrait};
 pub(crate) use builtin_func::{BuiltinFn, BuiltinFunc};
-pub(crate) use builtins::BUILTINS;
 pub(crate) use func::Func;
 pub(crate) use func_trait::FuncTrait;
 pub(crate) use ns::Namespace;
@@ -8,12 +7,12 @@ pub(crate) use result::{Args, CallResult, Params, This};
 pub(crate) use util::{args_to_str, this_to_str};
 
 pub(crate) mod create;
+pub(crate) mod modules;
 
 mod base;
 mod bool;
 mod bound_func;
 mod builtin_func;
-mod builtins;
 mod class;
 mod closure;
 mod custom;

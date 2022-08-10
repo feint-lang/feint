@@ -1,7 +1,7 @@
 use std::collections::hash_map;
 use std::slice;
 
-use crate::types::{create, Namespace, ObjectRef, ObjectTrait, BUILTINS};
+use crate::types::{create, modules, Namespace, ObjectRef, ObjectTrait};
 
 use super::constants::Constants;
 use super::result::{RuntimeErr, RuntimeResult};
@@ -43,14 +43,14 @@ impl RuntimeContext {
         // Builtins ----------------------------------------------------
 
         // Add builtins module to global scope.
-        let builtins = BUILTINS.clone();
+        let builtins = modules::BUILTINS.clone();
         if let Err(err) = self.declare_and_assign_var("builtins", builtins) {
             panic!("Could not define builtins module: {err}");
         }
 
         // Add shorthand aliases for builtin types and objects to global
         // scope.
-        let builtins = BUILTINS.clone();
+        let builtins = modules::BUILTINS.clone();
         let reader = builtins.read().unwrap();
         let ns = reader.namespace();
         for (name, obj) in ns.iter().filter(|(n, _)| !n.starts_with('$')) {

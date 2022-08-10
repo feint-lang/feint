@@ -2,6 +2,7 @@ use std::any::Any;
 use std::fmt;
 use std::sync::{Arc, RwLock};
 
+use crate::vm::Code;
 use once_cell::sync::Lazy;
 
 use super::create;
@@ -71,14 +72,15 @@ impl ObjectTrait for ModuleType {
 pub struct Module {
     name: String,
     namespace: Namespace,
+    pub code: Code,
 }
 
 unsafe impl Send for Module {}
 unsafe impl Sync for Module {}
 
 impl Module {
-    pub fn new(name: String, namespace: Namespace) -> Self {
-        Self { namespace, name }
+    pub fn new(name: String, namespace: Namespace, code: Code) -> Self {
+        Self { namespace, name, code }
     }
 
     pub fn name(&self) -> &str {

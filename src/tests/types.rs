@@ -53,7 +53,7 @@ mod custom {
 
     #[test]
     fn test_custom() {
-        let mod1 = create::new_module("test1", Namespace::new());
+        let mod1 = create::new_builtin_module("test1", Namespace::new());
 
         let t1 = create::new_custom_type(mod1, "Custom1");
 
@@ -86,7 +86,7 @@ mod custom {
             .unwrap()
             .is_equal(&*create::new_int(1).read().unwrap()));
 
-        let mod2 = create::new_module("test2", Namespace::new());
+        let mod2 = create::new_builtin_module("test2", Namespace::new());
 
         let t2 = create::new_custom_type(mod2, "Custom2");
         let t2_obj1 = create::new_custom_instance(t2, Namespace::new());

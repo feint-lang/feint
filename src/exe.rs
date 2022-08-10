@@ -6,6 +6,7 @@ use crate::dis;
 use crate::parser::{ParseErr, ParseErrKind, Parser};
 use crate::result::{ExeErr, ExeErrKind, ExeResult};
 use crate::scanner::{ScanErr, ScanErrKind, Scanner, Token, TokenWithLocation};
+use crate::types::{create, modules, Namespace, ObjectTrait};
 use crate::util::{
     source_from_file, source_from_stdin, source_from_text, Location, Source,
 };
@@ -130,6 +131,7 @@ impl<'a> Executor<'a> {
                 return Err(ExeErr::new(ExeErrKind::CompErr(err.kind)));
             }
         };
+
         if self.dis {
             log::trace!("BEGIN: disassemble code ====================");
             let mut disassembler = dis::Disassembler::new();
@@ -141,19 +143,31 @@ impl<'a> Executor<'a> {
             log::trace!("END: disassemble code ======================");
             Ok(VMState::Halted(0))
         } else {
-            self.execute_code(code, self.debug, source)
+            let system = modules::SYSTEM.read().unwrap();
+            let main_module = create::new_module("$main", Namespace::new(), code);
+
+            if let Ok(modules) = system.get_attr("modules") {
+                let modules = modules.write().unwrap();
+                let modules =
+                    modules.down_to_map().expect("Expected system.modules to be a Map");
+                modules.add("$main", main_module.clone());
+            }
+
+            let main_module = main_module.read().unwrap();
+            let main_module = main_module.down_to_mod().unwrap();
+            self.execute_code(&main_module.code, self.debug, source)
         }
     }
 
     /// Execute a code (a list of instructions).
     pub fn execute_code<T: BufRead>(
         &mut self,
-        code: Code,
+        code: &Code,
         debug: bool,
         source: &mut Source<T>,
     ) -> ExeResult {
         log::trace!("BEGIN: execute code ============================");
-        let result = self.vm.execute(&code);
+        let result = self.vm.execute(code);
         if debug {
             self.display_stack();
             self.display_vm_state(&result);

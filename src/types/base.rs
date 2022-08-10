@@ -8,8 +8,8 @@ use num_traits::ToPrimitive;
 
 use crate::vm::{RuntimeBoolResult, RuntimeErr, RuntimeObjResult, RuntimeResult, VM};
 
-use super::builtins::BUILTINS;
 use super::create;
+use super::modules::BUILTINS;
 use super::result::{Args, GetAttrResult, SetAttrResult};
 use super::util::args_to_str;
 

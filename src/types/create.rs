@@ -84,6 +84,10 @@ pub fn new_builtin_func(name: &str, params: &[&str], func: BuiltinFn) -> ObjectR
     Arc::new(RwLock::new(BuiltinFunc::new(name.to_owned(), params, func)))
 }
 
+pub fn new_builtin_module(name: &str, ns: Namespace) -> Arc<RwLock<Module>> {
+    Arc::new(RwLock::new(Module::new(name.into(), ns, Code::new())))
+}
+
 pub fn new_closure(func: ObjectRef) -> ObjectRef {
     Arc::new(RwLock::new(Closure::new(func)))
 }
@@ -135,8 +139,12 @@ pub fn new_map(entries: Vec<(String, ObjectRef)>) -> ObjectRef {
     Arc::new(RwLock::new(Map::new(entries)))
 }
 
-pub fn new_module<S: Into<String>>(name: S, ns: Namespace) -> Arc<RwLock<Module>> {
-    Arc::new(RwLock::new(Module::new(name.into(), ns)))
+pub fn new_module<S: Into<String>>(
+    name: S,
+    ns: Namespace,
+    code: Code,
+) -> Arc<RwLock<Module>> {
+    Arc::new(RwLock::new(Module::new(name.into(), ns, code)))
 }
 
 pub fn new_str<S: Into<String>>(value: S) -> ObjectRef {
