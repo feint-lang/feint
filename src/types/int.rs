@@ -38,7 +38,7 @@ impl IntType {
                 ("$name", create::new_str("Int")),
                 ("$full_name", create::new_str("builtins.Int")),
                 // Class Methods
-                make_meth!(IntType, new, Some(vec!["value"]), |_, args: Args, _| {
+                make_meth!(IntType, new, vec!["value"], |_, args: Args, _| {
                     let arg = use_arg!(args, 0);
                     let int = if let Some(val) = arg.get_int_val() {
                         create::new_int(val.clone())

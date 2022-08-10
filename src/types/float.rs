@@ -36,7 +36,7 @@ impl FloatType {
                 ("$name", create::new_str("Float")),
                 ("$full_name", create::new_str("builtins.Float")),
                 // Class Methods
-                make_meth!(FloatType, new, Some(vec!["value"]), |_, args: Args, _| {
+                make_meth!(FloatType, new, vec!["value"], |_, args: Args, _| {
                     let arg = use_arg!(args, 0);
                     let float = if let Some(val) = arg.get_float_val() {
                         create::new_float(*val)

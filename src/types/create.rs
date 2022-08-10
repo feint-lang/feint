@@ -79,7 +79,7 @@ pub fn new_bound_func(func: ObjectRef, this: ObjectRef) -> ObjectRef {
 
 pub fn new_builtin_func<S: Into<String>>(
     name: S,
-    params: Option<Vec<S>>,
+    params: Vec<S>,
     func: BuiltinFn,
 ) -> ObjectRef {
     let params = collect_params(params);
@@ -100,11 +100,7 @@ pub fn new_float_from_string<S: Into<String>>(value: S) -> ObjectRef {
     new_float(value)
 }
 
-pub fn new_func<S: Into<String>>(
-    name: S,
-    params: Option<Vec<S>>,
-    code: Code,
-) -> ObjectRef {
+pub fn new_func<S: Into<String>>(name: S, params: Vec<S>, code: Code) -> ObjectRef {
     let params = collect_params(params);
     Arc::new(RwLock::new(Func::new(name, params, code)))
 }
@@ -167,11 +163,6 @@ pub fn new_custom_instance(
 // Utilities -------------------------------------------------------
 
 /// Collect parameters for function types.
-fn collect_params<S: Into<String>>(params: Option<Vec<S>>) -> Params {
-    if let Some(names) = params {
-        let params = names.into_iter().map(|n| n.into()).collect();
-        Some(params)
-    } else {
-        None
-    }
+fn collect_params<S: Into<String>>(params: Vec<S>) -> Params {
+    params.into_iter().map(|n| n.into()).collect()
 }

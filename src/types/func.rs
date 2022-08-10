@@ -75,7 +75,6 @@ pub struct Func {
     namespace: Namespace,
     pub name: String,
     pub params: Params,
-    pub arity: Option<usize>,
     pub code: Code,
 }
 
@@ -85,19 +84,38 @@ unsafe impl Sync for Func {}
 impl Func {
     pub fn new<S: Into<String>>(name: S, params: Params, code: Code) -> Self {
         let name = name.into();
-        let arity = params.as_ref().map(|params| params.len());
-        let arity_obj = arity.map_or_else(create::new_nil, |len| create::new_int(len));
         Self {
             namespace: Namespace::with_entries(vec![
                 // Instance Attributes
                 ("$name", create::new_str(name.as_str())),
-                ("$arity", arity_obj),
             ]),
             name,
             params,
-            arity,
             code,
         }
+    }
+
+    pub fn arity(&self) -> usize {
+        if let Some(name) = self.params.last() {
+            if name.is_empty() {
+                // Has var args; return number of required args
+                self.params.len() - 1
+            } else {
+                // Does not have var args; all args required
+                self.params.len()
+            }
+        } else {
+            0
+        }
+    }
+
+    pub fn var_args_index(&self) -> Option<usize> {
+        if let Some(name) = self.params.last() {
+            if name.is_empty() {
+                return Some(self.params.len() - 1);
+            }
+        }
+        None
     }
 }
 
@@ -124,12 +142,10 @@ impl ObjectTrait for Func {
 impl fmt::Display for Func {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let name = &self.name;
-        let num_args = match self.arity {
-            Some(n) => n.to_string(),
-            None => "...".to_string(),
-        };
+        let arity = self.arity();
+        let suffix = if self.var_args_index().is_some() { "+" } else { "" };
         let id = self.id();
-        write!(f, "function {name}/{num_args} @ {id}")
+        write!(f, "function {name}/{arity}{suffix} @ {id}")
     }
 }
 

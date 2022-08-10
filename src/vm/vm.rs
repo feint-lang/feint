@@ -11,7 +11,7 @@ use ctrlc;
 use num_traits::ToPrimitive;
 
 use crate::types::{args_to_str, this_to_str};
-use crate::types::{create, Args, BuiltinFunc, Func, ObjectRef, Params, This};
+use crate::types::{create, Args, BuiltinFunc, Func, ObjectRef, This};
 use crate::util::{
     BinaryOperator, CompareOperator, InplaceOperator, Location, Stack,
     UnaryCompareOperator, UnaryOperator,
@@ -508,7 +508,13 @@ impl VM {
     ) -> RuntimeResult {
         log::trace!("BEGIN: call {} with this: {}", func.name, this_to_str(&this));
         log::trace!("ARGS: {}", args_to_str(&args));
-        self.check_call_args(&func.name, &func.params, &this, &args)?;
+        let args = self.check_call_args(
+            &func.name,
+            func.arity(),
+            &this,
+            &args,
+            func.var_args_index(),
+        )?;
         self.push_call_frame(this.clone())?;
         let result = (func.func)(this, args, self);
         match result {
@@ -527,7 +533,13 @@ impl VM {
     pub fn call_func(&mut self, func: &Func, this: This, args: Args) -> RuntimeResult {
         log::trace!("BEGIN: call {} with this: {}", func.name, this_to_str(&this));
         log::trace!("ARGS: {}", args_to_str(&args));
-        self.check_call_args(&func.name, &func.params, &this, &args)?;
+        let args = self.check_call_args(
+            &func.name,
+            func.arity(),
+            &this,
+            &args,
+            func.var_args_index(),
+        )?;
         self.enter_scope();
         self.push_call_frame(this.clone())?;
         if let Some(this_var) = this {
@@ -537,13 +549,8 @@ impl VM {
         } else {
             self.push_and_store_local(create::new_nil(), 0)?;
         }
-        if func.params.is_some() {
-            for (index, arg) in args.iter().enumerate() {
-                self.push_and_store_local(arg.clone(), index + 1)?;
-            }
-        } else {
-            let args = create::new_tuple(args);
-            self.push_and_store_local(args, 1)?;
+        for (index, arg) in args.iter().enumerate() {
+            self.push_and_store_local(arg.clone(), index + 1)?;
         }
         let result = self.execute(&func.code);
         match result {
@@ -559,48 +566,57 @@ impl VM {
         }
     }
 
-    /// Ensure correct number of args were passed.
+    /// Check call args to ensure they're valid. This ensures the
+    /// function was called with the required number args and also takes
+    /// care of mapping var args into a tuple in the last position.
     fn check_call_args(
         &self,
         name: &str,
-        params: &Params,
+        arity: usize,
         this: &This,
         args: &Args,
-    ) -> RuntimeResult {
-        if let Some(params) = params {
-            let arity = params.len();
-            let n_args = args.len();
-            if n_args != arity {
-                let ess = if arity == 1 { "" } else { "s" };
-                let msg = format!(
-                    "{}{}() expected {arity} arg{ess}; got {n_args}",
-                    this.clone().map_or_else(
-                        || "".to_owned(),
-                        |this| {
-                            let this = this.read().unwrap();
-                            let class = this.class();
-                            let class = class.read().unwrap();
-                            format!("{}.", class.name())
-                        }
-                    ),
-                    name
-                );
-                return Err(RuntimeErr::new_type_err(msg));
+        var_args_index: Option<usize>,
+    ) -> Result<Args, RuntimeErr> {
+        if let Some(var_args_index) = var_args_index {
+            let n_args = args.iter().take(var_args_index).len();
+            self.check_arity(name, arity, n_args, this)?;
+            let mut new_args = vec![];
+            for arg in args.iter().take(var_args_index) {
+                new_args.push(arg.clone());
             }
+            let var_args = args.iter().skip(var_args_index).cloned().collect();
+            let var_args = create::new_tuple(var_args);
+            new_args.push(var_args);
+            Ok(new_args)
+        } else {
+            self.check_arity(name, arity, args.len(), this)?;
+            Ok(args.clone())
         }
-        Ok(())
     }
 
-    /// Declare and assign vars corresponding to a call's args in the
-    /// call's scope. This makes the args accessible to inner functions.
-    pub fn assign_call_args(&mut self, params: &Params, args: &Args) -> RuntimeResult {
-        if let Some(params) = &params {
-            for (name, arg) in params.iter().zip(args) {
-                self.ctx.declare_and_assign_var(name, arg.clone())?;
-            }
-        } else {
-            let args = create::new_tuple(args.clone());
-            self.ctx.declare_and_assign_var("$args", args)?;
+    fn check_arity(
+        &self,
+        name: &str,
+        arity: usize,
+        n_args: usize,
+        this: &This,
+    ) -> RuntimeResult {
+        if n_args != arity {
+            let ess = if arity == 1 { "" } else { "s" };
+            let msg = format!(
+                "{}{}() expected {arity} arg{ess}; got {n_args}",
+                this.clone().map_or_else(
+                    || "".to_owned(),
+                    |this| {
+                        let this = this.read().unwrap();
+                        let class = this.class();
+                        let class = class.read().unwrap();
+                        format!("{}.", class.name())
+                    }
+                ),
+                name
+            );
+            return Err(RuntimeErr::new_type_err(msg));
         }
         Ok(())
     }

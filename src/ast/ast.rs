@@ -420,12 +420,15 @@ impl Func {
 
 impl fmt::Debug for Func {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let params = if let Some(params) = &self.params {
-            params.join(", ")
-        } else {
-            "...".to_owned()
-        };
-        write!(f, "func ({}) {:?}", params, self.block)
+        let mut names = self.params.clone();
+        let n_names = names.len();
+        if let Some(name) = names.last() {
+            if name.is_empty() {
+                names[n_names - 1] = "...".to_string();
+            }
+        }
+        let names = names.join(", ");
+        write!(f, "func ({names}) {:?}", self.block)
     }
 }
 

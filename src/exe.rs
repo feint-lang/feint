@@ -334,6 +334,9 @@ impl<'a> Executor<'a> {
             CannotAssignSpecialIdent(name) => {
                 format!("cannot assign to special name: {name}")
             }
+            VarArgsMustBeLast => {
+                "var args must be last in parameter list".to_owned()
+            }
         };
         eprintln!("    |\n\n  Compilation error: {}", message);
     }

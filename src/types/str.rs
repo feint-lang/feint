@@ -33,7 +33,7 @@ impl StrType {
                 make_meth!(
                     Str,
                     starts_with,
-                    Some(vec!["prefix"]),
+                    vec!["prefix"],
                     |this: ObjectRef, args: Args, _| {
                         let this = use_this!(this);
                         let this = this.down_to_str().unwrap();

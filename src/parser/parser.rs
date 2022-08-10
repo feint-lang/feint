@@ -439,34 +439,33 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
     /// Handle function definition.
     fn func(&mut self, params_expr: ast::Expr, start: Location) -> ExprResult {
         self.func_level += 1;
-        let params_opt = match params_expr.kind {
+        let param_exprs = match params_expr.kind {
             // Function has multiple parameters.
-            ast::ExprKind::Tuple(items) => Some(items),
+            ast::ExprKind::Tuple(items) => items,
             // Function has a single parameter.
-            _ => match params_expr.is_ellipsis() {
-                // The arg is an ellipsis, indicating variadic args. In
-                // this case, the ellipsis is consumed here and won't be
-                // compiled.
-                true => None,
-                // The arg is a regular arg.
-                false => Some(vec![params_expr]),
-            },
+            _ => vec![params_expr],
         };
-        let params = if let Some(items) = params_opt {
-            let mut params = vec![];
-            // Ensure all items are identifiers
-            for item in items.iter() {
-                match item.is_ident() {
-                    Some(name) => params.push(name),
-                    None => {
-                        return Err(self.err(ParseErrKind::ExpectedIdent(item.start)))
+        let mut params = vec![];
+        // Ensure all items are identifiers
+        let param_count = param_exprs.len();
+        if param_count > 0 {
+            let last = param_exprs.len() - 1;
+            for (i, item) in param_exprs.iter().enumerate() {
+                if item.is_ellipsis() {
+                    if i == last {
+                        params.push("".to_owned());
+                        continue;
+                    } else {
+                        return Err(self.err(ParseErrKind::VarArgsMustBeLast(start)));
                     }
                 }
+                if let Some(name) = item.is_ident() {
+                    params.push(name);
+                } else {
+                    return Err(self.err(ParseErrKind::ExpectedIdent(item.start)));
+                }
             }
-            Some(params)
-        } else {
-            None
-        };
+        }
         let block = self.block(start)?;
         let def_end = block.end;
         self.func_level -= 1;

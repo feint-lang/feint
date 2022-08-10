@@ -39,6 +39,7 @@ impl ParseErr {
             UnexpectedReturn(loc) => loc,
             InlineMatchNotAllowed(loc) => loc,
             MatchDefaultMustBeLast(loc) => loc,
+            VarArgsMustBeLast(loc) => loc,
             // TODO: Extract from ScanErr?
             ScanErr(_) => return Location::default(),
         };
@@ -70,4 +71,6 @@ pub enum ParseErrKind {
 
     InlineMatchNotAllowed(Location),
     MatchDefaultMustBeLast(Location),
+
+    VarArgsMustBeLast(Location),
 }

@@ -36,6 +36,10 @@ impl CompErr {
     pub fn new_cannot_assign_special_ident(name: String) -> Self {
         Self { kind: CompErrKind::CannotAssignSpecialIdent(name) }
     }
+
+    pub fn new_var_args_must_be_last() -> Self {
+        Self { kind: CompErrKind::VarArgsMustBeLast }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -46,4 +50,5 @@ pub enum CompErrKind {
     DuplicateLabelInScope(String),
     ExpectedIdent,
     CannotAssignSpecialIdent(String),
+    VarArgsMustBeLast,
 }

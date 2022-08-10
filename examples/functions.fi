@@ -18,8 +18,8 @@ print(f(3))  # -> [0, 1, 2, 3]
 
 returns = (n) ->
     if n > 1 ->
-        return "explicit"
-    "implicit"
+        return "explicit return"
+    "implicit return"
 
 print(returns(2))  # -> "explicit"
 print(returns(1))  # -> "implicit"
@@ -29,8 +29,15 @@ x = 1
 f = () ->
     x = x
     x += 2
-print(f())  # -> 3 (x in f())
-print(x)    # -> 1 (global x)
+print(f(), "(x in f() should be 3)")  # -> 3
+print(x, "(global x should be 1)")    # -> 1
+
+# Var args allowed in last position
+f = (...) -> print($args.length(), "var args")
+f(1, 2, 3)  # -> 3
+
+f = (required, ...) -> print($args.length(), "var args")
+f(1, 2, 3)  # -> 2
 
 # TODO: Implement closures
 # This will throw a name error because `captured` isn't actual captured

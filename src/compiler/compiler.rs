@@ -440,12 +440,20 @@ impl Visitor {
         // Add locals for function parameters
         visitor.scope_tree.add_local("this", true);
 
-        if node.params.is_some() {
-            node.params.clone().unwrap().iter().for_each(|name| {
-                visitor.scope_tree.add_local(name, true);
-            });
-        } else {
-            visitor.scope_tree.add_local("$args", true);
+        let param_count = node.params.len();
+        if param_count > 0 {
+            let last = node.params.len() - 1;
+            for (i, name) in node.params.iter().enumerate() {
+                if name.is_empty() {
+                    if i == last {
+                        visitor.scope_tree.add_local("$args", true);
+                    } else {
+                        return Err(CompErr::new_var_args_must_be_last());
+                    }
+                } else {
+                    visitor.scope_tree.add_local(name, true);
+                }
+            }
         }
 
         visitor.visit_statements(node.block.statements)?;

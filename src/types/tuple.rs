@@ -32,30 +32,20 @@ impl TupleType {
                 ("$name", create::new_str("Tuple")),
                 ("$full_name", create::new_str("builtins.Tuple")),
                 // Instance Methods
-                make_meth!(
-                    Tuple,
-                    length,
-                    Some(vec![]) as Option<Vec<&str>>,
-                    |this: ObjectRef, _, _| {
-                        let this = use_this!(this);
-                        let this = this.down_to_tuple().unwrap();
-                        Ok(create::new_int(this.len()))
-                    }
-                ),
-                make_meth!(
-                    Tuple,
-                    is_empty,
-                    Some(vec![]) as Option<Vec<&str>>,
-                    |this: ObjectRef, _, _| {
-                        let this = use_this!(this);
-                        let this = this.down_to_tuple().unwrap();
-                        Ok(create::new_bool(this.len() == 0))
-                    }
-                ),
+                make_meth!(Tuple, length, vec![], |this: ObjectRef, _, _| {
+                    let this = use_this!(this);
+                    let this = this.down_to_tuple().unwrap();
+                    Ok(create::new_int(this.len()))
+                }),
+                make_meth!(Tuple, is_empty, vec![], |this: ObjectRef, _, _| {
+                    let this = use_this!(this);
+                    let this = this.down_to_tuple().unwrap();
+                    Ok(create::new_bool(this.len() == 0))
+                }),
                 make_meth!(
                     Tuple,
                     map,
-                    Some(vec!["map_fn"]),
+                    vec!["map_fn"],
                     |this: ObjectRef, args: Args, vm: &mut VM| {
                         let this = use_this!(this);
                         let this = this.down_to_tuple().unwrap();

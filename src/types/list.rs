@@ -31,31 +31,21 @@ impl ListType {
                 ("$name", create::new_str("List")),
                 ("$full_name", create::new_str("builtins.List")),
                 // Instance Methods
-                make_meth!(
-                    List,
-                    length,
-                    Some(vec![]) as Option<Vec<&str>>,
-                    |this: ObjectRef, _, _| {
-                        let this = use_this!(this);
-                        let this = this.down_to_list().unwrap();
-                        Ok(create::new_int(this.len()))
-                    }
-                ),
-                make_meth!(
-                    List,
-                    is_empty,
-                    Some(vec![]) as Option<Vec<&str>>,
-                    |this: ObjectRef, _, _| {
-                        let this = use_this!(this);
-                        let this = this.down_to_list().unwrap();
-                        Ok(create::new_bool(this.len() == 0))
-                    }
-                ),
+                make_meth!(List, length, vec![], |this: ObjectRef, _, _| {
+                    let this = use_this!(this);
+                    let this = this.down_to_list().unwrap();
+                    Ok(create::new_int(this.len()))
+                }),
+                make_meth!(List, is_empty, vec![], |this: ObjectRef, _, _| {
+                    let this = use_this!(this);
+                    let this = this.down_to_list().unwrap();
+                    Ok(create::new_bool(this.len() == 0))
+                }),
                 // Push item and return it.
                 make_meth!(
                     List,
                     push,
-                    Some(vec!["item"]),
+                    vec!["item"],
                     |this: ObjectRef, args: Args, _| {
                         let this = use_this!(this);
                         let this = this.down_to_list().unwrap();
@@ -65,38 +55,28 @@ impl ListType {
                     }
                 ),
                 // Push items and return this.
-                make_meth!(
-                    List,
-                    extend,
-                    None as Option<Vec<&str>>,
-                    |this: ObjectRef, args: Args, _| {
-                        let return_val = this.clone();
-                        let this = use_this!(this);
-                        let this = this.down_to_list().unwrap();
-                        for arg in args {
-                            this.push(arg);
-                        }
-                        Ok(return_val)
+                make_meth!(List, extend, vec![""], |this: ObjectRef, args: Args, _| {
+                    let return_val = this.clone();
+                    let this = use_this!(this);
+                    let this = this.down_to_list().unwrap();
+                    for arg in args {
+                        this.push(arg);
                     }
-                ),
-                make_meth!(
-                    List,
-                    pop,
-                    Some(vec![]) as Option<Vec<&str>>,
-                    |this: ObjectRef, _, _| {
-                        let this = use_this!(this);
-                        let this = this.down_to_list().unwrap();
-                        let result = match this.pop() {
-                            Some(obj) => obj,
-                            None => create::new_nil(),
-                        };
-                        Ok(result)
-                    }
-                ),
+                    Ok(return_val)
+                }),
+                make_meth!(List, pop, vec![], |this: ObjectRef, _, _| {
+                    let this = use_this!(this);
+                    let this = this.down_to_list().unwrap();
+                    let result = match this.pop() {
+                        Some(obj) => obj,
+                        None => create::new_nil(),
+                    };
+                    Ok(result)
+                }),
                 make_meth!(
                     List,
                     get,
-                    Some(vec!["index"]),
+                    vec!["index"],
                     |this: ObjectRef, args: Args, _| {
                         let this = use_this!(this);
                         let this = this.down_to_list().unwrap();
@@ -112,7 +92,7 @@ impl ListType {
                 make_meth!(
                     List,
                     map,
-                    Some(vec!["map_fn"]),
+                    vec!["map_fn"],
                     |this: ObjectRef, args: Args, vm: &mut VM| {
                         let this = use_this!(this);
                         let this = this.down_to_list().unwrap();
