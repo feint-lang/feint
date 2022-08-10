@@ -22,6 +22,7 @@ mod func;
 mod func_trait;
 mod int;
 mod list;
+mod map;
 mod meth;
 mod module;
 mod nil;

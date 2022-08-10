@@ -158,6 +158,7 @@ impl Visitor {
         match node.kind {
             Kind::Tuple(items) => self.visit_tuple(items)?,
             Kind::List(items) => self.visit_list(items)?,
+            Kind::Map(entries) => self.visit_map(entries)?,
             Kind::Literal(literal) => self.visit_literal(literal)?,
             Kind::FormatString(items) => self.visit_format_string(items)?,
             Kind::Ident(ident) => self.visit_ident(ident)?,
@@ -196,6 +197,16 @@ impl Visitor {
         let num_items = items.len();
         self.visit_exprs(items)?;
         self.push(Inst::MakeList(num_items));
+        Ok(())
+    }
+
+    fn visit_map(&mut self, entries: Vec<(ast::Expr, ast::Expr)>) -> VisitResult {
+        let num_items = entries.len();
+        for (name, val) in entries {
+            self.visit_expr(name, None)?;
+            self.visit_expr(val, None)?;
+        }
+        self.push(Inst::MakeMap(num_items * 2));
         Ok(())
     }
 

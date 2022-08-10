@@ -250,12 +250,12 @@ b = 3
 
 #[test]
 fn scan_unknown() {
-    let source = "{";
+    let source = "\\";
     match scan_text(source) {
         Ok(_tokens) => assert!(false),
         Err(err) => match err {
             ScanErr { kind: ScanErrKind::UnexpectedChar(c), location } => {
-                assert_eq!(c, '{');
+                assert_eq!(c, '\\');
                 assert_eq!(location.line, 1);
                 assert_eq!(location.col, 1);
             }

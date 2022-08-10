@@ -72,6 +72,7 @@ pub enum Inst {
     MakeString(usize),
     MakeTuple(usize),
     MakeList(usize),
+    MakeMap(usize),
 
     // Make function closure for constant.
     MakeClosure(usize),

@@ -12,6 +12,8 @@ pub enum Token {
     RParen,   // )
     LBracket, // [
     RBracket, // ]
+    LBrace,   // {
+    RBrace,   // }
 
     // Miscellaneous ---------------------------------------------------
     Colon,    // :
@@ -105,6 +107,8 @@ impl Token {
             Self::RParen => ")",
             Self::LBracket => "[",
             Self::RBracket => "]",
+            Self::LBrace => "{",
+            Self::RBrace => "}",
 
             // Miscellaneous ---------------------------------------------------
             Self::Colon => ":",

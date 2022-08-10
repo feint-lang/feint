@@ -101,6 +101,7 @@ impl Disassembler {
             MakeString(n) => self.align("MAKE_STRING", n),
             MakeTuple(n) => self.align("MAKE_TUPLE", n),
             MakeList(n) => self.align("MAKE_LIST", n),
+            MakeMap(n) => self.align("MAKE_MAP", n),
             MakeClosure(index) => {
                 let func = match code.get_const(*index) {
                     Ok(obj) => obj.read().unwrap().to_string(),

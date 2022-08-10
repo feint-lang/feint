@@ -1,11 +1,13 @@
 //! Type Constructors.
 //!
 //! These constructors simplify the creation system objects.
+use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 use num_bigint::BigInt;
 use num_traits::{FromPrimitive, Num, Signed, ToPrimitive, Zero};
 
+use crate::types::map::Map;
 use once_cell::sync::Lazy;
 
 use crate::vm::Code;
@@ -127,7 +129,12 @@ pub fn new_int_from_string<S: Into<String>>(value: S) -> ObjectRef {
 }
 
 pub fn new_list(items: Vec<ObjectRef>) -> ObjectRef {
-    Arc::new(RwLock::new(List::new(items)))
+    Arc::new(RwLock::new(List::new(items.to_vec())))
+}
+
+pub fn new_map(entries: Vec<(String, ObjectRef)>) -> ObjectRef {
+    let entries: HashMap<String, ObjectRef> = entries.into_iter().collect();
+    Arc::new(RwLock::new(Map::new(entries)))
 }
 
 pub fn new_module<S: Into<String>>(name: S, ns: Namespace) -> Arc<RwLock<Module>> {

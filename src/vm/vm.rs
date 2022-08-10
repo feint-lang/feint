@@ -257,6 +257,24 @@ impl VM {
                     let list = create::new_list(items);
                     self.push_temp(list);
                 }
+                MakeMap(n) => {
+                    let objects = self.pop_n_obj(*n)?;
+                    let mut keys = vec![];
+                    let mut vals = vec![];
+                    for (i, obj) in objects.iter().enumerate() {
+                        if i % 2 == 0 {
+                            let obj = obj.read().unwrap();
+                            let key = obj.to_string();
+                            keys.push(key);
+                        } else {
+                            vals.push(obj.clone());
+                        }
+                    }
+                    let entries: Vec<(String, ObjectRef)> =
+                        keys.into_iter().zip(vals).collect();
+                    let map = create::new_map(entries);
+                    self.push_temp(map);
+                }
                 MakeClosure(index) => {
                     let obj = code.get_const(*index)?.clone();
                     let closure = create::new_closure(obj);

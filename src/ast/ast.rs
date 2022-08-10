@@ -114,6 +114,7 @@ pub struct Expr {
 pub enum ExprKind {
     Tuple(Vec<Expr>),
     List(Vec<Expr>),
+    Map(Vec<(Expr, Expr)>),
     Literal(Literal),
     FormatString(Vec<Expr>),
     Ident(Ident),
@@ -142,6 +143,10 @@ impl Expr {
 
     pub fn new_list(items: Vec<Expr>, start: Location, end: Location) -> Self {
         Self::new(ExprKind::List(items), start, end)
+    }
+
+    pub fn new_map(entries: Vec<(Expr, Expr)>, start: Location, end: Location) -> Self {
+        Self::new(ExprKind::Map(entries), start, end)
     }
 
     fn new_literal(literal: Literal, start: Location, end: Location) -> Self {
@@ -357,6 +362,7 @@ impl fmt::Debug for ExprKind {
         match self {
             Self::Tuple(items) => write!(f, "({items:?})"),
             Self::List(items) => write!(f, "[{items:?}]"),
+            Self::Map(entries) => write!(f, "[{entries:?}]"),
             Self::Literal(literal) => write!(f, "{literal:?}"),
             Self::FormatString(items) => write!(f, "{items:?}"),
             Self::Ident(ident) => write!(f, "{ident:?}"),

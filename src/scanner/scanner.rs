@@ -120,6 +120,14 @@ impl<'a, T: BufRead> Scanner<'a, T> {
                 self.maybe_exit_inline_scope(start, false);
                 self.pop_bracket_and_return_token(c, start, RBracket)?
             }
+            Some(('{', _, _)) => {
+                self.bracket_stack.push(('{', start));
+                LBrace
+            }
+            Some((c @ '}', _, _)) => {
+                self.maybe_exit_inline_scope(start, false);
+                self.pop_bracket_and_return_token(c, start, RBrace)?
+            }
             Some(('<', Some('='), _)) => {
                 self.consume_char_and_return_token(LessThanOrEqual)
             }
@@ -600,17 +608,16 @@ impl<'a, T: BufRead> Scanner<'a, T> {
     /// bracket matches. If it does, the specified token is returned.
     fn pop_bracket_and_return_token(
         &mut self,
-        closing_bracket: char,
-        location: Location,
+        close: char,
+        loc: Location,
         token: Token,
     ) -> Result<Token, ScanErr> {
-        match (self.bracket_stack.pop(), closing_bracket) {
-            (Some(('(', _)), ')') | (Some(('[', _)), ']') => Ok(token),
-            _ => Err(ScanErr::new(
-                ErrKind::UnmatchedClosingBracket(closing_bracket),
-                location,
-            )),
+        if let Some((open, _)) = self.bracket_stack.pop() {
+            if matches!((open, close), ('(', ')') | ('[', ']') | ('{', '}')) {
+                return Ok(token);
+            }
         }
+        Err(ScanErr::new(ErrKind::UnmatchedClosingBracket(close), loc))
     }
 
     /// Consume contiguous whitespace up to the end of the line. Return
