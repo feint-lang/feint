@@ -11,7 +11,7 @@ use ctrlc;
 use num_traits::ToPrimitive;
 
 use crate::types::{args_to_str, this_to_str};
-use crate::types::{create, Args, BuiltinFunc, Func, ObjectRef, This};
+use crate::types::{create, Args, BuiltinFunc, Func, FuncTrait, ObjectRef, This};
 use crate::util::{
     BinaryOperator, CompareOperator, InplaceOperator, Location, Stack,
     UnaryCompareOperator, UnaryOperator,
@@ -506,15 +506,9 @@ impl VM {
         this: This,
         args: Args,
     ) -> RuntimeResult {
-        log::trace!("BEGIN: call {} with this: {}", func.name, this_to_str(&this));
+        log::trace!("BEGIN: call {} with this: {}", func.name(), this_to_str(&this));
         log::trace!("ARGS: {}", args_to_str(&args));
-        let args = self.check_call_args(
-            &func.name,
-            func.arity(),
-            &this,
-            &args,
-            func.var_args_index(),
-        )?;
+        let args = self.check_call_args(func, &this, &args)?;
         self.push_call_frame(this.clone())?;
         let result = (func.func)(this, args, self);
         match result {
@@ -531,15 +525,9 @@ impl VM {
     }
 
     pub fn call_func(&mut self, func: &Func, this: This, args: Args) -> RuntimeResult {
-        log::trace!("BEGIN: call {} with this: {}", func.name, this_to_str(&this));
+        log::trace!("BEGIN: call {} with this: {}", func.name(), this_to_str(&this));
         log::trace!("ARGS: {}", args_to_str(&args));
-        let args = self.check_call_args(
-            &func.name,
-            func.arity(),
-            &this,
-            &args,
-            func.var_args_index(),
-        )?;
+        let args = self.check_call_args(func, &this, &args)?;
         self.enter_scope();
         self.push_call_frame(this.clone())?;
         if let Some(this_var) = this {
@@ -571,13 +559,13 @@ impl VM {
     /// care of mapping var args into a tuple in the last position.
     fn check_call_args(
         &self,
-        name: &str,
-        arity: usize,
+        func: &dyn FuncTrait,
         this: &This,
         args: &Args,
-        var_args_index: Option<usize>,
     ) -> Result<Args, RuntimeErr> {
-        if let Some(var_args_index) = var_args_index {
+        let name = func.name();
+        let arity = func.arity();
+        if let Some(var_args_index) = func.var_args_index() {
             let n_args = args.iter().take(var_args_index).len();
             self.check_arity(name, arity, n_args, this)?;
             let mut new_args = vec![];
