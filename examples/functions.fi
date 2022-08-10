@@ -4,7 +4,7 @@ self_referential = (n) ->
     else ->
         items = self_referential(n - 1)
         # NOTE: `List.extend()` returns `this`
-        items.extend(n)
+        items.extend((n,))
 
 print(self_referential(3))  # -> [0, 1, 2, 3]
 
@@ -12,7 +12,7 @@ print(self_referential(3))  # -> [0, 1, 2, 3]
 f = (n) ->
     match n ->
         0 -> [0]
-        : -> f(n - 1).extend(n)
+        : -> f(n - 1).extend([n])
 
 print(f(3))  # -> [0, 1, 2, 3]
 

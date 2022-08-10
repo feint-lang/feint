@@ -4,7 +4,7 @@ use std::sync::{Arc, RwLock};
 
 use once_cell::sync::Lazy;
 
-use crate::vm::{RuntimeErr, VM};
+use crate::vm::{RuntimeErr, RuntimeResult, VM};
 
 use super::create;
 use super::meth::{make_meth, use_arg, use_arg_usize, use_this};
@@ -55,15 +55,18 @@ impl ListType {
                     }
                 ),
                 // Push items and return this.
-                make_meth!(List, extend, vec![""], |this: ObjectRef, args: Args, _| {
-                    let return_val = this.clone();
-                    let this = use_this!(this);
-                    let this = this.down_to_list().unwrap();
-                    for arg in args {
-                        this.push(arg);
+                make_meth!(
+                    List,
+                    extend,
+                    vec!["items"],
+                    |this: ObjectRef, args: Args, _| {
+                        let return_val = this.clone();
+                        let this = use_this!(this);
+                        let this = this.down_to_list().unwrap();
+                        this.extend(args[0].clone())?;
+                        Ok(return_val)
                     }
-                    Ok(return_val)
-                }),
+                ),
                 make_meth!(List, pop, vec![], |this: ObjectRef, _, _| {
                     let this = use_this!(this);
                     let this = this.down_to_list().unwrap();
@@ -168,11 +171,27 @@ impl List {
         items.push(item);
     }
 
-    pub fn extend(&self, new_items: Vec<ObjectRef>) {
+    pub fn extend(&self, obj: ObjectRef) -> RuntimeResult {
+        let obj = obj.read().unwrap();
         let items = &mut self.items.write().unwrap();
-        for item in new_items {
-            items.push(item);
+        if let Some(list) = obj.down_to_list() {
+            let new_items = list.items.read().unwrap();
+            for item in new_items.iter() {
+                items.push(item.clone());
+            }
+        } else if let Some(tuple) = obj.down_to_tuple() {
+            for item in tuple.iter() {
+                items.push(item.clone());
+            }
+        } else {
+            // TODO: Do type checking at a higher level
+            let msg = format!(
+                "List.extend() expected List or Tuple; got {}",
+                obj.class().read().unwrap()
+            );
+            return Err(RuntimeErr::new_type_err(msg));
         }
+        Ok(())
     }
 
     pub fn pop(&self) -> Option<ObjectRef> {
