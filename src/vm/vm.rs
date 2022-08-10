@@ -105,7 +105,6 @@ impl VM {
         let mut sigint_counter = 0u32;
 
         let num_inst = code.len_chunk();
-        let frame_pointer = self.call_frame_pointer;
         let mut ip: usize = 0;
         let mut jump_ip = None;
 
@@ -115,7 +114,11 @@ impl VM {
                     // do nothing
                 }
                 Pop => {
-                    self.pop()?;
+                    if let ValueStackKind::Local(..) = self.peek()? {
+                        // Locals are cleaned up separately
+                    } else {
+                        self.pop()?;
+                    }
                 }
                 // Constants
                 LoadGlobalConst(index) => {
@@ -145,10 +148,13 @@ impl VM {
                 }
                 // Locals
                 StoreLocal(index) => {
-                    self.handle_store_local(frame_pointer, *index)?;
+                    // Load object at TOS to local
+                    let obj = self.peek_obj()?;
+                    self.store_local(obj, *index)?;
                 }
                 LoadLocal(index) => {
-                    self.handle_load_local(frame_pointer, *index)?;
+                    // Load specified local to TOS
+                    self.load_local(*index)?;
                 }
                 // Vars
                 DeclareVar(name) => {
@@ -360,42 +366,6 @@ impl VM {
 
     // Handlers --------------------------------------------------------
 
-    /// Store top of stack to local.
-    fn handle_store_local(
-        &mut self,
-        frame_pointer: usize,
-        index: usize,
-    ) -> RuntimeResult {
-        let frame_index = frame_pointer + index;
-        if frame_index < self.value_stack.size() {
-            let obj = self.peek_obj()?;
-            self.value_stack[frame_index] = ValueStackKind::Local(obj, index);
-        } else {
-            return Err(RuntimeErr::new(RuntimeErrKind::FrameIndexOutOfBounds(
-                frame_index,
-            )));
-        }
-        Ok(())
-    }
-
-    /// Load local onto stack.
-    fn handle_load_local(
-        &mut self,
-        frame_pointer: usize,
-        index: usize,
-    ) -> RuntimeResult {
-        let frame_index = frame_pointer + index;
-        if let Some(kind) = self.value_stack.peek_at(frame_index) {
-            let obj = self.get_obj(kind);
-            self.push_local(obj, index);
-        } else {
-            return Err(RuntimeErr::new(RuntimeErrKind::FrameIndexOutOfBounds(
-                frame_index,
-            )));
-        }
-        Ok(())
-    }
-
     fn handle_unary_op(&mut self, op: &UnaryOperator) -> RuntimeResult {
         use UnaryOperator::*;
         let a_kind = self.pop()?;
@@ -404,9 +374,6 @@ impl VM {
             Plus => a_ref, // no-op
             Negate => a_ref.read().unwrap().negate()?,
         };
-        if let ValueStackKind::Local(a, index) = a_kind {
-            self.push_and_store_local(a, index);
-        }
         self.push_temp(result);
         Ok(())
     }
@@ -420,9 +387,6 @@ impl VM {
             AsBool => a.bool_val()?,
             Not => a.not()?,
         };
-        if let ValueStackKind::Local(a, index) = a_kind {
-            self.push_and_store_local(a, index);
-        }
         self.push_temp(create::new_bool(result));
         Ok(())
     }
@@ -466,9 +430,6 @@ impl VM {
                 }
             }
         };
-        if let ValueStackKind::Local(a, index) = a_kind {
-            self.push_and_store_local(a, index);
-        }
         self.push_temp(result);
         Ok(())
     }
@@ -496,9 +457,6 @@ impl VM {
             GreaterThan => a.greater_than(b)?,
             GreaterThanOrEqual => a.greater_than(b)? || a.is_equal(b),
         };
-        if let ValueStackKind::Local(a, index) = a_kind {
-            self.push_and_store_local(a, index);
-        }
         self.push_temp(create::new_bool(result));
         Ok(())
     }
@@ -523,7 +481,7 @@ impl VM {
             self.ctx.assign_var_at_depth(depth, name.as_str(), result)?;
             self.push_var(depth, name)?;
         } else if let ValueStackKind::Local(_, index) = a_kind {
-            self.push_and_store_local(result, index);
+            self.push_and_store_local(result, index)?;
         } else {
             let message = format!("Binary op: {}", op);
             return Err(RuntimeErr::new(RuntimeErrKind::ExpectedVar(message)));
@@ -532,11 +490,13 @@ impl VM {
     }
 
     fn handle_call(&mut self, num_args: usize) -> RuntimeResult {
+        log::trace!("STACK BEFORE POPPING callable:\n{}", self.format_stack());
         let callable = self.pop_obj()?;
         let callable = callable.read().unwrap();
         log::trace!("HANDLE CALL: callable = {:?}", &*callable);
         log::trace!("STACK BEFORE POPPING {num_args} ARG(s):\n{}", self.format_stack());
         let args = if num_args > 0 { self.pop_n_obj(num_args)? } else { vec![] };
+        log::trace!("STACK AFTER POPPING {num_args} ARG(s):\n{}", self.format_stack());
         callable.call(args, self)
     }
 
@@ -550,13 +510,10 @@ impl VM {
         log::trace!("ARGS: {}", args_to_str(&args));
         self.check_call_args(&func.name, &func.params, &this, &args)?;
         self.push_call_frame(this.clone())?;
-        self.enter_scope();
-        self.assign_call_args(&func.params, &args)?;
         let result = (func.func)(this, args, self);
         match result {
             Ok(return_val) => {
                 self.push_return_val(return_val);
-                self.exit_scope();
                 self.pop_call_frame()?;
                 Ok(())
             }
@@ -571,23 +528,22 @@ impl VM {
         log::trace!("BEGIN: call {} with this: {}", func.name, this_to_str(&this));
         log::trace!("ARGS: {}", args_to_str(&args));
         self.check_call_args(&func.name, &func.params, &this, &args)?;
-        self.push_call_frame(this.clone())?;
         self.enter_scope();
+        self.push_call_frame(this.clone())?;
         if let Some(this_var) = this {
-            self.push_and_store_local(this_var.clone(), 0);
+            self.push_and_store_local(this_var.clone(), 0)?;
         } else if let Some(this_var) = self.find_this() {
-            self.push_and_store_local(this_var, 0);
+            self.push_and_store_local(this_var, 0)?;
         } else {
-            self.push_and_store_local(create::new_nil(), 0);
+            self.push_and_store_local(create::new_nil(), 0)?;
         }
-        self.assign_call_args(&func.params, &args)?;
         if func.params.is_some() {
             for (index, arg) in args.iter().enumerate() {
-                self.push_and_store_local(arg.clone(), index + 1);
+                self.push_and_store_local(arg.clone(), index + 1)?;
             }
         } else {
             let args = create::new_tuple(args);
-            self.push_and_store_local(args, 0);
+            self.push_and_store_local(args, 1)?;
         }
         let result = self.execute(&func.code);
         match result {
@@ -748,11 +704,30 @@ impl VM {
         self.push(ValueStackKind::Local(obj, index));
     }
 
-    fn push_and_store_local(&mut self, obj: ObjectRef, index: usize) {
-        use ValueStackKind::Local;
-        let frame_pointer = self.call_frame_pointer;
+    fn push_and_store_local(&mut self, obj: ObjectRef, index: usize) -> RuntimeResult {
         self.push_local(obj.clone(), index);
-        self.value_stack[frame_pointer + index] = Local(obj, index);
+        self.store_local(obj, index)
+    }
+
+    fn store_local(&mut self, obj: ObjectRef, index: usize) -> RuntimeResult {
+        let frame_index = self.call_frame_pointer + index;
+        if frame_index < self.value_stack.size() {
+            self.value_stack[frame_index] = ValueStackKind::Local(obj, index);
+            Ok(())
+        } else {
+            Err(RuntimeErr::new(RuntimeErrKind::FrameIndexOutOfBounds(frame_index)))
+        }
+    }
+
+    fn load_local(&mut self, index: usize) -> RuntimeResult {
+        let frame_index = self.call_frame_pointer + index;
+        if let Some(kind) = self.value_stack.peek_at(frame_index) {
+            let obj = self.get_obj(kind);
+            self.push_local(obj, index);
+            Ok(())
+        } else {
+            Err(RuntimeErr::new(RuntimeErrKind::FrameIndexOutOfBounds(frame_index)))
+        }
     }
 
     fn push_var(&mut self, depth: usize, name: String) -> RuntimeResult {
@@ -826,15 +801,24 @@ impl VM {
     }
 
     pub fn format_stack(&self) -> String {
+        use ValueStackKind::*;
         if self.value_stack.is_empty() {
             return "[EMPTY]".to_owned();
         }
         let mut items = vec![];
         for (i, kind) in self.value_stack.iter().enumerate() {
+            let kind_marker = match kind {
+                GlobalConstant(..) => "G",
+                Constant(..) => "C",
+                Var(..) => "V",
+                Local(..) => "L",
+                Temp(..) => "T",
+                ReturnVal(..) => "R",
+            };
             let obj = self.get_obj(kind);
             let obj = &*obj.read().unwrap();
-            let string =
-                format!("{:0>8} {:?}{}", i, obj, if i == 0 { " [TOP]" } else { "" });
+            let top_marker = if i == 0 { " [TOP]" } else { "" };
+            let string = format!("{i:0>8} {kind_marker} {obj:?}{top_marker}");
             items.push(string)
         }
         items.join("\n")

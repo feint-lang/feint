@@ -8,8 +8,8 @@ pub struct ScopeTree {
 }
 
 impl ScopeTree {
-    pub fn new() -> Self {
-        let global_scope = Scope::new(ScopeKind::Global, 0, None);
+    pub fn new(initial_scope_kind: ScopeKind) -> Self {
+        let global_scope = Scope::new(initial_scope_kind, 0, None);
         Self { storage: vec![global_scope], pointer: 0 }
     }
 
@@ -66,11 +66,18 @@ impl ScopeTree {
         };
     }
 
-    /// Add local var to current scope.
-    pub fn add_local<S: Into<String>>(&mut self, name: S, assigned: bool) {
+    /// Add local var to current scope and return its index. If the
+    /// local already exists in the current scope, just return its
+    /// existing index.
+    pub fn add_local<S: Into<String>>(&mut self, name: S, assigned: bool) -> usize {
         let name = name.into();
-        if !self.current().locals.iter().any(|(n, _)| &name == n) {
+        let locals = &self.current().locals;
+        if let Some(index) = locals.iter().position(|(n, _)| &name == n) {
+            index
+        } else {
+            let index = locals.len();
             self.current_mut().locals.push((name, assigned));
+            index
         }
     }
 

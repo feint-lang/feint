@@ -147,16 +147,6 @@ pub trait ObjectTrait {
         class.module().clone()
     }
 
-    fn module_name(&self) -> String {
-        let module = self.module();
-        let module = module.read().unwrap();
-        if let Some(module) = module.down_to_mod() {
-            String::from(module.name())
-        } else {
-            String::from("[unknown module]")
-        }
-    }
-
     // Attributes (accessed by name) -----------------------------------
 
     fn get_attr(&self, name: &str) -> GetAttrResult {

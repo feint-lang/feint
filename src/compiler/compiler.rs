@@ -22,7 +22,7 @@ pub fn compile(
     log::trace!("BEGIN: compile");
     let argv = argv.into_iter().map(|a| a.to_owned()).collect();
     log::trace!("ARGV: {argv:?}");
-    let mut visitor = Visitor::new(argv);
+    let mut visitor = Visitor::new(ScopeKind::Global, argv);
     visitor.visit_program(program, keep_top_on_halt)?;
     log::trace!("END: compile");
     Ok(visitor.code)
@@ -41,10 +41,10 @@ struct Visitor {
 }
 
 impl Visitor {
-    fn new(argv: Vec<String>) -> Self {
+    fn new(initial_scope_kind: ScopeKind, argv: Vec<String>) -> Self {
         Self {
             code: Code::new(),
-            scope_tree: ScopeTree::new(),
+            scope_tree: ScopeTree::new(initial_scope_kind),
             scope_depth: 0,
             has_main: false,
             argv,
@@ -89,12 +89,10 @@ impl Visitor {
         let num_statements = statements.len();
         if num_statements > 0 {
             let last = num_statements - 1;
-            let in_global_scope = self.scope_tree.in_global_scope();
             for (i, statement) in statements.into_iter().enumerate() {
-                let is_assignment = statement.is_assignment();
                 self.push(Inst::StatementStart(statement.start, statement.end));
                 self.visit_statement(statement)?;
-                if i != last && (in_global_scope || !is_assignment) {
+                if i != last {
                     self.push(Inst::Pop);
                 }
             }
@@ -424,22 +422,24 @@ impl Visitor {
     }
 
     fn visit_func(&mut self, node: ast::Func, name: Option<String>) -> VisitResult {
-        let mut visitor = Visitor::new(vec![]);
+        let mut visitor = Visitor::new(ScopeKind::Func, vec![]);
+
         let name = if let Some(name) = name {
             self.has_main = name == "$main" && self.scope_tree.in_global_scope();
             name
         } else {
             "<anonymous>".to_owned()
         };
+
         let return_nil = if let Some(last) = node.block.statements.last() {
             !matches!(last.kind, ast::StatementKind::Expr(_))
         } else {
             unreachable!("Block for function contains no statements");
         };
-        visitor.enter_scope(ScopeKind::Func);
-        visitor.push(Inst::ScopeStart);
+
         // Add locals for function parameters
         visitor.scope_tree.add_local("this", true);
+
         if node.params.is_some() {
             node.params.clone().unwrap().iter().for_each(|name| {
                 visitor.scope_tree.add_local(name, true);
@@ -447,18 +447,20 @@ impl Visitor {
         } else {
             visitor.scope_tree.add_local("$args", true);
         }
+
         visitor.visit_statements(node.block.statements)?;
+        assert_eq!(visitor.scope_tree.pointer(), 0);
         visitor.fix_jumps()?;
+
         if return_nil {
             visitor.push_nil();
         }
-        visitor.push(Inst::Return);
+
         let return_addr = visitor.len();
-        visitor.push(Inst::ScopeEnd);
-        visitor.exit_scope();
-        assert_eq!(visitor.scope_tree.pointer(), 0);
+        visitor.push(Inst::Return);
+
         // NOTE: Explicit return statements need to jump to the end
-        //       of the function so the its scope can be exited.
+        //       of the function so that its scope can be exited.
         for addr in 0..return_addr {
             let inst = &visitor.code[addr];
             if let Inst::ReturnPlaceholder(inst_addr, depth) = inst {
@@ -467,6 +469,7 @@ impl Visitor {
                     .replace_inst(*inst_addr, Inst::Jump(return_addr, depth - 1));
             }
         }
+
         let func = create::new_func(name, node.params, visitor.code);
         let index = self.code.add_const(func);
         self.push(Inst::MakeClosure(index));

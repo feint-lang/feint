@@ -79,17 +79,6 @@ impl Statement {
     pub fn new_expr(expr: Expr, start: Location, end: Location) -> Self {
         Self::new(StatementKind::Expr(expr), start, end)
     }
-
-    /// Check if statement is an assignment. This is used with local
-    /// assignments to skip popping the stack since the stack is used
-    /// to store locals.
-    pub fn is_assignment(&self) -> bool {
-        if let StatementKind::Expr(expr) = &self.kind {
-            expr.is_assignment()
-        } else {
-            false
-        }
-    }
 }
 
 impl fmt::Debug for Statement {
@@ -354,11 +343,6 @@ impl Expr {
         } else {
             None
         }
-    }
-
-    /// Check if expression is an assignment.
-    pub fn is_assignment(&self) -> bool {
-        matches!(self.kind, ExprKind::DeclarationAndAssignment(..))
     }
 }
 
