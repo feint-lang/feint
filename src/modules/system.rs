@@ -45,6 +45,6 @@ pub fn get_module(name: &str) -> RuntimeObjResult {
         Ok(module.clone())
     } else {
         let msg = format!("module not found: {name}");
-        Err(RuntimeErr::new_name_err(msg))
+        Err(RuntimeErr::name_err(msg))
     }
 }

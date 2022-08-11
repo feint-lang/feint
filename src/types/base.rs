@@ -93,7 +93,7 @@ macro_rules! make_value_extractor {
 macro_rules! make_unary_op {
     ( $meth:ident, $op:literal, $result:ty ) => {
         fn $meth(&self) -> $result {
-            Err(RuntimeErr::new_type_err(format!(
+            Err(RuntimeErr::type_err(format!(
                 "Unary operator {} ({}) not implemented for {}",
                 $op,
                 stringify!($meth),
@@ -107,7 +107,7 @@ macro_rules! make_unary_op {
 macro_rules! make_bin_op {
     ( $func:ident, $op:literal, $result:ty ) => {
         fn $func(&self, _rhs: &dyn ObjectTrait) -> $result {
-            Err(RuntimeErr::new_type_err(format!(
+            Err(RuntimeErr::type_err(format!(
                 "Binary operator {} ({}) not implemented for {}",
                 $op,
                 stringify!($func),
@@ -185,17 +185,14 @@ pub trait ObjectTrait {
     }
 
     fn set_attr(&mut self, name: &str, _value: ObjectRef) -> SetAttrResult {
-        Err(RuntimeErr::new_attr_cannot_be_set(
+        Err(RuntimeErr::attr_cannot_be_set(
             self.class().read().unwrap().full_name(),
             name,
         ))
     }
 
     fn attr_does_not_exist(&self, name: &str) -> RuntimeErr {
-        RuntimeErr::new_attr_does_not_exist(
-            self.class().read().unwrap().full_name(),
-            name,
-        )
+        RuntimeErr::attr_does_not_exist(self.class().read().unwrap().full_name(), name)
     }
 
     // Items (accessed by index) ---------------------------------------
@@ -205,24 +202,18 @@ pub trait ObjectTrait {
     }
 
     fn set_item(&mut self, index: usize, _value: ObjectRef) -> GetAttrResult {
-        Err(RuntimeErr::new_item_cannot_be_set(
+        Err(RuntimeErr::item_cannot_be_set(
             self.class().read().unwrap().full_name(),
             index,
         ))
     }
 
     fn item_does_not_exist(&self, index: usize) -> RuntimeErr {
-        RuntimeErr::new_item_does_not_exist(
-            self.class().read().unwrap().full_name(),
-            index,
-        )
+        RuntimeErr::item_does_not_exist(self.class().read().unwrap().full_name(), index)
     }
 
     fn index_out_of_bounds(&self, index: usize) -> RuntimeErr {
-        RuntimeErr::new_index_out_of_bounds(
-            self.class().read().unwrap().full_name(),
-            index,
-        )
+        RuntimeErr::index_out_of_bounds(self.class().read().unwrap().full_name(), index)
     }
 
     // Type checkers ---------------------------------------------------
@@ -360,7 +351,7 @@ pub trait ObjectTrait {
     }
 
     fn not_callable(&self) -> RuntimeErr {
-        RuntimeErr::new_not_callable(self.class().read().unwrap().full_name())
+        RuntimeErr::not_callable(self.class().read().unwrap().full_name())
     }
 }
 

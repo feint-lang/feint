@@ -67,7 +67,7 @@ impl Code {
         if let Some(obj) = self.constants.get(index) {
             Ok(obj)
         } else {
-            Err(RuntimeErr::new_object_not_found_err(index))
+            Err(RuntimeErr::object_not_found_err(index))
         }
     }
 

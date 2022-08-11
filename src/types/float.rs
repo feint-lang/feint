@@ -47,7 +47,7 @@ impl FloatType {
                     } else {
                         let message =
                             format!("Float new expected string or float; got {arg}");
-                        return Err(RuntimeErr::new_type_err(message));
+                        return Err(RuntimeErr::type_err(message));
                     };
                     Ok(float)
                 }),
@@ -98,7 +98,7 @@ macro_rules! make_op {
             } else if let Some(rhs) = rhs.down_to_int() {
                 rhs.value().to_f64().unwrap()
             } else {
-                return Err(RuntimeErr::new_type_err(format!($message, rhs.class().read().unwrap())));
+                return Err(RuntimeErr::type_err(format!($message, rhs.class().read().unwrap())));
             };
             let mut value = &self.value $op value;
             if $trunc {
@@ -165,7 +165,7 @@ impl ObjectTrait for Float {
         } else if let Some(rhs) = rhs.down_to_int() {
             Ok(lt_int_float(rhs, self))
         } else {
-            Err(RuntimeErr::new_type_err(format!(
+            Err(RuntimeErr::type_err(format!(
                 "Could not compare {} to {}: <",
                 self.class().read().unwrap(),
                 rhs.class().read().unwrap()
@@ -179,7 +179,7 @@ impl ObjectTrait for Float {
         } else if let Some(rhs) = rhs.down_to_int() {
             Ok(gt_int_float(rhs, self))
         } else {
-            Err(RuntimeErr::new_type_err(format!(
+            Err(RuntimeErr::type_err(format!(
                 "Could not compare {} to {}: >",
                 self.class().read().unwrap(),
                 rhs.class().read().unwrap()
@@ -193,7 +193,7 @@ impl ObjectTrait for Float {
         } else if let Some(rhs) = rhs.down_to_int() {
             rhs.value().to_f64().unwrap()
         } else {
-            return Err(RuntimeErr::new_type_err(format!(
+            return Err(RuntimeErr::type_err(format!(
                 "Could not raise {} by {}",
                 self.class().read().unwrap(),
                 rhs.class().read().unwrap()

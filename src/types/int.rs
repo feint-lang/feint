@@ -49,7 +49,7 @@ impl IntType {
                     } else {
                         let message =
                             format!("Int.new() expected number or string; got {arg}");
-                        return Err(RuntimeErr::new_type_err(message));
+                        return Err(RuntimeErr::type_err(message));
                     };
                     Ok(int)
                 }),
@@ -106,7 +106,7 @@ macro_rules! make_op {
                 let value = create::new_float(value);
                 Ok(value)
             } else {
-                Err(RuntimeErr::new_type_err(format!($message, rhs.class().read().unwrap())))
+                Err(RuntimeErr::type_err(format!($message, rhs.class().read().unwrap())))
             }
         }
     };
@@ -137,7 +137,7 @@ impl Int {
         } else if let Some(rhs) = rhs.down_to_float() {
             *rhs.value()
         } else {
-            return Err(RuntimeErr::new_type_err(format!(
+            return Err(RuntimeErr::type_err(format!(
                 "Could not divide {} into Int",
                 rhs.class().read().unwrap()
             )));
@@ -183,7 +183,7 @@ impl ObjectTrait for Int {
         } else if let Some(rhs) = rhs.down_to_float() {
             Ok(lt_int_float(self, rhs))
         } else {
-            Err(RuntimeErr::new_type_err(format!(
+            Err(RuntimeErr::type_err(format!(
                 "Could not compare {} to {}: >",
                 self.class().read().unwrap(),
                 rhs.class().read().unwrap()
@@ -197,7 +197,7 @@ impl ObjectTrait for Int {
         } else if let Some(rhs) = rhs.down_to_float() {
             Ok(gt_int_float(self, rhs))
         } else {
-            Err(RuntimeErr::new_type_err(format!(
+            Err(RuntimeErr::type_err(format!(
                 "Could not compare {} to {}: >",
                 self.class().read().unwrap(),
                 rhs.class().read().unwrap()
@@ -221,7 +221,7 @@ impl ObjectTrait for Int {
             let value = create::new_float(value);
             Ok(value)
         } else {
-            Err(RuntimeErr::new_type_err(format!(
+            Err(RuntimeErr::type_err(format!(
                 "Could not raise {} by {}",
                 self.class().read().unwrap(),
                 rhs.class().read().unwrap()

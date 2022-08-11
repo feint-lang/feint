@@ -31,7 +31,7 @@ macro_rules! make_meth {
         create::new_builtin_func(
             $name, $params, |this_opt: This, args: Args, vm: &mut VM| {
                 if this_opt.is_none() {
-                    return Err(RuntimeErr::new_type_err(format!(
+                    return Err(RuntimeErr::type_err(format!(
                         "Method {}.{}() expected receiver", stringify!($ty), $name,
                     )));
                 }
@@ -84,7 +84,7 @@ macro_rules! make_meth {
                         stringify!($ty),
                         &*this.class().read().unwrap(),
                     );
-                    return Err(RuntimeErr::new_type_err(msg));
+                    return Err(RuntimeErr::type_err(msg));
                 }
 
                 $func(this_ref.clone(), args, vm)
@@ -116,7 +116,7 @@ macro_rules! use_arg {
             $args[$index].read().unwrap()
         } else {
             // NOTE: This should never happen from user code.
-            return Err(RuntimeErr::new_index_out_of_bounds("Arg", $index));
+            return Err(RuntimeErr::index_out_of_bounds("Arg", $index));
         }
     }};
 }
@@ -132,7 +132,7 @@ macro_rules! use_arg_str {
             val
         } else {
             let msg = format!("Expected string; got {}", $arg.class().read().unwrap());
-            return Err(RuntimeErr::new_type_err(msg));
+            return Err(RuntimeErr::type_err(msg));
         }
     }};
 }
@@ -143,7 +143,7 @@ macro_rules! use_arg_usize {
             val
         } else {
             let msg = format!("Expected index; got {}", $arg.class().read().unwrap());
-            return Err(RuntimeErr::new_type_err(msg));
+            return Err(RuntimeErr::type_err(msg));
         }
     }};
 }

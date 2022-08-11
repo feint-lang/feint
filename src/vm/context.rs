@@ -132,7 +132,7 @@ impl RuntimeContext {
             Ok(self.current_depth)
         } else {
             let message = format!("Name not defined in current namespace: {name}");
-            Err(RuntimeErr::new_name_err(message))
+            Err(RuntimeErr::name_err(message))
         }
     }
 
@@ -158,7 +158,7 @@ impl RuntimeContext {
             Ok(())
         } else {
             let message = format!("Name not defined at depth {depth}: {name}");
-            Err(RuntimeErr::new_name_err(message))
+            Err(RuntimeErr::name_err(message))
         }
     }
 
@@ -173,7 +173,7 @@ impl RuntimeContext {
             }
             if var_depth == 0 {
                 let message = format!("Name not found: {name}");
-                break Err(RuntimeErr::new_name_err(message));
+                break Err(RuntimeErr::name_err(message));
             }
             var_depth -= 1;
         }
@@ -195,7 +195,7 @@ impl RuntimeContext {
             Ok(obj)
         } else {
             let message = format!("Name not defined in current namespace: {name}");
-            Err(RuntimeErr::new_name_err(message))
+            Err(RuntimeErr::name_err(message))
         }
     }
 
@@ -209,7 +209,7 @@ impl RuntimeContext {
             Ok(obj)
         } else {
             let message = format!("Name not defined at depth {depth}: {name}");
-            Err(RuntimeErr::new_name_err(message))
+            Err(RuntimeErr::name_err(message))
         }
     }
 

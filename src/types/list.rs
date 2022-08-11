@@ -189,7 +189,7 @@ impl List {
                 "List.extend() expected List or Tuple; got {}",
                 obj.class().read().unwrap()
             );
-            return Err(RuntimeErr::new_type_err(msg));
+            return Err(RuntimeErr::type_err(msg));
         }
         Ok(())
     }

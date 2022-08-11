@@ -140,7 +140,7 @@ impl ObjectTrait for Str {
             let value = create::new_str(value);
             Ok(value)
         } else {
-            Err(RuntimeErr::new_type_err(format!(
+            Err(RuntimeErr::type_err(format!(
                 "Cannot concatenate {} to {}",
                 self.class().read().unwrap(),
                 rhs.class().read().unwrap(),
@@ -152,7 +152,7 @@ impl ObjectTrait for Str {
         if let Some(rhs) = rhs.down_to_str() {
             Ok(self.value() < rhs.value())
         } else {
-            Err(RuntimeErr::new_type_err(format!(
+            Err(RuntimeErr::type_err(format!(
                 "Cannot compare {} to {}: <",
                 self.class().read().unwrap(),
                 rhs.class().read().unwrap(),
@@ -164,7 +164,7 @@ impl ObjectTrait for Str {
         if let Some(rhs) = rhs.down_to_str() {
             Ok(self.value() > rhs.value())
         } else {
-            Err(RuntimeErr::new_type_err(format!(
+            Err(RuntimeErr::type_err(format!(
                 "Cannot compare {} to {}: >",
                 self.class().read().unwrap(),
                 rhs.class().read().unwrap(),

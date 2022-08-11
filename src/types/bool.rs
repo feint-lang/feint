@@ -125,7 +125,7 @@ impl ObjectTrait for Bool {
         if let Some(rhs) = rhs.down_to_bool() {
             Ok(*self.value() && *rhs.value())
         } else {
-            Err(RuntimeErr::new_type_err(format!(
+            Err(RuntimeErr::type_err(format!(
                 "{} && {} not implemented",
                 self.class().read().unwrap(),
                 rhs.class().read().unwrap(),
@@ -137,7 +137,7 @@ impl ObjectTrait for Bool {
         if let Some(rhs) = rhs.down_to_bool() {
             Ok(*self.value() || *rhs.value())
         } else {
-            Err(RuntimeErr::new_type_err(format!(
+            Err(RuntimeErr::type_err(format!(
                 "{} || {} not implemented",
                 self.class().read().unwrap(),
                 rhs.class().read().unwrap(),

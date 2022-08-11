@@ -24,7 +24,7 @@ use super::context::RuntimeContext;
 use super::inst::Inst;
 use super::result::{
     CallDepth, PeekObjResult, PopNObjResult, PopNResult, PopObjResult, PopResult,
-    RuntimeErr, RuntimeErrKind, RuntimeResult, VMExeResult, VMState, ValueStackKind,
+    RuntimeErr, RuntimeResult, VMExeResult, VMState, ValueStackKind,
 };
 
 pub const DEFAULT_MAX_CALL_DEPTH: CallDepth =
@@ -441,7 +441,7 @@ impl VM {
                     a.get_item(index)?
                 } else {
                     let message = format!("Not an attribute name or index: {b:?}");
-                    return Err(RuntimeErr::new_type_err(message));
+                    return Err(RuntimeErr::type_err(message));
                 };
                 let bind = {
                     let obj = obj_ref.read().unwrap();
@@ -509,8 +509,7 @@ impl VM {
             self.store_local(result.clone(), index)?;
             self.push_temp(result);
         } else {
-            let message = format!("Binary op: {}", op);
-            return Err(RuntimeErr::new(RuntimeErrKind::ExpectedVar(message)));
+            return Err(RuntimeErr::expected_var(format!("Binary op: {}", op)));
         }
         Ok(())
     }
@@ -631,7 +630,7 @@ impl VM {
                 ),
                 name
             );
-            return Err(RuntimeErr::new_type_err(msg));
+            return Err(RuntimeErr::type_err(msg));
         }
         Ok(())
     }
@@ -641,7 +640,7 @@ impl VM {
     fn push_call_frame(&mut self, this: This) -> RuntimeResult {
         if self.call_stack_size == self.max_call_depth {
             self.reset();
-            return Err(RuntimeErr::new_recursion_depth_exceeded(self.max_call_depth));
+            return Err(RuntimeErr::recursion_depth_exceeded(self.max_call_depth));
         }
         let stack_position = self.value_stack.size();
         let frame = CallFrame::new(stack_position, this);
@@ -660,7 +659,7 @@ impl VM {
                     if size == 0 { 0 } else { self.call_stack[size - 1].stack_pointer };
                 Ok(frame)
             }
-            None => Err(RuntimeErr::new(RuntimeErrKind::EmptyCallStack)),
+            None => Err(RuntimeErr::empty_call_stack()),
         }
     }
 
@@ -753,7 +752,7 @@ impl VM {
             self.value_stack[frame_index] = ValueStackKind::Local(obj, index);
             Ok(())
         } else {
-            Err(RuntimeErr::new(RuntimeErrKind::FrameIndexOutOfBounds(frame_index)))
+            Err(RuntimeErr::frame_index_out_of_bounds(frame_index))
         }
     }
 
@@ -765,7 +764,7 @@ impl VM {
             self.push_temp_local(obj, index);
             Ok(())
         } else {
-            Err(RuntimeErr::new(RuntimeErrKind::FrameIndexOutOfBounds(frame_index)))
+            Err(RuntimeErr::frame_index_out_of_bounds(frame_index))
         }
     }
 
@@ -786,7 +785,7 @@ impl VM {
     fn pop(&mut self) -> PopResult {
         match self.value_stack.pop() {
             Some(kind) => Ok(kind),
-            None => Err(RuntimeErr::new_empty_stack()),
+            None => Err(RuntimeErr::empty_stack()),
         }
     }
 
@@ -798,7 +797,7 @@ impl VM {
     fn pop_n(&mut self, n: usize) -> PopNResult {
         match self.value_stack.pop_n(n) {
             Some(kinds) => Ok(kinds),
-            None => Err(RuntimeErr::new_not_enough_values_on_stack(n)),
+            None => Err(RuntimeErr::not_enough_values_on_stack(n)),
         }
     }
 
@@ -811,7 +810,7 @@ impl VM {
     fn peek(&self) -> PeekResult {
         match self.value_stack.peek() {
             Some(kind) => Ok(kind),
-            None => Err(RuntimeErr::new_empty_stack()),
+            None => Err(RuntimeErr::empty_stack()),
         }
     }
 
