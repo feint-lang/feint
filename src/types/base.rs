@@ -1,5 +1,5 @@
 //! Type System
-use std::any::Any;
+use std::any::{Any, TypeId};
 use std::fmt;
 use std::sync::{Arc, RwLock};
 
@@ -64,7 +64,7 @@ pub trait TypeTrait {
 macro_rules! make_type_checker {
     ( $func:ident, $ty:ty) => {
         fn $func(&self) -> bool {
-            self.as_any().downcast_ref::<$ty>().is_some()
+            self.as_any().type_id() == TypeId::of::<$ty>()
         }
     };
 }

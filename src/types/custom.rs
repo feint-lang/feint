@@ -113,10 +113,8 @@ impl ObjectTrait for CustomObj {
     }
 
     fn is_equal(&self, rhs: &dyn ObjectTrait) -> bool {
-        if let Some(rhs) = rhs.as_any().downcast_ref::<Self>() {
-            if self.is(rhs) {
-                return true;
-            }
+        if self.is(rhs) {
+            return true;
         }
         self.namespace.is_equal(rhs.namespace())
     }
