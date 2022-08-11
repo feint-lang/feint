@@ -116,7 +116,7 @@ impl Visitor {
                 let addr = self.len();
                 self.visit_expr(expr, None)?;
                 if self.scope_tree.add_label(name.as_str(), addr).is_some() {
-                    return Err(CompErr::new_duplicate_label_in_scope(name));
+                    return Err(CompErr::duplicate_label_in_scope(name));
                 }
             }
             Kind::Break(expr) => self.visit_break(expr)?,
@@ -471,7 +471,7 @@ impl Visitor {
                     if i == last {
                         visitor.scope_tree.add_local("$args", true);
                     } else {
-                        return Err(CompErr::new_var_args_must_be_last());
+                        return Err(CompErr::var_args_must_be_last());
                     }
                 } else {
                     visitor.scope_tree.add_local(name, true);
@@ -555,7 +555,7 @@ impl Visitor {
         log::trace!("BEGIN: declaration of {ident_expr:?}");
         let name = if let Some(name) = ident_expr.is_ident() {
             if name == "this" {
-                return Err(CompErr::new_cannot_assign_special_ident(name));
+                return Err(CompErr::cannot_assign_special_ident(name));
             }
             name
         } else if let Some(name) = ident_expr.is_special_ident() {
@@ -563,12 +563,12 @@ impl Visitor {
                 log::trace!("FOUND $main");
                 name
             } else {
-                return Err(CompErr::new_cannot_assign_special_ident(name));
+                return Err(CompErr::cannot_assign_special_ident(name));
             }
         } else if let Some(_name) = ident_expr.is_type_ident() {
             todo!("Implement custom types")
         } else {
-            return Err(CompErr::new_expected_ident());
+            return Err(CompErr::expected_ident());
         };
         if self.scope_tree.in_global_scope() {
             log::trace!("DECLARE GLOBAL: {name}");
@@ -610,7 +610,7 @@ impl Visitor {
             }
             Ok(())
         } else {
-            Err(CompErr::new_expected_ident())
+            Err(CompErr::expected_ident())
         }
     }
 
@@ -634,7 +634,7 @@ impl Visitor {
     ) -> VisitResult {
         // TODO: Allow in place attribute updates
         if expr_a.is_ident().is_none() {
-            return Err(CompErr::new_expected_ident());
+            return Err(CompErr::expected_ident());
         }
         self.visit_expr(expr_a, None)?;
         self.visit_expr(expr_b, None)?;
@@ -713,9 +713,9 @@ impl Visitor {
             true
         });
         if let Some(name) = jump_out_of_func {
-            return Err(CompErr::new_cannot_jump_out_of_func(name));
+            return Err(CompErr::cannot_jump_out_of_func(name));
         } else if let Some(name) = not_found {
-            return Err(CompErr::new_label_not_found_in_scope(name));
+            return Err(CompErr::label_not_found_in_scope(name));
         }
         Ok(())
     }

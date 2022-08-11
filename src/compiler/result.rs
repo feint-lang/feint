@@ -9,36 +9,36 @@ pub struct CompErr {
 }
 
 impl CompErr {
-    pub fn new(kind: CompErrKind) -> Self {
+    fn new(kind: CompErrKind) -> Self {
         Self { kind }
     }
 
-    pub fn new_unhandled_expr(start: Location, end: Location) -> Self {
-        Self { kind: CompErrKind::UnhandledExpr(start, end) }
+    pub fn unhandled_expr(start: Location, end: Location) -> Self {
+        Self::new(CompErrKind::UnhandledExpr(start, end))
     }
 
-    pub fn new_label_not_found_in_scope(name: String) -> Self {
-        Self { kind: CompErrKind::LabelNotFoundInScope(name) }
+    pub fn label_not_found_in_scope(name: String) -> Self {
+        Self::new(CompErrKind::LabelNotFoundInScope(name))
     }
 
-    pub fn new_cannot_jump_out_of_func(name: String) -> Self {
-        Self { kind: CompErrKind::CannotJumpOutOfFunc(name) }
+    pub fn cannot_jump_out_of_func(name: String) -> Self {
+        Self::new(CompErrKind::CannotJumpOutOfFunc(name))
     }
 
-    pub fn new_duplicate_label_in_scope(name: String) -> Self {
-        Self { kind: CompErrKind::DuplicateLabelInScope(name) }
+    pub fn duplicate_label_in_scope(name: String) -> Self {
+        Self::new(CompErrKind::DuplicateLabelInScope(name))
     }
 
-    pub fn new_expected_ident() -> Self {
-        Self { kind: CompErrKind::ExpectedIdent }
+    pub fn expected_ident() -> Self {
+        Self::new(CompErrKind::ExpectedIdent)
     }
 
-    pub fn new_cannot_assign_special_ident(name: String) -> Self {
-        Self { kind: CompErrKind::CannotAssignSpecialIdent(name) }
+    pub fn cannot_assign_special_ident(name: String) -> Self {
+        Self::new(CompErrKind::CannotAssignSpecialIdent(name))
     }
 
-    pub fn new_var_args_must_be_last() -> Self {
-        Self { kind: CompErrKind::VarArgsMustBeLast }
+    pub fn var_args_must_be_last() -> Self {
+        Self::new(CompErrKind::VarArgsMustBeLast)
     }
 }
 
