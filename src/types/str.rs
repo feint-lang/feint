@@ -32,7 +32,7 @@ impl StrType {
                 ("$full_name", create::new_str("builtins.Str")),
                 make_meth!(
                     Str,
-                    starts_with,
+                    "starts_with",
                     &["prefix"],
                     |this: ObjectRef, args: Args, _| {
                         let this = use_this!(this);

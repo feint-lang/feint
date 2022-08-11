@@ -5,7 +5,7 @@
 /// $ty:     type   The type the method belongs. To create a class
 ///                 method, use a type like `IntType`. To create and
 ///                 instance method, use a type like `Int`.
-/// $name:   ident  The method name as an identifier (no quotes).
+/// $name:   &str   The method name.
 /// $params: Params The method's parameters.
 /// $func:   fn     The function that implements the method. Accepts
 ///                 3 args: `this` (ObjectRef), `args` (Args), and
@@ -25,18 +25,15 @@
 /// itself. This makes it easy to add the method to the type's namespace
 /// by calling `ns.add_entry(make_meth!(...))`.
 macro_rules! make_meth {
-    ( $ty:ty, $name:ident, $params:expr, $func:expr ) => {(
-        stringify!($name),
+    ( $ty:ty, $name:literal, $params:expr, $func:expr ) => {(
+        $name,
 
         create::new_builtin_func(
-            stringify!($name), $params, |this_opt: This, args: Args, vm: &mut VM| {
+            $name, $params, |this_opt: This, args: Args, vm: &mut VM| {
                 if this_opt.is_none() {
-                    let msg = format!(
-                        "Method {}.{}() expected receiver",
-                        stringify!($ty),
-                        stringify!($name),
-                    );
-                    return Err(RuntimeErr::new_type_err(msg));
+                    return Err(RuntimeErr::new_type_err(format!(
+                        "Method {}.{}() expected receiver", stringify!($ty), $name,
+                    )));
                 }
 
                 let this_ref = this_opt.unwrap();
@@ -83,7 +80,7 @@ macro_rules! make_meth {
                     let msg = format!(
                         "Method {}.{}() expected receiver to be type {}; got {:?}",
                         stringify!($ty),
-                        stringify!($name),
+                        $name,
                         stringify!($ty),
                         &*this.class().read().unwrap(),
                     );

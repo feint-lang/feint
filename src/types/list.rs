@@ -31,28 +31,33 @@ impl ListType {
                 ("$name", create::new_str("List")),
                 ("$full_name", create::new_str("builtins.List")),
                 // Instance Methods
-                make_meth!(List, length, &[], |this: ObjectRef, _, _| {
+                make_meth!(List, "length", &[], |this: ObjectRef, _, _| {
                     let this = use_this!(this);
                     let this = this.down_to_list().unwrap();
                     Ok(create::new_int(this.len()))
                 }),
-                make_meth!(List, is_empty, &[], |this: ObjectRef, _, _| {
+                make_meth!(List, "is_empty", &[], |this: ObjectRef, _, _| {
                     let this = use_this!(this);
                     let this = this.down_to_list().unwrap();
                     Ok(create::new_bool(this.len() == 0))
                 }),
                 // Push item and return it.
-                make_meth!(List, push, &["item"], |this: ObjectRef, args: Args, _| {
-                    let this = use_this!(this);
-                    let this = this.down_to_list().unwrap();
-                    let arg = args[0].clone();
-                    this.push(arg.clone());
-                    Ok(arg)
-                }),
+                make_meth!(
+                    List,
+                    "push",
+                    &["item"],
+                    |this: ObjectRef, args: Args, _| {
+                        let this = use_this!(this);
+                        let this = this.down_to_list().unwrap();
+                        let arg = args[0].clone();
+                        this.push(arg.clone());
+                        Ok(arg)
+                    }
+                ),
                 // Push items and return this.
                 make_meth!(
                     List,
-                    extend,
+                    "extend",
                     &["items"],
                     |this: ObjectRef, args: Args, _| {
                         let return_val = this.clone();
@@ -62,7 +67,7 @@ impl ListType {
                         Ok(return_val)
                     }
                 ),
-                make_meth!(List, pop, &[], |this: ObjectRef, _, _| {
+                make_meth!(List, "pop", &[], |this: ObjectRef, _, _| {
                     let this = use_this!(this);
                     let this = this.down_to_list().unwrap();
                     let result = match this.pop() {
@@ -71,20 +76,25 @@ impl ListType {
                     };
                     Ok(result)
                 }),
-                make_meth!(List, get, &["index"], |this: ObjectRef, args: Args, _| {
-                    let this = use_this!(this);
-                    let this = this.down_to_list().unwrap();
-                    let arg = use_arg!(args, 0);
-                    let index = use_arg_usize!(arg);
-                    let result = match this.get(index) {
-                        Some(obj) => obj,
-                        None => create::new_nil(),
-                    };
-                    Ok(result)
-                }),
                 make_meth!(
                     List,
-                    map,
+                    "get",
+                    &["index"],
+                    |this: ObjectRef, args: Args, _| {
+                        let this = use_this!(this);
+                        let this = this.down_to_list().unwrap();
+                        let arg = use_arg!(args, 0);
+                        let index = use_arg_usize!(arg);
+                        let result = match this.get(index) {
+                            Some(obj) => obj,
+                            None => create::new_nil(),
+                        };
+                        Ok(result)
+                    }
+                ),
+                make_meth!(
+                    List,
+                    "map",
                     &["map_fn"],
                     |this: ObjectRef, args: Args, vm: &mut VM| {
                         let this = use_this!(this);
