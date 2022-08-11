@@ -505,7 +505,7 @@ impl VM {
         if let ValueStackKind::Var(_, depth, name) = a_kind {
             self.ctx.assign_var_at_depth(depth, name.as_str(), result.clone())?;
             self.push_temp(result);
-        } else if let ValueStackKind::Local(_, index) = a_kind {
+        } else if let ValueStackKind::TempLocal(_, index) = a_kind {
             self.store_local(result.clone(), index)?;
             self.push_temp(result);
         } else {
@@ -732,7 +732,7 @@ impl VM {
     }
 
     fn push_local(&mut self, obj: ObjectRef, index: usize) {
-        self.push(ValueStackKind::Local(obj, index));
+        self.push(ValueStackKind::TempLocal(obj, index));
     }
 
     fn push_and_store_local(&mut self, obj: ObjectRef, index: usize) -> RuntimeResult {
@@ -819,6 +819,7 @@ impl VM {
             Constant(obj, ..) => obj.clone(),
             Var(obj, ..) => obj.clone(),
             Local(obj, ..) => obj.clone(),
+            TempLocal(obj, ..) => obj.clone(),
             Temp(obj) => obj.clone(),
             ReturnVal(obj) => obj.clone(),
         }
@@ -844,6 +845,7 @@ impl VM {
                 Var(..) => "V",
                 Local(..) => "L",
                 Temp(..) => "T",
+                TempLocal(..) => "U",
                 ReturnVal(..) => "R",
             };
             let obj = self.get_obj(kind);

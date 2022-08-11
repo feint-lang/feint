@@ -30,6 +30,7 @@ pub enum ValueStackKind {
     Var(ObjectRef, usize, String),
     Local(ObjectRef, usize),
     Temp(ObjectRef),
+    TempLocal(ObjectRef, usize),
     ReturnVal(ObjectRef),
 }
 
