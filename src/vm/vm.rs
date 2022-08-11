@@ -503,10 +503,11 @@ impl VM {
             InplaceOperator::Sub => a.sub(&*b)?,
         };
         if let ValueStackKind::Var(_, depth, name) = a_kind {
-            self.ctx.assign_var_at_depth(depth, name.as_str(), result)?;
-            self.push_var(depth, name)?;
+            self.ctx.assign_var_at_depth(depth, name.as_str(), result.clone())?;
+            self.push_temp(result);
         } else if let ValueStackKind::Local(_, index) = a_kind {
-            self.push_and_store_local(result, index)?;
+            self.store_local(result.clone(), index)?;
+            self.push_temp(result);
         } else {
             let message = format!("Binary op: {}", op);
             return Err(RuntimeErr::new(RuntimeErrKind::ExpectedVar(message)));
