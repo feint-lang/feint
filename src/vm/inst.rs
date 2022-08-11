@@ -29,8 +29,8 @@ pub enum Inst {
     // replace local value lower in stack with top of stack value.
     StoreLocal(usize),
 
-    // Load local value onto top of stack--retrieve local value from
-    // lower in stack and push it to top of stack.
+    // Load local value onto top of stack--retrieve (copy) local value
+    // from slot lower in stack and push it onto TOS.
     LoadLocal(usize),
 
     DeclareVar(String),

@@ -149,12 +149,12 @@ impl VM {
                 }
                 // Locals
                 StoreLocal(index) => {
-                    // Load object at TOS to local
+                    // Store object at TOS into local slot.
                     let obj = self.peek_obj()?;
                     self.store_local(obj, *index)?;
                 }
                 LoadLocal(index) => {
-                    // Load specified local to TOS
+                    // Load (copy) specified local to TOS.
                     self.load_local(*index)?;
                 }
                 // Vars
@@ -557,14 +557,14 @@ impl VM {
         self.enter_scope();
         self.push_call_frame(this.clone())?;
         if let Some(this_var) = this {
-            self.push_and_store_local(this_var.clone(), 0)?;
+            self.push_local(this_var.clone(), 0);
         } else if let Some(this_var) = self.find_this() {
-            self.push_and_store_local(this_var, 0)?;
+            self.push_local(this_var, 0);
         } else {
-            self.push_and_store_local(create::new_nil(), 0)?;
+            self.push_local(create::new_nil(), 0);
         }
         for (index, arg) in args.iter().enumerate() {
-            self.push_and_store_local(arg.clone(), index + 1)?;
+            self.push_local(arg.clone(), index + 1);
         }
         let result = self.execute(&func.code);
         match result {
@@ -731,15 +731,22 @@ impl VM {
         Ok(())
     }
 
+    /// This is used to create new local slots on the stack. These slots
+    /// remain on the stack until the current scope is exited.
+    ///
+    /// NOTE: This is only used when calling a user functions to store
+    ///       its args as locals.
     fn push_local(&mut self, obj: ObjectRef, index: usize) {
+        self.push(ValueStackKind::Local(obj, index));
+    }
+
+    /// This is used when loading (copying) a local from its slot to
+    /// TOS. These "temporary locals" are cleaned up normally.
+    fn push_temp_local(&mut self, obj: ObjectRef, index: usize) {
         self.push(ValueStackKind::TempLocal(obj, index));
     }
 
-    fn push_and_store_local(&mut self, obj: ObjectRef, index: usize) -> RuntimeResult {
-        self.push_local(obj.clone(), index);
-        self.store_local(obj, index)
-    }
-
+    /// Store object into local slot.
     fn store_local(&mut self, obj: ObjectRef, index: usize) -> RuntimeResult {
         let frame_index = self.call_frame_pointer + index;
         if frame_index < self.value_stack.size() {
@@ -750,11 +757,12 @@ impl VM {
         }
     }
 
+    /// Load (copy) object from local slot to TOS.
     fn load_local(&mut self, index: usize) -> RuntimeResult {
         let frame_index = self.call_frame_pointer + index;
         if let Some(kind) = self.value_stack.peek_at(frame_index) {
             let obj = self.get_obj(kind);
-            self.push_local(obj, index);
+            self.push_temp_local(obj, index);
             Ok(())
         } else {
             Err(RuntimeErr::new(RuntimeErrKind::FrameIndexOutOfBounds(frame_index)))

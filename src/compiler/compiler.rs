@@ -576,6 +576,11 @@ impl Visitor {
         } else {
             log::trace!("DECLARE (ADD) LOCAL: {name}");
             self.scope_tree.add_local(name, false);
+            // There's no instruction for declaring locals, because
+            // locals initially appear on the stack by being loaded as
+            // the RHS of an assignment. When the local is assigned,
+            // that temp TOS value will be converted in place to a Local
+            // type (remaining at TOS).
         }
         Ok(())
     }
@@ -591,6 +596,10 @@ impl Visitor {
             self.visit_expr(value_expr, Some(name.clone()))?;
             match self.scope_tree.find_local(name.as_str(), true) {
                 Some((index, _)) => {
+                    // A slightly confusing thing here is that on the
+                    // *initial* assignment of a local, STORE_LOCAL will
+                    // *replace* the TOS value, converting it to a Local
+                    // value type.
                     log::trace!("ASSIGN (STORE) LOCAL: {name} @ {index}");
                     self.push(Inst::StoreLocal(index));
                 }
