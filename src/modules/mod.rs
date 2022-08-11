@@ -1,6 +1,5 @@
 pub(crate) use builtins::BUILTINS;
-pub(crate) use file::FILE;
-pub(crate) use system::SYSTEM;
+pub(crate) use system::{add_module, get_module};
 
 mod builtins;
 mod file;

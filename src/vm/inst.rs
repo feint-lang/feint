@@ -77,6 +77,8 @@ pub enum Inst {
     // Make function closure for constant.
     MakeClosure(usize),
 
+    LoadModule(String),
+
     Placeholder(usize, Box<Inst>, String),
     BreakPlaceholder(usize, usize), // jump address, scope depth
     ContinuePlaceholder(usize, usize), // jump address, scope depth

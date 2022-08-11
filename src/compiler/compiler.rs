@@ -122,6 +122,7 @@ impl Visitor {
             Kind::Break(expr) => self.visit_break(expr)?,
             Kind::Continue => self.visit_continue()?,
             Kind::Return(expr) => self.visit_return(expr)?,
+            Kind::Import(name) => self.visit_import(name)?,
             Kind::Expr(expr) => self.visit_expr(expr, None)?,
         }
         Ok(())
@@ -141,6 +142,11 @@ impl Visitor {
     fn visit_return(&mut self, expr: ast::Expr) -> VisitResult {
         self.visit_expr(expr, None)?;
         self.push(Inst::ReturnPlaceholder(self.len(), self.scope_depth));
+        Ok(())
+    }
+
+    fn visit_import(&mut self, name: String) -> VisitResult {
+        self.push(Inst::LoadModule(name));
         Ok(())
     }
 

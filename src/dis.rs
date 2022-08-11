@@ -109,6 +109,7 @@ impl Disassembler {
                 };
                 self.align("MAKE_CLOSURE", func)
             }
+            LoadModule(name) => self.align("IMPORT", name),
             Halt(code) => self.align("HALT", code),
             HaltTop => self.align("HALT_TOP", ""),
             // None of the following should ever appear in the list. If they

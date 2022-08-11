@@ -82,7 +82,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
         let level = self.statement_level;
         log::trace!("BEGIN {level}: statement");
         self.statement_level += 1;
-        use Token::{Break, Continue, EndOfStatement, Jump, Label, Return};
+        use Token::{Break, Continue, EndOfStatement, Import, Jump, Label, Return};
         let token = self.expect_next_token()?;
         let start = token.start;
         let statement = match token.token {
@@ -91,6 +91,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
             Break => self.break_(start)?,
             Continue => self.continue_(start, token.end)?,
             Return => self.return_(start)?,
+            Import => self.import(start)?,
             _ => {
                 self.lookahead_queue.push_front(token);
                 let expr = self.expr(0)?;
@@ -150,6 +151,16 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
         let expr = self.next_expr_or_nil(start)?;
         let end = expr.end;
         Ok(ast::Statement::new_return(expr, start, end))
+    }
+
+    fn import(&mut self, start: Location) -> StatementResult {
+        let name_expr = self.expr(0)?;
+        if let Some(name) = name_expr.is_ident() {
+            let end = name_expr.end;
+            Ok(ast::Statement::new_import(name, start, end))
+        } else {
+            Err(self.err(ParseErrKind::ExpectedIdent(self.loc())))
+        }
     }
 
     /// Get the next expression, possibly recurring to handle nested

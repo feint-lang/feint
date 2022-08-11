@@ -1,5 +1,13 @@
+import file
+
 # Read file as text
-print(file.read("examples/builtins.fi"))
+print("Read file as text:")
+text = file.read("Cargo.toml")
+print(text)
+
+print()
 
 # Read file as lines (and print the first line)
-print(file.read_lines("examples/builtins.fi").0)
+print("Read file as lines:")
+lines = file.read_lines("Cargo.toml")
+print(lines)

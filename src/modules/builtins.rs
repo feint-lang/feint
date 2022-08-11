@@ -21,8 +21,6 @@ use crate::types::nil::NIL_TYPE;
 use crate::types::str::STR_TYPE;
 use crate::types::tuple::TUPLE_TYPE;
 
-use super::FILE;
-
 pub static BUILTINS: Lazy<Arc<RwLock<Module>>> = Lazy::new(|| {
     let mut entries = vec![
         ("$name", create::new_str("builtins")),
@@ -40,9 +38,6 @@ pub static BUILTINS: Lazy<Arc<RwLock<Module>>> = Lazy::new(|| {
         ("Nil", NIL_TYPE.clone()),
         ("Str", STR_TYPE.clone()),
         ("Tuple", TUPLE_TYPE.clone()),
-        // TODO: Sticking the file module here is a hack for now since
-        //       there's no import system.
-        ("file", FILE.clone()),
     ];
 
     for spec in get_builtin_func_specs() {

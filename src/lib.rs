@@ -2,6 +2,8 @@
 //!
 //! FeInt is a stack-based bytecode interpreter.
 
+extern crate core;
+
 pub mod dis;
 pub mod exe;
 pub mod repl;

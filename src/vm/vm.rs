@@ -10,6 +10,7 @@ use std::sync::{
 use ctrlc;
 use num_traits::ToPrimitive;
 
+use crate::modules;
 use crate::types::{args_to_str, this_to_str};
 use crate::types::{create, Args, BuiltinFunc, Func, FuncTrait, ObjectRef, This};
 use crate::util::{
@@ -279,6 +280,12 @@ impl VM {
                     let obj = code.get_const(*index)?.clone();
                     let closure = create::new_closure(obj);
                     self.push_temp(closure);
+                }
+                // Modules
+                LoadModule(name) => {
+                    let module = modules::get_module(name.as_str())?;
+                    self.ctx.declare_and_assign_var(name, module.clone())?;
+                    self.push_temp(module.clone());
                 }
                 // Placeholders
                 Placeholder(addr, inst, message) => {

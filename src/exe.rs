@@ -7,7 +7,6 @@ use crate::modules;
 use crate::parser::{ParseErr, ParseErrKind, Parser};
 use crate::result::{ExeErr, ExeErrKind, ExeResult};
 use crate::scanner::{ScanErr, ScanErrKind, Scanner, Token, TokenWithLocation};
-use crate::types::{create, Namespace, ObjectTrait};
 use crate::util::{
     source_from_file, source_from_stdin, source_from_text, Location, Source,
 };
@@ -144,19 +143,14 @@ impl<'a> Executor<'a> {
             log::trace!("END: disassemble code ======================");
             Ok(VMState::Halted(0))
         } else {
-            let system = modules::SYSTEM.read().unwrap();
-            let main_module = create::new_module("$main", Namespace::new(), code);
-
-            if let Ok(modules) = system.get_attr("modules") {
-                let modules = modules.write().unwrap();
-                let modules =
-                    modules.down_to_map().expect("Expected system.modules to be a Map");
-                modules.add("$main", main_module.clone());
+            match modules::add_module("$main", code) {
+                Ok(main_module) => {
+                    let main_module = main_module.read().unwrap();
+                    let main_module = main_module.down_to_mod().unwrap();
+                    self.execute_code(&main_module.code, self.debug, source)
+                }
+                Err(err) => Err(ExeErr::new(ExeErrKind::RuntimeErr(err.kind))),
             }
-
-            let main_module = main_module.read().unwrap();
-            let main_module = main_module.down_to_mod().unwrap();
-            self.execute_code(&main_module.code, self.debug, source)
         }
     }
 
