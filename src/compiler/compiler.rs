@@ -322,6 +322,9 @@ impl Visitor {
                 "Branch condition jump not set".to_owned(),
             ));
 
+            // Pop result of branch condition evaluation.
+            self.push(Inst::Pop);
+
             // Branch selected. Execute body.
             self.visit_statements(block.statements)?;
             self.push(Inst::ScopeEnd);
@@ -400,6 +403,9 @@ impl Visitor {
             Box::new(Inst::JumpIfNot(0, 0)),
             "Jump-out for loop not set".to_owned(),
         ));
+
+        // Pop result of loop condition evaluation.
+        self.push(Inst::Pop);
 
         // Run the loop body.
         let block_start_addr = self.len();
