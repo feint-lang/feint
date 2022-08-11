@@ -3,10 +3,11 @@ use std::io::BufRead;
 
 use crate::compiler::{compile, CompErr, CompErrKind};
 use crate::dis;
+use crate::modules;
 use crate::parser::{ParseErr, ParseErrKind, Parser};
 use crate::result::{ExeErr, ExeErrKind, ExeResult};
 use crate::scanner::{ScanErr, ScanErrKind, Scanner, Token, TokenWithLocation};
-use crate::types::{create, modules, Namespace, ObjectTrait};
+use crate::types::{create, Namespace, ObjectTrait};
 use crate::util::{
     source_from_file, source_from_stdin, source_from_text, Location, Source,
 };

@@ -1,6 +1,5 @@
 use crate::types::BuiltinFn;
 
-use super::file::*;
 use super::print::*;
 use super::types::*;
 
@@ -9,9 +8,6 @@ use super::types::*;
 /// that means the function accepts a variable number of args.
 pub fn get_builtin_func_specs<'a>() -> Vec<(&'a str, &'a [&'a str], BuiltinFn)> {
     vec![
-        // File
-        ("read_file", &["file_name"], read_file),
-        ("read_file_lines", &["file_name"], read_file_lines),
         // Print
         ("print", &[""], print),
         // Type

@@ -1,0 +1,5 @@
+# Read file as text
+print(file.read("examples/builtins.fi"))
+
+# Read file as lines (and print the first line)
+print(file.read_lines("examples/builtins.fi").0)

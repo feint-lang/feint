@@ -102,6 +102,14 @@ impl RuntimeErr {
     pub fn new_not_callable<S: Into<String>>(type_name: S) -> Self {
         Self::new(RuntimeErrKind::NotCallable(type_name.into()))
     }
+
+    pub fn arg_err<S: Into<String>>(message: S) -> Self {
+        Self::new(RuntimeErrKind::ArgErr(message.into()))
+    }
+
+    pub fn could_not_read_file<S: Into<String>>(message: S) -> Self {
+        Self::new(RuntimeErrKind::CouldNotReadFile(message.into()))
+    }
 }
 
 impl fmt::Display for RuntimeErr {
@@ -132,7 +140,7 @@ pub enum RuntimeErrKind {
     IndexOutOfBounds(String, usize),
     NotCallable(String),
 
-    // Move?
+    ArgErr(String),
     CouldNotReadFile(String),
 }
 

@@ -6,10 +6,10 @@ use std::sync::{Arc, RwLock};
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 
+use crate::modules;
 use crate::vm::{RuntimeBoolResult, RuntimeErr, RuntimeObjResult, RuntimeResult, VM};
 
 use super::create;
-use super::modules::BUILTINS;
 use super::result::{Args, GetAttrResult, SetAttrResult};
 use super::util::args_to_str;
 
@@ -44,7 +44,7 @@ pub trait TypeTrait {
     fn namespace(&self) -> &Namespace;
 
     fn module(&self) -> ObjectRef {
-        BUILTINS.clone()
+        modules::BUILTINS.clone()
     }
 
     fn id(&self) -> usize {

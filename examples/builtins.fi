@@ -24,9 +24,3 @@ print("Tuple (1, 2) mapped to print:", (1, 2).map(print))
 print("Tuple (1, 2) mapped to `item * 2`:", (1, 2).map((item, i) -> item * 2))
 
 print()
-
-# Read file as text
-print(read_file("examples/builtins.fi"))
-
-# Read file as lines (and print the first line)
-print(read_file_lines("examples/builtins.fi").0)

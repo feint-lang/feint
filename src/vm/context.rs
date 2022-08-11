@@ -1,7 +1,8 @@
 use std::collections::hash_map;
 use std::slice;
 
-use crate::types::{create, modules, Namespace, ObjectRef, ObjectTrait};
+use crate::modules;
+use crate::types::{create, Namespace, ObjectRef, ObjectTrait};
 
 use super::constants::Constants;
 use super::result::{RuntimeErr, RuntimeResult};

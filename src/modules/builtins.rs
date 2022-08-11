@@ -4,24 +4,24 @@ use std::sync::{Arc, RwLock};
 use once_cell::sync::Lazy;
 
 use crate::builtin_funcs::get_builtin_func_specs;
+use crate::types::{create, Module, Namespace};
 
-use super::create;
+use crate::types::bool::BOOL_TYPE;
+use crate::types::bound_func::BOUND_FUNC_TYPE;
+use crate::types::builtin_func::BUILTIN_FUNC_TYPE;
+use crate::types::class::TYPE_TYPE;
+use crate::types::closure::CLOSURE_TYPE;
+use crate::types::float::FLOAT_TYPE;
+use crate::types::func::FUNC_TYPE;
+use crate::types::int::INT_TYPE;
+use crate::types::list::LIST_TYPE;
+use crate::types::map::MAP_TYPE;
+use crate::types::module::MODULE_TYPE;
+use crate::types::nil::NIL_TYPE;
+use crate::types::str::STR_TYPE;
+use crate::types::tuple::TUPLE_TYPE;
 
-use super::bool::BOOL_TYPE;
-use super::bound_func::BOUND_FUNC_TYPE;
-use super::builtin_func::BUILTIN_FUNC_TYPE;
-use super::class::TYPE_TYPE;
-use super::closure::CLOSURE_TYPE;
-use super::float::FLOAT_TYPE;
-use super::func::FUNC_TYPE;
-use super::int::INT_TYPE;
-use super::list::LIST_TYPE;
-use super::map::MAP_TYPE;
-use super::module::{Module, MODULE_TYPE};
-use super::nil::NIL_TYPE;
-use super::ns::Namespace;
-use super::str::STR_TYPE;
-use super::tuple::TUPLE_TYPE;
+use super::FILE;
 
 pub static BUILTINS: Lazy<Arc<RwLock<Module>>> = Lazy::new(|| {
     let mut entries = vec![
@@ -40,6 +40,9 @@ pub static BUILTINS: Lazy<Arc<RwLock<Module>>> = Lazy::new(|| {
         ("Nil", NIL_TYPE.clone()),
         ("Str", STR_TYPE.clone()),
         ("Tuple", TUPLE_TYPE.clone()),
+        // TODO: Sticking the file module here is a hack for now since
+        //       there's no import system.
+        ("file", FILE.clone()),
     ];
 
     for spec in get_builtin_func_specs() {
@@ -48,16 +51,4 @@ pub static BUILTINS: Lazy<Arc<RwLock<Module>>> = Lazy::new(|| {
     }
 
     create::new_builtin_module("builtins", Namespace::with_entries(&entries))
-});
-
-pub static SYSTEM: Lazy<Arc<RwLock<Module>>> = Lazy::new(|| {
-    let modules = create::new_map(vec![("builtins".to_string(), BUILTINS.clone())]);
-
-    create::new_builtin_module(
-        "system",
-        Namespace::with_entries(&[
-            ("$name", create::new_str("system")),
-            ("modules", modules),
-        ]),
-    )
 });
