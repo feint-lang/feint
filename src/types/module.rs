@@ -2,10 +2,13 @@ use std::any::Any;
 use std::fmt;
 use std::sync::{Arc, RwLock};
 
-use crate::vm::Code;
 use once_cell::sync::Lazy;
 
+use crate::vm::{Code, RuntimeErr, VM};
+
 use super::create;
+use super::meth::{make_meth, use_this};
+use super::result::{Args, This};
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
 use super::class::TYPE_TYPE;
@@ -30,6 +33,14 @@ impl ModuleType {
                 // Class Attributes
                 ("$name", create::new_str("Module")),
                 ("$full_name", create::new_str("builtins.Module")),
+                // Instance Methods
+                make_meth!(Module, "$items", &[], |this: ObjectRef, _, _| {
+                    let this = use_this!(this);
+                    let this = this.down_to_mod().unwrap();
+                    let ns = this.namespace();
+                    let items = ns.iter().map(|(n, _)| create::new_str(n)).collect();
+                    Ok(create::new_tuple(items))
+                }),
             ]),
         }
     }
