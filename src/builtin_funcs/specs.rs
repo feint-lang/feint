@@ -13,6 +13,5 @@ pub fn get_builtin_func_specs<'a>() -> Vec<(&'a str, &'a [&'a str], BuiltinFn)> 
         // Type
         ("type_of", &["object"], type_of),
         ("obj_id", &["object"], obj_id),
-        ("items", &["object"], items),
     ]
 }

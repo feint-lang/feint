@@ -139,6 +139,7 @@ pub trait ObjectTrait {
     }
 
     fn id_obj(&self) -> ObjectRef {
+        // TODO: Cache?
         create::new_int(self.id())
     }
 
@@ -160,6 +161,19 @@ pub trait ObjectTrait {
         }
         if name == "$id" {
             return Ok(self.id_obj());
+        }
+        if name == "$names" {
+            let class = self.class();
+            let class = class.read().unwrap();
+            let class_ns = class.namespace();
+            let obj_ns = self.namespace();
+            let mut names: Vec<String> =
+                class_ns.iter().map(|(n, _)| n).cloned().collect();
+            names.extend(obj_ns.iter().map(|(n, _)| n).cloned());
+            names.sort();
+            names.dedup();
+            let items = names.iter().map(create::new_str).collect();
+            return Ok(create::new_tuple(items));
         }
         if let Some(obj) = self.namespace().get_obj(name) {
             return Ok(obj);
