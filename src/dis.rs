@@ -81,6 +81,12 @@ impl Disassembler {
             }
             StoreLocal(index) => self.align("STORE_LOCAL", index),
             LoadLocal(index) => self.align("LOAD_LOCAL", index),
+            StoreCaptured(func_id, index) => {
+                self.align("STORE_CAPTURED", format!("{func_id} : {index}"))
+            }
+            LoadCaptured(func_id, index) => {
+                self.align("LOAD_CAPTURED", format!("{func_id} : {index}"))
+            }
             DeclareVar(name) => self.align("DECLARE_VAR", name),
             AssignVar(name) => self.align("ASSIGN_VAR", name),
             LoadVar(name) => self.align("LOAD_VAR", name),
@@ -102,12 +108,12 @@ impl Disassembler {
             MakeTuple(n) => self.align("MAKE_TUPLE", n),
             MakeList(n) => self.align("MAKE_LIST", n),
             MakeMap(n) => self.align("MAKE_MAP", n),
-            MakeClosure(index) => {
+            MakeClosure(index, count) => {
                 let func = match code.get_const(*index) {
                     Ok(obj) => obj.read().unwrap().to_string(),
                     Err(err) => err.to_string(),
                 };
-                self.align("MAKE_CLOSURE", func)
+                self.align("MAKE_CLOSURE", format!("{func} with {count} captured"))
             }
             LoadModule(name) => self.align("IMPORT", name),
             Halt(code) => self.align("HALT", code),

@@ -11,6 +11,7 @@ use ctrlc;
 use num_traits::ToPrimitive;
 
 use crate::modules;
+use crate::types::closure::Closure;
 use crate::types::{args_to_str, this_to_str};
 use crate::types::{create, Args, BuiltinFunc, Func, FuncTrait, ObjectRef, This};
 use crate::util::{
@@ -41,6 +42,32 @@ impl CallFrame {
     }
 }
 
+/// The "heap" stores vars that were captured by a closure. These vars
+/// are addressed by the function ID where the captured var was defined
+/// and the local index of the var in that function.
+struct Heap {
+    /// Function ID, local index, object
+    objects: Vec<(usize, usize, ObjectRef)>,
+}
+
+impl Heap {
+    pub fn new() -> Self {
+        Self { objects: Vec::with_capacity(64) }
+    }
+
+    pub fn get(&self, func_id: usize, local_index: usize) -> Option<ObjectRef> {
+        let result = self
+            .objects
+            .iter()
+            .find(|(id, index, _)| func_id == *id && local_index == *index);
+        if let Some((_, _, obj)) = result {
+            Some(obj.clone())
+        } else {
+            None
+        }
+    }
+}
+
 pub struct VM {
     ctx: RuntimeContext,
     // The scope stack contains pointers into the value stack. When a
@@ -59,6 +86,8 @@ pub struct VM {
     // Maximum depth of "call stack" (quotes because there's no explicit
     // call stack).
     max_call_depth: CallDepth,
+    // The "heap" stores objects that need to outlive a call frame.
+    heap: Heap,
     // The location of the current statement. Used for error reporting.
     loc: (Location, Location),
     // SIGINT (Ctrl-C) handling.
@@ -86,6 +115,7 @@ impl VM {
             call_stack_size: 0,
             call_frame_pointer: 0,
             max_call_depth,
+            heap: Heap::new(),
             loc: (Location::default(), Location::default()),
             handle_sigint: sigint_flag.load(Ordering::Relaxed),
             sigint_flag,
@@ -156,6 +186,21 @@ impl VM {
                 LoadLocal(index) => {
                     // Load (copy) specified local to TOS.
                     self.load_local(*index)?;
+                }
+                // Captures
+                StoreCaptured(func_id, index) => {
+                    log::trace!("STORE CAPTURED: {func_id} : {index}");
+                    self.load_local(*index)?;
+                    let obj = self.pop_obj()?;
+                    self.heap.objects.push((*func_id, *index, obj));
+                }
+                LoadCaptured(func_id, index) => {
+                    log::trace!("LOAD CAPTURED: {func_id} : {index}");
+                    if let Some(obj) = self.heap.get(*func_id, *index) {
+                        self.push_temp(obj);
+                    } else {
+                        return Err(RuntimeErr::object_not_found_err(*index));
+                    }
                 }
                 // Vars
                 DeclareVar(name) => {
@@ -276,9 +321,13 @@ impl VM {
                     let map = create::new_map(entries);
                     self.push_temp(map);
                 }
-                MakeClosure(index) => {
+                MakeClosure(index, captured_count) => {
                     let obj = code.get_const(*index)?.clone();
-                    let closure = create::new_closure(obj);
+                    let mut captured = vec![];
+                    for _ in 0..*captured_count {
+                        captured.push(None);
+                    }
+                    let closure = create::new_closure(obj, captured);
                     self.push_temp(closure);
                 }
                 // Modules
@@ -576,6 +625,20 @@ impl VM {
                 self.reset();
                 Err(err)
             }
+        }
+    }
+
+    pub fn call_closure(
+        &mut self,
+        closure: &Closure,
+        this: This,
+        args: Args,
+    ) -> RuntimeResult {
+        let func_ref = closure.func.read().unwrap();
+        if let Some(func) = func_ref.down_to_func() {
+            self.call_func(func, this, args)
+        } else {
+            Err(RuntimeErr::not_callable(""))
         }
     }
 

@@ -22,7 +22,7 @@ pub fn compile(
     log::trace!("BEGIN: compile");
     let argv = argv.into_iter().map(|a| a.to_owned()).collect();
     log::trace!("ARGV: {argv:?}");
-    let mut visitor = Visitor::new(ScopeKind::Global, argv);
+    let mut visitor = Visitor::new(None, ScopeKind::Global, argv);
     visitor.visit_program(program, keep_top_on_halt)?;
     log::trace!("END: compile");
     Ok(visitor.code)
@@ -32,20 +32,32 @@ pub fn compile(
 
 type VisitResult = Result<(), CompErr>;
 
-struct Visitor {
+struct Visitor<'a> {
+    parent: Option<&'a Visitor<'a>>,
+    initial_scope_kind: ScopeKind,
+    func_id: Option<usize>,
     code: Code,
     scope_tree: ScopeTree,
     scope_depth: usize,
+    maybe_captured: Vec<(usize, String)>,
     has_main: bool,
     argv: Vec<String>,
 }
 
-impl Visitor {
-    fn new(initial_scope_kind: ScopeKind, argv: Vec<String>) -> Self {
+impl<'a> Visitor<'a> {
+    fn new(
+        parent: Option<&'a Visitor<'a>>,
+        initial_scope_kind: ScopeKind,
+        argv: Vec<String>,
+    ) -> Self {
         Self {
+            parent,
+            initial_scope_kind,
+            func_id: None,
             code: Code::new(),
             scope_tree: ScopeTree::new(initial_scope_kind),
             scope_depth: 0,
+            maybe_captured: vec![],
             has_main: false,
             argv,
         }
@@ -255,17 +267,27 @@ impl Visitor {
         if self.scope_tree.in_global_scope() {
             self.push(Inst::LoadVar(name));
         } else {
-            match self.scope_tree.find_local(name.as_str(), false) {
+            match self.scope_tree.find_local(name.as_str()) {
                 Some((index, true)) => {
                     // Local exists and has been assigned
                     self.push(Inst::LoadLocal(index));
                 }
-                Some((_, false)) => {
+                Some((_, false)) | None => {
                     // Local exists but has not been assigned (e.g.,
-                    // `f = () -> x = x` where RHS `x` is a global.
-                    self.push(Inst::LoadVar(name));
+                    // `f = () -> x = x` where RHS `x` is captured from
+                    // an outer function or is a global).
+                    if self.initial_scope_kind == ScopeKind::Func {
+                        let addr = self.len();
+                        self.maybe_captured.push((addr, name.clone()));
+                        self.push(Inst::Placeholder(
+                            addr,
+                            Box::new(Inst::LoadVar(name)),
+                            "Ident not resolved".to_string(),
+                        ));
+                    } else {
+                        self.push(Inst::LoadVar(name));
+                    }
                 }
-                None => self.push(Inst::LoadVar(name)),
             }
         }
         Ok(())
@@ -341,7 +363,7 @@ impl Visitor {
 
             // Jump target if branch condition is false.
             // NOTE: Jump to SCOPE_END for this branch!
-            self.code.replace_inst(jump_index, Inst::JumpIfNot(self.len(), 0));
+            self.replace(jump_index, Inst::JumpIfNot(self.len(), 0));
 
             self.push(Inst::ScopeEnd);
             self.exit_scope();
@@ -359,7 +381,7 @@ impl Visitor {
 
         // Replace jump-out placeholders with actual jumps.
         for addr in jump_out_addrs {
-            self.code.replace_inst(addr, Inst::Jump(after_addr, 0));
+            self.replace(addr, Inst::Jump(after_addr, 0));
         }
 
         Ok(())
@@ -423,18 +445,18 @@ impl Visitor {
         self.exit_scope();
 
         // Set target of jump-out placeholder.
-        self.code.replace_inst(jump_out_addr, Inst::JumpIfNot(jump_out_target, 0));
+        self.replace(jump_out_addr, Inst::JumpIfNot(jump_out_target, 0));
 
         // Set address of breaks and continues.
         for addr in block_start_addr..=block_end_addr {
             let inst = &self.code[addr];
             if let Inst::BreakPlaceholder(inst_addr, depth) = inst {
-                self.code.replace_inst(
+                self.replace(
                     *inst_addr,
                     Inst::Jump(jump_out_target, depth - loop_scope_depth),
                 );
             } else if let Inst::ContinuePlaceholder(inst_addr, depth) = inst {
-                self.code.replace_inst(
+                self.replace(
                     *inst_addr,
                     Inst::JumpPushNil(loop_addr, depth - loop_scope_depth),
                 );
@@ -445,8 +467,6 @@ impl Visitor {
     }
 
     fn visit_func(&mut self, node: ast::Func, name: Option<String>) -> VisitResult {
-        let mut visitor = Visitor::new(ScopeKind::Func, vec![]);
-
         let name = if let Some(name) = name {
             self.has_main = name == "$main" && self.scope_tree.in_global_scope();
             name
@@ -459,6 +479,8 @@ impl Visitor {
         } else {
             unreachable!("Block for function contains no statements");
         };
+
+        let mut visitor = Visitor::new(None, ScopeKind::Func, vec![]);
 
         // Add locals for function parameters
         visitor.scope_tree.add_local("this", true);
@@ -490,8 +512,8 @@ impl Visitor {
         let return_addr = visitor.len();
         visitor.push(Inst::Return);
 
-        // NOTE: Explicit return statements need to jump to the end
-        //       of the function so that its scope can be exited.
+        // NOTE: Explicit return statements need to jump to the end of
+        //       the function so that its scope can be exited.
         for addr in 0..return_addr {
             let inst = &visitor.code[addr];
             if let Inst::ReturnPlaceholder(inst_addr, depth) = inst {
@@ -501,9 +523,99 @@ impl Visitor {
             }
         }
 
-        let func = create::new_func(name, node.params, visitor.code);
-        let index = self.code.add_const(func);
-        self.push(Inst::MakeClosure(index));
+        let captured = if !visitor.maybe_captured.is_empty() {
+            let mut globals = vec![];
+
+            // NOTE: We have to check the outer visitor's *initial*
+            //       scope type because this function could be defined
+            //       in an inner block scope within the outer function.
+            if self.initial_scope_kind == ScopeKind::Func {
+                let parent: &Visitor = self;
+                log::trace!("PARENT FUNC ID: {:?}", parent.func_id);
+                let mut captured = vec![];
+
+                'outer: for (addr, name) in visitor.maybe_captured.iter() {
+                    let mut current = parent;
+                    loop {
+                        log::trace!("FUNC ID: {:?}", current.func_id);
+                        if let Some((index, _)) = current.scope_tree.find_local(name) {
+                            log::trace!(
+                                "INITIAL SCOPE KIND: {:?}",
+                                current.initial_scope_kind
+                            );
+                            let func_id = current
+                                .func_id
+                                .expect("Current visitor should have a function ID");
+                            log::trace!(
+                                "VAR RESOLVED AS CAPTURED: {name} @ {func_id} : {index}"
+                            );
+                            captured.push((*addr, func_id, index, name.clone()));
+                            // Name found in some outer function scope;
+                            // record capture info and move on to next
+                            // name.
+                            continue 'outer;
+                        }
+                        // Name not found in some outer function scope;
+                        // move up to the previous call and look there.
+                        if let Some(parent) = current.parent {
+                            if parent.initial_scope_kind == ScopeKind::Func {
+                                current = parent;
+                                continue;
+                            }
+                        }
+                        // Name not found in any outer function scope;
+                        // assume it's a global.
+                        log::trace!("VAR RESOLVED AS GLOBAL: {name}");
+                        globals.push((*addr, name.clone()));
+                        break;
+                    }
+                }
+
+                for (addr, name) in globals.into_iter() {
+                    visitor.replace(addr, Inst::LoadVar(name));
+                }
+
+                for (addr, func_id, index, _) in captured.iter() {
+                    visitor.replace(*addr, Inst::LoadCaptured(*func_id, *index));
+                    self.push(Inst::StoreCaptured(*func_id, *index));
+                }
+
+                captured
+            } else {
+                // This function wasn't defined inside another function,
+                // so all of the potential captures are vars.
+                for (addr, name) in visitor.maybe_captured.iter() {
+                    globals.push((*addr, name.clone()));
+                }
+                for (addr, name) in globals.into_iter() {
+                    visitor.replace(addr, Inst::LoadVar(name));
+                }
+                vec![]
+            }
+        } else {
+            vec![]
+        };
+
+        let func_ref = create::new_func(name, node.params, visitor.code);
+        let func = func_ref.read().unwrap();
+        let func_id = func.id();
+
+        drop(func);
+
+        let index = self.code.add_const(func_ref);
+
+        if captured.is_empty() {
+            self.push(Inst::LoadConst(index));
+        } else {
+            // NOTE: Closures must be created at runtime so each
+            //       instance can separately capture the current
+            //       environment.
+            self.push(Inst::MakeClosure(index, captured.len()));
+        }
+
+        visitor.parent = Some(self);
+        visitor.func_id = Some(func_id);
+
         Ok(())
     }
 
@@ -594,7 +706,7 @@ impl Visitor {
         log::trace!("BEGIN: assignment {lhs_expr:?} = {value_expr:?}");
         if let Some(name) = lhs_expr.ident_name() {
             self.visit_expr(value_expr, Some(name.clone()))?;
-            match self.scope_tree.find_local(name.as_str(), true) {
+            match self.scope_tree.find_local_and_mark_assigned(name.as_str()) {
                 Some((index, _)) => {
                     // A slightly confusing thing here is that on the
                     // *initial* assignment of a local, STORE_LOCAL will
@@ -650,6 +762,10 @@ impl Visitor {
 
     fn push(&mut self, inst: Inst) {
         self.code.push_inst(inst);
+    }
+
+    fn replace(&mut self, addr: usize, inst: Inst) {
+        self.code.replace_inst(addr, inst);
     }
 
     // Global constants ------------------------------------------------

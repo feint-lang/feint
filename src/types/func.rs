@@ -4,10 +4,11 @@ use std::sync::{Arc, RwLock};
 
 use once_cell::sync::Lazy;
 
-use crate::vm::Code;
+use crate::vm::{Code, RuntimeResult, VM};
 
 use super::create;
-use super::result::Params;
+use super::result::{Args, Params};
+use super::util::args_to_str;
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
 use super::class::TYPE_TYPE;
@@ -121,6 +122,12 @@ impl ObjectTrait for Func {
 
     fn namespace(&self) -> &Namespace {
         &self.namespace
+    }
+
+    fn call(&self, args: Args, vm: &mut VM) -> RuntimeResult {
+        log::trace!("BEGIN: call {self}");
+        log::trace!("ARGS: {}", args_to_str(&args));
+        vm.call_func(self, None, args)
     }
 }
 

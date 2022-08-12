@@ -33,6 +33,15 @@ pub enum Inst {
     // from slot lower in stack and push it onto TOS.
     LoadLocal(usize),
 
+    // Store a local var from the current function scope that was
+    // captured by an inner function.
+    StoreCaptured(usize, usize), // function ID, index
+
+    // Load a captured local var that was stored previously in an outer
+    // function scope. The depth is how far up the call stack the
+    // captured var lives.
+    LoadCaptured(usize, usize), // function ID, index
+
     DeclareVar(String),
     AssignVar(String),
     LoadVar(String),
@@ -75,13 +84,13 @@ pub enum Inst {
     MakeMap(usize),
 
     // Make function closure for constant.
-    MakeClosure(usize),
+    MakeClosure(usize, usize), // const index, captured count
 
     LoadModule(String),
 
-    Placeholder(usize, Box<Inst>, String),
-    BreakPlaceholder(usize, usize), // jump address, scope depth
-    ContinuePlaceholder(usize, usize), // jump address, scope depth
+    Placeholder(usize, Box<Inst>, String), // address, instruction, error message
+    BreakPlaceholder(usize, usize),        // jump address, scope depth
+    ContinuePlaceholder(usize, usize),     // jump address, scope depth
 
     // NOTE: This is used for explicit return statements. It will be
     //       replaced with a jump to a RETURN target.

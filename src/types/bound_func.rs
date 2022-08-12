@@ -105,16 +105,20 @@ impl ObjectTrait for BoundFunc {
     }
 
     fn call(&self, args: Args, vm: &mut VM) -> RuntimeResult {
+        log::trace!("BEGIN: call bound function");
+        log::trace!("THIS: {}", this_to_str(&Some(self.this.clone())));
+        log::trace!("ARGS: {}", args_to_str(&args));
         let func_ref = self.func.read().unwrap();
         if let Some(func) = func_ref.down_to_builtin_func() {
-            log::trace!("BEGIN: call bound {func}");
-            log::trace!("THIS: {}", this_to_str(&Some(self.this.clone())));
-            log::trace!("ARGS: {}", args_to_str(&args));
+            log::trace!("BOUND: {func}");
             let this = Some(self.this.clone());
             vm.call_builtin_func(func, this, args)
-        } else if let Some(closure) = func_ref.down_to_closure() {
-            log::trace!("BEGIN: call closure {closure}");
-            closure.call(args, vm)
+        } else if let Some(func) = func_ref.down_to_func() {
+            log::trace!("BOUND: {func}");
+            func.call(args, vm)
+        } else if let Some(func) = func_ref.down_to_closure() {
+            log::trace!("BOUND: {func}");
+            func.call(args, vm)
         } else {
             Err(self.not_callable())
         }

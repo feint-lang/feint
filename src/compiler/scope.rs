@@ -66,6 +66,8 @@ impl ScopeTree {
         };
     }
 
+    // Locals ----------------------------------------------------------
+
     /// Add local var to current scope and return its index. If the
     /// local already exists in the current scope, just return its
     /// existing index.
@@ -84,26 +86,55 @@ impl ScopeTree {
     /// Find a local var in current scope or any of its ancestor scopes.
     /// The index returned is a pointer into the stack where the local
     /// var lives at runtime. If the local is found, a flag indicating
-    /// whether it has been assigned is also returned.
-    pub fn find_local<S: Into<String>>(
-        &mut self,
-        name: S,
-        mark_assigned: bool,
-    ) -> Option<(usize, bool)> {
-        let name = name.into();
+    /// whether it has already been assigned is also returned.
+    pub fn find_local(&self, name: &str) -> Option<(usize, bool)> {
+        let locals = self.all_locals();
+        if !locals.is_empty() {
+            let mut index = locals.len();
+            for (_, _, local_name, assigned) in locals.into_iter().rev() {
+                index -= 1;
+                if local_name == name {
+                    return Some((index, assigned));
+                }
+            }
+        }
+        None
+    }
 
-        // Flatten locals of current scope and its ancestors. The
-        // current scope's locals will be at the end and the search
-        // must proceed from the end.
+    /// The same as `find_local()` but also marks the local as assigned.
+    /// Note that the *previous* assigned flag will be returned so that
+    /// it's possible to detect that an assignment has occurred.
+    pub fn find_local_and_mark_assigned(
+        &mut self,
+        name: &str,
+    ) -> Option<(usize, bool)> {
+        let locals = self.all_locals();
+        if !locals.is_empty() {
+            let mut index = locals.len();
+            let iter = locals.into_iter().rev();
+            for (scope_index, local_index, local_name, assigned) in iter {
+                index -= 1;
+                if local_name == name {
+                    let found_scope = self.scope_mut(scope_index);
+                    found_scope.locals[local_index] = (name.to_owned(), true);
+                    return Some((index, assigned));
+                }
+            }
+        }
+        None
+    }
+
+    /// Get all locals from current scope and its ancestors. The current
+    /// scope's locals will be at the end and the search must proceed
+    /// in reverse.
+    fn all_locals(&self) -> Vec<(usize, usize, &String, bool)> {
         let mut locals = VecDeque::new();
         let mut scope = self.current();
-        let mut count = 0;
         loop {
             let scope_index = scope.index;
             let mut scope_locals = vec![];
             for (local_index, local) in scope.locals.iter().enumerate() {
                 scope_locals.push((scope_index, local_index, &local.0, local.1));
-                count += 1;
             }
             locals.push_front(scope_locals);
             if let Some(parent_index) = scope.parent {
@@ -112,27 +143,12 @@ impl ScopeTree {
                 break;
             }
         }
-
-        if count == 0 {
-            return None;
-        }
-
-        let iter = locals.into_iter().flatten().rev();
-        let mut index = count;
-
-        for (scope_index, local_index, local_name, assigned) in iter {
-            index -= 1;
-            if local_name == &name {
-                if mark_assigned {
-                    let found_scope = self.scope_mut(scope_index);
-                    found_scope.locals[local_index] = (name, true);
-                }
-                return Some((index, assigned));
-            }
-        }
-
-        None
+        locals.into_iter().flatten().collect()
     }
+
+    // Captures --------------------------------------------------------
+
+    // Jumps & Labels --------------------------------------------------
 
     // Add jump target and address to current scope
     pub fn add_jump<S: Into<String>>(&mut self, name: S, addr: usize) {
