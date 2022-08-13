@@ -47,7 +47,7 @@ impl CallFrame {
 /// and the local index of the var in that function.
 struct Heap {
     /// Function ID, local index, object
-    objects: Vec<(usize, usize, usize, ObjectRef)>,
+    objects: Vec<(usize, ObjectRef)>,
 }
 
 impl Heap {
@@ -55,32 +55,15 @@ impl Heap {
         Self { objects: Vec::with_capacity(64) }
     }
 
-    pub fn add(
-        &mut self,
-        func_id: usize,
-        local_index: usize,
-        x: usize,
-        obj: ObjectRef,
-    ) {
-        self.objects.push((func_id, local_index, x, obj));
+    pub fn add(&mut self, index: usize, obj: ObjectRef) {
+        self.objects.push((index, obj));
     }
 
-    pub fn get(
-        &self,
-        func_id: usize,
-        local_index: usize,
-        x: usize,
-    ) -> Option<ObjectRef> {
-        log::trace!("GETTING OBJECT FROM HEAP: {func_id} : {local_index} : {x}");
+    pub fn get(&self, local_index: usize) -> Option<ObjectRef> {
+        log::trace!("GETTING OBJECT FROM HEAP: {local_index}");
         log::trace!("HEAP CONTENTS: {:?}", self.objects);
-        let result = self.objects.iter().find(|(id, index, x_, _)| {
-            func_id == *id && local_index == *index && x == *x_
-        });
-        if let Some((.., obj)) = result {
-            Some(obj.clone())
-        } else {
-            None
-        }
+        let result = self.objects.iter().find(|(index, _)| local_index == *index);
+        result.map(|(.., obj)| obj.clone())
     }
 }
 
@@ -194,29 +177,14 @@ impl VM {
                     self.push_const(code, *index)?;
                 }
                 // Locals
-                StoreLocal(index) => {
+                StoreLocal(index, captured) => {
                     // Store object at TOS into local slot.
                     let obj = self.peek_obj()?;
-                    self.store_local(obj, *index)?;
+                    self.store_local(obj, *index, *captured)?;
                 }
                 LoadLocal(index) => {
                     // Load (copy) specified local to TOS.
                     self.load_local(*index)?;
-                }
-                // Captures
-                StoreCaptured(func_id, depth, index) => {
-                    log::trace!("STORE CAPTURED: {func_id} : {index} : {depth}");
-                    self.load_local(*index)?;
-                    let obj = self.pop_obj()?;
-                    self.heap.add(*func_id, *index, *depth, obj);
-                }
-                LoadCaptured(func_id, depth, index) => {
-                    log::trace!("LOAD CAPTURED: {func_id} : {index} : {depth}");
-                    if let Some(obj) = self.heap.get(*func_id, *index, *depth) {
-                        self.push_temp(obj);
-                    } else {
-                        return Err(RuntimeErr::object_not_found(*index));
-                    }
                 }
                 // Vars
                 DeclareVar(name) => {
@@ -571,8 +539,8 @@ impl VM {
         if let ValueStackKind::Var(_, depth, name) = a_kind {
             self.ctx.assign_var_at_depth(depth, name.as_str(), result.clone())?;
             self.push_temp(result);
-        } else if let ValueStackKind::TempLocal(_, index) = a_kind {
-            self.store_local(result.clone(), index)?;
+        } else if let ValueStackKind::TempLocal(_, index, captured) = a_kind {
+            self.store_local(result.clone(), index, captured)?;
             self.push_temp(result);
         } else {
             return Err(RuntimeErr::expected_var(format!("Binary op: {}", op)));
@@ -622,12 +590,12 @@ impl VM {
         self.enter_scope();
         self.push_call_frame(this.clone())?;
         if let Some(this_var) = self.find_this() {
-            self.push_local(this_var, 0);
+            self.push_local(this_var, 0, false);
         } else {
-            self.push_local(create::new_nil(), 0);
+            self.push_local(create::new_nil(), 0, false);
         }
         for (index, arg) in args.iter().enumerate() {
-            self.push_local(arg.clone(), index + 1);
+            self.push_local(arg.clone(), index + 1, false);
         }
         let result = self.execute(&func.code);
         match result {
@@ -766,7 +734,17 @@ impl VM {
     fn exit_scope(&mut self) {
         let return_val = self.pop_obj();
         if let Some(pointer) = self.scope_stack.pop() {
-            self.value_stack.truncate(pointer);
+            log::trace!("INSPECTING STACK FOR LOCALS:\n{}", self.format_stack());
+            let items = self.value_stack.split_off(pointer);
+            for item in items {
+                log::trace!("STACK VALUE: {item:?}");
+                if let ValueStackKind::Local(obj_ref, index, true) = item {
+                    let obj = obj_ref.read().unwrap();
+                    log::trace!("SAVE LOCAL TO HEAP: {index} ({obj})");
+                    drop(obj);
+                    self.heap.add(index, obj_ref);
+                }
+            }
         } else {
             panic!("Scope stack unexpectedly empty when exiting scope");
         };
@@ -813,21 +791,26 @@ impl VM {
     ///
     /// NOTE: This is only used when calling a user functions to store
     ///       its args as locals.
-    fn push_local(&mut self, obj: ObjectRef, index: usize) {
-        self.push(ValueStackKind::Local(obj, index));
+    fn push_local(&mut self, obj: ObjectRef, index: usize, captured: bool) {
+        self.push(ValueStackKind::Local(obj, index, captured));
     }
 
     /// This is used when loading (copying) a local from its slot to
     /// TOS. These "temporary locals" are cleaned up normally.
-    fn push_temp_local(&mut self, obj: ObjectRef, index: usize) {
-        self.push(ValueStackKind::TempLocal(obj, index));
+    fn push_temp_local(&mut self, obj: ObjectRef, index: usize, captured: bool) {
+        self.push(ValueStackKind::TempLocal(obj, index, captured));
     }
 
     /// Store object into local slot.
-    fn store_local(&mut self, obj: ObjectRef, index: usize) -> RuntimeResult {
+    fn store_local(
+        &mut self,
+        obj: ObjectRef,
+        index: usize,
+        captured: bool,
+    ) -> RuntimeResult {
         let frame_index = self.call_frame_pointer + index;
         if frame_index < self.value_stack.size() {
-            self.value_stack[frame_index] = ValueStackKind::Local(obj, index);
+            self.value_stack[frame_index] = ValueStackKind::Local(obj, index, captured);
             Ok(())
         } else {
             Err(RuntimeErr::frame_index_out_of_bounds(frame_index))
@@ -838,9 +821,12 @@ impl VM {
     fn load_local(&mut self, index: usize) -> RuntimeResult {
         let frame_index = self.call_frame_pointer + index;
         if let Some(kind) = self.value_stack.peek_at(frame_index) {
-            let obj = self.get_obj(kind);
-            self.push_temp_local(obj, index);
-            Ok(())
+            if let ValueStackKind::Local(obj, index, captured) = kind {
+                self.push_temp_local(obj.clone(), *index, *captured);
+                Ok(())
+            } else {
+                panic!("Expected local; got {kind:?}");
+            }
         } else {
             Err(RuntimeErr::frame_index_out_of_bounds(frame_index))
         }
@@ -930,13 +916,13 @@ impl VM {
                 Var(..) => "V",
                 Local(..) => "L",
                 Temp(..) => "T",
-                TempLocal(..) => "U",
+                TempLocal(..) => "TL",
                 ReturnVal(..) => "R",
             };
             let obj = self.get_obj(kind);
             let obj = &*obj.read().unwrap();
             let top_marker = if i == 0 { " [TOP]" } else { "" };
-            let string = format!("{i:0>8} {kind_marker} {obj:?}{top_marker}");
+            let string = format!("{i:0>8} {obj:?} {kind_marker}{top_marker}");
             items.push(string)
         }
         items.join("\n")

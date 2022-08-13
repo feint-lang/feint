@@ -25,22 +25,12 @@ pub enum Inst {
     // Other constants are local to a given code unit.
     LoadConst(usize),
 
-    // Store value at top of stack into local--pop top of stack and
-    // replace local value lower in stack with top of stack value.
-    StoreLocal(usize),
+    // Store value at top of stack as local.
+    StoreLocal(usize, bool),
 
     // Load local value onto top of stack--retrieve (copy) local value
     // from slot lower in stack and push it onto TOS.
     LoadLocal(usize),
-
-    // Store a local var from the current function scope that was
-    // captured by an inner function.
-    StoreCaptured(usize, usize, usize), // function ID, index, discriminator
-
-    // Load a captured local var that was stored previously in an outer
-    // function scope. The depth is how far up the call stack the
-    // captured var lives.
-    LoadCaptured(usize, usize, usize), // function ID, index, discriminator
 
     DeclareVar(String),
     AssignVar(String),

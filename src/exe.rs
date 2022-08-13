@@ -124,9 +124,10 @@ impl<'a> Executor<'a> {
             Ok(code) => code,
             Err(err) => {
                 if !self.ignore_comp_err(&err) {
+                    let (start, _end) = err.loc();
                     self.print_err_line(
-                        source.line_no,
-                        source.get_current_line().unwrap_or("<none>"),
+                        start.line,
+                        source.get_line(start.line).unwrap_or("<none>"),
                     );
                     self.handle_comp_err(&err);
                 }

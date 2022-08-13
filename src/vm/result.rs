@@ -28,9 +28,9 @@ pub enum ValueStackKind {
     GlobalConstant(ObjectRef, usize),
     Constant(ObjectRef, usize),
     Var(ObjectRef, usize, String),
-    Local(ObjectRef, usize),
+    Local(ObjectRef, usize, bool),
     Temp(ObjectRef),
-    TempLocal(ObjectRef, usize),
+    TempLocal(ObjectRef, usize, bool),
     ReturnVal(ObjectRef),
 }
 

@@ -1,9 +1,7 @@
-use std::sync::{Arc, RwLock};
-
 use num_traits::ToPrimitive;
 
 use crate::ast;
-use crate::types::{create, Func, ObjectRef, ObjectTrait};
+use crate::types::{create, ObjectRef};
 use crate::util::{
     BinaryOperator, CompareOperator, InplaceOperator, Location, Stack,
     UnaryCompareOperator, UnaryOperator,
@@ -16,12 +14,13 @@ use super::scope::{Scope, ScopeKind, ScopeTree};
 // Compiler ------------------------------------------------------------
 
 pub struct Compiler {
-    scope_tree_stack: Stack<ScopeTree>,
+    // The visitor stack is analogous to the VM call stack.
+    visitor_stack: Stack<Visitor>,
 }
 
 impl Compiler {
     pub fn new() -> Self {
-        Self { scope_tree_stack: Stack::new() }
+        Self { visitor_stack: Stack::new() }
     }
 
     pub fn compile_script(
@@ -32,7 +31,7 @@ impl Compiler {
     ) -> CompResult {
         log::trace!("BEGIN: compile script");
 
-        let mut visitor = Visitor::new(None, ScopeKind::Global);
+        let mut visitor = Visitor::new(ScopeKind::Global);
 
         if program.statements.is_empty() {
             visitor.push(Inst::Halt(0));
@@ -46,209 +45,140 @@ impl Compiler {
             "Expected to be in global scope after compiling script"
         );
 
-        let mut code = visitor.code;
+        // Functions ---------------------------------------------------
 
-        log::trace!("BEGIN compiling functions in script");
-        self.scope_tree_stack.push(visitor.scope_tree);
+        self.visitor_stack.push(visitor);
+
         let mut has_main = false;
-        for (addr, node, name_opt) in visitor.func_nodes.into_iter() {
-            self.compile_global_func(&mut code, addr, node, name_opt.clone())?;
-            if let Some(name) = name_opt {
-                has_main = name == "$main";
+
+        log::trace!("BEGIN: compiling global functions");
+        let func_nodes: Vec<(usize, String, ast::Func)> =
+            self.visitor_stack[0].func_nodes.iter().cloned().collect();
+        for (addr, name, node) in func_nodes {
+            if name == "$main" {
+                has_main = true;
             }
+            let func = self.compile_func(name, node)?;
+            let const_index = self.visitor_stack[0].code.add_const(func);
+            self.visitor_stack[0].replace(addr, Inst::LoadConst(const_index));
         }
-        self.scope_tree_stack.pop();
-        log::trace!("END compiling functions in script");
+        log::trace!("END: compiling global functions");
+
+        let mut visitor = self.visitor_stack.pop().unwrap();
+
+        // END Functions -----------------------------------------------
 
         if has_main {
             let argv: Vec<ObjectRef> =
                 argv.iter().map(|a| create::new_str(a.to_owned())).collect();
             let argc = argv.len();
             for arg in argv {
-                let index = code.add_const(arg);
-                code.push_inst(Inst::LoadConst(index));
+                let index = visitor.code.add_const(arg);
+                visitor.code.push_inst(Inst::LoadConst(index));
             }
-            code.push_inst(Inst::LoadVar("$main".to_string()));
-            code.push_inst(Inst::Call(argc));
-            code.push_inst(Inst::Return);
-            code.push_inst(Inst::Pop);
-            code.push_inst(Inst::HaltTop);
+            visitor.code.push_inst(Inst::LoadVar("$main".to_string()));
+            visitor.code.push_inst(Inst::Call(argc));
+            visitor.code.push_inst(Inst::Return);
+            visitor.code.push_inst(Inst::Pop);
+            visitor.code.push_inst(Inst::HaltTop);
         } else {
             if !keep_top_on_halt {
-                code.push_inst(Inst::Pop);
+                visitor.code.push_inst(Inst::Pop);
             }
-            code.push_inst(Inst::Halt(0));
+            visitor.code.push_inst(Inst::Halt(0));
         }
 
         log::trace!("END: compile module");
-        Ok(code)
+        Ok(visitor.code)
     }
 
-    pub fn compile_global_func(
+    fn compile_func(
         &mut self,
-        global_code: &mut Code,
-        func_addr: usize,
+        name: String,
         node: ast::Func,
-        name_opt: Option<String>,
-    ) -> Result<(), CompErr> {
-        log::trace!("BEGIN compile global function {name_opt:?}");
-
-        let name =
-            if let Some(name) = name_opt { name } else { "<anonymous>".to_owned() };
+    ) -> Result<ObjectRef, CompErr> {
+        let stack_index = self.visitor_stack.size();
         let params = node.params.clone();
 
-        let mut visitor = Visitor::new(None, ScopeKind::Func);
+        let mut visitor = Visitor::new(ScopeKind::Func);
         visitor.visit_func(node)?;
 
-        let mut func = Func::new(name, params, visitor.code);
+        log::trace!("BEGIN: resolving names");
+        let mut presumed_globals = vec![];
+        for (addr, name, start, end) in &visitor.unresolved_names {
+            let mut store_local_addrs = vec![];
+            let mut stack_index = self.visitor_stack.size();
+            let mut found_index = self.visitor_stack.size();
 
-        for (addr, name, start, end) in visitor.unresolved_names {
-            log::trace!("VAR RESOLVED AS GLOBAL: {name}");
-            self.check_global(name.as_str(), start, end)?;
-            func.code.replace_inst(addr, Inst::LoadVar(name));
-        }
+            for up_visitor in self.visitor_stack.iter().rev() {
+                stack_index -= 1;
+                let result = up_visitor.scope_tree.find_local(name.as_str());
+                if let Some((local_addr, index, ..)) = result {
+                    log::trace!("RESOLVED VAR AS CAPTURED: {name} @ {index}");
+                    found_index = stack_index;
 
-        log::trace!("BEGIN compiling functions in global function");
-        for (addr, node, name_opt) in visitor.func_nodes.iter() {
-            self.compile_func(Some(&visitor), &mut func, addr, node, name_opt)?;
-        }
-        log::trace!("END compiling functions in global function");
+                    for (addr, inst) in up_visitor.code.iter_chunk().enumerate() {
+                        if let Inst::StoreLocal(index, _) = inst {
+                            store_local_addrs.push((addr, *index));
+                        }
+                    }
 
-        func.code.push_inst(Inst::Return);
-        func.code.fix_up_explicit_returns();
+                    // TODO: This should *retrieve* an object from the heap.
+                    // visitor.code.replace_inst(addr, Inst::LoadCaptured(index));
 
-        let func_obj = Arc::new(RwLock::new(func));
-        let index = global_code.add_const(func_obj);
-        global_code.replace_inst(func_addr, Inst::LoadConst(index));
+                    break;
+                }
+            }
 
-        log::trace!("END compile global function");
-        Ok(())
-    }
-
-    pub fn compile_func(
-        &mut self,
-        parent_visitor: Option<&Visitor>,
-        outer_func: &mut Func,
-        func_addr: usize,
-        node: ast::Func,
-        name_opt: Option<String>,
-    ) -> Result<(), CompErr> {
-        log::trace!("BEGIN compile function {name_opt:?}");
-
-        let name =
-            if let Some(name) = name_opt { name } else { "<anonymous>".to_owned() };
-        let params = node.params.clone();
-
-        let mut visitor = Visitor::new(parent_visitor, ScopeKind::Func);
-        visitor.visit_func(node)?;
-
-        let mut func = Func::new(name, params, visitor.code);
-
-        // Two scenarios:
-        //
-        // 1. The function contains no unresolved vars, so there's
-        //    nothing to do in that regard.
-        // 2. The function is an inner function defined within an outer
-        //    function.
-        //
-        // In case 1, instructions to create a regular function are
-        // emitted.
-        //
-        // In case 2, if all unresolved vars are globals, instructions
-        // to create a regular function will be emitted. If the function
-        // contains any captured locals, instructions to create a
-        // closure will be emitted.
-        let (globals, captured) = if visitor.unresolved_names.is_empty() {
-            (vec![], vec![])
-        } else {
-            // For each unresolved name, look up the scope tree stack
-            // and try to find a captured local.
-            let mut globals = vec![];
-            let mut captured = vec![];
-            let iter = visitor.unresolved_names.iter();
-            for (addr, name, start, end) in iter {
-                let iter = self.scope_tree_stack.iter().enumerate();
-                for (depth, tree) in iter {
-                    if tree.in_global_scope() {
-                        log::trace!("VAR RESOLVED AS GLOBAL: {name}");
-                        globals.push((*addr, name.to_owned(), *start, *end));
-                    } else if let Some((index, _)) = tree.find_local(name.as_str()) {
-                        log::trace!("VAR RESOLVED AS CAPTURED: {name} @ {index}");
-                        captured.push((*addr, depth, index));
-                        break;
-                    } else {
-                        log::trace!("VAR RESOLVED AS GLOBAL: {name}");
-                        globals.push((*addr, name.to_owned(), *start, *end));
+            if found_index < self.visitor_stack.size() {
+                // Update STORE_LOCAL instruction in upward visitor to
+                // note that the local is captured.
+                if store_local_addrs.is_empty() {
+                    panic!("STORE_LOCAL({addr} not found in visitor");
+                } else {
+                    let found_visitor = &mut self.visitor_stack[found_index];
+                    for (addr, index) in store_local_addrs {
+                        let new_inst = Inst::StoreLocal(index, true);
+                        found_visitor.code.replace_inst(addr, new_inst);
                     }
                 }
-            }
-            (globals, captured)
-        };
-
-        log::trace!("BEGIN compiling functions in function");
-        self.scope_tree_stack.push(visitor.scope_tree);
-        for (addr, node, name_opt) in visitor.func_nodes.into_iter() {
-            self.compile_func(Some(&visitor), &mut func, addr, node, name_opt)?;
-        }
-        self.scope_tree_stack.pop().unwrap();
-        log::trace!("END compiling functions in function");
-
-        if !globals.is_empty() {
-            for (addr, name, start, end) in globals.into_iter() {
-                self.check_global(name.as_str(), start, end)?;
-                func.code.replace_inst(addr, Inst::LoadVar(name));
+            } else {
+                presumed_globals.push((*addr, name.clone(), *start, *end));
             }
         }
 
-        if captured.is_empty() {
-            // Create a regular, non-closure function.
-            let func_obj = Arc::new(RwLock::new(func));
-            let index = outer_func.code.add_const(func_obj);
-            outer_func.code.replace_inst(func_addr, Inst::LoadConst(index));
-        } else {
-            // Create a closure.
-            let func_id = func.id();
-            let mut info = vec![];
-            let mut already_stored = vec![];
-            for (addr, depth, index) in captured.into_iter() {
-                // Store captured vars in outer function.
-                if !already_stored.iter().any(|(d, i)| (d, i) == (&depth, &index)) {
-                    let inst = Inst::StoreCaptured(func_id, depth, index);
-                    outer_func.code.insert_inst_last(inst);
-                    already_stored.push((depth, index));
-                }
-
-                // Load captured vars in current, inner function.
-                let inst = Inst::LoadCaptured(func_id, depth, index);
-                func.code.replace_inst(addr, inst);
-
-                info.push((func_id, depth, index));
+        // Resolve globals
+        for (addr, name, start, end) in presumed_globals.into_iter() {
+            log::trace!("RESOLVED VAR AS GLOBAL: {name}");
+            if self.visitor_stack[0].scope_tree.has_global(name.as_str()) {
+                visitor.code.replace_inst(addr, Inst::LoadVar(name));
+            } else {
+                return Err(CompErr::global_not_found(name, start, end));
             }
-            let func_obj = Arc::new(RwLock::new(func));
-            let index = outer_func.code.add_const(func_obj);
-            outer_func.code.replace_inst(func_addr, Inst::MakeClosure(index, info));
         }
+        log::trace!("END: resolving names");
 
-        outer_func.code.push_inst(Inst::Return);
-        outer_func.code.fix_up_explicit_returns();
+        // Functions ---------------------------------------------------
 
-        log::trace!("END compile function");
-        Ok(())
-    }
+        self.visitor_stack.push(visitor);
 
-    /// Ensure global var exists, returning an error if it doesn't.
-    fn check_global(
-        &self,
-        name: &str,
-        start: Location,
-        end: Location,
-    ) -> Result<(), CompErr> {
-        let global_tree = &self.scope_tree_stack[0];
-        if global_tree.has_global(name) {
-            Ok(())
-        } else {
-            Err(CompErr::global_not_found(name, start, end))
+        log::trace!("BEGIN: compiling inner functions");
+        let func_nodes: Vec<(usize, String, ast::Func)> =
+            self.visitor_stack[stack_index].func_nodes.iter().cloned().collect();
+
+        for (addr, name, node) in func_nodes {
+            let func = self.compile_func(name, node)?;
+            let const_index = self.visitor_stack[stack_index].code.add_const(func);
+            self.visitor_stack[stack_index].replace(addr, Inst::LoadConst(const_index));
         }
+        log::trace!("END: compiling inner functions");
+
+        let visitor = self.visitor_stack.pop().unwrap();
+
+        // END Functions -----------------------------------------------
+
+        let func = create::new_func(name, params, visitor.code);
+        Ok(func)
     }
 }
 
@@ -256,25 +186,26 @@ impl Compiler {
 
 type VisitResult = Result<(), CompErr>;
 
-struct Visitor<'a> {
-    parent: Option<&'a Visitor<'a>>,
+pub struct Visitor {
     initial_scope_kind: ScopeKind,
-    func_nodes: Vec<(usize /* LOAD_CONST address */, ast::Func, Option<String>)>,
     code: Code,
     scope_tree: ScopeTree,
     scope_depth: usize,
+    func_nodes: Vec<(usize, String, ast::Func)>,
     unresolved_names: Vec<(usize, String, Location, Location)>,
 }
 
-impl<'a> Visitor<'a> {
-    fn new(parent: Option<&'a Visitor<'a>>, initial_scope_kind: ScopeKind) -> Self {
+impl Visitor {
+    fn new(initial_scope_kind: ScopeKind) -> Self {
+        let scope_tree = ScopeTree::new(initial_scope_kind);
+        let mut scope_tree_stack = Stack::new();
+        scope_tree_stack.push(scope_tree);
         Self {
-            parent,
             initial_scope_kind,
-            func_nodes: vec![],
             code: Code::new(),
             scope_tree: ScopeTree::new(initial_scope_kind),
             scope_depth: 0,
+            func_nodes: vec![],
             unresolved_names: vec![],
         }
     }
@@ -289,6 +220,8 @@ impl<'a> Visitor<'a> {
     }
 
     fn visit_func(&mut self, node: ast::Func) -> VisitResult {
+        let params = node.params;
+
         let last_statement = node
             .block
             .statements
@@ -299,37 +232,48 @@ impl<'a> Visitor<'a> {
         let return_nil = !matches!(last_statement.kind, ast::StatementKind::Expr(_));
 
         // Add local slot for this.
-        self.scope_tree.add_local("this", true);
+        self.scope_tree.add_local(0, "this", true);
 
         // Add local slots for function parameters.
-        let param_count = node.params.len();
+        let param_count = params.len();
         if param_count > 0 {
-            let last = node.params.len() - 1;
-            for (i, name) in node.params.iter().enumerate() {
+            let last = params.len() - 1;
+            for (i, name) in params.iter().enumerate() {
                 if name.is_empty() {
                     if i == last {
-                        self.scope_tree.add_local("$args", true);
+                        self.scope_tree.add_local(0, "$args", true);
                     } else {
                         return Err(CompErr::var_args_must_be_last());
                     }
                 } else {
-                    self.scope_tree.add_local(name, true);
+                    self.scope_tree.add_local(0, name, true);
                 }
             }
         }
 
         self.visit_statements(node.block.statements)?;
+
         assert_eq!(self.scope_tree.pointer(), 0);
+        assert!(
+            self.scope_tree.in_func_scope(),
+            "Expected to be in function scope after compiling function"
+        );
+
         self.fix_jumps()?;
 
         if return_nil {
             self.push_nil();
         }
 
-        // NOTE: The function's RETURN instruction will be added by the
-        //       Compiler once all inner functions have been compiled.
-        //       This is because additional instructions may be added
-        //       when compiling inner functions.
+        let return_addr = self.len();
+        self.push(Inst::Return);
+
+        for addr in 0..return_addr {
+            let inst = &self.code[addr];
+            if let Inst::ReturnPlaceholder(inst_addr, depth) = inst {
+                self.code.replace_inst(*inst_addr, Inst::Jump(return_addr, depth - 1));
+            }
+        }
 
         Ok(())
     }
@@ -436,12 +380,12 @@ impl<'a> Visitor<'a> {
             }
             Kind::Loop(expr, block) => self.visit_loop(*expr, block)?,
             Kind::Func(func) => {
-                let addr = self.len();
-                self.func_nodes.push((addr, func, name));
+                let name = name.map_or_else(|| "<anonymous>".to_owned(), |name| name);
+                self.func_nodes.push((self.len(), name, func));
                 self.push(Inst::Placeholder(
-                    addr,
+                    self.len(),
                     Box::new(Inst::LoadConst(0)),
-                    "Constant index for function not updated".to_owned(),
+                    "Function placeholder not updated".to_owned(),
                 ));
             }
             Kind::Call(call) => self.visit_call(call)?,
@@ -520,14 +464,14 @@ impl<'a> Visitor<'a> {
     ) -> VisitResult {
         let name = node.name();
         if self.scope_tree.in_global_scope() {
-            self.load_global_var(name, start, end)?;
+            self.load_global_var(name.as_str(), start, end)?;
         } else {
             match self.scope_tree.find_local(name.as_str()) {
-                Some((index, true)) => {
+                Some((_, index, true, _)) => {
                     // Local exists and has been assigned
                     self.push(Inst::LoadLocal(index));
                 }
-                Some((_, false)) | None => {
+                Some((_, _, false, _)) | None => {
                     // Local exists but has not been assigned (e.g.,
                     // `f = () -> x = x` where RHS `x` is captured from
                     // an outer function or is a global).
@@ -535,7 +479,7 @@ impl<'a> Visitor<'a> {
                     if self.initial_scope_kind == ScopeKind::Global {
                         // In a block or function defined in the global
                         // scope. All names resolve to global vars.
-                        self.load_global_var(name, start, end)?;
+                        self.load_global_var(name.as_str(), start, end)?;
                     } else {
                         // In a function defined in an outer function.
                         // Names may resolve to locals in the outer
@@ -554,11 +498,11 @@ impl<'a> Visitor<'a> {
     /// exists. Otherwise, return an error.
     fn load_global_var(
         &mut self,
-        name: String,
+        name: &str,
         start: Location,
         end: Location,
     ) -> Result<(), CompErr> {
-        if self.scope_tree.has_global(name.as_str()) {
+        if self.scope_tree.has_global(name) {
             self.push(Inst::LoadVar(name.to_owned()));
             Ok(())
         } else {
@@ -808,7 +752,8 @@ impl<'a> Visitor<'a> {
             self.push(Inst::DeclareVar(name));
         } else {
             log::trace!("DECLARE (ADD) LOCAL: {name}");
-            self.scope_tree.add_local(name, false);
+            let local_addr = self.len();
+            self.scope_tree.add_local(local_addr, name, false);
             // There's no instruction for declaring locals, because
             // locals initially appear on the stack by being loaded as
             // the RHS of an assignment. When the local is assigned,
@@ -828,13 +773,13 @@ impl<'a> Visitor<'a> {
         if let Some(name) = lhs_expr.ident_name() {
             self.visit_expr(value_expr, Some(name.clone()))?;
             match self.scope_tree.find_local_and_mark_assigned(name.as_str()) {
-                Some((index, _)) => {
+                Some((_, index, _, captured)) => {
                     // A slightly confusing thing here is that on the
                     // *initial* assignment of a local, STORE_LOCAL will
                     // *replace* the TOS value, converting it to a Local
                     // value type.
-                    log::trace!("ASSIGN (STORE) LOCAL: {name} @ {index}");
-                    self.push(Inst::StoreLocal(index));
+                    log::trace!("ASSIGN (STORE) LOCAL: {name} @ {index} : captured = {captured}");
+                    self.push(Inst::StoreLocal(index, captured));
                 }
                 None => {
                     log::trace!("ASSIGN VAR: {name}");

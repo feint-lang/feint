@@ -16,39 +16,24 @@ impl ScopeTree {
         Self { storage: vec![global_scope], pointer: 0 }
     }
 
-    pub fn in_global_scope(&self) -> bool {
-        self.current().is_global()
-    }
-
-    // Construction ----------------------------------------------------
-    //
-    // The methods in this section operate on the current scope, which
-    // is tracked by a pointer.
-
     pub fn pointer(&self) -> usize {
         self.pointer
     }
 
-    pub fn current(&self) -> &Scope {
-        &self.storage[self.pointer]
+    pub fn in_global_scope(&self) -> bool {
+        self.current().is_global()
     }
 
-    pub fn current_mut(&mut self) -> &mut Scope {
-        &mut self.storage[self.pointer]
+    pub fn in_func_scope(&self) -> bool {
+        self.current().is_func()
     }
 
-    pub fn scope_mut(&mut self, index: usize) -> &mut Scope {
+    fn get(&self, index: usize) -> &Scope {
+        &self.storage[index]
+    }
+
+    fn get_mut(&mut self, index: usize) -> &mut Scope {
         &mut self.storage[index]
-    }
-
-    /// Add nested scope to current scope then make the new scope the
-    /// current scope.
-    pub fn add(&mut self, kind: ScopeKind) -> usize {
-        let index = self.storage.len();
-        self.storage.push(Scope::new(kind, index, Some(self.pointer)));
-        self.storage[self.pointer].children.push(index);
-        self.pointer = index;
-        index
     }
 
     // Traversal -------------------------------------------------------
@@ -63,12 +48,69 @@ impl ScopeTree {
         }
     }
 
-    // Move up from current scope to its parent (sets current pointer)
+    fn scope_depth(&self, scope: &Scope) -> usize {
+        let mut depth = 0;
+        let mut scope = self.get(scope.index);
+        while let Some(parent_index) = scope.parent {
+            depth += 1;
+            scope = self.get(parent_index);
+        }
+        depth
+    }
+
+    /// Move up from current scope to its parent (sets current pointer).
     pub fn move_up(&mut self) {
         match self.parent_index() {
             Some(parent_index) => self.pointer = parent_index,
             None => panic!("Could not move up from {}", self.pointer),
         };
+    }
+
+    /// For each leaf scope, apply the specified visit function to the
+    /// leaf scope first and then to each of its parent scopes in turn.
+    /// Note that parent scopes will be processed multiple times when a
+    /// parent scope contains multiple nested scopes. The visit function
+    /// will be passed the current scope and its depth.
+    pub fn walk_up(&self, mut visit: impl FnMut(&Scope, usize) -> bool) {
+        for scope in self.storage.iter().filter(|n| n.is_leaf()) {
+            let depth = self.scope_depth(scope);
+            if visit(scope, depth) {
+                match scope.parent {
+                    Some(parent_index) => {
+                        let parent_scope = self.get(parent_index);
+                        if !visit(parent_scope, depth - 1) {
+                            break;
+                        }
+                    }
+                    _ => break,
+                }
+            } else {
+                break;
+            }
+        }
+    }
+
+    // Current Scope ---------------------------------------------------
+    //
+    // NOTE: All methods from here to the end of the impl operate on the
+    //       current scope.
+
+    fn current(&self) -> &Scope {
+        &self.storage[self.pointer]
+    }
+
+    fn current_mut(&mut self) -> &mut Scope {
+        &mut self.storage[self.pointer]
+    }
+
+    /// Add nested scope to current scope then make the new scope the
+    /// current scope.
+    pub fn add(&mut self, kind: ScopeKind) -> usize {
+        let index = self.storage.len();
+        self.storage.push(Scope::new(kind, index, Some(self.pointer)));
+        self.storage[self.pointer].children.push(index);
+        self.pointer = index;
+        index
     }
 
     // Globals ---------------------------------------------------------
@@ -107,53 +149,79 @@ impl ScopeTree {
     /// Add local var to current scope and return its index. If the
     /// local already exists in the current scope, just return its
     /// existing index.
-    pub fn add_local<S: Into<String>>(&mut self, name: S, assigned: bool) -> usize {
+    pub fn add_local<S: Into<String>>(
+        &mut self,
+        addr: usize,
+        name: S,
+        assigned: bool,
+    ) -> usize {
         let name = name.into();
         let locals = &self.current().locals;
-        if let Some(index) = locals.iter().position(|(n, _)| &name == n) {
+        if let Some(index) = locals.iter().position(|(_, n, ..)| &name == n) {
             index
         } else {
             let index = locals.len();
-            self.current_mut().locals.push((name, assigned));
+            self.current_mut().locals.push((addr, name, assigned, false));
             index
         }
     }
 
-    /// Find a local var in current scope or any of its ancestor scopes.
+    /// Find local var in current scope or any of its ancestor scopes.
     /// The index returned is a pointer into the stack where the local
-    /// var lives at runtime. If the local is found, a flag indicating
-    /// whether it has already been assigned is also returned.
-    pub fn find_local(&self, name: &str) -> Option<(usize, bool)> {
+    /// var lives at runtime. If the local is found, flags indicating
+    /// whether it has already been assigned and captured are also
+    /// returned.
+    pub fn find_local(&self, name: &str) -> Option<(usize, usize, bool, bool)> {
         let locals = self.all_locals();
         if !locals.is_empty() {
             let mut index = locals.len();
-            for (_, _, local_name, assigned) in locals.into_iter().rev() {
+            let iter = locals.iter().rev();
+            for (.., addr, local_name, assigned, captured) in iter {
                 index -= 1;
-                if local_name == name {
-                    return Some((index, assigned));
+                if *local_name == name {
+                    return Some((*addr, index, *assigned, *captured));
                 }
             }
         }
         None
     }
 
-    /// The same as `find_local()` but also marks the local as assigned.
-    /// Note that the *previous* assigned flag will be returned so that
-    /// it's possible to detect that an assignment has occurred.
+    /// Like `find_local()` but also marks the local as assigned. Note
+    /// that the *previous* assigned flag will be returned so that it's
+    /// possible to detect that an assignment has occurred.
     pub fn find_local_and_mark_assigned(
         &mut self,
         name: &str,
-    ) -> Option<(usize, bool)> {
+    ) -> Option<(usize, usize, bool, bool)> {
+        self.find_local_and_mark(name, true, false)
+    }
+
+    /// Find local var in current scope or any of its ancestor scopes
+    /// and, optionally, mark it as assigned and/or captured. Note that
+    /// the *previous* assigned and captured flags will be returned so
+    /// that it's possible to detect that an assignment and/or capture
+    /// has occurred.
+    fn find_local_and_mark(
+        &mut self,
+        name: &str,
+        mark_assigned: bool,
+        mark_captured: bool,
+    ) -> Option<(usize, usize, bool, bool)> {
         let locals = self.all_locals();
         if !locals.is_empty() {
             let mut index = locals.len();
             let iter = locals.into_iter().rev();
-            for (scope_index, local_index, local_name, assigned) in iter {
+            for (scope_index, local_index, addr, local_name, assigned, captured) in iter
+            {
                 index -= 1;
                 if local_name == name {
-                    let found_scope = self.scope_mut(scope_index);
-                    found_scope.locals[local_index] = (name.to_owned(), true);
-                    return Some((index, assigned));
+                    if mark_assigned || mark_captured {
+                        log::trace!("MARK CAPTURED: {name} {mark_captured}");
+                        let found_scope = self.get_mut(scope_index);
+                        found_scope.locals[local_index] =
+                            (addr, name.to_owned(), mark_assigned, mark_captured);
+                    }
+                    return Some((addr, index, assigned, captured));
                 }
             }
         }
@@ -163,14 +231,21 @@ impl ScopeTree {
     /// Get all locals from current scope and its ancestors. The current
     /// scope's locals will be at the end and the search must proceed
     /// in reverse.
-    fn all_locals(&self) -> Vec<(usize, usize, &String, bool)> {
+    fn all_locals(&self) -> Vec<(usize, usize, usize, &String, bool, bool)> {
         let mut locals = VecDeque::new();
         let mut scope = self.current();
         loop {
             let scope_index = scope.index;
             let mut scope_locals = vec![];
             for (local_index, local) in scope.locals.iter().enumerate() {
-                scope_locals.push((scope_index, local_index, &local.0, local.1));
+                scope_locals.push((
+                    scope_index,
+                    local_index,
+                    local.0,
+                    &local.1,
+                    local.2,
+                    local.3,
+                ));
             }
             locals.push_front(scope_locals);
             if let Some(parent_index) = scope.parent {
@@ -182,60 +257,32 @@ impl ScopeTree {
         locals.into_iter().flatten().collect()
     }
 
+    // Captures --------------------------------------------------------
+
+    /// Like `find_local()` but also marks the local as captured. Note
+    /// that the *previous* captured flag will be returned so that it's
+    /// possible to detect that capture has occurred.
+    pub fn find_local_and_mark_captured(
+        &mut self,
+        name: &str,
+    ) -> Option<(usize, usize, bool, bool)> {
+        self.find_local_and_mark(name, false, true)
+    }
+
     // Jumps & Labels --------------------------------------------------
 
-    // Add jump target and address to current scope
+    /// Add jump target and address to current scope
     pub fn add_jump<S: Into<String>>(&mut self, name: S, addr: usize) {
         self.current_mut().jumps.push((name.into(), addr))
     }
 
-    // Add label name and address to current scope
+    /// Add label name and address to current scope
     pub fn add_label<S: Into<String>>(
         &mut self,
         name: S,
         addr: usize,
     ) -> Option<usize> {
         self.current_mut().labels.insert(name.into(), addr)
-    }
-
-    // -----------------------------------------------------------------
-
-    fn get(&self, index: usize) -> &Scope {
-        &self.storage[index]
-    }
-
-    pub fn scope_depth(&self, scope: &Scope) -> usize {
-        let mut depth = 0;
-        let mut scope = self.get(scope.index);
-        while let Some(parent_index) = scope.parent {
-            depth += 1;
-            scope = self.get(parent_index);
-        }
-        depth
-    }
-
-    /// For each leaf scope, apply the specified visit function to the
-    /// leaf scope first and then to each of its parent scopes in turn.
-    /// Note that parent scopes will be processed multiple times when a
-    /// parent scope contains multiple nested scopes. The visit function
-    /// will be passed the current scope and its depth.
-    pub fn walk_up(&self, mut visit: impl FnMut(&Scope, usize) -> bool) {
-        for scope in self.storage.iter().filter(|n| n.is_leaf()) {
-            let depth = self.scope_depth(scope);
-            if visit(scope, depth) {
-                match scope.parent {
-                    Some(parent_index) => {
-                        let parent_scope = self.get(parent_index);
-                        if !visit(parent_scope, depth - 1) {
-                            break;
-                        }
-                    }
-                    _ => break,
-                }
-            } else {
-                break;
-            }
-        }
     }
 }
 
@@ -245,8 +292,8 @@ pub struct Scope {
     index: usize,
     parent: Option<usize>,
     children: Vec<usize>,
-    globals: Vec<String>,        // name
-    locals: Vec<(String, bool)>, // name, assigned
+    globals: Vec<String>,                     // name
+    locals: Vec<(usize, String, bool, bool)>, // address, name, assigned, captured
     /// target label name => jump inst address
     jumps: Vec<(String, usize)>,
     /// label name => label inst address
@@ -267,15 +314,19 @@ impl Scope {
             index,
             parent,
             children: vec![],
-            globals: Vec::new(),
-            locals: Vec::new(),
-            jumps: Vec::new(),
+            globals: vec![],
+            locals: vec![],
+            jumps: vec![],
             labels: HashMap::new(),
         }
     }
 
     fn is_global(&self) -> bool {
         self.kind == ScopeKind::Global
+    }
+
+    fn is_func(&self) -> bool {
+        self.kind == ScopeKind::Func
     }
 
     fn is_leaf(&self) -> bool {

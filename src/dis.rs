@@ -79,14 +79,10 @@ impl Disassembler {
                 };
                 self.align("LOAD_CONST", format!("{index} ({constant})"))
             }
-            StoreLocal(index) => self.align("STORE_LOCAL", index),
+            StoreLocal(index, captured) => {
+                self.align("STORE_LOCAL", format!("{index} : captured = {captured}"))
+            }
             LoadLocal(index) => self.align("LOAD_LOCAL", index),
-            StoreCaptured(func_id, index, x) => {
-                self.align("STORE_CAPTURED", format!("{func_id} : {index} : {x}"))
-            }
-            LoadCaptured(func_id, index, x) => {
-                self.align("LOAD_CAPTURED", format!("{func_id} : {index} : {x}"))
-            }
             DeclareVar(name) => self.align("DECLARE_VAR", name),
             AssignVar(name) => self.align("ASSIGN_VAR", name),
             LoadVar(name) => self.align("LOAD_VAR", name),

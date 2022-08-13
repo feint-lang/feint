@@ -72,6 +72,10 @@ impl<T> Stack<T> {
         self.storage.clear()
     }
 
+    pub fn split_off(&mut self, len: usize) -> Vec<T> {
+        self.storage.split_off(len)
+    }
+
     pub fn truncate(&mut self, len: usize) {
         self.storage.truncate(len)
     }
