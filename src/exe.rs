@@ -1,7 +1,7 @@
 //! Front end for executing code from a source on a VM.
 use std::io::BufRead;
 
-use crate::compiler::{compile, CompErr, CompErrKind};
+use crate::compiler::{CompErr, CompErrKind, Compiler};
 use crate::dis;
 use crate::modules;
 use crate::parser::{ParseErr, ParseErrKind, Parser};
@@ -118,7 +118,9 @@ impl<'a> Executor<'a> {
                 };
             }
         };
-        let code = match compile(program, argv, self.keep_top_on_halt) {
+
+        let mut compiler = Compiler::new();
+        let code = match compiler.compile_script(program, argv, self.keep_top_on_halt) {
             Ok(code) => code,
             Err(err) => {
                 if !self.ignore_comp_err(&err) {
@@ -330,24 +332,28 @@ impl<'a> Executor<'a> {
 
     fn handle_comp_err(&self, err: &CompErr) {
         use CompErrKind::*;
+        let (start, end) = err.loc();
         let message = match &err.kind {
-            UnhandledExpr(start, end) => {
-                format!("unhandled expression at {start} -> {end}")
-            }
             LabelNotFoundInScope(name) => format!("label not found in scope: {name}"),
             CannotJumpOutOfFunc(name) => format!(
-                "Cannot jump out of function: label {name} not found or defined in outer scope"
+                "cannot jump out of function: label {name} not found or defined in outer scope"
             ),
-            DuplicateLabelInScope(name) => format!("duplicate label in scope: {name}"),
-            ExpectedIdent => "expected identifier".to_string(),
+            DuplicateLabelInScope(name, ..) => format!("duplicate label in scope: {name}"),
+            ExpectedIdent(..) => {
+                "expected identifier".to_string()
+            },
             CannotAssignSpecialIdent(name) => {
                 format!("cannot assign to special name: {name}")
+            }
+            GlobalNotFound(name, ..) => {
+                format!("global var not found: {name}")
             }
             VarArgsMustBeLast => {
                 "var args must be last in parameter list".to_owned()
             }
         };
-        eprintln!("    |\n\n  Compilation error: {}", message);
+        let message = format!("Compilation error: {message}");
+        self.print_err_message(message, start, end);
     }
 
     fn ignore_comp_err(&self, err: &CompErr) -> bool {

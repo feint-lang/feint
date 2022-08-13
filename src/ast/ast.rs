@@ -9,19 +9,19 @@ use crate::util::{
     UnaryOperator,
 };
 
-/// Program - a list of statements.
+/// Module - A self-contained list of statements.
 #[derive(PartialEq)]
-pub struct Program {
+pub struct Module {
     pub statements: Vec<Statement>,
 }
 
-impl Program {
+impl Module {
     pub fn new(statements: Vec<Statement>) -> Self {
         Self { statements }
     }
 }
 
-impl fmt::Debug for Program {
+impl fmt::Debug for Module {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let items: Vec<String> = self
             .statements
@@ -32,7 +32,7 @@ impl fmt::Debug for Program {
     }
 }
 
-/// Statement - a logical chunk of code.
+/// Statement - a discrete unit of code.
 #[derive(Clone, PartialEq)]
 pub struct Statement {
     pub kind: StatementKind,
@@ -51,7 +51,6 @@ pub enum StatementKind {
     Expr(Expr),
 }
 
-// TODO: Pass correct location from parser to all constructors
 impl Statement {
     pub fn new(kind: StatementKind, start: Location, end: Location) -> Self {
         Self { kind, start, end }

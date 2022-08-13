@@ -7,7 +7,7 @@ use crate::util::Location;
 #[test]
 #[rustfmt::skip]
 fn create_ast() {
-    let program = Program::new(vec![
+    let program = Module::new(vec![
         // 1 + 2
         Statement::new_expr(
             Expr::new_binary_op(

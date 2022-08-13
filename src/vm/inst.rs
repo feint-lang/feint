@@ -35,12 +35,12 @@ pub enum Inst {
 
     // Store a local var from the current function scope that was
     // captured by an inner function.
-    StoreCaptured(usize, usize), // function ID, index
+    StoreCaptured(usize, usize, usize), // function ID, index, discriminator
 
     // Load a captured local var that was stored previously in an outer
     // function scope. The depth is how far up the call stack the
     // captured var lives.
-    LoadCaptured(usize, usize), // function ID, index
+    LoadCaptured(usize, usize, usize), // function ID, index, discriminator
 
     DeclareVar(String),
     AssignVar(String),
@@ -84,11 +84,13 @@ pub enum Inst {
     MakeMap(usize),
 
     // Make function closure for constant.
-    MakeClosure(usize, usize), // const index, captured count
+    // Function constant index, [(function ID, depth, local index)]
+    MakeClosure(usize, Vec<(usize, usize, usize)>),
 
     LoadModule(String),
 
     Placeholder(usize, Box<Inst>, String), // address, instruction, error message
+    VarPlaceholder(usize, String),         // address, var name
     BreakPlaceholder(usize, usize),        // jump address, scope depth
     ContinuePlaceholder(usize, usize),     // jump address, scope depth
 

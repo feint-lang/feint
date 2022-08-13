@@ -66,7 +66,7 @@ impl RuntimeErr {
         Self::new(RuntimeErrKind::RecursionDepthExceeded(max_call_depth))
     }
 
-    pub fn object_not_found_err(index: usize) -> Self {
+    pub fn object_not_found(index: usize) -> Self {
         Self::new(RuntimeErrKind::ObjectNotFound(index))
     }
 

@@ -70,6 +70,10 @@ impl Namespace {
         }
     }
 
+    pub fn has(&self, name: &str) -> bool {
+        self.objects.contains_key(name)
+    }
+
     pub fn is_equal(&self, other: &Namespace) -> bool {
         if self.size() != other.size() {
             // Namespaces have a different number of entries, so

@@ -47,12 +47,39 @@ impl Code {
         self.chunk.push(inst)
     }
 
+    pub fn insert_inst(&mut self, index: usize, inst: Inst) {
+        self.chunk.insert(index, inst);
+    }
+
+    /// Insert instruction at `len - 1`, pushing the last instruction
+    /// to the end.
+    pub fn insert_inst_last(&mut self, inst: Inst) {
+        let len = self.len_chunk();
+        if len == 0 {
+            self.push_inst(inst);
+        } else {
+            self.chunk.insert(len - 1, inst);
+        }
+    }
+
     pub fn replace_inst(&mut self, index: usize, inst: Inst) {
         self.chunk[index] = inst;
     }
 
     pub fn get_inst(&mut self, index: usize) -> Option<&Inst> {
         self.chunk.get(index)
+    }
+
+    /// Explicit return statements need to jump to the end of the
+    /// function so that the function can be cleanly exited.
+    pub fn fix_up_explicit_returns(&mut self) {
+        let return_addr = self.len_chunk();
+        for addr in 0..return_addr {
+            let inst = &self.chunk[addr];
+            if let Inst::ReturnPlaceholder(inst_addr, depth) = inst {
+                self.replace_inst(*inst_addr, Inst::Jump(return_addr, depth - 1));
+            }
+        }
     }
 
     // Constants -------------------------------------------------------
@@ -67,7 +94,7 @@ impl Code {
         if let Some(obj) = self.constants.get(index) {
             Ok(obj)
         } else {
-            Err(RuntimeErr::object_not_found_err(index))
+            Err(RuntimeErr::object_not_found(index))
         }
     }
 

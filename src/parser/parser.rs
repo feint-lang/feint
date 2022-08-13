@@ -49,14 +49,14 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
 
     // Parse entry point -----------------------------------------------
 
-    /// Parse token stream a produce a program, which is a sequence of
+    /// Parse token stream a produce a module, which is a sequence of
     /// statements.
     pub fn parse(&mut self) -> ParseResult {
-        log::trace!("BEGIN: program");
+        log::trace!("BEGIN: module");
         let statements = self.statements()?;
-        let program = ast::Program::new(statements);
-        log::trace!("END: program");
-        Ok(program)
+        let module = ast::Module::new(statements);
+        log::trace!("END: module");
+        Ok(module)
     }
 
     // Grammar ---------------------------------------------------------

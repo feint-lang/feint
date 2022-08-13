@@ -3,7 +3,7 @@ use crate::scanner::{ScanErr, Token, TokenWithLocation};
 use crate::util::Location;
 
 pub type BoolResult = Result<bool, ParseErr>;
-pub type ParseResult = Result<ast::Program, ParseErr>;
+pub type ParseResult = Result<ast::Module, ParseErr>;
 pub type StatementResult = Result<ast::Statement, ParseErr>;
 pub type StatementsResult = Result<Vec<ast::Statement>, ParseErr>;
 pub type BlockResult = Result<ast::StatementBlock, ParseErr>;

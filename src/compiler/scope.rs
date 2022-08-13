@@ -2,6 +2,9 @@
 //! Currently, it's only used resolve jump targets to labels.
 use std::collections::{HashMap, VecDeque};
 
+use crate::modules;
+use crate::types::ObjectTrait;
+
 pub struct ScopeTree {
     storage: Vec<Scope>,
     pointer: usize,
@@ -48,6 +51,8 @@ impl ScopeTree {
         index
     }
 
+    // Traversal -------------------------------------------------------
+
     fn parent_index(&self) -> Option<usize> {
         match self.pointer {
             0 => None,
@@ -64,6 +69,37 @@ impl ScopeTree {
             Some(parent_index) => self.pointer = parent_index,
             None => panic!("Could not move up from {}", self.pointer),
         };
+    }
+
+    // Globals ---------------------------------------------------------
+
+    /// Keep track of global vars so we can check to be sure that they
+    /// exist when compiling.
+    pub fn add_global<S: Into<String>>(&mut self, name: S) {
+        if self.in_global_scope() {
+            self.current_mut().globals.push(name.into());
+        } else {
+            panic!("Cannot add global while not in global scope");
+        }
+    }
+
+    /// See if global exists in or above current scope.
+    pub fn has_global(&self, name: &str) -> bool {
+        let mut current = self.current();
+        loop {
+            if current.is_global() {
+                return current.globals.iter().any(|n| n == name) || {
+                    let builtins = modules::BUILTINS.read().unwrap();
+                    builtins.namespace().has(name)
+                };
+            }
+            if let Some(parent_index) = current.parent {
+                current = &self.storage[parent_index];
+            } else {
+                break;
+            }
+        }
+        false
     }
 
     // Locals ----------------------------------------------------------
@@ -146,8 +182,6 @@ impl ScopeTree {
         locals.into_iter().flatten().collect()
     }
 
-    // Captures --------------------------------------------------------
-
     // Jumps & Labels --------------------------------------------------
 
     // Add jump target and address to current scope
@@ -211,6 +245,7 @@ pub struct Scope {
     index: usize,
     parent: Option<usize>,
     children: Vec<usize>,
+    globals: Vec<String>,        // name
     locals: Vec<(String, bool)>, // name, assigned
     /// target label name => jump inst address
     jumps: Vec<(String, usize)>,
@@ -232,6 +267,7 @@ impl Scope {
             index,
             parent,
             children: vec![],
+            globals: Vec::new(),
             locals: Vec::new(),
             jumps: Vec::new(),
             labels: HashMap::new(),

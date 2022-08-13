@@ -75,14 +75,14 @@ impl ObjectTrait for ClosureType {
 pub struct Closure {
     namespace: Namespace,
     pub func: ObjectRef,
-    pub captured: Vec<Option<ObjectRef>>,
+    pub captured: Vec<ObjectRef>,
 }
 
 unsafe impl Send for Closure {}
 unsafe impl Sync for Closure {}
 
 impl Closure {
-    pub fn new(func_ref: ObjectRef, captured: Vec<Option<ObjectRef>>) -> Self {
+    pub fn new(func_ref: ObjectRef, captured: Vec<ObjectRef>) -> Self {
         Self { namespace: Namespace::new(), func: func_ref, captured }
     }
 }

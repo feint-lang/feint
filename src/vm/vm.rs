@@ -47,7 +47,7 @@ impl CallFrame {
 /// and the local index of the var in that function.
 struct Heap {
     /// Function ID, local index, object
-    objects: Vec<(usize, usize, ObjectRef)>,
+    objects: Vec<(usize, usize, usize, ObjectRef)>,
 }
 
 impl Heap {
@@ -55,12 +55,28 @@ impl Heap {
         Self { objects: Vec::with_capacity(64) }
     }
 
-    pub fn get(&self, func_id: usize, local_index: usize) -> Option<ObjectRef> {
-        let result = self
-            .objects
-            .iter()
-            .find(|(id, index, _)| func_id == *id && local_index == *index);
-        if let Some((_, _, obj)) = result {
+    pub fn add(
+        &mut self,
+        func_id: usize,
+        local_index: usize,
+        x: usize,
+        obj: ObjectRef,
+    ) {
+        self.objects.push((func_id, local_index, x, obj));
+    }
+
+    pub fn get(
+        &self,
+        func_id: usize,
+        local_index: usize,
+        x: usize,
+    ) -> Option<ObjectRef> {
+        log::trace!("GETTING OBJECT FROM HEAP: {func_id} : {local_index} : {x}");
+        log::trace!("HEAP CONTENTS: {:?}", self.objects);
+        let result = self.objects.iter().find(|(id, index, x_, _)| {
+            func_id == *id && local_index == *index && x == *x_
+        });
+        if let Some((.., obj)) = result {
             Some(obj.clone())
         } else {
             None
@@ -188,18 +204,18 @@ impl VM {
                     self.load_local(*index)?;
                 }
                 // Captures
-                StoreCaptured(func_id, index) => {
-                    log::trace!("STORE CAPTURED: {func_id} : {index}");
+                StoreCaptured(func_id, depth, index) => {
+                    log::trace!("STORE CAPTURED: {func_id} : {index} : {depth}");
                     self.load_local(*index)?;
                     let obj = self.pop_obj()?;
-                    self.heap.objects.push((*func_id, *index, obj));
+                    self.heap.add(*func_id, *index, *depth, obj);
                 }
-                LoadCaptured(func_id, index) => {
-                    log::trace!("LOAD CAPTURED: {func_id} : {index}");
-                    if let Some(obj) = self.heap.get(*func_id, *index) {
+                LoadCaptured(func_id, depth, index) => {
+                    log::trace!("LOAD CAPTURED: {func_id} : {index} : {depth}");
+                    if let Some(obj) = self.heap.get(*func_id, *index, *depth) {
                         self.push_temp(obj);
                     } else {
-                        return Err(RuntimeErr::object_not_found_err(*index));
+                        return Err(RuntimeErr::object_not_found(*index));
                     }
                 }
                 // Vars
@@ -321,13 +337,9 @@ impl VM {
                     let map = create::new_map(entries);
                     self.push_temp(map);
                 }
-                MakeClosure(index, captured_count) => {
-                    let obj = code.get_const(*index)?.clone();
-                    let mut captured = vec![];
-                    for _ in 0..*captured_count {
-                        captured.push(None);
-                    }
-                    let closure = create::new_closure(obj, captured);
+                MakeClosure(index, info) => {
+                    let func = code.get_const(*index)?.clone();
+                    let closure = create::new_closure(func, vec![]);
                     self.push_temp(closure);
                 }
                 // Modules
@@ -342,6 +354,11 @@ impl VM {
                     eprintln!(
                         "Placeholder at {addr} was not updated: {inst:?}\n{message}"
                     );
+                    break Ok(VMState::Halted(255));
+                }
+                VarPlaceholder(addr, name) => {
+                    self.halt();
+                    eprintln!("Var placeholder at {addr} was not updated: {name}");
                     break Ok(VMState::Halted(255));
                 }
                 BreakPlaceholder(addr, _) => {
@@ -494,7 +511,7 @@ impl VM {
                 };
                 let bind = {
                     let obj = obj_ref.read().unwrap();
-                    obj.is_builtin_func() || obj.is_closure()
+                    obj.is_builtin_func() || obj.is_func()
                 };
                 if bind {
                     // If `b` in `a.b` is a function, bind `b` to `a`.
@@ -604,9 +621,7 @@ impl VM {
         let args = self.check_call_args(func, &this, args)?;
         self.enter_scope();
         self.push_call_frame(this.clone())?;
-        if let Some(this_var) = this {
-            self.push_local(this_var.clone(), 0);
-        } else if let Some(this_var) = self.find_this() {
+        if let Some(this_var) = self.find_this() {
             self.push_local(this_var, 0);
         } else {
             self.push_local(create::new_nil(), 0);

@@ -81,11 +81,11 @@ impl Disassembler {
             }
             StoreLocal(index) => self.align("STORE_LOCAL", index),
             LoadLocal(index) => self.align("LOAD_LOCAL", index),
-            StoreCaptured(func_id, index) => {
-                self.align("STORE_CAPTURED", format!("{func_id} : {index}"))
+            StoreCaptured(func_id, index, x) => {
+                self.align("STORE_CAPTURED", format!("{func_id} : {index} : {x}"))
             }
-            LoadCaptured(func_id, index) => {
-                self.align("LOAD_CAPTURED", format!("{func_id} : {index}"))
+            LoadCaptured(func_id, index, x) => {
+                self.align("LOAD_CAPTURED", format!("{func_id} : {index} : {x}"))
             }
             DeclareVar(name) => self.align("DECLARE_VAR", name),
             AssignVar(name) => self.align("ASSIGN_VAR", name),
@@ -108,12 +108,15 @@ impl Disassembler {
             MakeTuple(n) => self.align("MAKE_TUPLE", n),
             MakeList(n) => self.align("MAKE_LIST", n),
             MakeMap(n) => self.align("MAKE_MAP", n),
-            MakeClosure(index, count) => {
+            MakeClosure(index, info) => {
                 let func = match code.get_const(*index) {
                     Ok(obj) => obj.read().unwrap().to_string(),
                     Err(err) => err.to_string(),
                 };
-                self.align("MAKE_CLOSURE", format!("{func} with {count} captured"))
+                self.align(
+                    "MAKE_CLOSURE",
+                    format!("{func} with capture info: {info:?}"),
+                )
             }
             LoadModule(name) => self.align("IMPORT", name),
             Halt(code) => self.align("HALT", code),
@@ -126,6 +129,9 @@ impl Disassembler {
                     "PLACEHOLDER",
                     format!("{formatted_inst} @ {addr} ({message})"),
                 )
+            }
+            VarPlaceholder(addr, name) => {
+                self.align("PLACEHOLDER", format!("VAR {name} @ {addr}"))
             }
             BreakPlaceholder(addr, _) => {
                 self.align("PLACEHOLDER", format!("BREAK @ {addr}"))
