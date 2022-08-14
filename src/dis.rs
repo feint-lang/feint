@@ -57,9 +57,12 @@ impl Disassembler {
                 let index = *index;
                 let op_code = "LOAD_GLOBAL_CONST";
                 if (3..=259).contains(&index) {
-                    self.align(op_code, (index - 3).to_string())
+                    self.align(
+                        op_code,
+                        format!("{index} ({})", (index - 3).to_string()),
+                    )
                 } else {
-                    self.align(op_code, "[unknown]")
+                    self.align(op_code, format!("{index} ([unknown])"))
                 }
             }
             LoadNil => self.align("LOAD_NIL", "nil"),
@@ -83,6 +86,7 @@ impl Disassembler {
                 self.align("STORE_LOCAL", format!("{index} : captured = {captured}"))
             }
             LoadLocal(index) => self.align("LOAD_LOCAL", index),
+            LoadCell(index) => self.align("LOAD_CELL", index),
             DeclareVar(name) => self.align("DECLARE_VAR", name),
             AssignVar(name) => self.align("ASSIGN_VAR", name),
             LoadVar(name) => self.align("LOAD_VAR", name),
@@ -104,15 +108,12 @@ impl Disassembler {
             MakeTuple(n) => self.align("MAKE_TUPLE", n),
             MakeList(n) => self.align("MAKE_LIST", n),
             MakeMap(n) => self.align("MAKE_MAP", n),
-            MakeClosure(index, info) => {
+            MakeClosure(index, count) => {
                 let func = match code.get_const(*index) {
                     Ok(obj) => obj.read().unwrap().to_string(),
                     Err(err) => err.to_string(),
                 };
-                self.align(
-                    "MAKE_CLOSURE",
-                    format!("{func} with capture info: {info:?}"),
-                )
+                self.align("MAKE_CLOSURE", format!("{func} ({count} captured)"))
             }
             LoadModule(name) => self.align("IMPORT", name),
             Halt(code) => self.align("HALT", code),

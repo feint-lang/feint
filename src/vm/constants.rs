@@ -27,7 +27,7 @@ impl Constants {
         if let Some(obj) = self.storage.get(index) {
             Ok(obj)
         } else {
-            Err(RuntimeErr::object_not_found(index))
+            Err(RuntimeErr::constant_not_found(index))
         }
     }
 }

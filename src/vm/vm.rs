@@ -42,27 +42,29 @@ impl CallFrame {
     }
 }
 
-/// The "heap" stores vars that were captured by a closure. These vars
-/// are addressed by the function ID where the captured var was defined
-/// and the local index of the var in that function.
-struct Heap {
-    /// Function ID, local index, object
+/// Stores vars that were captured by a closure. These vars are
+/// addressed by the function ID where the captured var was defined and
+/// the local index of the var in that function.
+struct Cell {
+    /// local index, object
     objects: Vec<(usize, ObjectRef)>,
 }
 
-impl Heap {
+impl Cell {
     pub fn new() -> Self {
         Self { objects: Vec::with_capacity(64) }
     }
 
     pub fn add(&mut self, index: usize, obj: ObjectRef) {
-        self.objects.push((index, obj));
+        if !self.objects.iter().any(|(i, _)| *i == index) {
+            self.objects.push((index, obj));
+        }
     }
 
     pub fn get(&self, local_index: usize) -> Option<ObjectRef> {
         log::trace!("GETTING OBJECT FROM HEAP: {local_index}");
         log::trace!("HEAP CONTENTS: {:?}", self.objects);
-        let result = self.objects.iter().find(|(index, _)| local_index == *index);
+        let result = self.objects.iter().rev().find(|(index, _)| local_index == *index);
         result.map(|(.., obj)| obj.clone())
     }
 }
@@ -85,8 +87,8 @@ pub struct VM {
     // Maximum depth of "call stack" (quotes because there's no explicit
     // call stack).
     max_call_depth: CallDepth,
-    // The "heap" stores objects that need to outlive a call frame.
-    heap: Heap,
+    // Storage for objects that need to outlive a call frame.
+    cells: Cell,
     // The location of the current statement. Used for error reporting.
     loc: (Location, Location),
     // SIGINT (Ctrl-C) handling.
@@ -114,7 +116,7 @@ impl VM {
             call_stack_size: 0,
             call_frame_pointer: 0,
             max_call_depth,
-            heap: Heap::new(),
+            cells: Cell::new(),
             loc: (Location::default(), Location::default()),
             handle_sigint: sigint_flag.load(Ordering::Relaxed),
             sigint_flag,
@@ -180,11 +182,22 @@ impl VM {
                 StoreLocal(index, captured) => {
                     // Store object at TOS into local slot.
                     let obj = self.peek_obj()?;
-                    self.store_local(obj, *index, *captured)?;
+                    if *captured {
+                        self.cells.add(*index, obj.clone());
+                    }
+                    self.store_local(obj, *index)?;
                 }
                 LoadLocal(index) => {
                     // Load (copy) specified local to TOS.
                     self.load_local(*index)?;
+                }
+                LoadCell(index) => {
+                    // Load data from cell to TOS.
+                    if let Some(obj) = self.cells.get(*index) {
+                        self.push_temp(obj);
+                    } else {
+                        return Err(RuntimeErr::cell_not_found(*index));
+                    }
                 }
                 // Vars
                 DeclareVar(name) => {
@@ -305,7 +318,7 @@ impl VM {
                     let map = create::new_map(entries);
                     self.push_temp(map);
                 }
-                MakeClosure(index, info) => {
+                MakeClosure(index, count) => {
                     let func = code.get_const(*index)?.clone();
                     let closure = create::new_closure(func, vec![]);
                     self.push_temp(closure);
@@ -539,8 +552,8 @@ impl VM {
         if let ValueStackKind::Var(_, depth, name) = a_kind {
             self.ctx.assign_var_at_depth(depth, name.as_str(), result.clone())?;
             self.push_temp(result);
-        } else if let ValueStackKind::TempLocal(_, index, captured) = a_kind {
-            self.store_local(result.clone(), index, captured)?;
+        } else if let ValueStackKind::TempLocal(_, index) = a_kind {
+            self.store_local(result.clone(), index)?;
             self.push_temp(result);
         } else {
             return Err(RuntimeErr::expected_var(format!("Binary op: {}", op)));
@@ -549,13 +562,10 @@ impl VM {
     }
 
     fn handle_call(&mut self, num_args: usize) -> RuntimeResult {
-        log::trace!("STACK BEFORE POPPING callable:\n{}", self.format_stack());
         let callable = self.pop_obj()?;
         let callable = callable.read().unwrap();
         log::trace!("HANDLE CALL: callable = {:?}", &*callable);
-        log::trace!("STACK BEFORE POPPING {num_args} ARG(s):\n{}", self.format_stack());
         let args = if num_args > 0 { self.pop_n_obj(num_args)? } else { vec![] };
-        log::trace!("STACK AFTER POPPING {num_args} ARG(s):\n{}", self.format_stack());
         callable.call(args, self)
     }
 
@@ -595,7 +605,9 @@ impl VM {
             self.push_local(create::new_nil(), 0, false);
         }
         for (index, arg) in args.iter().enumerate() {
-            self.push_local(arg.clone(), index + 1, false);
+            // TODO: Don't always capture args
+            self.push_local(arg.clone(), index + 1, true);
+            self.cells.add(index + 1, arg.clone());
         }
         let result = self.execute(&func.code);
         match result {
@@ -688,7 +700,7 @@ impl VM {
             self.reset();
             return Err(RuntimeErr::recursion_depth_exceeded(self.max_call_depth));
         }
-        let stack_position = self.value_stack.size();
+        let stack_position = self.value_stack.len();
         let frame = CallFrame::new(stack_position, this);
         self.call_stack.push(frame);
         self.call_stack_size += 1;
@@ -722,7 +734,7 @@ impl VM {
     // Scopes ----------------------------------------------------------
 
     fn enter_scope(&mut self) {
-        self.scope_stack.push(self.value_stack.size());
+        self.scope_stack.push(self.value_stack.len());
         self.ctx.enter_scope();
     }
 
@@ -734,17 +746,7 @@ impl VM {
     fn exit_scope(&mut self) {
         let return_val = self.pop_obj();
         if let Some(pointer) = self.scope_stack.pop() {
-            log::trace!("INSPECTING STACK FOR LOCALS:\n{}", self.format_stack());
-            let items = self.value_stack.split_off(pointer);
-            for item in items {
-                log::trace!("STACK VALUE: {item:?}");
-                if let ValueStackKind::Local(obj_ref, index, true) = item {
-                    let obj = obj_ref.read().unwrap();
-                    log::trace!("SAVE LOCAL TO HEAP: {index} ({obj})");
-                    drop(obj);
-                    self.heap.add(index, obj_ref);
-                }
-            }
+            self.value_stack.truncate(pointer);
         } else {
             panic!("Scope stack unexpectedly empty when exiting scope");
         };
@@ -792,25 +794,20 @@ impl VM {
     /// NOTE: This is only used when calling a user functions to store
     ///       its args as locals.
     fn push_local(&mut self, obj: ObjectRef, index: usize, captured: bool) {
-        self.push(ValueStackKind::Local(obj, index, captured));
+        self.push(ValueStackKind::Local(obj, index));
     }
 
     /// This is used when loading (copying) a local from its slot to
     /// TOS. These "temporary locals" are cleaned up normally.
-    fn push_temp_local(&mut self, obj: ObjectRef, index: usize, captured: bool) {
-        self.push(ValueStackKind::TempLocal(obj, index, captured));
+    fn push_temp_local(&mut self, obj: ObjectRef, index: usize) {
+        self.push(ValueStackKind::TempLocal(obj, index));
     }
 
     /// Store object into local slot.
-    fn store_local(
-        &mut self,
-        obj: ObjectRef,
-        index: usize,
-        captured: bool,
-    ) -> RuntimeResult {
+    fn store_local(&mut self, obj: ObjectRef, index: usize) -> RuntimeResult {
         let frame_index = self.call_frame_pointer + index;
-        if frame_index < self.value_stack.size() {
-            self.value_stack[frame_index] = ValueStackKind::Local(obj, index, captured);
+        if frame_index < self.value_stack.len() {
+            self.value_stack[frame_index] = ValueStackKind::Local(obj, index);
             Ok(())
         } else {
             Err(RuntimeErr::frame_index_out_of_bounds(frame_index))
@@ -821,8 +818,8 @@ impl VM {
     fn load_local(&mut self, index: usize) -> RuntimeResult {
         let frame_index = self.call_frame_pointer + index;
         if let Some(kind) = self.value_stack.peek_at(frame_index) {
-            if let ValueStackKind::Local(obj, index, captured) = kind {
-                self.push_temp_local(obj.clone(), *index, *captured);
+            if let ValueStackKind::Local(obj, index) = kind {
+                self.push_temp_local(obj.clone(), *index);
                 Ok(())
             } else {
                 panic!("Expected local; got {kind:?}");

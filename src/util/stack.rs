@@ -42,7 +42,7 @@ impl<T> Stack<T> {
     /// Pop top N items if at least N items are present. The top item in
     /// the stack will be at the *end* of list of returned items.
     pub fn pop_n(&mut self, n: usize) -> Option<Vec<T>> {
-        let size = self.size();
+        let size = self.len();
         if size < n {
             None
         } else {
@@ -55,6 +55,10 @@ impl<T> Stack<T> {
         self.storage.last()
     }
 
+    pub fn peek_mut(&mut self) -> Option<&mut T> {
+        self.storage.last_mut()
+    }
+
     pub fn peek_at(&self, index: usize) -> Option<&T> {
         self.storage.get(index)
     }
@@ -63,17 +67,13 @@ impl<T> Stack<T> {
         self.storage.is_empty()
     }
 
-    pub fn size(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.storage.len()
     }
 
     #[cfg(test)]
     pub fn clear(&mut self) {
         self.storage.clear()
-    }
-
-    pub fn split_off(&mut self, len: usize) -> Vec<T> {
-        self.storage.split_off(len)
     }
 
     pub fn truncate(&mut self, len: usize) {

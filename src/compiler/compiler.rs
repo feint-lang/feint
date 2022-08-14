@@ -31,7 +31,7 @@ impl Compiler {
     ) -> CompResult {
         log::trace!("BEGIN: compile script");
 
-        let mut visitor = Visitor::new(ScopeKind::Global);
+        let mut visitor = Visitor::for_module();
 
         if program.statements.is_empty() {
             visitor.push(Inst::Halt(0));
@@ -45,28 +45,23 @@ impl Compiler {
             "Expected to be in global scope after compiling script"
         );
 
-        // Functions ---------------------------------------------------
-
-        self.visitor_stack.push(visitor);
-
-        let mut has_main = false;
+        // Global Functions --------------------------------------------
 
         log::trace!("BEGIN: compiling global functions");
-        let func_nodes: Vec<(usize, String, ast::Func)> =
-            self.visitor_stack[0].func_nodes.iter().cloned().collect();
-        for (addr, name, node) in func_nodes {
+        let mut has_main = false;
+        let func_nodes: Vec<(usize, usize, String, ast::Func)> =
+            visitor.func_nodes.iter().cloned().collect();
+        self.visitor_stack.push(visitor);
+        for (addr, scope_tree_pointer, name, node) in func_nodes {
             if name == "$main" {
                 has_main = true;
             }
-            let func = self.compile_func(name, node)?;
-            let const_index = self.visitor_stack[0].code.add_const(func);
-            self.visitor_stack[0].replace(addr, Inst::LoadConst(const_index));
+            self.compile_func(addr, scope_tree_pointer, name, node)?;
         }
+        let mut visitor = self.visitor_stack.pop().unwrap();
         log::trace!("END: compiling global functions");
 
-        let mut visitor = self.visitor_stack.pop().unwrap();
-
-        // END Functions -----------------------------------------------
+        // END Global Functions ----------------------------------------
 
         if has_main {
             let argv: Vec<ObjectRef> =
@@ -92,93 +87,135 @@ impl Compiler {
         Ok(visitor.code)
     }
 
+    /// Compile a function and inject it into the *parent* visitor at
+    /// the specified address.
     fn compile_func(
         &mut self,
+        // Address in parent visitor's code where function was defined.
+        func_addr: usize,
+        scope_tree_pointer: usize,
         name: String,
         node: ast::Func,
-    ) -> Result<ObjectRef, CompErr> {
-        let stack_index = self.visitor_stack.size();
+    ) -> VisitResult {
+        let stack = &mut self.visitor_stack;
         let params = node.params.clone();
 
-        let mut visitor = Visitor::new(ScopeKind::Func);
+        let mut visitor = Visitor::for_func();
         visitor.visit_func(node)?;
 
-        log::trace!("BEGIN: resolving names");
+        // NOTE: The current visitor needs to be pushed onto the visitor
+        //       stack for free var resolution.
+        let stack_index = stack.len();
+        stack.push(visitor);
+
+        log::trace!("BEGIN: resolving names in outer scopes");
+
+        let mut captured = vec![];
         let mut presumed_globals = vec![];
-        for (addr, name, start, end) in &visitor.unresolved_names {
-            let mut store_local_addrs = vec![];
-            let mut stack_index = self.visitor_stack.size();
-            let mut found_index = self.visitor_stack.size();
+        let mut cell_vars = vec![];
 
-            for up_visitor in self.visitor_stack.iter().rev() {
-                stack_index -= 1;
-                let result = up_visitor.scope_tree.find_local(name.as_str());
-                if let Some((local_addr, index, ..)) = result {
-                    log::trace!("RESOLVED VAR AS CAPTURED: {name} @ {index}");
-                    found_index = stack_index;
+        for (addr, name, start, end) in stack[stack_index].code.free_vars().iter() {
+            log::trace!("RESOLVING {name}");
+            let mut found = false;
+            let mut found_stack_index = stack.len();
 
-                    for (addr, inst) in up_visitor.code.iter_chunk().enumerate() {
-                        if let Inst::StoreLocal(index, _) = inst {
-                            store_local_addrs.push((addr, *index));
-                        }
+            for up_visitor in stack.iter().rev() {
+                found_stack_index -= 1;
+
+                let result = up_visitor
+                    .scope_tree
+                    .find_local(name.as_str(), Some(scope_tree_pointer));
+
+                if let Some((index, pointer, ..)) = result {
+                    // NOTE: If the free var is found in the current
+                    //       scope tree, that means it's an RHS value
+                    //       that refers to a var with the same name in
+                    //       an enclosing scope, so it's not resolved at
+                    //       this point.
+                    if pointer == scope_tree_pointer {
+                        continue;
                     }
 
-                    // TODO: This should *retrieve* an object from the heap.
-                    // visitor.code.replace_inst(addr, Inst::LoadCaptured(index));
+                    log::trace!(
+                        "RESOLVED VAR AS CAPTURED: {name} @ {found_stack_index} @ {index}"
+                    );
 
+                    found = true;
+                    captured.push((*addr, index));
+
+                    for (addr, inst) in up_visitor.code.iter_chunk().enumerate() {
+                        if let Inst::StoreLocal(local_index, _) = inst {
+                            if *local_index == index {
+                                cell_vars.push((
+                                    found_stack_index,
+                                    addr,
+                                    index,
+                                    name.clone(),
+                                ));
+                            }
+                        }
+                    }
                     break;
                 }
             }
 
-            if found_index < self.visitor_stack.size() {
-                // Update STORE_LOCAL instruction in upward visitor to
-                // note that the local is captured.
-                if store_local_addrs.is_empty() {
-                    panic!("STORE_LOCAL({addr} not found in visitor");
-                } else {
-                    let found_visitor = &mut self.visitor_stack[found_index];
-                    for (addr, index) in store_local_addrs {
-                        let new_inst = Inst::StoreLocal(index, true);
-                        found_visitor.code.replace_inst(addr, new_inst);
-                    }
-                }
-            } else {
+            if !found {
                 presumed_globals.push((*addr, name.clone(), *start, *end));
             }
         }
 
-        // Resolve globals
+        // Update STORE_LOCAL instruction in upward visitors to note
+        // which locals are captured.
+        for (found_stack_index, addr, index, name) in cell_vars {
+            stack[found_stack_index].code.add_cell_var(name);
+            stack[found_stack_index].replace(addr, Inst::StoreLocal(index, true));
+        }
+
+        // Update placeholder instructions in current visitors to load
+        // from cell.
+        for (addr, index) in captured.iter() {
+            stack[stack_index].code.replace_inst(*addr, Inst::LoadCell(*index));
+        }
+
+        // Resolve globals.
         for (addr, name, start, end) in presumed_globals.into_iter() {
-            log::trace!("RESOLVED VAR AS GLOBAL: {name}");
-            if self.visitor_stack[0].scope_tree.has_global(name.as_str()) {
-                visitor.code.replace_inst(addr, Inst::LoadVar(name));
+            if stack[0].scope_tree.has_global(name.as_str()) {
+                log::trace!("RESOLVED VAR AS GLOBAL: {name}");
+                stack[stack_index].code.replace_inst(addr, Inst::LoadVar(name));
             } else {
                 return Err(CompErr::global_not_found(name, start, end));
             }
         }
+
         log::trace!("END: resolving names");
 
-        // Functions ---------------------------------------------------
-
-        self.visitor_stack.push(visitor);
+        // Inner Functions ---------------------------------------------
 
         log::trace!("BEGIN: compiling inner functions");
-        let func_nodes: Vec<(usize, String, ast::Func)> =
-            self.visitor_stack[stack_index].func_nodes.iter().cloned().collect();
-
-        for (addr, name, node) in func_nodes {
-            let func = self.compile_func(name, node)?;
-            let const_index = self.visitor_stack[stack_index].code.add_const(func);
-            self.visitor_stack[stack_index].replace(addr, Inst::LoadConst(const_index));
+        let func_nodes: Vec<(usize, usize, String, ast::Func)> =
+            stack[stack_index].func_nodes.iter().cloned().collect();
+        for (addr, scope_tree_pointer, name, node) in func_nodes {
+            self.compile_func(addr, scope_tree_pointer, name, node)?;
         }
+        let visitor = self.visitor_stack.pop().unwrap();
         log::trace!("END: compiling inner functions");
 
-        let visitor = self.visitor_stack.pop().unwrap();
-
-        // END Functions -----------------------------------------------
+        // END Inner Functions -----------------------------------------
 
         let func = create::new_func(name, params, visitor.code);
-        Ok(func)
+
+        let parent_visitor = self.visitor_stack.peek_mut().unwrap();
+        let parent_code = &mut parent_visitor.code;
+        let const_index = parent_code.add_const(func);
+
+        if captured.is_empty() {
+            parent_visitor.replace(func_addr, Inst::LoadConst(const_index));
+        } else {
+            parent_visitor
+                .replace(func_addr, Inst::MakeClosure(const_index, captured.len()));
+        }
+
+        Ok(())
     }
 }
 
@@ -191,12 +228,17 @@ pub struct Visitor {
     code: Code,
     scope_tree: ScopeTree,
     scope_depth: usize,
-    func_nodes: Vec<(usize, String, ast::Func)>,
-    unresolved_names: Vec<(usize, String, Location, Location)>,
+    func_nodes: Vec<(
+        usize,  /* address */
+        usize,  /* scope tree pointer */
+        String, /* name */
+        ast::Func,
+    )>,
 }
 
 impl Visitor {
     fn new(initial_scope_kind: ScopeKind) -> Self {
+        assert!(matches!(initial_scope_kind, ScopeKind::Module | ScopeKind::Func));
         let scope_tree = ScopeTree::new(initial_scope_kind);
         let mut scope_tree_stack = Stack::new();
         scope_tree_stack.push(scope_tree);
@@ -206,8 +248,15 @@ impl Visitor {
             scope_tree: ScopeTree::new(initial_scope_kind),
             scope_depth: 0,
             func_nodes: vec![],
-            unresolved_names: vec![],
         }
+    }
+
+    fn for_module() -> Self {
+        Self::new(ScopeKind::Module)
+    }
+
+    fn for_func() -> Self {
+        Self::new(ScopeKind::Func)
     }
 
     // Entry Point Visitors --------------------------------------------
@@ -232,7 +281,7 @@ impl Visitor {
         let return_nil = !matches!(last_statement.kind, ast::StatementKind::Expr(_));
 
         // Add local slot for this.
-        self.scope_tree.add_local(0, "this", true);
+        self.scope_tree.add_local("this", true);
 
         // Add local slots for function parameters.
         let param_count = params.len();
@@ -241,12 +290,15 @@ impl Visitor {
             for (i, name) in params.iter().enumerate() {
                 if name.is_empty() {
                     if i == last {
-                        self.scope_tree.add_local(0, "$args", true);
+                        self.scope_tree.add_local("$args", true);
                     } else {
-                        return Err(CompErr::var_args_must_be_last());
+                        return Err(CompErr::var_args_must_be_last(
+                            node.block.start,
+                            node.block.end,
+                        ));
                     }
                 } else {
-                    self.scope_tree.add_local(0, name, true);
+                    self.scope_tree.add_local(name, true);
                 }
             }
         }
@@ -381,7 +433,12 @@ impl Visitor {
             Kind::Loop(expr, block) => self.visit_loop(*expr, block)?,
             Kind::Func(func) => {
                 let name = name.map_or_else(|| "<anonymous>".to_owned(), |name| name);
-                self.func_nodes.push((self.len(), name, func));
+                self.func_nodes.push((
+                    self.len(),
+                    self.scope_tree.pointer(),
+                    name,
+                    func,
+                ));
                 self.push(Inst::Placeholder(
                     self.len(),
                     Box::new(Inst::LoadConst(0)),
@@ -454,8 +511,8 @@ impl Visitor {
         Ok(())
     }
 
-    /// Visit identifier as expression (i.e., not as part of an
-    /// assignment). Whenever possible, we prefer local variables.
+    /// Visit identifier (AKA name) as expression (i.e., not as part of
+    /// an assignment).
     fn visit_ident(
         &mut self,
         node: ast::Ident,
@@ -463,31 +520,39 @@ impl Visitor {
         end: Location,
     ) -> VisitResult {
         let name = node.name();
+        let name = name.as_str();
         if self.scope_tree.in_global_scope() {
-            self.load_global_var(name.as_str(), start, end)?;
-        } else {
-            match self.scope_tree.find_local(name.as_str()) {
-                Some((_, index, true, _)) => {
-                    // Local exists and has been assigned
-                    self.push(Inst::LoadLocal(index));
-                }
-                Some((_, _, false, _)) | None => {
-                    // Local exists but has not been assigned (e.g.,
-                    // `f = () -> x = x` where RHS `x` is captured from
-                    // an outer function or is a global).
-
-                    if self.initial_scope_kind == ScopeKind::Global {
-                        // In a block or function defined in the global
-                        // scope. All names resolve to global vars.
-                        self.load_global_var(name.as_str(), start, end)?;
-                    } else {
-                        // In a function defined in an outer function.
-                        // Names may resolve to locals in the outer
-                        // function(s) or global vars.
-                        let addr = self.len();
-                        self.unresolved_names.push((addr, name.clone(), start, end));
-                        self.push(Inst::VarPlaceholder(addr, name));
-                    }
+            // Quick check for global var, avoiding unnecessary search
+            // for local below.
+            self.load_global_var(name, start, end)?;
+            return Ok(());
+        }
+        // NOTE: When a function is being compiled, find_local will
+        //       traverse upward as far as the top level scope of the
+        //       function. It will NOT proceed up into a function's
+        //       enclosing scope.
+        match self.scope_tree.find_local(name, None) {
+            Some((index, .., true)) => {
+                // Local exists and has been assigned.
+                self.push(Inst::LoadLocal(index));
+            }
+            Some((.., false)) | None => {
+                // 1. The local exists but has not been assigned
+                //    (e.g., `f = () -> x = x` where RHS `x` is
+                //    defined in an enclosing scope.
+                //
+                // 2. The name wasn't found, it's either a global or
+                //    a free var, depending on the initial scope.
+                if self.initial_scope_kind == ScopeKind::Func {
+                    // In a function enclosed in an outer function
+                    // names may resolve to locals in an outer
+                    // function, locals in an outer block, or to global
+                    // vars. These names will be resolved later.
+                    self.code.add_free_var(name, start, end);
+                } else {
+                    // In a block or function defined in module/global
+                    // scope, all free vars resolve to global vars.
+                    self.load_global_var(name, start, end)?;
                 }
             }
         }
@@ -731,7 +796,11 @@ impl Visitor {
         log::trace!("BEGIN: declaration of {ident_expr:?}");
         let name = if let Some(name) = ident_expr.is_ident() {
             if name == "this" {
-                return Err(CompErr::cannot_assign_special_ident(name));
+                return Err(CompErr::cannot_assign_special_ident(
+                    name,
+                    ident_expr.start,
+                    ident_expr.end,
+                ));
             }
             name
         } else if let Some(name) = ident_expr.is_special_ident() {
@@ -739,7 +808,11 @@ impl Visitor {
                 log::trace!("FOUND $main");
                 name
             } else {
-                return Err(CompErr::cannot_assign_special_ident(name));
+                return Err(CompErr::cannot_assign_special_ident(
+                    name,
+                    ident_expr.start,
+                    ident_expr.end,
+                ));
             }
         } else if let Some(_name) = ident_expr.is_type_ident() {
             todo!("Implement custom types")
@@ -752,8 +825,7 @@ impl Visitor {
             self.push(Inst::DeclareVar(name));
         } else {
             log::trace!("DECLARE (ADD) LOCAL: {name}");
-            let local_addr = self.len();
-            self.scope_tree.add_local(local_addr, name, false);
+            self.scope_tree.add_local(name, false);
             // There's no instruction for declaring locals, because
             // locals initially appear on the stack by being loaded as
             // the RHS of an assignment. When the local is assigned,
@@ -772,14 +844,15 @@ impl Visitor {
         log::trace!("BEGIN: assignment {lhs_expr:?} = {value_expr:?}");
         if let Some(name) = lhs_expr.ident_name() {
             self.visit_expr(value_expr, Some(name.clone()))?;
-            match self.scope_tree.find_local_and_mark_assigned(name.as_str()) {
-                Some((_, index, _, captured)) => {
+            match self.scope_tree.find_local(name.as_str(), None) {
+                Some((index, scope_index, local_index, _)) => {
                     // A slightly confusing thing here is that on the
                     // *initial* assignment of a local, STORE_LOCAL will
                     // *replace* the TOS value, converting it to a Local
                     // value type.
-                    log::trace!("ASSIGN (STORE) LOCAL: {name} @ {index} : captured = {captured}");
-                    self.push(Inst::StoreLocal(index, captured));
+                    log::trace!("ASSIGN (STORE) LOCAL: {name} @ {index}");
+                    self.scope_tree.mark_assigned(scope_index, local_index);
+                    self.push(Inst::StoreLocal(index, false));
                 }
                 None => {
                     log::trace!("ASSIGN VAR: {name}");
@@ -894,10 +967,19 @@ impl Visitor {
             }
             true
         });
+        // TODO: Fix locations
         if let Some(name) = jump_out_of_func {
-            return Err(CompErr::cannot_jump_out_of_func(name));
+            return Err(CompErr::cannot_jump_out_of_func(
+                name,
+                Location::default(),
+                Location::default(),
+            ));
         } else if let Some(name) = not_found {
-            return Err(CompErr::label_not_found_in_scope(name));
+            return Err(CompErr::label_not_found_in_scope(
+                name,
+                Location::default(),
+                Location::default(),
+            ));
         }
         Ok(())
     }

@@ -75,14 +75,14 @@ impl ObjectTrait for ClosureType {
 pub struct Closure {
     namespace: Namespace,
     pub func: ObjectRef,
-    pub captured: Vec<ObjectRef>,
+    pub captured: Vec<usize>,
 }
 
 unsafe impl Send for Closure {}
 unsafe impl Sync for Closure {}
 
 impl Closure {
-    pub fn new(func_ref: ObjectRef, captured: Vec<ObjectRef>) -> Self {
+    pub fn new(func_ref: ObjectRef, captured: Vec<usize>) -> Self {
         Self { namespace: Namespace::new(), func: func_ref, captured }
     }
 }
@@ -115,7 +115,7 @@ impl ObjectTrait for Closure {
 
 impl fmt::Display for Closure {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.func.read().unwrap())
+        write!(f, "[closure] {}", self.func.read().unwrap())
     }
 }
 

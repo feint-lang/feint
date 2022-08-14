@@ -2,14 +2,32 @@ use std::ops::Index;
 use std::slice::Iter;
 
 use crate::types::ObjectRef;
+use crate::util::Location;
 
 use super::inst::Inst;
 use super::result::RuntimeErr;
 
-/// Represents a unit of code.
+type CellVarEntry = Vec<(
+    usize,  // address
+    String, // name
+)>;
+
+type FreeVarEntry = Vec<(
+    usize,    // address
+    String,   // name
+    Location, // source start
+    Location, // source end
+)>;
+
+/// Code for a module or function.
 pub struct Code {
     chunk: Vec<Inst>,
     constants: Vec<ObjectRef>,
+    // Vars defined in this unit of code that are referenced by free
+    // vars in other units of code.
+    cell_vars: CellVarEntry,
+    // Vars defined outside of this unit of code.
+    free_vars: FreeVarEntry,
 }
 
 impl Index<usize> for Code {
@@ -22,7 +40,7 @@ impl Index<usize> for Code {
 
 impl Code {
     pub fn new() -> Self {
-        Self { chunk: Vec::new(), constants: Vec::new() }
+        Self { chunk: vec![], constants: vec![], cell_vars: vec![], free_vars: vec![] }
     }
 
     /// Initialize code object with a list of instructions, also known
@@ -94,11 +112,44 @@ impl Code {
         if let Some(obj) = self.constants.get(index) {
             Ok(obj)
         } else {
-            Err(RuntimeErr::object_not_found(index))
+            Err(RuntimeErr::constant_not_found(index))
         }
     }
 
     pub fn iter_constants(&self) -> Iter<'_, ObjectRef> {
         self.constants.iter()
+    }
+
+    // Vars ------------------------------------------------------------
+
+    pub fn cell_vars(&self) -> &CellVarEntry {
+        &self.cell_vars
+    }
+
+    pub fn add_cell_var<S: Into<String>>(&mut self, name: S) {
+        let addr = self.len_chunk();
+        self.cell_vars.push((addr, name.into()));
+    }
+
+    pub fn free_vars(&self) -> &FreeVarEntry {
+        &self.free_vars
+    }
+
+    /// Add a free var, a reference to a var defined in an enclosing
+    /// scope. This also pushes a placeholder instruction for the var.
+    pub fn add_free_var<S: Into<String>>(
+        &mut self,
+        name: S,
+        start: Location,
+        end: Location,
+    ) {
+        let addr = self.len_chunk();
+        let name = name.into();
+        self.free_vars.push((addr, name.clone(), start, end));
+        self.push_inst(Inst::VarPlaceholder(addr, name));
+    }
+
+    pub fn has_free_var_at_addr(&self, addr: usize) -> bool {
+        self.free_vars().iter().any(|(a, ..)| *a == addr)
     }
 }

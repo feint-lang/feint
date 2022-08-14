@@ -13,12 +13,20 @@ impl CompErr {
         Self { kind }
     }
 
-    pub fn label_not_found_in_scope(name: String) -> Self {
-        Self::new(CompErrKind::LabelNotFoundInScope(name))
+    pub fn label_not_found_in_scope(
+        name: String,
+        start: Location,
+        end: Location,
+    ) -> Self {
+        Self::new(CompErrKind::LabelNotFoundInScope(name, start, end))
     }
 
-    pub fn cannot_jump_out_of_func(name: String) -> Self {
-        Self::new(CompErrKind::CannotJumpOutOfFunc(name))
+    pub fn cannot_jump_out_of_func(
+        name: String,
+        start: Location,
+        end: Location,
+    ) -> Self {
+        Self::new(CompErrKind::CannotJumpOutOfFunc(name, start, end))
     }
 
     pub fn duplicate_label_in_scope(
@@ -33,8 +41,12 @@ impl CompErr {
         Self::new(CompErrKind::ExpectedIdent(start, end))
     }
 
-    pub fn cannot_assign_special_ident(name: String) -> Self {
-        Self::new(CompErrKind::CannotAssignSpecialIdent(name))
+    pub fn cannot_assign_special_ident(
+        name: String,
+        start: Location,
+        end: Location,
+    ) -> Self {
+        Self::new(CompErrKind::CannotAssignSpecialIdent(name, start, end))
     }
 
     pub fn global_not_found<S: Into<String>>(
@@ -45,33 +57,33 @@ impl CompErr {
         Self::new(CompErrKind::GlobalNotFound(name.into(), start, end))
     }
 
-    pub fn var_args_must_be_last() -> Self {
-        Self::new(CompErrKind::VarArgsMustBeLast)
+    pub fn var_args_must_be_last(start: Location, end: Location) -> Self {
+        Self::new(CompErrKind::VarArgsMustBeLast(start, end))
     }
 
     pub fn loc(&self) -> (Location, Location) {
         use CompErrKind::*;
-        let default = Location::default();
-        match &self.kind {
-            LabelNotFoundInScope(..) => (default, default),
-            CannotJumpOutOfFunc(..) => (default, default),
-            DuplicateLabelInScope(_, start, end) => (*start, *end),
-            ExpectedIdent(start, end) => (*start, *end),
-            CannotAssignSpecialIdent(..) => (default, default),
-            GlobalNotFound(_, start, end) => (*start, *end),
-            VarArgsMustBeLast => (default, default),
-        }
+        let (start, end) = match &self.kind {
+            LabelNotFoundInScope(_, start, end) => (start, end),
+            CannotJumpOutOfFunc(_, start, end) => (start, end),
+            DuplicateLabelInScope(_, start, end) => (start, end),
+            ExpectedIdent(start, end) => (start, end),
+            CannotAssignSpecialIdent(_, start, end) => (start, end),
+            GlobalNotFound(_, start, end) => (start, end),
+            VarArgsMustBeLast(start, end) => (start, end),
+        };
+        (*start, *end)
     }
 }
 
 // TODO: Add start and end locations to all error types
 #[derive(Clone, Debug)]
 pub enum CompErrKind {
-    LabelNotFoundInScope(String),
-    CannotJumpOutOfFunc(String),
+    LabelNotFoundInScope(String, Location, Location),
+    CannotJumpOutOfFunc(String, Location, Location),
     DuplicateLabelInScope(String, Location, Location),
     ExpectedIdent(Location, Location),
-    CannotAssignSpecialIdent(String),
+    CannotAssignSpecialIdent(String, Location, Location),
     GlobalNotFound(String, Location, Location),
-    VarArgsMustBeLast,
+    VarArgsMustBeLast(Location, Location),
 }

@@ -32,6 +32,9 @@ pub enum Inst {
     // from slot lower in stack and push it onto TOS.
     LoadLocal(usize),
 
+    // Load a captured var from the "heap" to TOS.
+    LoadCell(usize),
+
     DeclareVar(String),
     AssignVar(String),
     LoadVar(String),
@@ -74,8 +77,8 @@ pub enum Inst {
     MakeMap(usize),
 
     // Make function closure for constant.
-    // Function constant index, [(function ID, depth, local index)]
-    MakeClosure(usize, Vec<(usize, usize, usize)>),
+    // Function constant index, capture count
+    MakeClosure(usize, usize),
 
     LoadModule(String),
 

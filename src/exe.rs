@@ -335,21 +335,21 @@ impl<'a> Executor<'a> {
         use CompErrKind::*;
         let (start, end) = err.loc();
         let message = match &err.kind {
-            LabelNotFoundInScope(name) => format!("label not found in scope: {name}"),
-            CannotJumpOutOfFunc(name) => format!(
+            LabelNotFoundInScope(name, ..) => format!("label not found in scope: {name}"),
+            CannotJumpOutOfFunc(name, ..) => format!(
                 "cannot jump out of function: label {name} not found or defined in outer scope"
             ),
             DuplicateLabelInScope(name, ..) => format!("duplicate label in scope: {name}"),
             ExpectedIdent(..) => {
                 "expected identifier".to_string()
             },
-            CannotAssignSpecialIdent(name) => {
+            CannotAssignSpecialIdent(name, ..) => {
                 format!("cannot assign to special name: {name}")
             }
             GlobalNotFound(name, ..) => {
                 format!("global var not found: {name}")
             }
-            VarArgsMustBeLast => {
+            VarArgsMustBeLast(..) => {
                 "var args must be last in parameter list".to_owned()
             }
         };
@@ -359,7 +359,7 @@ impl<'a> Executor<'a> {
 
     fn ignore_comp_err(&self, err: &CompErr) -> bool {
         use CompErrKind::*;
-        self.incremental && matches!(&err.kind, LabelNotFoundInScope(_))
+        self.incremental && matches!(&err.kind, LabelNotFoundInScope(..))
     }
 
     fn handle_runtime_err(&self, err: &RuntimeErr) {
