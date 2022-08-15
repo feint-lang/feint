@@ -151,12 +151,13 @@ impl ScopeTree {
     /// existing stack index.
     pub fn add_local<S: Into<String>>(&mut self, name: S, assigned: bool) -> usize {
         let name = name.into();
-        let locals = &self.current().locals;
-        if let Some(index) = locals.iter().position(|(n, ..)| &name == n) {
+        let current = self.current_mut();
+        let locals = &mut current.locals;
+        if let Some(index) = locals.iter().position(|(_, _, n, _)| n == &name) {
             index
         } else {
             let index = locals.len();
-            self.current_mut().locals.push((name, assigned));
+            locals.push((current.index, index, name, assigned));
             index
         }
     }
@@ -166,8 +167,9 @@ impl ScopeTree {
     /// var lives at runtime.
     ///
     /// If the local is found, a tuple with the following fields is
-    /// returned: stack index, scope tree pointer where found, local
-    /// index in scope where found, assigned flag.
+    /// returned: stack index (overall local index in scope tree), scope
+    /// pointer of scope where found, local index in scope where found,
+    /// assigned flag.
     pub fn find_local(
         &self,
         name: &str,
@@ -175,12 +177,12 @@ impl ScopeTree {
     ) -> Option<(usize, usize, usize, bool)> {
         let locals = self.all_locals(pointer);
         if !locals.is_empty() {
-            let mut index = locals.len();
+            let mut stack_index = locals.len();
             let iter = locals.iter().rev();
             for (pointer, local_index, local_name, assigned) in iter {
-                index -= 1;
+                stack_index -= 1;
                 if *local_name == name {
-                    return Some((index, *pointer, *local_index, *assigned));
+                    return Some((stack_index, *pointer, *local_index, *assigned));
                 }
             }
         }
@@ -190,14 +192,14 @@ impl ScopeTree {
     /// Mark local as assigned.
     pub fn mark_assigned(&mut self, pointer: usize, local_index: usize) {
         let scope = self.get_mut(pointer);
-        let name = scope.locals[local_index].0.clone();
-        scope.locals[local_index] = (name, true);
+        let (pointer, index, name, _) = &scope.locals[local_index];
+        scope.locals[local_index] = (*pointer, *index, name.clone(), true);
     }
 
     /// Get all locals from current scope and its ancestors. The current
     /// scope's locals will be at the end and the search must proceed
     /// in reverse.
-    fn all_locals(&self, pointer: Option<usize>) -> Vec<(usize, usize, String, bool)> {
+    fn all_locals(&self, pointer: Option<usize>) -> Vec<&(usize, usize, String, bool)> {
         let mut locals = VecDeque::new();
         let mut scope = if let Some(pointer) = pointer {
             self.get(pointer)
@@ -205,17 +207,7 @@ impl ScopeTree {
             self.current()
         };
         loop {
-            let scope_idx = scope.index;
-            let mut scope_locals = vec![];
-            for (local_idx, local) in scope.locals.iter().enumerate() {
-                scope_locals.push((
-                    scope_idx,
-                    local_idx,
-                    local.0.clone(), // name
-                    local.1,         // assigned
-                ));
-            }
-            locals.push_front(scope_locals);
+            locals.push_front(&scope.locals);
             if let Some(parent_index) = scope.parent {
                 scope = &self.storage[parent_index];
             } else {
@@ -248,8 +240,8 @@ pub struct Scope {
     index: usize,
     parent: Option<usize>,
     children: Vec<usize>,
-    globals: Vec<String>,        // name
-    locals: Vec<(String, bool)>, // name, assigned,
+    globals: Vec<String>,                      // name
+    locals: Vec<(usize, usize, String, bool)>, // scope pointer, index, name, assigned
     /// target label name => jump inst address
     jumps: Vec<(String, usize)>,
     /// label name => label inst address

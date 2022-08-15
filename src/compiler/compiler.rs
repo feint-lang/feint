@@ -548,11 +548,11 @@ impl Visitor {
         //       function. It will NOT proceed up into a function's
         //       enclosing scope.
         match self.scope_tree.find_local(name, None) {
-            Some((index, .., true)) => {
+            Some((stack_index, _, _, true)) => {
                 // Local exists and has been assigned.
-                self.push(Inst::LoadLocal(index));
+                self.push(Inst::LoadLocal(stack_index));
             }
-            Some((.., false)) | None => {
+            Some((_, _, _, false)) | None => {
                 // 1. The local exists but has not been assigned
                 //    (e.g., `f = () -> x = x` where RHS `x` is
                 //    defined in an enclosing scope.
@@ -858,14 +858,14 @@ impl Visitor {
         if let Some(name) = lhs_expr.ident_name() {
             self.visit_expr(value_expr, Some(name.clone()))?;
             match self.scope_tree.find_local(name.as_str(), None) {
-                Some((index, scope_index, local_index, _)) => {
+                Some((stack_index, pointer, local_index, _)) => {
                     // A slightly confusing thing here is that on the
                     // *initial* assignment of a local, STORE_LOCAL will
                     // *replace* the TOS value, converting it to a Local
                     // value type.
-                    log::trace!("ASSIGN (STORE) LOCAL: {name} @ {index}");
-                    self.scope_tree.mark_assigned(scope_index, local_index);
-                    self.push(Inst::StoreLocal(index));
+                    log::trace!("ASSIGN (STORE) LOCAL: {name} @ {stack_index}");
+                    self.scope_tree.mark_assigned(pointer, local_index);
+                    self.push(Inst::StoreLocal(stack_index));
                 }
                 None => {
                     log::trace!("ASSIGN VAR: {name}");
