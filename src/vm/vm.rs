@@ -208,6 +208,31 @@ impl VM {
                         return Err(RuntimeErr::cell_not_found(*index));
                     }
                 }
+                // Args (locals for Call)
+                ToArg(index) => {
+                    log::trace!("CONVERT TO ARG:\n{}", self.format_stack());
+                    let stack_index = self.value_stack.len() - 1 - index;
+                    if let Some(kind) = self.value_stack.peek_at(stack_index) {
+                        let obj = self.get_obj(kind);
+                        let local = ValueStackKind::Local(obj, *index);
+                        self.value_stack[stack_index] = local;
+                    } else {
+                        panic!("Expected stack value at {stack_index}");
+                    }
+                    log::trace!("AFTER CONVERSION TO ARG:\n{}", self.format_stack());
+                }
+                ToArgAndCell(index) => {
+                    log::trace!("TO ARG AND CELL:\n{}", self.format_stack());
+                    let stack_index = self.value_stack.len() - 1 - index;
+                    if let Some(kind) = self.value_stack.peek_at(stack_index) {
+                        let obj = self.get_obj(kind);
+                        let local = ValueStackKind::Local(obj.clone(), *index);
+                        self.value_stack[stack_index] = local;
+                        self.cells.add(*index, obj);
+                    } else {
+                        panic!("Expected stack value at {stack_index}");
+                    }
+                }
                 // Vars
                 DeclareVar(name) => {
                     if self.ctx.get_var_in_current_namespace(name).is_err() {
@@ -273,27 +298,6 @@ impl VM {
                     self.handle_inplace_op(op)?;
                 }
                 // Functions
-                ToArg(index) => {
-                    let stack_index = self.value_stack.len() - 1 - index;
-                    if let Some(kind) = self.value_stack.peek_at(stack_index) {
-                        let obj = self.get_obj(kind);
-                        let local = ValueStackKind::Local(obj, *index);
-                        self.value_stack[stack_index] = local;
-                    } else {
-                        panic!();
-                    }
-                }
-                ToArgAndCell(index) => {
-                    let stack_index = self.value_stack.len() - 1 - index;
-                    if let Some(kind) = self.value_stack.peek_at(stack_index) {
-                        let obj = self.get_obj(kind);
-                        let local = ValueStackKind::Local(obj.clone(), *index);
-                        self.value_stack[stack_index] = local;
-                        self.cells.add(*index, obj);
-                    } else {
-                        panic!();
-                    }
-                }
                 Call(n) => {
                     self.handle_call(*n)?;
                 }

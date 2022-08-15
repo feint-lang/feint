@@ -78,7 +78,7 @@ impl Disassembler {
                     Ok(obj) => obj.read().unwrap().to_string(),
                     Err(err) => err.to_string(),
                 };
-                self.align("LOAD_CONST", format!("{index} ({constant})"))
+                self.align("LOAD_CONST", format!("{index} ({constant:?})"))
             }
             StoreLocal(index) => self.align("STORE_LOCAL", index),
             LoadLocal(index) => self.align("LOAD_LOCAL", index),

@@ -122,37 +122,28 @@ impl Compiler {
             let mut current_scope_pointer = parent_scope_pointer;
 
             for (up_visitor, up_scope_pointer) in stack.iter().rev() {
-                found_stack_index -= 1;
-
                 let result = up_visitor
                     .scope_tree
                     .find_local(name.as_str(), Some(current_scope_pointer));
 
-                if let Some((index, found_scope_pointer, ..)) = result {
-                    // NOTE: If the free var is found in the current
-                    //       scope, that means it's an RHS value that
-                    //       refers to a var with the same name in an
-                    //       enclosing scope, so it's not resolved at
-                    //       this point.
-                    if found_scope_pointer == current_scope_pointer {
-                        log::trace!(
-                            "SKIPPED VAR RESOLUTION FOR {name} (found in same scope)"
-                        );
-                        continue;
-                    }
-
-                    log::trace!("RESOLVED VAR AS CAPTURED: {name} @  {index}");
+                if let Some((index, ..)) = result {
+                    log::trace!("RESOLVED VAR AS CAPTURED: {name} @ {index} [{found_stack_index}]");
 
                     found = true;
                     captured.push((*addr, index));
 
+                    // Note all the STORE_LOCAL and TO_ARG instructions
+                    // in the upward visitor (they'll be replaced
+                    // below).
                     for (addr, inst) in up_visitor.code.iter_chunk().enumerate() {
                         match inst {
                             Inst::StoreLocal(local_index) if *local_index == index => {
+                                let name = name.clone();
                                 let item = ("L", found_stack_index, addr, index, name);
                                 cell_vars.push(item);
                             }
                             Inst::ToArg(local_index) if *local_index == index => {
+                                let name = name.clone();
                                 let item = ("A", found_stack_index, addr, index, name);
                                 cell_vars.push(item);
                             }
@@ -162,6 +153,7 @@ impl Compiler {
                     break;
                 }
 
+                found_stack_index -= 1;
                 current_scope_pointer = *up_scope_pointer;
             }
 
@@ -670,6 +662,13 @@ impl Visitor {
             // Jump target if branch condition is false.
             // NOTE: Jump to SCOPE_END for this branch!
             self.replace(jump_index, Inst::JumpIfNot(self.len(), 0));
+
+            // If branch condition evaluated false, replace with nil.
+            //
+            // NOTE: The block *has* to return something, even when the
+            //       branch condition is false.
+            self.push(Inst::Pop);
+            self.push_nil();
 
             self.push(Inst::ScopeEnd);
             self.exit_scope();
