@@ -146,15 +146,15 @@ impl ScopeTree {
 
     // Locals ----------------------------------------------------------
 
-    /// Add local var to current scope and return its index. If the
-    /// local already exists in the current scope, just return its
-    /// existing stack index.
+    /// Add local var to current scope and return its index within that
+    /// scope. If the local already exists in the current scope, just
+    /// return its existing stack index.
     pub fn add_local<S: Into<String>>(&mut self, name: S, assigned: bool) -> usize {
         let name = name.into();
         let current = self.current_mut();
         let locals = &mut current.locals;
-        if let Some(index) = locals.iter().position(|(_, _, n, _)| n == &name) {
-            index
+        if let Some((_, index, _, _)) = locals.iter().find(|(_, _, n, _)| n == &name) {
+            *index
         } else {
             let index = locals.len();
             locals.push((current.index, index, name, assigned));
@@ -196,9 +196,9 @@ impl ScopeTree {
         scope.locals[local_index] = (*pointer, *index, name.clone(), true);
     }
 
-    /// Get all locals from current scope and its ancestors. The current
-    /// scope's locals will be at the end and the search must proceed
-    /// in reverse.
+    /// Flatten locals of scope (current by default) and its ancestors.
+    /// The scope's locals will be at the end and the search must
+    /// proceed in reverse.
     fn all_locals(&self, pointer: Option<usize>) -> Vec<&(usize, usize, String, bool)> {
         let mut locals = VecDeque::new();
         let mut scope = if let Some(pointer) = pointer {
