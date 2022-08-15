@@ -51,16 +51,14 @@ impl Disassembler {
     fn format_inst(&mut self, code: &Code, inst: &Inst) -> String {
         use Inst::*;
         match inst {
+            DisplayStack => self.align("DISPLAY_STACK", ""),
             NoOp => self.align("NOOP", "ø"),
             Pop => self.align("POP", ""),
             LoadGlobalConst(index) => {
                 let index = *index;
                 let op_code = "LOAD_GLOBAL_CONST";
                 if (3..=259).contains(&index) {
-                    self.align(
-                        op_code,
-                        format!("{index} ({})", (index - 3).to_string()),
-                    )
+                    self.align(op_code, format!("{index} ({})", index - 3))
                 } else {
                     self.align(op_code, format!("{index} ([unknown])"))
                 }
@@ -82,10 +80,9 @@ impl Disassembler {
                 };
                 self.align("LOAD_CONST", format!("{index} ({constant})"))
             }
-            StoreLocal(index, captured) => {
-                self.align("STORE_LOCAL", format!("{index} : captured = {captured}"))
-            }
+            StoreLocal(index) => self.align("STORE_LOCAL", index),
             LoadLocal(index) => self.align("LOAD_LOCAL", index),
+            StoreLocalAndCell(index) => self.align("STORE_LOCAL_AND_CELL", index),
             LoadCell(index) => self.align("LOAD_CELL", index),
             DeclareVar(name) => self.align("DECLARE_VAR", name),
             AssignVar(name) => self.align("ASSIGN_VAR", name),
@@ -102,6 +99,8 @@ impl Disassembler {
             BinaryOp(op) => self.align("BINARY_OP", op),
             CompareOp(op) => self.align("COMPARE_OP", op),
             InplaceOp(op) => self.align("INPLACE_OP", op),
+            ToArg(index) => self.align("TO_ARG", index),
+            ToArgAndCell(index) => self.align("TO_ARG_AND_CELL", index),
             Call(num_args) => self.align("CALL", num_args),
             Return => self.align("RETURN", ""),
             MakeString(n) => self.align("MAKE_STRING", n),

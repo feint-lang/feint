@@ -13,7 +13,9 @@ use num_traits::ToPrimitive;
 use crate::modules;
 use crate::types::closure::Closure;
 use crate::types::{args_to_str, this_to_str};
-use crate::types::{create, Args, BuiltinFunc, Func, FuncTrait, ObjectRef, This};
+use crate::types::{
+    create, Args, BuiltinFunc, Func, FuncTrait, ObjectRef, ObjectTrait, This,
+};
 use crate::util::{
     BinaryOperator, CompareOperator, InplaceOperator, Location, Stack,
     UnaryCompareOperator, UnaryOperator,
@@ -33,12 +35,11 @@ pub const DEFAULT_MAX_CALL_DEPTH: CallDepth =
 
 struct CallFrame {
     stack_pointer: usize,
-    this: This,
 }
 
 impl CallFrame {
-    pub fn new(stack_pointer: usize, this: This) -> Self {
-        Self { stack_pointer, this }
+    pub fn new(stack_pointer: usize) -> Self {
+        Self { stack_pointer }
     }
 }
 
@@ -142,6 +143,9 @@ impl VM {
 
         loop {
             match &code[ip] {
+                DisplayStack => {
+                    self.display_stack();
+                }
                 NoOp => {
                     // do nothing
                 }
@@ -179,13 +183,17 @@ impl VM {
                     self.push_const(code, *index)?;
                 }
                 // Locals
-                StoreLocal(index, captured) => {
-                    // Store object at TOS into local slot.
+                StoreLocal(index) => {
+                    // Store object at TOS into local slot. Note that
+                    // this leaves TOS in place.
                     let obj = self.peek_obj()?;
-                    if *captured {
-                        self.cells.add(*index, obj.clone());
-                    }
                     self.store_local(obj, *index)?;
+                }
+                StoreLocalAndCell(index) => {
+                    // Store object at TOS into local slot and to cell.
+                    let obj = self.peek_obj()?;
+                    self.store_local(obj.clone(), *index)?;
+                    self.cells.add(*index, obj);
                 }
                 LoadLocal(index) => {
                     // Load (copy) specified local to TOS.
@@ -264,12 +272,32 @@ impl VM {
                     self.handle_inplace_op(op)?;
                 }
                 // Functions
+                ToArg(index) => {
+                    let stack_index = self.value_stack.len() - 1 - index;
+                    if let Some(kind) = self.value_stack.peek_at(stack_index) {
+                        let obj = self.get_obj(kind);
+                        let local = ValueStackKind::Local(obj, *index);
+                        self.value_stack[stack_index] = local;
+                    } else {
+                        panic!();
+                    }
+                }
+                ToArgAndCell(index) => {
+                    let stack_index = self.value_stack.len() - 1 - index;
+                    if let Some(kind) = self.value_stack.peek_at(stack_index) {
+                        let obj = self.get_obj(kind);
+                        let local = ValueStackKind::Local(obj.clone(), *index);
+                        self.value_stack[stack_index] = local;
+                        self.cells.add(*index, obj);
+                    } else {
+                        panic!();
+                    }
+                }
                 Call(n) => {
                     self.handle_call(*n)?;
                 }
                 Return => {
-                    // XXX: What should this do, if anything? Currently,
-                    //      it serves only serves as a marker.
+                    self.exit_scope();
                 }
                 // Object construction
                 MakeString(n) => {
@@ -284,10 +312,7 @@ impl VM {
                 }
                 MakeTuple(n) => {
                     let objects = self.pop_n_obj(*n)?;
-                    let mut items = vec![];
-                    for obj in objects {
-                        items.push(obj.clone());
-                    }
+                    let items = objects.iter().cloned().collect();
                     let tuple = create::new_tuple(items);
                     self.push_temp(tuple);
                 }
@@ -553,6 +578,7 @@ impl VM {
             self.ctx.assign_var_at_depth(depth, name.as_str(), result.clone())?;
             self.push_temp(result);
         } else if let ValueStackKind::TempLocal(_, index) = a_kind {
+            log::trace!("STORE LOCAL FOR INPLACE {index}");
             self.store_local(result.clone(), index)?;
             self.push_temp(result);
         } else {
@@ -565,8 +591,18 @@ impl VM {
         let callable = self.pop_obj()?;
         let callable = callable.read().unwrap();
         log::trace!("HANDLE CALL: callable = {:?}", &*callable);
-        let args = if num_args > 0 { self.pop_n_obj(num_args)? } else { vec![] };
-        callable.call(args, self)
+        if let Some(func) = callable.down_to_builtin_func() {
+            let args = if num_args > 0 { self.pop_n_obj(num_args)? } else { vec![] };
+            self.call_builtin_func(func, None, args)
+        } else if let Some(func) = callable.down_to_func() {
+            log::trace!("CALL FUNC: {}\n{}", func.name(), self.format_stack());
+            self.call_func(func, num_args)
+        } else if let Some(func) = callable.down_to_bound_func() {
+            let args = if num_args > 0 { self.pop_n_obj(num_args)? } else { vec![] };
+            func.call(args, self)
+        } else {
+            Err(callable.not_callable())
+        }
     }
 
     pub fn call_builtin_func(
@@ -578,7 +614,7 @@ impl VM {
         log::trace!("BEGIN: call {} with this: {}", func.name(), this_to_str(&this));
         log::trace!("ARGS: {}", args_to_str(&args));
         let args = self.check_call_args(func, &this, args)?;
-        self.push_call_frame(this.clone())?;
+        self.push_call_frame(0)?;
         let result = (func.func)(this, args, self);
         match result {
             Ok(return_val) => {
@@ -593,24 +629,47 @@ impl VM {
         }
     }
 
-    pub fn call_func(&mut self, func: &Func, this: This, args: Args) -> RuntimeResult {
-        log::trace!("BEGIN: call {} with this: {}", func.name(), this_to_str(&this));
-        log::trace!("ARGS: {}", args_to_str(&args));
-        let args = self.check_call_args(func, &this, args)?;
-        self.enter_scope();
-        self.push_call_frame(this.clone())?;
-        if let Some(this_var) = self.find_this() {
-            self.push_local(this_var, 0, false);
+    pub fn call_func(&mut self, func: &Func, num_args: usize) -> RuntimeResult {
+        log::trace!("BEGIN: call {}", func.name());
+        self.push_call_frame(num_args)?;
+        let name = func.name();
+        let arity = func.arity();
+        if let Some(var_args_index) = func.var_args_index() {
+            if num_args < arity {
+                self.check_arity(name, arity, num_args, &None)?;
+            }
+            let objects = self.pop_n_obj(num_args - var_args_index)?;
+            let items = objects.iter().cloned().collect();
+            let tuple = create::new_tuple(items);
+            self.push_temp(tuple);
         } else {
-            self.push_local(create::new_nil(), 0, false);
+            self.check_arity(name, arity, num_args, &None)?;
         }
-        for (index, arg) in args.iter().enumerate() {
-            // TODO: Don't always capture args
-            self.push_local(arg.clone(), index + 1, true);
-            self.cells.add(index + 1, arg.clone());
+        match self.execute(&func.code) {
+            Ok(_) => {
+                self.pop_call_frame()?;
+                Ok(())
+            }
+            Err(err) => {
+                self.reset();
+                Err(err)
+            }
         }
-        let result = self.execute(&func.code);
-        match result {
+    }
+
+    pub fn call_func_direct(&mut self, func: &Func, args: Args) -> RuntimeResult {
+        log::trace!(
+            "BEGIN: call {} directly with args: {}",
+            func.name(),
+            args_to_str(&args)
+        );
+        let args = self.check_call_args(func, &None, args)?;
+        self.enter_scope();
+        self.push_call_frame(0)?;
+        for (i, arg) in args.into_iter().enumerate() {
+            self.push_local(arg, i);
+        }
+        match self.execute(&func.code) {
             Ok(_) => {
                 self.exit_scope();
                 self.pop_call_frame()?;
@@ -623,15 +682,10 @@ impl VM {
         }
     }
 
-    pub fn call_closure(
-        &mut self,
-        closure: &Closure,
-        this: This,
-        args: Args,
-    ) -> RuntimeResult {
+    pub fn call_closure(&mut self, closure: &Closure, args: Args) -> RuntimeResult {
         let func_ref = closure.func.read().unwrap();
         if let Some(func) = func_ref.down_to_func() {
-            self.call_func(func, this, args)
+            self.call_func_direct(func, args)
         } else {
             Err(RuntimeErr::not_callable(""))
         }
@@ -651,15 +705,11 @@ impl VM {
         if let Some(var_args_index) = func.var_args_index() {
             let n_args = args.iter().take(var_args_index).len();
             self.check_arity(name, arity, n_args, this)?;
-            let mut new_args = vec![];
-            for arg in args.iter().take(var_args_index) {
-                new_args.push(arg.clone());
-            }
-            let var_args: Vec<ObjectRef> =
-                args.iter().skip(var_args_index).cloned().collect();
-            let var_args = create::new_tuple(var_args);
-            new_args.push(var_args);
-            Ok(new_args)
+            let mut args = args.clone();
+            let var_args_items = args.split_off(var_args_index);
+            let var_args = create::new_tuple(var_args_items);
+            args.push(var_args);
+            Ok(args)
         } else {
             self.check_arity(name, arity, args.len(), this)?;
             Ok(args)
@@ -695,13 +745,13 @@ impl VM {
 
     // Call Stack ------------------------------------------------------
 
-    fn push_call_frame(&mut self, this: This) -> RuntimeResult {
+    fn push_call_frame(&mut self, args_offset: usize) -> RuntimeResult {
         if self.call_stack_size == self.max_call_depth {
             self.reset();
             return Err(RuntimeErr::recursion_depth_exceeded(self.max_call_depth));
         }
-        let stack_position = self.value_stack.len();
-        let frame = CallFrame::new(stack_position, this);
+        let stack_position = self.value_stack.len() - args_offset;
+        let frame = CallFrame::new(stack_position);
         self.call_stack.push(frame);
         self.call_stack_size += 1;
         self.call_frame_pointer = stack_position;
@@ -721,14 +771,12 @@ impl VM {
         }
     }
 
-    /// Look up call chain for `this`.
-    fn find_this(&self) -> Option<ObjectRef> {
-        for frame in self.call_stack.iter().rev() {
-            if frame.this.is_some() {
-                return frame.this.clone();
-            }
+    fn current_call_frame(&self) -> Result<&CallFrame, RuntimeErr> {
+        if let Some(frame) = self.call_stack.peek() {
+            Ok(frame)
+        } else {
+            Err(RuntimeErr::empty_call_stack())
         }
-        None
     }
 
     // Scopes ----------------------------------------------------------
@@ -791,9 +839,9 @@ impl VM {
     /// This is used to create new local slots on the stack. These slots
     /// remain on the stack until the current scope is exited.
     ///
-    /// NOTE: This is only used when calling a user functions to store
+    /// NOTE: This is only used when calling a user function to store
     ///       its args as locals.
-    fn push_local(&mut self, obj: ObjectRef, index: usize, captured: bool) {
+    fn push_local(&mut self, obj: ObjectRef, index: usize) {
         self.push(ValueStackKind::Local(obj, index));
     }
 

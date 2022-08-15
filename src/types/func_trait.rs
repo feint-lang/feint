@@ -8,6 +8,7 @@ pub(crate) trait FuncTrait {
     fn name(&self) -> &str;
     fn params(&self) -> &Params;
 
+    /// Returns the required number of args.
     fn arity(&self) -> usize {
         let params = self.params();
         if let Some(name) = params.last() {
@@ -23,6 +24,9 @@ pub(crate) trait FuncTrait {
         }
     }
 
+    /// If the function has var args, this returns the index of the var
+    /// args in the args list (which is also equal to the required
+    /// number of args).
     fn var_args_index(&self) -> Option<usize> {
         let params = self.params();
         if let Some(name) = params.last() {

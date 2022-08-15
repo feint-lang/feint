@@ -125,9 +125,8 @@ impl ObjectTrait for Func {
     }
 
     fn call(&self, args: Args, vm: &mut VM) -> RuntimeResult {
-        log::trace!("BEGIN: call {self}");
-        log::trace!("ARGS: {}", args_to_str(&args));
-        vm.call_func(self, None, args)
+        log::trace!("BEGIN: call {self} directly with args: {}", args_to_str(&args));
+        vm.call_func_direct(self, args)
     }
 }
 

@@ -5,6 +5,8 @@ use crate::util::{
 
 #[derive(Debug, PartialEq)]
 pub enum Inst {
+    DisplayStack,
+
     NoOp,
 
     Pop,
@@ -25,12 +27,14 @@ pub enum Inst {
     // Other constants are local to a given code unit.
     LoadConst(usize),
 
-    // Store value at top of stack as local.
-    StoreLocal(usize, bool),
+    // Store value at TOS as local.
+    StoreLocal(usize),
 
     // Load local value onto top of stack--retrieve (copy) local value
     // from slot lower in stack and push it onto TOS.
     LoadLocal(usize),
+
+    StoreLocalAndCell(usize),
 
     // Load a captured var from the "heap" to TOS.
     LoadCell(usize),
@@ -67,8 +71,17 @@ pub enum Inst {
     CompareOp(CompareOperator),
     InplaceOp(InplaceOperator),
 
-    Call(usize), // Call function with N values from top of stack
-    Return,      // Return is a no-op jump target
+    // Convert arg at offset from TOS to local for use as call arg.
+    ToArg(usize),
+    ToArgAndCell(usize),
+
+    // Call function with N values from top of stack. The args are
+    // ordered such that the 1st arg is at TOS and other args are below
+    // it.
+    Call(usize),
+
+    // Return is a jump target that exits the function's scope.
+    Return,
 
     // These make compound objects from the top N items on the stack.
     MakeString(usize),
@@ -77,8 +90,7 @@ pub enum Inst {
     MakeMap(usize),
 
     // Make function closure for constant.
-    // Function constant index, capture count
-    MakeClosure(usize, usize),
+    MakeClosure(usize, usize), // constant index, capture count
 
     LoadModule(String),
 

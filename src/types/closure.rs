@@ -107,7 +107,7 @@ impl ObjectTrait for Closure {
     fn call(&self, args: Args, vm: &mut VM) -> RuntimeResult {
         log::trace!("BEGIN: call closure {self}");
         log::trace!("ARGS: {}", args_to_str(&args));
-        vm.call_closure(self, None, args)
+        vm.call_closure(self, args)
     }
 }
 

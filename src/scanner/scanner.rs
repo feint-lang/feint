@@ -334,7 +334,7 @@ impl<'a, T: BufRead> Scanner<'a, T> {
     }
 
     fn handle_newline(&mut self, loc: Location) -> AddTokensResult {
-        if self.bracket_stack.len() == 0 {
+        if self.bracket_stack.is_empty() {
             self.maybe_exit_inline_scope(loc, false);
             self.maybe_add_end_of_statement_token(loc);
             self.maybe_dedent()?;

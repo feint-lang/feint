@@ -49,8 +49,7 @@ impl Compiler {
 
         log::trace!("BEGIN: compiling global functions");
         let mut has_main = false;
-        let func_nodes: Vec<(usize, usize, String, ast::Func)> =
-            visitor.func_nodes.iter().cloned().collect();
+        let func_nodes = visitor.func_nodes.to_vec();
         self.visitor_stack.push(visitor);
         for (addr, scope_tree_pointer, name, node) in func_nodes {
             if name == "$main" {
@@ -64,11 +63,10 @@ impl Compiler {
         // END Global Functions ----------------------------------------
 
         if has_main {
-            let argv: Vec<ObjectRef> =
-                argv.iter().map(|a| create::new_str(a.to_owned())).collect();
             let argc = argv.len();
+            visitor.code.push_inst(Inst::ScopeStart);
             for arg in argv {
-                let index = visitor.code.add_const(arg);
+                let index = visitor.code.add_const(create::new_str(arg));
                 visitor.code.push_inst(Inst::LoadConst(index));
             }
             visitor.code.push_inst(Inst::LoadVar("$main".to_string()));
@@ -144,14 +142,25 @@ impl Compiler {
                     captured.push((*addr, index));
 
                     for (addr, inst) in up_visitor.code.iter_chunk().enumerate() {
-                        if let Inst::StoreLocal(local_index, _) = inst {
+                        if let Inst::StoreLocal(local_index) = inst {
                             if *local_index == index {
                                 cell_vars.push((
+                                    "store_local",
                                     found_stack_index,
                                     addr,
                                     index,
                                     name.clone(),
                                 ));
+                            } else if let Inst::ToArg(local_index) = inst {
+                                if *local_index == index {
+                                    cell_vars.push((
+                                        "to_arg",
+                                        found_stack_index,
+                                        addr,
+                                        index,
+                                        name.clone(),
+                                    ));
+                                }
                             }
                         }
                     }
@@ -164,11 +173,15 @@ impl Compiler {
             }
         }
 
-        // Update STORE_LOCAL instruction in upward visitors to note
-        // which locals are captured.
-        for (found_stack_index, addr, index, name) in cell_vars {
+        // Update STORE_LOCAL instructions in ancestor visitors to store
+        // to both local (stack) and cell.
+        for (kind, found_stack_index, addr, index, name) in cell_vars {
             stack[found_stack_index].code.add_cell_var(name);
-            stack[found_stack_index].replace(addr, Inst::StoreLocal(index, true));
+            if kind == "store_local" {
+                stack[found_stack_index].replace(addr, Inst::StoreLocalAndCell(index));
+            } else {
+                stack[found_stack_index].replace(addr, Inst::ToArgAndCell(index));
+            }
         }
 
         // Update placeholder instructions in current visitors to load
@@ -192,8 +205,7 @@ impl Compiler {
         // Inner Functions ---------------------------------------------
 
         log::trace!("BEGIN: compiling inner functions");
-        let func_nodes: Vec<(usize, usize, String, ast::Func)> =
-            stack[stack_index].func_nodes.iter().cloned().collect();
+        let func_nodes = stack[stack_index].func_nodes.to_vec();
         for (addr, scope_tree_pointer, name, node) in func_nodes {
             self.compile_func(addr, scope_tree_pointer, name, node)?;
         }
@@ -271,26 +283,28 @@ impl Visitor {
     fn visit_func(&mut self, node: ast::Func) -> VisitResult {
         let params = node.params;
 
+        // Return nil when the last statement is NOT an expression.
         let last_statement = node
             .block
             .statements
             .last()
             .expect("Block for function contains no statements");
-
-        // Return nil when the last statement is NOT an expression.
         let return_nil = !matches!(last_statement.kind, ast::StatementKind::Expr(_));
 
-        // Add local slot for this.
-        self.scope_tree.add_local("this", true);
+        self.push(Inst::ScopeStart);
 
         // Add local slots for function parameters.
         let param_count = params.len();
+
+        self.push(Inst::DisplayStack);
+
         if param_count > 0 {
-            let last = params.len() - 1;
+            let last = param_count - 1;
             for (i, name) in params.iter().enumerate() {
                 if name.is_empty() {
                     if i == last {
-                        self.scope_tree.add_local("$args", true);
+                        let index = self.scope_tree.add_local("$args", true);
+                        self.push(Inst::ToArg(index));
                     } else {
                         return Err(CompErr::var_args_must_be_last(
                             node.block.start,
@@ -298,20 +312,17 @@ impl Visitor {
                         ));
                     }
                 } else {
-                    self.scope_tree.add_local(name, true);
+                    let index = self.scope_tree.add_local(name, true);
+                    self.push(Inst::ToArg(index));
                 }
             }
         }
 
+        self.push(Inst::DisplayStack);
+
         self.visit_statements(node.block.statements)?;
-
         assert_eq!(self.scope_tree.pointer(), 0);
-        assert!(
-            self.scope_tree.in_func_scope(),
-            "Expected to be in function scope after compiling function"
-        );
-
-        self.fix_jumps()?;
+        assert!(self.scope_tree.in_func_scope());
 
         if return_nil {
             self.push_nil();
@@ -320,13 +331,28 @@ impl Visitor {
         let return_addr = self.len();
         self.push(Inst::Return);
 
+        // Update jump targets for labels.
+        self.fix_jumps()?;
+
+        // Update jump targets for explicit return statements.
         for addr in 0..return_addr {
             let inst = &self.code[addr];
             if let Inst::ReturnPlaceholder(inst_addr, depth) = inst {
-                self.code.replace_inst(*inst_addr, Inst::Jump(return_addr, depth - 1));
+                self.replace(*inst_addr, Inst::Jump(return_addr, depth - 1));
             }
         }
 
+        Ok(())
+    }
+
+    /// This pushes the args onto the stack first and then the function.
+    fn visit_call(&mut self, node: ast::Call) -> VisitResult {
+        let callable = node.callable;
+        let args = node.args;
+        let num_args = args.len();
+        self.visit_exprs(args)?;
+        self.visit_expr(*callable, None)?;
+        self.push(Inst::Call(num_args));
         Ok(())
     }
 
@@ -748,16 +774,6 @@ impl Visitor {
         Ok(())
     }
 
-    fn visit_call(&mut self, node: ast::Call) -> VisitResult {
-        let callable = node.callable;
-        let args = node.args;
-        let num_args = args.len();
-        self.visit_exprs(args)?;
-        self.visit_expr(*callable, None)?;
-        self.push(Inst::Call(num_args));
-        Ok(())
-    }
-
     fn visit_unary_op(&mut self, op: UnaryOperator, expr: ast::Expr) -> VisitResult {
         self.visit_expr(expr, None)?;
         self.push(Inst::UnaryOp(op));
@@ -852,7 +868,7 @@ impl Visitor {
                     // value type.
                     log::trace!("ASSIGN (STORE) LOCAL: {name} @ {index}");
                     self.scope_tree.mark_assigned(scope_index, local_index);
-                    self.push(Inst::StoreLocal(index, false));
+                    self.push(Inst::StoreLocal(index));
                 }
                 None => {
                     log::trace!("ASSIGN VAR: {name}");
