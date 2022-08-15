@@ -145,6 +145,7 @@ impl VM {
             match &code[ip] {
                 DisplayStack => {
                     self.display_stack();
+                    eprintln!();
                 }
                 NoOp => {
                     // do nothing
@@ -312,17 +313,12 @@ impl VM {
                 }
                 MakeTuple(n) => {
                     let objects = self.pop_n_obj(*n)?;
-                    let items = objects.iter().cloned().collect();
-                    let tuple = create::new_tuple(items);
+                    let tuple = create::new_tuple(objects);
                     self.push_temp(tuple);
                 }
                 MakeList(n) => {
                     let objects = self.pop_n_obj(*n)?;
-                    let mut items = vec![];
-                    for obj in objects {
-                        items.push(obj.clone());
-                    }
-                    let list = create::new_list(items);
+                    let list = create::new_list(objects);
                     self.push_temp(list);
                 }
                 MakeMap(n) => {
@@ -639,8 +635,7 @@ impl VM {
                 self.check_arity(name, arity, num_args, &None)?;
             }
             let objects = self.pop_n_obj(num_args - var_args_index)?;
-            let items = objects.iter().cloned().collect();
-            let tuple = create::new_tuple(items);
+            let tuple = create::new_tuple(objects);
             self.push_temp(tuple);
         } else {
             self.check_arity(name, arity, num_args, &None)?;

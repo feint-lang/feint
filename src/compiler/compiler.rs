@@ -15,7 +15,7 @@ use super::scope::{Scope, ScopeKind, ScopeTree};
 
 pub struct Compiler {
     // The visitor stack is analogous to the VM call stack.
-    visitor_stack: Stack<Visitor>,
+    visitor_stack: Stack<(Visitor, usize)>, // visitor, scope tree pointer
 }
 
 impl Compiler {
@@ -50,14 +50,19 @@ impl Compiler {
         log::trace!("BEGIN: compiling global functions");
         let mut has_main = false;
         let func_nodes = visitor.func_nodes.to_vec();
-        self.visitor_stack.push(visitor);
+        self.visitor_stack.push((visitor, 0));
         for (addr, scope_tree_pointer, name, node) in func_nodes {
             if name == "$main" {
                 has_main = true;
             }
             self.compile_func(addr, scope_tree_pointer, name, node)?;
         }
-        let mut visitor = self.visitor_stack.pop().unwrap();
+        assert_eq!(
+            1,
+            self.visitor_stack.len(),
+            "Visitor stack should contain only the global visitor"
+        );
+        let (mut visitor, _) = self.visitor_stack.pop().unwrap();
         log::trace!("END: compiling global functions");
 
         // END Global Functions ----------------------------------------
@@ -91,7 +96,10 @@ impl Compiler {
         &mut self,
         // Address in parent visitor's code where function was defined.
         func_addr: usize,
-        scope_tree_pointer: usize,
+        // Pointer to scope in parent where function was defined. This
+        // is needed so that we can start the search for cell vars in
+        // the correct scope in the parent and other upward visitors.
+        parent_scope_pointer: usize,
         name: String,
         node: ast::Func,
     ) -> VisitResult {
@@ -101,71 +109,60 @@ impl Compiler {
         let mut visitor = Visitor::for_func();
         visitor.visit_func(node)?;
 
-        // NOTE: The current visitor needs to be pushed onto the visitor
-        //       stack for free var resolution.
-        let stack_index = stack.len();
-        stack.push(visitor);
-
         log::trace!("BEGIN: resolving names in outer scopes");
 
         let mut captured = vec![];
         let mut presumed_globals = vec![];
         let mut cell_vars = vec![];
 
-        for (addr, name, start, end) in stack[stack_index].code.free_vars().iter() {
+        for (addr, name, start, end) in visitor.code.free_vars().iter() {
             log::trace!("RESOLVING {name}");
             let mut found = false;
             let mut found_stack_index = stack.len();
+            let mut current_scope_pointer = parent_scope_pointer;
 
-            for up_visitor in stack.iter().rev() {
+            for (up_visitor, up_scope_pointer) in stack.iter().rev() {
                 found_stack_index -= 1;
 
                 let result = up_visitor
                     .scope_tree
-                    .find_local(name.as_str(), Some(scope_tree_pointer));
+                    .find_local(name.as_str(), Some(current_scope_pointer));
 
-                if let Some((index, pointer, ..)) = result {
+                if let Some((index, found_scope_pointer, ..)) = result {
                     // NOTE: If the free var is found in the current
-                    //       scope tree, that means it's an RHS value
-                    //       that refers to a var with the same name in
-                    //       an enclosing scope, so it's not resolved at
+                    //       scope, that means it's an RHS value that
+                    //       refers to a var with the same name in an
+                    //       enclosing scope, so it's not resolved at
                     //       this point.
-                    if pointer == scope_tree_pointer {
+                    if found_scope_pointer == current_scope_pointer {
+                        log::trace!(
+                            "SKIPPED VAR RESOLUTION FOR {name} (found in same scope)"
+                        );
                         continue;
                     }
 
-                    log::trace!(
-                        "RESOLVED VAR AS CAPTURED: {name} @ {found_stack_index} @ {index}"
-                    );
+                    log::trace!("RESOLVED VAR AS CAPTURED: {name} @  {index}");
 
                     found = true;
                     captured.push((*addr, index));
 
                     for (addr, inst) in up_visitor.code.iter_chunk().enumerate() {
-                        if let Inst::StoreLocal(local_index) = inst {
-                            if *local_index == index {
-                                cell_vars.push((
-                                    "store_local",
-                                    found_stack_index,
-                                    addr,
-                                    index,
-                                    name.clone(),
-                                ));
-                            } else if let Inst::ToArg(local_index) = inst {
-                                if *local_index == index {
-                                    cell_vars.push((
-                                        "to_arg",
-                                        found_stack_index,
-                                        addr,
-                                        index,
-                                        name.clone(),
-                                    ));
-                                }
+                        match inst {
+                            Inst::StoreLocal(local_index) if *local_index == index => {
+                                let item = ("L", found_stack_index, addr, index, name);
+                                cell_vars.push(item);
                             }
-                        }
+                            Inst::ToArg(local_index) if *local_index == index => {
+                                let item = ("A", found_stack_index, addr, index, name);
+                                cell_vars.push(item);
+                            }
+                            _ => (),
+                        };
                     }
                     break;
                 }
+
+                current_scope_pointer = *up_scope_pointer;
             }
 
             if !found {
@@ -173,28 +170,32 @@ impl Compiler {
             }
         }
 
-        // Update STORE_LOCAL instructions in ancestor visitors to store
-        // to both local (stack) and cell.
+        // Update STORE_LOCAL and TO_ARG instructions in ancestor
+        // visitors to store to both local (stack) and cell.
         for (kind, found_stack_index, addr, index, name) in cell_vars {
-            stack[found_stack_index].code.add_cell_var(name);
-            if kind == "store_local" {
-                stack[found_stack_index].replace(addr, Inst::StoreLocalAndCell(index));
+            let up_visitor = &mut stack[found_stack_index].0;
+            up_visitor.code.add_cell_var(name);
+            if kind == "L" {
+                up_visitor.replace(addr, Inst::StoreLocalAndCell(index));
+            } else if kind == "A" {
+                up_visitor.replace(addr, Inst::ToArgAndCell(index));
             } else {
-                stack[found_stack_index].replace(addr, Inst::ToArgAndCell(index));
+                panic!("Unexpected cell var type: {kind}");
             }
         }
 
-        // Update placeholder instructions in current visitors to load
-        // from cell.
+        // Update placeholder instructions in current visitor/function
+        // to load from cell.
         for (addr, index) in captured.iter() {
-            stack[stack_index].code.replace_inst(*addr, Inst::LoadCell(*index));
+            visitor.code.replace_inst(*addr, Inst::LoadCell(*index));
         }
 
         // Resolve globals.
+        let (global_visitor, _) = &stack[0];
         for (addr, name, start, end) in presumed_globals.into_iter() {
-            if stack[0].scope_tree.has_global(name.as_str()) {
+            if global_visitor.scope_tree.has_global(name.as_str()) {
                 log::trace!("RESOLVED VAR AS GLOBAL: {name}");
-                stack[stack_index].code.replace_inst(addr, Inst::LoadVar(name));
+                visitor.code.replace_inst(addr, Inst::LoadVar(name));
             } else {
                 return Err(CompErr::global_not_found(name, start, end));
             }
@@ -205,27 +206,30 @@ impl Compiler {
         // Inner Functions ---------------------------------------------
 
         log::trace!("BEGIN: compiling inner functions");
-        let func_nodes = stack[stack_index].func_nodes.to_vec();
+        let func_nodes = visitor.func_nodes.to_vec();
+        self.visitor_stack.push((visitor, parent_scope_pointer));
+        let start_len = self.visitor_stack.len();
         for (addr, scope_tree_pointer, name, node) in func_nodes {
             self.compile_func(addr, scope_tree_pointer, name, node)?;
         }
-        let visitor = self.visitor_stack.pop().unwrap();
+        assert_eq!(start_len, self.visitor_stack.len());
+        let (visitor, _) = self.visitor_stack.pop().unwrap();
         log::trace!("END: compiling inner functions");
 
         // END Inner Functions -----------------------------------------
 
         let func = create::new_func(name, params, visitor.code);
 
-        let parent_visitor = self.visitor_stack.peek_mut().unwrap();
+        let (parent_visitor, _) = self.visitor_stack.peek_mut().unwrap();
         let parent_code = &mut parent_visitor.code;
         let const_index = parent_code.add_const(func);
 
-        if captured.is_empty() {
-            parent_visitor.replace(func_addr, Inst::LoadConst(const_index));
-        } else {
-            parent_visitor
-                .replace(func_addr, Inst::MakeClosure(const_index, captured.len()));
-        }
+        // if captured.is_empty() {
+        parent_visitor.replace(func_addr, Inst::LoadConst(const_index));
+        // } else {
+        //     parent_visitor
+        //         .replace(func_addr, Inst::MakeClosure(const_index, captured.len()));
+        // }
 
         Ok(())
     }
@@ -296,8 +300,6 @@ impl Visitor {
         // Add local slots for function parameters.
         let param_count = params.len();
 
-        self.push(Inst::DisplayStack);
-
         if param_count > 0 {
             let last = param_count - 1;
             for (i, name) in params.iter().enumerate() {
@@ -317,8 +319,6 @@ impl Visitor {
                 }
             }
         }
-
-        self.push(Inst::DisplayStack);
 
         self.visit_statements(node.block.statements)?;
         assert_eq!(self.scope_tree.pointer(), 0);
@@ -459,14 +459,12 @@ impl Visitor {
             Kind::Loop(expr, block) => self.visit_loop(*expr, block)?,
             Kind::Func(func) => {
                 let name = name.map_or_else(|| "<anonymous>".to_owned(), |name| name);
-                self.func_nodes.push((
-                    self.len(),
-                    self.scope_tree.pointer(),
-                    name,
-                    func,
-                ));
+                let addr = self.len();
+                let pointer = self.scope_tree.pointer();
+                log::trace!("FOUND FUNC {name} @ {addr} in {pointer}");
+                self.func_nodes.push((addr, pointer, name, func));
                 self.push(Inst::Placeholder(
-                    self.len(),
+                    addr,
                     Box::new(Inst::LoadConst(0)),
                     "Function placeholder not updated".to_owned(),
                 ));
@@ -657,7 +655,7 @@ impl Visitor {
 
             // Branch selected. Execute body.
             self.visit_statements(block.statements)?;
-            self.push(Inst::ScopeEnd);
+            self.push(Inst::ScopeEnd); // NOTE: ScopeStart is at top of for loop
 
             // Placeholder for jump out of conditional suite if this
             // branch is selected.
