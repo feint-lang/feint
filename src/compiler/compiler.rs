@@ -666,7 +666,7 @@ impl Visitor {
 
             // If branch condition evaluated false, replace with nil.
             //
-            // NOTE: The block *has* to return something, even when the
+            // NOTE: The branch *has* to return something, even when the
             //       branch condition is false.
             self.push(Inst::Pop);
             self.push_nil();

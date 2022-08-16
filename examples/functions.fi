@@ -42,10 +42,10 @@ f(1, 2, 3)  # -> 2
 # TODO: Implement closures
 # This will throw a name error because `captured` isn't actual captured
 make_closure = (captured) ->
-    closure = () -> print(captured)
+    closure = () -> captured
 
 closure_1 = make_closure("x")
 closure_2 = make_closure("y")
 
-closure_1()  # -> "x"
-closure_2()  # -> "y"
+assert(closure_1() == "x", $"closure 1: {closure_1()} != 'x'")
+assert(closure_2() == "y", $"closure 2: {closure_2()} != 'y'")

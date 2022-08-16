@@ -366,6 +366,13 @@ impl<'a> Executor<'a> {
         use RuntimeErrKind::*;
         let (start, end) = self.vm.loc();
         let message = match &err.kind {
+            AssertionFailed(message) => {
+                if message.is_empty() {
+                    format!("Assertion failed")
+                } else {
+                    format!("Assertion failed with message: {message}")
+                }
+            }
             RecursionDepthExceeded(max_call_depth) => {
                 format!(
                     "Maximum recursion depth of {max_call_depth} was exceeded; use the \

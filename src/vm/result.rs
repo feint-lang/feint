@@ -46,6 +46,10 @@ impl RuntimeErr {
         Self { kind }
     }
 
+    pub fn assertion_failed(message: String) -> Self {
+        Self::new(RuntimeErrKind::AssertionFailed(message))
+    }
+
     pub fn empty_stack() -> Self {
         Self::new(RuntimeErrKind::EmptyStack)
     }
@@ -131,6 +135,7 @@ impl fmt::Display for RuntimeErr {
 
 #[derive(Clone, Debug)]
 pub enum RuntimeErrKind {
+    AssertionFailed(String),
     EmptyStack,
     NotEnoughValuesOnStack(usize),
     EmptyCallStack,
