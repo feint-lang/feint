@@ -287,7 +287,7 @@ impl Visitor {
             .expect("Block for function contains no statements");
         let return_nil = !matches!(last_statement.kind, ast::StatementKind::Expr(_));
 
-        self.push(Inst::ScopeStart);
+        self.push(Inst::FuncScopeStart(params.len()));
 
         // Add local slots for function parameters.
         let param_count = params.len();
@@ -321,6 +321,7 @@ impl Visitor {
         }
 
         let return_addr = self.len();
+        // self.push(Inst::DisplayStack("before return".to_owned()));
         self.push(Inst::Return);
 
         // Update jump targets for labels.

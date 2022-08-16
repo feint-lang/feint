@@ -5,7 +5,7 @@ use crate::util::{
 
 #[derive(Debug, PartialEq)]
 pub enum Inst {
-    DisplayStack,
+    DisplayStack(String),
 
     NoOp,
 
@@ -19,6 +19,7 @@ pub enum Inst {
     LoadTrue,  // 1
     LoadFalse, // 2
 
+    FuncScopeStart(usize),
     ScopeStart,
     ScopeEnd,
 

@@ -63,6 +63,10 @@ impl<T> Stack<T> {
         self.storage.get(index)
     }
 
+    pub fn set_at(&mut self, index: usize, item: T) {
+        self.storage[index] = item;
+    }
+
     pub fn is_empty(&self) -> bool {
         self.storage.is_empty()
     }

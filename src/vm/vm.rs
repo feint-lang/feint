@@ -143,7 +143,8 @@ impl VM {
 
         loop {
             match &code[ip] {
-                DisplayStack => {
+                DisplayStack(message) => {
+                    eprintln!("\nSTACK: {message}\n");
                     self.display_stack();
                     eprintln!();
                 }
@@ -171,8 +172,11 @@ impl VM {
                     self.push_global_const(2)?;
                 }
                 // Scopes
+                FuncScopeStart(args_offset) => {
+                    self.enter_scope(*args_offset);
+                }
                 ScopeStart => {
-                    self.enter_scope();
+                    self.enter_scope(0);
                 }
                 ScopeEnd => {
                     self.exit_scope();
@@ -215,7 +219,7 @@ impl VM {
                     if let Some(kind) = self.value_stack.peek_at(stack_index) {
                         let obj = self.get_obj(kind);
                         let local = ValueStackKind::Local(obj, *index);
-                        self.value_stack[stack_index] = local;
+                        self.replace(stack_index, local)?;
                     } else {
                         panic!("Expected stack value at {stack_index}");
                     }
@@ -227,7 +231,7 @@ impl VM {
                     if let Some(kind) = self.value_stack.peek_at(stack_index) {
                         let obj = self.get_obj(kind);
                         let local = ValueStackKind::Local(obj.clone(), *index);
-                        self.value_stack[stack_index] = local;
+                        self.replace(stack_index, local)?;
                         self.cells.add(*index, obj);
                     } else {
                         panic!("Expected stack value at {stack_index}");
@@ -631,22 +635,27 @@ impl VM {
 
     pub fn call_func(&mut self, func: &Func, num_args: usize) -> RuntimeResult {
         log::trace!("BEGIN: call {}", func.name());
-        self.push_call_frame(num_args)?;
         let name = func.name();
         let arity = func.arity();
-        if let Some(var_args_index) = func.var_args_index() {
+        let args_offset = if let Some(var_args_index) = func.var_args_index() {
             if num_args < arity {
                 self.check_arity(name, arity, num_args, &None)?;
             }
             let objects = self.pop_n_obj(num_args - var_args_index)?;
             let tuple = create::new_tuple(objects);
             self.push_temp(tuple);
+            arity + 1
         } else {
             self.check_arity(name, arity, num_args, &None)?;
-        }
+            num_args
+        };
+        log::trace!("STACK BEFORE PUSHING FRAME:\n{}", self.format_stack());
+        self.push_call_frame(args_offset)?;
+        log::trace!("STACK AFTER PUSHING FRAME:\n{}", self.format_stack());
         match self.execute(&func.code) {
             Ok(_) => {
                 self.pop_call_frame()?;
+                log::trace!("STACK AFTER POPPING FRAME:\n{}", self.format_stack());
                 Ok(())
             }
             Err(err) => {
@@ -663,7 +672,7 @@ impl VM {
             args_to_str(&args)
         );
         let args = self.check_call_args(func, &None, args)?;
-        self.enter_scope();
+        self.enter_scope(0);
         self.push_call_frame(0)?;
         for (i, arg) in args.into_iter().enumerate() {
             self.push_local(arg, i);
@@ -686,7 +695,7 @@ impl VM {
         if let Some(func) = func_ref.down_to_func() {
             self.call_func_direct(func, args)
         } else {
-            Err(RuntimeErr::not_callable(""))
+            Err(closure.not_callable())
         }
     }
 
@@ -780,8 +789,8 @@ impl VM {
 
     // Scopes ----------------------------------------------------------
 
-    fn enter_scope(&mut self) {
-        self.scope_stack.push(self.value_stack.len());
+    fn enter_scope(&mut self, args_offset: usize) {
+        self.scope_stack.push(self.value_stack.len() - args_offset);
         self.ctx.enter_scope();
     }
 
@@ -791,6 +800,7 @@ impl VM {
     /// scope's "return value" back onto the stack. Finally, the scope's
     /// namespace is then cleared and removed.
     fn exit_scope(&mut self) {
+        log::trace!("STACK BEFORE EXIT SCOPE:\n{}", self.format_stack());
         let return_val = self.pop_obj();
         if let Some(pointer) = self.scope_stack.pop() {
             self.value_stack.truncate(pointer);
@@ -805,6 +815,7 @@ impl VM {
         }
         // Clear scope namespaces.
         self.ctx.exit_scope();
+        log::trace!("STACK AFTER EXIT SCOPE:\n{}", self.format_stack());
     }
 
     /// This is a convenience for jumping out multiple scopes when
@@ -850,12 +861,21 @@ impl VM {
         self.push(ValueStackKind::TempLocal(obj, index));
     }
 
+    /// Replace value stack item at index.
+    fn replace(&mut self, index: usize, kind: ValueStackKind) -> RuntimeResult {
+        if index < self.value_stack.len() {
+            self.value_stack.set_at(index, kind);
+            Ok(())
+        } else {
+            Err(RuntimeErr::stack_index_out_of_bounds(index))
+        }
+    }
+
     /// Store object into local slot.
     fn store_local(&mut self, obj: ObjectRef, index: usize) -> RuntimeResult {
         let frame_index = self.call_frame_pointer + index;
         if frame_index < self.value_stack.len() {
-            self.value_stack[frame_index] = ValueStackKind::Local(obj, index);
-            Ok(())
+            self.replace(frame_index, ValueStackKind::Local(obj, index))
         } else {
             Err(RuntimeErr::frame_index_out_of_bounds(frame_index))
         }
@@ -965,8 +985,10 @@ impl VM {
             };
             let obj = self.get_obj(kind);
             let obj = &*obj.read().unwrap();
-            let top_marker = if i == 0 { " [TOP]" } else { "" };
-            let string = format!("{i:0>8} {obj:?} {kind_marker}{top_marker}");
+            let top_marker = if i == 0 { "TOS" } else { "     " };
+            let frame_marker = if i == self.call_frame_pointer { "<----" } else { "" };
+            let string =
+                format!("{top_marker: <8}{kind_marker: <4}{obj:?}{frame_marker: >12}");
             items.push(string)
         }
         items.join("\n")

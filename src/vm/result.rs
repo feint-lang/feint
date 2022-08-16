@@ -58,6 +58,10 @@ impl RuntimeErr {
         Self::new(RuntimeErrKind::EmptyCallStack)
     }
 
+    pub fn stack_index_out_of_bounds(index: usize) -> Self {
+        Self::new(RuntimeErrKind::StackIndexOutOfBounds(index))
+    }
+
     pub fn frame_index_out_of_bounds(index: usize) -> Self {
         Self::new(RuntimeErrKind::FrameIndexOutOfBounds(index))
     }
@@ -130,6 +134,7 @@ pub enum RuntimeErrKind {
     EmptyStack,
     NotEnoughValuesOnStack(usize),
     EmptyCallStack,
+    StackIndexOutOfBounds(usize),
     FrameIndexOutOfBounds(usize),
     RecursionDepthExceeded(CallDepth),
     ConstantNotFound(usize),

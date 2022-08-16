@@ -45,13 +45,13 @@ impl Disassembler {
     /// Align instruction name and any additional data, such as a
     /// constant index, var name, etc.
     fn align<T: fmt::Display>(&self, name: &str, value: T) -> String {
-        format!("{name: <w$}{value:}", w = 24)
+        format!("{name: <w$}{value}", w = 24)
     }
 
     fn format_inst(&mut self, code: &Code, inst: &Inst) -> String {
         use Inst::*;
         match inst {
-            DisplayStack => self.align("DISPLAY_STACK", ""),
+            DisplayStack(message) => self.align("DISPLAY_STACK", message),
             NoOp => self.align("NOOP", "ø"),
             Pop => self.align("POP", ""),
             LoadGlobalConst(index) => {
@@ -66,6 +66,9 @@ impl Disassembler {
             LoadNil => self.align("LOAD_NIL", "nil"),
             LoadTrue => self.align("LOAD_TRUE", "true"),
             LoadFalse => self.align("LOAD_FALSE", "false"),
+            FuncScopeStart(args_offset) => {
+                self.align("FUNC_SCOPE_START", format!("({args_offset}) ->"))
+            }
             ScopeStart => self.align("SCOPE_START", "->"),
             ScopeEnd => self.align("SCOPE_END", ""),
             StatementStart(start, _) => {
