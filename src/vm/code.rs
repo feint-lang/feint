@@ -95,7 +95,8 @@ impl Code {
         for addr in 0..return_addr {
             let inst = &self.chunk[addr];
             if let Inst::ReturnPlaceholder(inst_addr, depth) = inst {
-                self.replace_inst(*inst_addr, Inst::Jump(return_addr, depth - 1));
+                let rel_addr = return_addr - inst_addr;
+                self.replace_inst(*inst_addr, Inst::Jump(rel_addr, true, depth - 1));
             }
         }
     }

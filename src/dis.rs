@@ -98,12 +98,17 @@ impl Disassembler {
             DeclareVar(name) => self.align("DECLARE_VAR", name),
             AssignVar(name) => self.align("ASSIGN_VAR", name),
             LoadVar(name) => self.align("LOAD_VAR", name),
-            Jump(addr, _) => self.align("JUMP", format!("{addr}",)),
-            JumpPushNil(addr, _) => self.align("JUMP_PUSH_NIL", format!("{addr}",)),
-            JumpIf(addr, _) => self.align("JUMP_IF", format!("{addr}",)),
-            JumpIfNot(addr, _) => self.align("JUMP_IF_NOT", format!("{addr}",)),
-            JumpIfElse(if_addr, else_addr, _) => {
-                self.align("JUMP_IF_ELSE", format!("{if_addr} : {else_addr}"))
+            Jump(rel_addr, forward, _) => {
+                let kind = if *forward { "forward" } else { "backward" };
+                self.align("JUMP", format!("{rel_addr} ({kind})"))
+            }
+            JumpPushNil(rel_addr, forward, _) => {
+                let kind = if *forward { "forward" } else { "backward" };
+                self.align("JUMP_PUSH_NIL", format!("{rel_addr} ({kind})"))
+            }
+            JumpIfNot(rel_addr, forward, _) => {
+                let kind = if *forward { "forward" } else { "backward" };
+                self.align("JUMP_IF_NOT", format!("{rel_addr} ({kind})"))
             }
             UnaryOp(op) => self.align("UNARY_OP", op),
             UnaryCompareOp(op) => self.align("UNARY_COMPARE_OP", op),

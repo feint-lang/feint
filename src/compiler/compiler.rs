@@ -348,7 +348,8 @@ impl Visitor {
         for addr in 0..return_addr {
             let inst = &self.code[addr];
             if let Inst::ReturnPlaceholder(inst_addr, depth) = inst {
-                self.replace(*inst_addr, Inst::Jump(return_addr, depth - 1));
+                let rel_addr = return_addr - inst_addr;
+                self.replace(*inst_addr, Inst::Jump(rel_addr, true, depth - 1));
             }
         }
 
@@ -390,7 +391,7 @@ impl Visitor {
                 let jump_addr = self.len();
                 self.push(Inst::Placeholder(
                     0,
-                    Box::new(Inst::Jump(0, 0)),
+                    Box::new(Inst::Jump(0, true, 0)),
                     "Jump address not set to label address".to_owned(),
                 ));
                 self.scope_tree.add_jump(name.as_str(), jump_addr);
@@ -656,7 +657,7 @@ impl Visitor {
             let jump_index = self.len();
             self.push(Inst::Placeholder(
                 jump_index,
-                Box::new(Inst::JumpIfNot(0, 0)),
+                Box::new(Inst::JumpIfNot(0, true, 0)),
                 "Branch condition jump not set".to_owned(),
             ));
 
@@ -673,18 +674,17 @@ impl Visitor {
             jump_out_addrs.push(jump_out_addr);
             self.push(Inst::Placeholder(
                 jump_out_addr,
-                Box::new(Inst::Jump(0, 0)),
+                Box::new(Inst::Jump(0, true, 0)),
                 "Branch jump out not set".to_owned(),
             ));
 
-            // Jump target if branch condition is false.
-            // NOTE: Jump to SCOPE_END for this branch!
-            self.replace(jump_index, Inst::JumpIfNot(self.len(), 0));
+            // Set jump target for when branch condition is false.
+            let rel_addr = self.len() - jump_index;
+            self.replace(jump_index, Inst::JumpIfNot(rel_addr, true, 0));
 
             // If branch condition evaluated false, replace with nil.
-            //
-            // NOTE: The branch *has* to return something, even when the
-            //       branch condition is false.
+            // The branch *has* to return something, even when the
+            // branch condition is false.
             self.push(Inst::Pop);
             self.push_nil();
 
@@ -704,7 +704,8 @@ impl Visitor {
 
         // Replace jump-out placeholders with actual jumps.
         for addr in jump_out_addrs {
-            self.replace(addr, Inst::Jump(after_addr, 0));
+            let rel_addr = after_addr - addr;
+            self.replace(addr, Inst::Jump(rel_addr, true, 0));
         }
 
         Ok(())
@@ -745,7 +746,7 @@ impl Visitor {
         let jump_out_addr = self.len();
         self.push(Inst::Placeholder(
             jump_out_addr,
-            Box::new(Inst::JumpIfNot(0, 0)),
+            Box::new(Inst::JumpIfNot(0, true, 0)),
             "Jump-out for loop not set".to_owned(),
         ));
 
@@ -758,7 +759,8 @@ impl Visitor {
         let block_end_addr = self.len();
 
         // Jump to top of loop.
-        self.push(Inst::Jump(loop_addr, 0));
+        let rel_addr = self.len() - loop_addr;
+        self.push(Inst::Jump(rel_addr, false, 0));
 
         // Jump-out target address.
         let jump_out_target = self.len();
@@ -768,20 +770,23 @@ impl Visitor {
         self.exit_scope();
 
         // Set target of jump-out placeholder.
-        self.replace(jump_out_addr, Inst::JumpIfNot(jump_out_target, 0));
+        let rel_addr = jump_out_target - jump_out_addr;
+        self.replace(jump_out_addr, Inst::JumpIfNot(rel_addr, true, 0));
 
         // Set address of breaks and continues.
         for addr in block_start_addr..=block_end_addr {
             let inst = &self.code[addr];
             if let Inst::BreakPlaceholder(inst_addr, depth) = inst {
+                let rel_addr = jump_out_target - addr;
                 self.replace(
                     *inst_addr,
-                    Inst::Jump(jump_out_target, depth - loop_scope_depth),
+                    Inst::Jump(rel_addr, true, depth - loop_scope_depth),
                 );
             } else if let Inst::ContinuePlaceholder(inst_addr, depth) = inst {
+                let rel_addr = addr - loop_addr;
                 self.replace(
                     *inst_addr,
-                    Inst::JumpPushNil(loop_addr, depth - loop_scope_depth),
+                    Inst::JumpPushNil(rel_addr, false, depth - loop_scope_depth),
                 );
             }
         }
@@ -985,8 +990,10 @@ impl Visitor {
             for (name, jump_addr) in scope.jumps().iter() {
                 let result = scope.find_label(scope_tree, name, None);
                 if let Some((label_addr, label_depth)) = result {
+                    let rel_addr = label_addr - jump_addr;
                     let depth = jump_depth - label_depth;
-                    code.replace_inst(*jump_addr, Inst::JumpPushNil(label_addr, depth));
+                    let new_inst = Inst::JumpPushNil(rel_addr, true, depth);
+                    code.replace_inst(*jump_addr, new_inst);
                 } else {
                     if scope.kind == ScopeKind::Func {
                         jump_out_of_func = Some(name.clone());

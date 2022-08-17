@@ -260,37 +260,34 @@ impl VM {
                     self.push_var(depth, name.clone())?;
                 }
                 // Jumps
-                Jump(addr, scope_exit_count) => {
+                Jump(addr, forward, scope_exit_count) => {
                     self.exit_scopes(*scope_exit_count);
-                    jump_ip = Some(*addr);
-                }
-                JumpPushNil(addr, scope_exit_count) => {
-                    self.push_global_const(0)?;
-                    self.exit_scopes(*scope_exit_count);
-                    jump_ip = Some(*addr);
-                }
-                JumpIf(addr, scope_exit_count) => {
-                    self.exit_scopes(*scope_exit_count);
-                    let obj = self.peek_obj()?;
-                    let obj = obj.read().unwrap();
-                    if obj.bool_val()? {
-                        jump_ip = Some(*addr);
+                    if *forward {
+                        jump_ip = Some(ip + *addr);
+                    } else {
+                        jump_ip = Some(ip - *addr);
                     }
                 }
-                JumpIfNot(addr, scope_exit_count) => {
+                JumpPushNil(addr, forward, scope_exit_count) => {
+                    self.push_global_const(0)?;
+                    self.exit_scopes(*scope_exit_count);
+                    if *forward {
+                        jump_ip = Some(ip + *addr);
+                    } else {
+                        jump_ip = Some(ip - *addr);
+                    }
+                }
+                JumpIfNot(addr, forward, scope_exit_count) => {
                     self.exit_scopes(*scope_exit_count);
                     let obj = self.peek_obj()?;
                     let obj = obj.read().unwrap();
                     if !obj.bool_val()? {
-                        jump_ip = Some(*addr);
+                        if *forward {
+                            jump_ip = Some(ip + *addr);
+                        } else {
+                            jump_ip = Some(ip - *addr);
+                        }
                     }
-                }
-                JumpIfElse(if_addr, else_addr, scope_exit_count) => {
-                    self.exit_scopes(*scope_exit_count);
-                    let obj = self.pop_obj()?;
-                    let obj = obj.read().unwrap();
-                    let addr = if obj.bool_val()? { *if_addr } else { *else_addr };
-                    jump_ip = Some(addr);
                 }
                 // Operations
                 UnaryOp(op) => {

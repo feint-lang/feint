@@ -50,24 +50,24 @@ pub enum Inst {
 
     // Jumps -----------------------------------------------------------
     //
-    // NOTE: For all jump instructions, the last arg is the scope exit
-    //       count.
+    // For all jump instructions, the first arg is the target address
+    // relative to the jump address. The second arg is a flag to
+    // indicate a forward or reverse jump. The third arg is the scope
+    // exit count.
+    //
+    // Relative addresses allow instructions to be inserted BEFORE any
+    // forward jumps or AFTER any backward jumps within a code segment.
+    // Mainly this is to allow instructions to be inserted at the
+    // beginning of functions.
 
-    // Jump unconditionally
-    Jump(usize, usize), // address
+    // Jump unconditionally.
+    Jump(usize, bool, usize),
 
-    // Jump unconditionally and push nil onto stack
-    JumpPushNil(usize, usize), // address
-
-    // If top of stack is true, jump to address. Otherwise, continue.
-    JumpIf(usize, usize),
+    // Jump unconditionally and push nil onto stack.
+    JumpPushNil(usize, bool, usize),
 
     // If top of stack is false, jump to address. Otherwise, continue.
-    JumpIfNot(usize, usize),
-
-    // If top of stack is true, jump to first address. Otherwise,
-    // jump to second address.
-    JumpIfElse(usize, usize, usize),
+    JumpIfNot(usize, bool, usize),
 
     UnaryOp(UnaryOperator),
     UnaryCompareOp(UnaryCompareOperator),
