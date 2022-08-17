@@ -11,7 +11,6 @@ use ctrlc;
 use num_traits::ToPrimitive;
 
 use crate::modules;
-use crate::types::closure::Closure;
 use crate::types::{args_to_str, this_to_str};
 use crate::types::{
     create, Args, BuiltinFunc, Func, FuncTrait, ObjectRef, ObjectTrait, This,
@@ -27,7 +26,7 @@ use super::context::RuntimeContext;
 use super::inst::Inst;
 use super::result::{
     CallDepth, PeekObjResult, PopNObjResult, PopNResult, PopObjResult, PopResult,
-    RuntimeErr, RuntimeResult, VMExeResult, VMState, ValueStackKind,
+    RuntimeErr, RuntimeObjResult, RuntimeResult, VMExeResult, VMState, ValueStackKind,
 };
 
 pub const DEFAULT_MAX_CALL_DEPTH: CallDepth =
@@ -35,38 +34,34 @@ pub const DEFAULT_MAX_CALL_DEPTH: CallDepth =
 
 struct CallFrame {
     stack_pointer: usize,
+    closure: Option<ObjectRef>,
 }
 
 impl CallFrame {
-    pub fn new(stack_pointer: usize) -> Self {
-        Self { stack_pointer }
-    }
-}
-
-/// Stores vars that were captured by a closure. These vars are
-/// addressed by the function ID where the captured var was defined and
-/// the local index of the var in that function.
-struct Cell {
-    /// local index, object
-    objects: Vec<(usize, ObjectRef)>,
-}
-
-impl Cell {
-    pub fn new() -> Self {
-        Self { objects: Vec::with_capacity(64) }
+    pub fn new(stack_pointer: usize, closure: Option<ObjectRef>) -> Self {
+        Self { stack_pointer, closure }
     }
 
-    pub fn add(&mut self, index: usize, obj: ObjectRef) {
-        if !self.objects.iter().any(|(i, _)| *i == index) {
-            self.objects.push((index, obj));
+    pub fn get_cell_data(&self, index: usize) -> RuntimeObjResult {
+        if let Some(closure) = &self.closure {
+            let closure = closure.read().unwrap();
+            let closure = closure.down_to_closure().unwrap();
+            let cells = closure.cells.read().unwrap();
+            if let Some(obj) = cells.get(index) {
+                return Ok(obj.clone());
+            }
         }
+        Err(RuntimeErr::cell_not_found(index))
     }
 
-    pub fn get(&self, local_index: usize) -> Option<ObjectRef> {
-        log::trace!("GETTING OBJECT FROM HEAP: {local_index}");
-        log::trace!("HEAP CONTENTS: {:?}", self.objects);
-        let result = self.objects.iter().rev().find(|(index, _)| local_index == *index);
-        result.map(|(.., obj)| obj.clone())
+    pub fn set_cell_data(&self, index: usize, data: ObjectRef) -> RuntimeResult {
+        if let Some(closure) = &self.closure {
+            let closure = closure.read().unwrap();
+            let closure = closure.down_to_closure().unwrap();
+            let mut cells = closure.cells.write().unwrap();
+            cells[index] = data;
+        }
+        Err(RuntimeErr::cell_not_found(index))
     }
 }
 
@@ -88,8 +83,6 @@ pub struct VM {
     // Maximum depth of "call stack" (quotes because there's no explicit
     // call stack).
     max_call_depth: CallDepth,
-    // Storage for objects that need to outlive a call frame.
-    cells: Cell,
     // The location of the current statement. Used for error reporting.
     loc: (Location, Location),
     // SIGINT (Ctrl-C) handling.
@@ -117,7 +110,6 @@ impl VM {
             call_stack_size: 0,
             call_frame_pointer: 0,
             max_call_depth,
-            cells: Cell::new(),
             loc: (Location::default(), Location::default()),
             handle_sigint: sigint_flag.load(Ordering::Relaxed),
             sigint_flag,
@@ -194,11 +186,15 @@ impl VM {
                     let obj = self.peek_obj()?;
                     self.store_local(obj, *index)?;
                 }
-                StoreLocalAndCell(index) => {
+                // This called from an ancestor frame. It needs access
+                // to the cell storage of the closure(s) it was added
+                // for.
+                StoreLocalAndCell(local_index, cell_index) => {
                     // Store object at TOS into local slot and to cell.
                     let obj = self.peek_obj()?;
-                    self.store_local(obj.clone(), *index)?;
-                    self.cells.add(*index, obj);
+                    self.store_local(obj.clone(), *local_index)?;
+                    // let frame = self.current_call_frame()?;
+                    // frame.set_cell_data(*cell_index, obj.clone())?;
                 }
                 LoadLocal(index) => {
                     // Load (copy) specified local to TOS.
@@ -206,36 +202,47 @@ impl VM {
                 }
                 LoadCell(index) => {
                     // Load data from cell to TOS.
-                    if let Some(obj) = self.cells.get(*index) {
-                        self.push_temp(obj);
-                    } else {
-                        return Err(RuntimeErr::cell_not_found(*index));
-                    }
+                    let frame = self.current_call_frame()?;
+                    let obj = frame.get_cell_data(*index)?;
+                    self.push_temp(obj);
                 }
                 // Args (locals for Call)
-                ToArg(index) => {
-                    log::trace!("CONVERT TO ARG:\n{}", self.format_stack());
-                    let stack_index = self.value_stack.len() - 1 - index;
-                    if let Some(kind) = self.value_stack.peek_at(stack_index) {
-                        let obj = self.get_obj(kind);
-                        let local = ValueStackKind::Local(obj, *index);
+                ToArg(local_index) => {
+                    log::trace!("BEFORE CONVERSION TO ARG:\n{}", self.format_stack());
+                    let offset = local_index + 1;
+                    if offset > self.value_stack.len() {
+                        panic!("Arg offset out of bounds: {offset}");
+                    }
+                    let stack_index = self.value_stack.len() - offset;
+                    if let Ok(kind) = self.peek_at(stack_index) {
+                        let arg = self.get_obj(kind);
+                        log::trace!("ARG: {arg:?}");
+                        let local = ValueStackKind::Local(arg, *local_index);
                         self.replace(stack_index, local)?;
                     } else {
                         panic!("Expected stack value at {stack_index}");
                     }
                     log::trace!("AFTER CONVERSION TO ARG:\n{}", self.format_stack());
                 }
-                ToArgAndCell(index) => {
-                    log::trace!("TO ARG AND CELL:\n{}", self.format_stack());
-                    let stack_index = self.value_stack.len() - 1 - index;
-                    if let Some(kind) = self.value_stack.peek_at(stack_index) {
-                        let obj = self.get_obj(kind);
-                        let local = ValueStackKind::Local(obj.clone(), *index);
+                ToArgAndCell(local_index, cell_index) => {
+                    log::trace!(
+                        "BEFORE CONVERSION TO ARG AND CELL:\n{}",
+                        self.format_stack()
+                    );
+                    let offset = local_index + 1;
+                    if offset > self.value_stack.len() {
+                        panic!("Arg offset out of bounds: {offset}");
+                    }
+                    let stack_index = self.value_stack.len() - offset;
+                    if let Ok(kind) = self.peek_at(stack_index) {
+                        let arg = self.get_obj(kind);
+                        log::trace!("ARG: {arg:?}");
+                        let local = ValueStackKind::Local(arg, *local_index);
                         self.replace(stack_index, local)?;
-                        self.cells.add(*index, obj);
                     } else {
                         panic!("Expected stack value at {stack_index}");
                     }
+                    log::trace!("AFTER CONVERSION TO ARG:\n{}", self.format_stack());
                 }
                 // Vars
                 DeclareVar(name) => {
@@ -347,9 +354,26 @@ impl VM {
                     let map = create::new_map(entries);
                     self.push_temp(map);
                 }
-                MakeClosure(index, count) => {
-                    let func = code.get_const(*index)?.clone();
-                    let closure = create::new_closure(func, vec![]);
+                // A closure is created in its parent frame.
+                MakeClosure(func_const_index, cell_info) => {
+                    let func = code.get_const(*func_const_index)?.clone();
+                    let mut cells = vec![];
+                    for (call_stack_index, local_index) in cell_info {
+                        let frame =
+                            &self.call_stack[self.call_stack_size - call_stack_index];
+
+                        let index = frame.stack_pointer + local_index;
+
+                        if let Ok(kind) = self.peek_at(index) {
+                            assert!(matches!(kind, ValueStackKind::Local(..)));
+                            let obj = self.peek_at_obj(index)?;
+                            cells.push(obj);
+                        } else {
+                            // local not stored yet
+                            cells.push(create::new_nil());
+                        }
+                    }
+                    let closure = create::new_closure(func, cells);
                     self.push_temp(closure);
                 }
                 // Modules
@@ -592,8 +616,8 @@ impl VM {
     }
 
     fn handle_call(&mut self, num_args: usize) -> RuntimeResult {
-        let callable = self.pop_obj()?;
-        let callable = callable.read().unwrap();
+        let callable_ref = self.pop_obj()?;
+        let callable = callable_ref.read().unwrap();
         log::trace!("HANDLE CALL: callable = {:?}", &*callable);
         if let Some(func) = callable.down_to_builtin_func() {
             let args = if num_args > 0 { self.pop_n_obj(num_args)? } else { vec![] };
@@ -601,6 +625,9 @@ impl VM {
         } else if let Some(func) = callable.down_to_func() {
             log::trace!("CALL FUNC: {}\n{}", func.name(), self.format_stack());
             self.call_func(func, num_args)
+        } else if let Some(closure) = callable.down_to_closure() {
+            log::trace!("CALL CLOSURE: {}\n{}", closure.name(), self.format_stack());
+            self.call_closure(callable_ref.clone(), num_args)
         } else if let Some(func) = callable.down_to_bound_func() {
             let args = if num_args > 0 { self.pop_n_obj(num_args)? } else { vec![] };
             func.call(args, self)
@@ -618,7 +645,7 @@ impl VM {
         log::trace!("BEGIN: call {} with this: {}", func.name(), this_to_str(&this));
         log::trace!("ARGS: {}", args_to_str(&args));
         let args = self.check_call_args(func, &this, args)?;
-        self.push_call_frame(0)?;
+        self.push_call_frame(0, None)?;
         let result = (func.func)(this, args, self);
         match result {
             Ok(return_val) => {
@@ -634,28 +661,12 @@ impl VM {
     }
 
     pub fn call_func(&mut self, func: &Func, num_args: usize) -> RuntimeResult {
-        log::trace!("BEGIN: call {}", func.name());
-        let name = func.name();
-        let arity = func.arity();
-        let args_offset = if let Some(var_args_index) = func.var_args_index() {
-            if num_args < arity {
-                self.check_arity(name, arity, num_args, &None)?;
-            }
-            let objects = self.pop_n_obj(num_args - var_args_index)?;
-            let tuple = create::new_tuple(objects);
-            self.push_temp(tuple);
-            arity + 1
-        } else {
-            self.check_arity(name, arity, num_args, &None)?;
-            num_args
-        };
-        log::trace!("STACK BEFORE PUSHING FRAME:\n{}", self.format_stack());
-        self.push_call_frame(args_offset)?;
-        log::trace!("STACK AFTER PUSHING FRAME:\n{}", self.format_stack());
+        log::trace!("BEGIN: call {}\n{}", func.name(), self.format_stack());
+        let args_offset = self.check_func_args(func, num_args)?;
+        self.push_call_frame(args_offset, None)?;
         match self.execute(&func.code) {
             Ok(_) => {
                 self.pop_call_frame()?;
-                log::trace!("STACK AFTER POPPING FRAME:\n{}", self.format_stack());
                 Ok(())
             }
             Err(err) => {
@@ -673,9 +684,9 @@ impl VM {
         );
         let args = self.check_call_args(func, &None, args)?;
         self.enter_scope(0);
-        self.push_call_frame(0)?;
-        for (i, arg) in args.into_iter().enumerate() {
-            self.push_local(arg, i);
+        self.push_call_frame(0, None)?;
+        for arg in args {
+            self.push_temp(arg);
         }
         match self.execute(&func.code) {
             Ok(_) => {
@@ -690,12 +701,52 @@ impl VM {
         }
     }
 
-    pub fn call_closure(&mut self, closure: &Closure, args: Args) -> RuntimeResult {
-        let func_ref = closure.func.read().unwrap();
-        if let Some(func) = func_ref.down_to_func() {
-            self.call_func_direct(func, args)
+    pub fn call_closure(
+        &mut self,
+        closure_ref: ObjectRef,
+        num_args: usize,
+    ) -> RuntimeResult {
+        let closure = closure_ref.read().unwrap();
+        let closure = closure.down_to_closure().unwrap();
+        log::trace!("BEGIN: call closure {}", closure.name());
+        let func = closure.func.read().unwrap();
+        let func = func.down_to_func().unwrap();
+        let args_offset = self.check_func_args(func, num_args)?;
+        self.push_call_frame(args_offset, Some(closure_ref.clone()))?;
+        match self.execute(&func.code) {
+            Ok(_) => {
+                self.pop_call_frame()?;
+                Ok(())
+            }
+            Err(err) => {
+                self.reset();
+                Err(err)
+            }
+        }
+    }
+
+    /// Check args for function. These N args are sitting at the top of
+    /// the stack. This also handles mapping vars into a tuple. The
+    /// return value is the "args offset" which is used to adjust the
+    /// call frame pointer to account for args.
+    fn check_func_args(
+        &mut self,
+        func: &Func,
+        num_args: usize,
+    ) -> Result<usize, RuntimeErr> {
+        let name = func.name();
+        let arity = func.arity();
+        if let Some(var_args_index) = func.var_args_index() {
+            if num_args < arity {
+                self.check_arity(name, arity, num_args, &None)?;
+            }
+            let objects = self.pop_n_obj(num_args - var_args_index)?;
+            let tuple = create::new_tuple(objects);
+            self.push_temp(tuple);
+            Ok(arity + 1)
         } else {
-            Err(closure.not_callable())
+            self.check_arity(name, arity, num_args, &None)?;
+            Ok(num_args)
         }
     }
 
@@ -753,13 +804,17 @@ impl VM {
 
     // Call Stack ------------------------------------------------------
 
-    fn push_call_frame(&mut self, args_offset: usize) -> RuntimeResult {
+    fn push_call_frame(
+        &mut self,
+        args_offset: usize,
+        closure: Option<ObjectRef>,
+    ) -> RuntimeResult {
         if self.call_stack_size == self.max_call_depth {
             self.reset();
             return Err(RuntimeErr::recursion_depth_exceeded(self.max_call_depth));
         }
         let stack_position = self.value_stack.len() - args_offset;
-        let frame = CallFrame::new(stack_position);
+        let frame = CallFrame::new(stack_position, closure);
         self.call_stack.push(frame);
         self.call_stack_size += 1;
         self.call_frame_pointer = stack_position;
@@ -944,6 +999,18 @@ impl VM {
 
     pub fn peek_obj(&mut self) -> PeekObjResult {
         let kind = self.peek()?;
+        Ok(self.get_obj(kind))
+    }
+
+    fn peek_at(&self, index: usize) -> PeekResult {
+        match self.value_stack.peek_at(index) {
+            Some(kind) => Ok(kind),
+            None => Err(RuntimeErr::stack_index_out_of_bounds(index)),
+        }
+    }
+
+    fn peek_at_obj(&self, index: usize) -> PeekObjResult {
+        let kind = self.peek_at(index)?;
         Ok(self.get_obj(kind))
     }
 

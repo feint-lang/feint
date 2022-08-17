@@ -88,8 +88,8 @@ pub fn new_builtin_module(name: &str, ns: Namespace) -> Arc<RwLock<Module>> {
     Arc::new(RwLock::new(Module::new(name.into(), ns, Code::new())))
 }
 
-pub fn new_closure(func: ObjectRef, captured: Vec<usize>) -> ObjectRef {
-    Arc::new(RwLock::new(Closure::new(func, captured)))
+pub fn new_closure(func: ObjectRef, cells: Vec<ObjectRef>) -> ObjectRef {
+    Arc::new(RwLock::new(Closure::new(func, cells)))
 }
 
 pub fn new_float(value: f64) -> ObjectRef {

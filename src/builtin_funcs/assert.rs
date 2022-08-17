@@ -1,7 +1,11 @@
 use crate::types::{create, Args, CallResult, ObjectTrait, This};
 use crate::vm::{RuntimeErr, VM};
 
-/// Returns Nil
+/// Check condition and return error if false.
+///
+/// Args:
+///     condition: Bool
+///     message?: Any
 pub fn assert(_this: This, args: Args, _vm: &mut VM) -> CallResult {
     let arg = args.get(0).unwrap();
     let arg = arg.read().unwrap();

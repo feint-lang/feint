@@ -98,7 +98,7 @@ impl Compiler {
         func_addr: usize,
         // Pointer to scope in parent where function was defined. This
         // is needed so that we can start the search for cell vars in
-        // the correct scope in the parent and other upward visitors.
+        // the correct scope in the parent visitor.
         parent_scope_pointer: usize,
         name: String,
         node: ast::Func,
@@ -111,9 +111,20 @@ impl Compiler {
 
         log::trace!("BEGIN: resolving names in outer scopes");
 
-        let mut captured = vec![];
-        let mut presumed_globals = vec![];
+        // Cell vars in enclosing functions. These are discovered while
+        // processing the free vars of the current function (assuming
+        // it's an inner function).
         let mut cell_vars = vec![];
+
+        // Captured vars in current function. These are free vars in the
+        // current function that are defined in an enclosing function.
+        // Each entry contains: address of free var in current function,
+        // stack index where found, local index in enclosing function.
+        let mut captured: Vec<(usize, usize, usize)> = vec![];
+
+        // Names that weren't found in any enclosing function are
+        // presumed to be globals.
+        let mut presumed_globals = vec![];
 
         for (addr, name, start, end) in visitor.code.free_vars().iter() {
             log::trace!("RESOLVING {name}");
@@ -130,7 +141,7 @@ impl Compiler {
                     log::trace!("RESOLVED VAR AS CAPTURED: {name} @ {index} [{found_stack_index}]");
 
                     found = true;
-                    captured.push((*addr, index));
+                    captured.push((*addr, found_stack_index, index));
 
                     // Note all the STORE_LOCAL and TO_ARG instructions
                     // in the upward visitor (they'll be replaced
@@ -162,15 +173,18 @@ impl Compiler {
             }
         }
 
-        // Update STORE_LOCAL and TO_ARG instructions in ancestor
-        // visitors to store to both local (stack) and cell.
-        for (kind, found_stack_index, addr, index, name) in cell_vars {
+        // Update STORE_LOCAL instructions in ancestor visitors to store
+        // to both local (stack) and cell.
+        for (cell_index, (kind, found_stack_index, addr, local_index, name)) in
+            cell_vars.into_iter().enumerate()
+        {
             let up_visitor = &mut stack[found_stack_index].0;
             up_visitor.code.add_cell_var(name);
             if kind == "L" {
-                up_visitor.replace(addr, Inst::StoreLocalAndCell(index));
+                up_visitor
+                    .replace(addr, Inst::StoreLocalAndCell(local_index, cell_index));
             } else if kind == "A" {
-                up_visitor.replace(addr, Inst::ToArgAndCell(index));
+                up_visitor.replace(addr, Inst::ToArgAndCell(local_index, cell_index));
             } else {
                 panic!("Unexpected cell var type: {kind}");
             }
@@ -178,8 +192,8 @@ impl Compiler {
 
         // Update placeholder instructions in current visitor/function
         // to load from cell.
-        for (addr, index) in captured.iter() {
-            visitor.code.replace_inst(*addr, Inst::LoadCell(*index));
+        for (i, (addr, ..)) in captured.iter().enumerate() {
+            visitor.replace(*addr, Inst::LoadCell(i));
         }
 
         // Resolve globals.
@@ -216,12 +230,16 @@ impl Compiler {
         let parent_code = &mut parent_visitor.code;
         let const_index = parent_code.add_const(func);
 
-        // if captured.is_empty() {
-        parent_visitor.replace(func_addr, Inst::LoadConst(const_index));
-        // } else {
-        //     parent_visitor
-        //         .replace(func_addr, Inst::MakeClosure(const_index, captured.len()));
-        // }
+        if captured.is_empty() {
+            parent_visitor.replace(func_addr, Inst::LoadConst(const_index));
+        } else {
+            let cell_info = captured
+                .iter()
+                .map(|(_, stack_index, local_index)| (*stack_index, *local_index))
+                .collect();
+            parent_visitor
+                .replace(func_addr, Inst::MakeClosure(const_index, cell_info));
+        }
 
         Ok(())
     }
@@ -321,7 +339,6 @@ impl Visitor {
         }
 
         let return_addr = self.len();
-        // self.push(Inst::DisplayStack("before return".to_owned()));
         self.push(Inst::Return);
 
         // Update jump targets for labels.

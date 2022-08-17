@@ -35,10 +35,14 @@ pub enum Inst {
     // from slot lower in stack and push it onto TOS.
     LoadLocal(usize),
 
-    StoreLocalAndCell(usize),
+    StoreLocalAndCell(usize, usize), // local index, cell index
 
     // Load a captured var from the "heap" to TOS.
     LoadCell(usize),
+
+    // Convert arg at offset from TOS to local for use as call arg.
+    ToArg(usize),
+    ToArgAndCell(usize, usize),
 
     DeclareVar(String),
     AssignVar(String),
@@ -72,10 +76,6 @@ pub enum Inst {
     CompareOp(CompareOperator),
     InplaceOp(InplaceOperator),
 
-    // Convert arg at offset from TOS to local for use as call arg.
-    ToArg(usize),
-    ToArgAndCell(usize),
-
     // Call function with N values from top of stack. The args are
     // ordered such that the 1st arg is at TOS and other args are below
     // it.
@@ -90,8 +90,11 @@ pub enum Inst {
     MakeList(usize),
     MakeMap(usize),
 
-    // Make function closure for constant.
-    MakeClosure(usize, usize), // constant index, capture count
+    // Make closure wrapping function.
+    MakeClosure(
+        usize,               // constant index of wrapped function
+        Vec<(usize, usize)>, // (relative call stack index, local index within frame)+
+    ),
 
     LoadModule(String),
 

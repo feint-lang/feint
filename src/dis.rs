@@ -85,8 +85,16 @@ impl Disassembler {
             }
             StoreLocal(index) => self.align("STORE_LOCAL", index),
             LoadLocal(index) => self.align("LOAD_LOCAL", index),
-            StoreLocalAndCell(index) => self.align("STORE_LOCAL_AND_CELL", index),
+            StoreLocalAndCell(local_index, cell_index) => self.align(
+                "STORE_LOCAL_AND_CELL",
+                format!("local index = {local_index} cell index = {cell_index}"),
+            ),
             LoadCell(index) => self.align("LOAD_CELL", index),
+            ToArg(index) => self.align("TO_ARG", index),
+            ToArgAndCell(local_index, cell_index) => self.align(
+                "TO_ARG_AND_CELL",
+                format!("local index = {local_index} cell index = {cell_index}"),
+            ),
             DeclareVar(name) => self.align("DECLARE_VAR", name),
             AssignVar(name) => self.align("ASSIGN_VAR", name),
             LoadVar(name) => self.align("LOAD_VAR", name),
@@ -102,20 +110,18 @@ impl Disassembler {
             BinaryOp(op) => self.align("BINARY_OP", op),
             CompareOp(op) => self.align("COMPARE_OP", op),
             InplaceOp(op) => self.align("INPLACE_OP", op),
-            ToArg(index) => self.align("TO_ARG", index),
-            ToArgAndCell(index) => self.align("TO_ARG_AND_CELL", index),
             Call(num_args) => self.align("CALL", num_args),
             Return => self.align("RETURN", ""),
             MakeString(n) => self.align("MAKE_STRING", n),
             MakeTuple(n) => self.align("MAKE_TUPLE", n),
             MakeList(n) => self.align("MAKE_LIST", n),
             MakeMap(n) => self.align("MAKE_MAP", n),
-            MakeClosure(index, count) => {
+            MakeClosure(index, cell_info) => {
                 let func = match code.get_const(*index) {
                     Ok(obj) => obj.read().unwrap().to_string(),
                     Err(err) => err.to_string(),
                 };
-                self.align("MAKE_CLOSURE", format!("{func} ({count} captured)"))
+                self.align("MAKE_CLOSURE", format!("{func} : {cell_info:?}"))
             }
             LoadModule(name) => self.align("IMPORT", name),
             Halt(code) => self.align("HALT", code),

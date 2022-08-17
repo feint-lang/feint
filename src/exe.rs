@@ -368,7 +368,7 @@ impl<'a> Executor<'a> {
         let message = match &err.kind {
             AssertionFailed(message) => {
                 if message.is_empty() {
-                    format!("Assertion failed")
+                    "Assertion failed".to_string()
                 } else {
                     format!("Assertion failed with message: {message}")
                 }

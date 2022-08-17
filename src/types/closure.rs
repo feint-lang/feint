@@ -2,16 +2,14 @@ use std::any::Any;
 use std::fmt;
 use std::sync::{Arc, RwLock};
 
+use crate::types::Params;
 use once_cell::sync::Lazy;
 
-use crate::vm::{RuntimeResult, VM};
-
 use super::create;
-use super::result::Args;
-use super::util::args_to_str;
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
 use super::class::TYPE_TYPE;
+use super::func_trait::FuncTrait;
 use super::ns::Namespace;
 
 // Closure Type --------------------------------------------------------
@@ -74,16 +72,36 @@ impl ObjectTrait for ClosureType {
 
 pub struct Closure {
     namespace: Namespace,
+    name: String,
+    params: Params,
     pub func: ObjectRef,
-    pub captured: Vec<usize>,
+    pub cells: RwLock<Vec<ObjectRef>>,
 }
 
 unsafe impl Send for Closure {}
 unsafe impl Sync for Closure {}
 
 impl Closure {
-    pub fn new(func_ref: ObjectRef, captured: Vec<usize>) -> Self {
-        Self { namespace: Namespace::new(), func: func_ref, captured }
+    pub fn new(func_ref: ObjectRef, cells: Vec<ObjectRef>) -> Self {
+        let func = func_ref.read().unwrap();
+        let func = func.down_to_func().unwrap();
+        Self {
+            namespace: Namespace::new(),
+            name: func.name().to_owned(),
+            params: func.params().clone(),
+            func: func_ref.clone(),
+            cells: RwLock::new(cells),
+        }
+    }
+}
+
+impl FuncTrait for Closure {
+    fn name(&self) -> &str {
+        self.name.as_str()
+    }
+
+    fn params(&self) -> &Params {
+        &self.params
     }
 }
 
@@ -104,11 +122,11 @@ impl ObjectTrait for Closure {
         &self.namespace
     }
 
-    fn call(&self, args: Args, vm: &mut VM) -> RuntimeResult {
-        log::trace!("BEGIN: call closure {self}");
-        log::trace!("ARGS: {}", args_to_str(&args));
-        vm.call_closure(self, args)
-    }
+    // fn call(&self, args: Args, vm: &mut VM) -> RuntimeResult {
+    //     log::trace!("BEGIN: call closure {self}");
+    //     log::trace!("ARGS: {}", args_to_str(&args));
+    //     vm.call_closure(self, args)
+    // }
 }
 
 // Display -------------------------------------------------------------
