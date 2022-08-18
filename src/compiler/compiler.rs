@@ -31,8 +31,6 @@ impl Compiler {
         argv: Vec<&str>,
         keep_top_on_halt: bool,
     ) -> CompResult {
-        log::trace!("BEGIN: compile script");
-
         let mut visitor = Visitor::for_module("$main");
 
         if program.statements.is_empty() {
@@ -49,7 +47,6 @@ impl Compiler {
 
         // Global Functions --------------------------------------------
 
-        log::trace!("BEGIN: compiling global functions");
         let mut has_main = false;
         let func_nodes = visitor.func_nodes.to_vec();
         self.visitor_stack.push((visitor, 0));
@@ -59,13 +56,7 @@ impl Compiler {
             }
             self.compile_func(addr, scope_tree_pointer, name, node)?;
         }
-        assert_eq!(
-            1,
-            self.visitor_stack.len(),
-            "Visitor stack should contain only the global visitor"
-        );
-        let (mut visitor, _) = self.visitor_stack.pop().unwrap();
-        log::trace!("END: compiling global functions");
+        let mut visitor = self.visitor_stack.pop().unwrap().0;
 
         // END Global Functions ----------------------------------------
 
@@ -84,7 +75,6 @@ impl Compiler {
             visitor.push(Inst::Halt(0));
         }
 
-        log::trace!("END: compile module");
         Ok(visitor.code)
     }
 
@@ -215,16 +205,21 @@ impl Compiler {
             // found, add a local var and note that it's a cell var.
             let next_stack_index = found_stack_index + 1;
             if next_stack_index < stack.len() {
+                let mut local_index = *local_index;
                 for i in next_stack_index..stack.len() {
                     let up_visitor = &mut stack[i].0;
                     let index = up_visitor.scope_tree.add_local(name, true);
                     up_visitor.code.add_cell_var(name, index);
+                    local_index = index;
                 }
+                cell_indexes.push(local_index);
+            } else {
+                cell_indexes.push(*local_index);
             }
         }
 
         // Resolve globals.
-        let (global_visitor, _) = &stack[0];
+        let global_visitor = &stack[0].0;
         for (addr, name, start, end) in presumed_globals.into_iter() {
             if global_visitor.scope_tree.has_global(name.as_str()) {
                 log::trace!("RESOLVED VAR AS GLOBAL: {name}");
@@ -238,16 +233,12 @@ impl Compiler {
 
         // Inner Functions ---------------------------------------------
 
-        log::trace!("BEGIN: compiling inner functions");
         let func_nodes = visitor.func_nodes.to_vec();
         self.visitor_stack.push((visitor, parent_scope_pointer));
-        let start_len = self.visitor_stack.len();
         for (addr, scope_tree_pointer, name, node) in func_nodes {
             self.compile_func(addr, scope_tree_pointer, name, node)?;
         }
-        assert_eq!(start_len, self.visitor_stack.len());
-        let (visitor, _) = self.visitor_stack.pop().unwrap();
-        log::trace!("END: compiling inner functions");
+        let visitor = self.visitor_stack.pop().unwrap().0;
 
         // END Inner Functions -----------------------------------------
 
@@ -258,20 +249,9 @@ impl Compiler {
             visitor.scope_tree.num_locals(),
         );
 
-        let stack_len = self.visitor_stack.len();
-        log::trace!("V STACK LEN: {stack_len}");
-        let (parent_visitor, _) = self.visitor_stack.peek_mut().unwrap();
-        let parent_code = &mut parent_visitor.code;
-        let const_index = parent_code.add_const(func);
-
-        let cell_info = captured
-            .iter()
-            .map(|(_, stack_index, local_index, _)| {
-                (stack_len - stack_index, *local_index)
-            })
-            .collect();
-
-        parent_visitor.replace(func_addr, Inst::MakeClosure(const_index, cell_info));
+        let parent_visitor = &mut self.visitor_stack.peek_mut().unwrap().0;
+        let const_index = parent_visitor.add_const(func);
+        parent_visitor.replace(func_addr, Inst::MakeClosure(const_index, cell_indexes));
 
         Ok(())
     }
@@ -335,6 +315,10 @@ impl Visitor {
             .last()
             .expect("Block for function contains no statements");
         let return_nil = !matches!(last_statement.kind, ast::StatementKind::Expr(_));
+
+        // Add local slot for this.
+        // TODO: Rethink this handling.
+        self.scope_tree.add_local("this", true);
 
         // Add local slots for function parameters.
         // NOTE: Upon entry, the args will be at TOS.

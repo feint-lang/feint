@@ -12,7 +12,6 @@ pub(crate) use func_trait::FuncTrait;
 
 pub(crate) mod create;
 pub(crate) use result::{Args, CallResult, Params, This};
-pub(crate) use util::{args_to_str, this_to_str};
 
 mod base;
 mod func_trait;

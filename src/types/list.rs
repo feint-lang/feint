@@ -99,11 +99,14 @@ impl ListType {
                     |this: ObjectRef, args: Args, vm: &mut VM| {
                         let this = use_this!(this);
                         let this = this.down_to_list().unwrap();
-                        let map_fn = use_arg!(args, 0);
                         let items = this.items.read().unwrap();
+                        let map_fn = &args[0];
                         let mut results = vec![];
                         for (i, item) in items.iter().enumerate() {
-                            map_fn.call(vec![item.clone(), create::new_int(i)], vm)?;
+                            vm.call(
+                                map_fn.clone(),
+                                vec![item.clone(), create::new_int(i)],
+                            )?;
                             results.push(vm.pop_obj()?);
                         }
                         Ok(create::new_tuple(results))

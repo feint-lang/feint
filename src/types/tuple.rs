@@ -8,7 +8,7 @@ use once_cell::sync::Lazy;
 use crate::vm::{RuntimeErr, VM};
 
 use super::create;
-use super::meth::{make_meth, use_arg, use_this};
+use super::meth::{make_meth, use_this};
 use super::result::{Args, GetAttrResult, This};
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
@@ -49,11 +49,14 @@ impl TupleType {
                     |this: ObjectRef, args: Args, vm: &mut VM| {
                         let this = use_this!(this);
                         let this = this.down_to_tuple().unwrap();
-                        let map_fn = use_arg!(args, 0);
                         let items = &this.items;
+                        let map_fn = &args[0];
                         let mut results = vec![];
                         for (i, item) in items.iter().enumerate() {
-                            map_fn.call(vec![item.clone(), create::new_int(i)], vm)?;
+                            vm.call(
+                                map_fn.clone(),
+                                vec![item.clone(), create::new_int(i)],
+                            )?;
                             results.push(vm.pop_obj()?);
                         }
                         Ok(create::new_tuple(results))

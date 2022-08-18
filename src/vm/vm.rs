@@ -11,10 +11,7 @@ use ctrlc;
 use num_traits::ToPrimitive;
 
 use crate::modules;
-use crate::types::{
-    args_to_str, create, this_to_str, Args, BuiltinFunc, Func, FuncTrait, ObjectRef,
-    ObjectTrait, This,
-};
+use crate::types::{create, Args, BuiltinFunc, Func, FuncTrait, ObjectRef, This};
 use crate::util::{
     BinaryOperator, CompareOperator, InplaceOperator, Location, Stack,
     UnaryCompareOperator, UnaryOperator,
@@ -34,12 +31,13 @@ pub const DEFAULT_MAX_CALL_DEPTH: CallDepth =
 
 struct CallFrame {
     stack_pointer: usize,
+    this: This,
     closure: Option<ObjectRef>,
 }
 
 impl CallFrame {
-    pub fn new(stack_pointer: usize, closure: Option<ObjectRef>) -> Self {
-        Self { stack_pointer, closure }
+    pub fn new(stack_pointer: usize, this: This, closure: Option<ObjectRef>) -> Self {
+        Self { stack_pointer, this, closure }
     }
 
     pub fn get_cell(&self, index: usize) -> RuntimeObjResult {
@@ -269,8 +267,10 @@ impl VM {
                     self.handle_inplace_op(op)?;
                 }
                 // Functions
-                Call(n) => {
-                    self.handle_call(*n)?;
+                Call(num_args) => {
+                    let callable = self.pop_obj()?;
+                    let args = self.pop_n_obj(*num_args)?;
+                    self.call(callable, args)?;
                 }
                 Return => {
                     // self.exit_scope();
@@ -315,7 +315,7 @@ impl VM {
                     self.push_temp(map);
                 }
                 // A closure is created in its parent's frame.
-                MakeClosure(func_const_index, cell_info) => {
+                MakeClosure(func_const_index, cell_indexes) => {
                     let func = code.get_const(*func_const_index)?.clone();
                     let mut cells = vec![];
 
@@ -327,18 +327,9 @@ impl VM {
                     );
                     drop(f);
 
-                    for (call_stack_index, local_index) in cell_info {
-                        let call_frame_index = self.call_stack.len() - call_stack_index;
-
-                        log::trace!(
-                            "call_stack_index = {call_stack_index} \
-                            call_frame_index = {call_frame_index}"
-                        );
-
-                        let frame = self
-                            .call_stack
-                            .peek_at(call_frame_index - 1)
-                            .expect("Expected call frame at {call_frame_index}");
+                    for local_index in cell_indexes {
+                        let frame =
+                            self.call_stack.peek().expect("Expected call frame");
 
                         let index = frame.stack_pointer + local_index;
                         let cell_ref = self.peek_at_obj(index)?;
@@ -527,7 +518,7 @@ impl VM {
                 };
                 let bind = {
                     let obj = obj_ref.read().unwrap();
-                    obj.is_builtin_func() || obj.is_func()
+                    obj.is_builtin_func() || obj.is_func() || obj.is_closure()
                 };
                 if bind {
                     // If `b` in `a.b` is a function, bind `b` to `a`.
@@ -597,170 +588,20 @@ impl VM {
         Ok(())
     }
 
-    fn handle_call(&mut self, num_args: usize) -> RuntimeResult {
-        let callable_ref = self.pop_obj()?;
-        let callable = callable_ref.read().unwrap();
-        log::trace!("HANDLE CALL: callable = {:?}", &*callable);
-        let args = self.pop_n_obj(num_args)?;
-        if let Some(func) = callable.down_to_builtin_func() {
-            self.call_builtin_func(func, None, args)
-        } else if let Some(func) = callable.down_to_func() {
-            log::trace!("CALL FUNC: {}\n{}", func.name(), self.format_stack());
-            self.call_func(func, args, None)
-        } else if let Some(closure) = callable.down_to_closure() {
-            log::trace!("CALL CLOSURE: {}\n{}", closure.name(), self.format_stack());
-            self.call_closure(callable_ref.clone(), args)
-        } else if let Some(func) = callable.down_to_bound_func() {
-            func.call(args, self)
-        } else {
-            Err(callable.not_callable())
-        }
-    }
-
-    pub fn call_builtin_func(
-        &mut self,
-        func: &BuiltinFunc,
-        this: This,
-        args: Args,
-    ) -> RuntimeResult {
-        log::trace!("BEGIN: call {} with this: {}", func.name(), this_to_str(&this));
-        log::trace!("ARGS: {}", args_to_str(&args));
-        let args = self.check_call_args(func, &this, args)?;
-        self.push_call_frame(None)?;
-        let result = (func.func)(this, args, self);
-        match result {
-            Ok(return_val) => {
-                self.push_return_val(return_val);
-                self.pop_call_frame()?;
-                Ok(())
-            }
-            Err(err) => {
-                self.reset();
-                Err(err)
-            }
-        }
-    }
-
-    pub fn call_func(
-        &mut self,
-        func: &Func,
-        args: Args,
-        closure: Option<ObjectRef>,
-    ) -> RuntimeResult {
-        log::trace!("BEGIN: call {}\n{}", func.name(), self.format_stack());
-        let args = self.check_call_args(func, &None, args)?;
-        let num_locals = func.num_locals;
-        let num_args = args.len();
-        self.push_call_frame(closure)?;
-
-        for (index, arg) in args.into_iter().enumerate() {
-            if func.is_cell_var(index) {
-                log::trace!("ARG IS CELL: {index}");
-                let cell = create::new_cell_with_value(arg);
-                self.push_local(cell, index);
-            } else {
-                log::trace!("ARG IS NOT CELL: {index}");
-                self.push_local(arg, index);
-            }
-        }
-
-        for index in num_args..num_locals {
-            if func.is_cell_var(index) {
-                log::trace!("LOCAL IS CELL: {index}");
-                self.push_local(create::new_cell(), index);
-            } else {
-                log::trace!("LOCAL IS NOT CELL: {index}");
-                self.push_local(create::new_nil(), index);
-            }
-        }
-
-        match self.execute(&func.code) {
-            Ok(_) => {
-                self.pop_call_frame()?;
-                Ok(())
-            }
-            Err(err) => {
-                self.reset();
-                Err(err)
-            }
-        }
-    }
-
-    pub fn call_closure(
-        &mut self,
-        closure_ref: ObjectRef,
-        args: Args,
-    ) -> RuntimeResult {
-        log::trace!("BEGIN: call closure");
-        let closure = closure_ref.read().unwrap();
-        let closure = closure.down_to_closure().unwrap();
-        let func = closure.func.read().unwrap();
-        let func = func.down_to_func().unwrap();
-        self.call_func(func, args, Some(closure_ref.clone()))
-    }
-
-    /// Check call args to ensure they're valid. This ensures the
-    /// function was called with the required number args and also takes
-    /// care of mapping var args into a tuple in the last position.
-    fn check_call_args(
-        &self,
-        func: &dyn FuncTrait,
-        this: &This,
-        args: Args,
-    ) -> Result<Args, RuntimeErr> {
-        let name = func.name();
-        let arity = func.arity();
-        if let Some(var_args_index) = func.var_args_index() {
-            let n_args = args.iter().take(var_args_index).len();
-            self.check_arity(name, arity, n_args, this)?;
-            let mut args = args.clone();
-            let var_args_items = args.split_off(var_args_index);
-            let var_args = create::new_tuple(var_args_items);
-            args.push(var_args);
-            Ok(args)
-        } else {
-            self.check_arity(name, arity, args.len(), this)?;
-            Ok(args)
-        }
-    }
-
-    fn check_arity(
-        &self,
-        name: &str,
-        arity: usize,
-        n_args: usize,
-        this: &This,
-    ) -> RuntimeResult {
-        if n_args != arity {
-            let ess = if arity == 1 { "" } else { "s" };
-            let msg = format!(
-                "{}{}() expected {arity} arg{ess}; got {n_args}",
-                this.clone().map_or_else(
-                    || "".to_owned(),
-                    |this| {
-                        let this = this.read().unwrap();
-                        let class = this.class();
-                        let class = class.read().unwrap();
-                        format!("{}.", class.name())
-                    }
-                ),
-                name
-            );
-            return Err(RuntimeErr::type_err(msg));
-        }
-        Ok(())
-    }
-
     // Call Stack ------------------------------------------------------
 
     // NOTE: Pushing a call frame is similar to entering a scope.
-    fn push_call_frame(&mut self, closure: Option<ObjectRef>) -> RuntimeResult {
+    fn push_call_frame(
+        &mut self,
+        this: This,
+        closure: Option<ObjectRef>,
+    ) -> RuntimeResult {
         if self.call_stack.len() == self.max_call_depth {
             self.reset();
             return Err(RuntimeErr::recursion_depth_exceeded(self.max_call_depth));
         }
         let stack_pointer = self.value_stack.len();
-        let frame = CallFrame::new(stack_pointer, closure);
+        let frame = CallFrame::new(stack_pointer, this, closure);
         self.call_stack.push(frame);
         Ok(())
     }
@@ -793,6 +634,182 @@ impl VM {
         } else {
             self.call_stack[self.call_stack.len() - 1].stack_pointer
         }
+    }
+
+    /// Look up call chain for `this`.
+    fn find_this(&self) -> ObjectRef {
+        for frame in self.call_stack.iter().rev() {
+            if let Some(this) = &frame.this {
+                return this.clone();
+            }
+        }
+        create::new_nil()
+    }
+
+    // Function calls --------------------------------------------------
+
+    pub fn call(&mut self, callable_ref: ObjectRef, args: Args) -> RuntimeResult {
+        let callable = callable_ref.read().unwrap();
+        if let Some(func) = callable.down_to_builtin_func() {
+            self.call_builtin_func(func, None, args)
+        } else if let Some(func) = callable.down_to_func() {
+            self.call_func(func, None, args, None)
+        } else if callable.is_closure() {
+            self.call_closure(callable_ref.clone(), None, args)
+        } else if let Some(bound_func) = callable.down_to_bound_func() {
+            let func_ref = bound_func.func.clone();
+            let func_obj = func_ref.read().unwrap();
+            let this = Some(bound_func.this.clone());
+            if let Some(func) = func_obj.down_to_builtin_func() {
+                self.call_builtin_func(func, this, args)
+            } else if let Some(func) = func_obj.down_to_func() {
+                self.call_func(func, this, args, None)
+            } else if callable.is_closure() {
+                self.call_closure(func_ref.clone(), this, args)
+            } else {
+                Err(func_obj.not_callable())
+            }
+        } else {
+            Err(callable.not_callable())
+        }
+    }
+
+    fn call_builtin_func(
+        &mut self,
+        func: &BuiltinFunc,
+        this: This,
+        args: Args,
+    ) -> RuntimeResult {
+        let args = self.check_call_args(func, &this, args)?;
+        self.push_call_frame(this.clone(), None)?;
+        let result = (func.func)(this, args, self);
+        match result {
+            Ok(return_val) => {
+                self.push_return_val(return_val);
+                self.pop_call_frame()?;
+                Ok(())
+            }
+            Err(err) => {
+                self.reset();
+                Err(err)
+            }
+        }
+    }
+
+    pub fn call_func(
+        &mut self,
+        func: &Func,
+        this: This,
+        args: Args,
+        closure: Option<ObjectRef>,
+    ) -> RuntimeResult {
+        log::trace!("BEGIN: call {}\n{}", func.name(), self.format_stack());
+        let args = self.check_call_args(func, &None, args)?;
+        let num_locals = func.num_locals;
+        let num_args = args.len();
+
+        self.push_call_frame(this, closure)?;
+
+        let mut local_index = 0;
+        self.push_local(self.find_this(), local_index);
+
+        for arg in args.into_iter() {
+            local_index += 1;
+            if func.is_cell_var(local_index) {
+                log::trace!("ARG IS CELL: {local_index}");
+                let cell = create::new_cell_with_value(arg);
+                self.push_local(cell, local_index);
+            } else {
+                log::trace!("ARG IS NOT CELL: {local_index}");
+                self.push_local(arg, local_index);
+            }
+        }
+
+        for _ in num_args..num_locals {
+            local_index += 1;
+            if func.is_cell_var(local_index) {
+                log::trace!("LOCAL IS CELL: {local_index}");
+                self.push_local(create::new_cell(), local_index);
+            } else {
+                log::trace!("LOCAL IS NOT CELL: {local_index}");
+                self.push_local(create::new_nil(), local_index);
+            }
+        }
+
+        match self.execute(&func.code) {
+            Ok(_) => {
+                self.pop_call_frame()?;
+                Ok(())
+            }
+            Err(err) => {
+                self.reset();
+                Err(err)
+            }
+        }
+    }
+
+    pub fn call_closure(
+        &mut self,
+        closure_ref: ObjectRef,
+        this: This,
+        args: Args,
+    ) -> RuntimeResult {
+        log::trace!("BEGIN: call closure");
+        let closure = closure_ref.read().unwrap();
+        let closure = closure.down_to_closure().unwrap();
+        let func = closure.func.read().unwrap();
+        let func = func.down_to_func().unwrap();
+        self.call_func(func, this, args, Some(closure_ref.clone()))
+    }
+
+    /// Check call args to ensure they're valid. This ensures the
+    /// function was called with the required number args and also takes
+    /// care of mapping var args into a tuple in the last position.
+    fn check_call_args(
+        &self,
+        func: &dyn FuncTrait,
+        this: &This,
+        args: Args,
+    ) -> Result<Args, RuntimeErr> {
+        let name = func.name();
+        let arity = func.arity();
+        if let Some(var_args_index) = func.var_args_index() {
+            let n_args = args.iter().take(var_args_index).len();
+            self.check_arity(name, arity, n_args, this)?;
+            let mut args = args.clone();
+            let var_args_items = args.split_off(var_args_index);
+            let var_args = create::new_tuple(var_args_items);
+            args.push(var_args);
+            Ok(args)
+        } else {
+            self.check_arity(name, arity, args.len(), this)?;
+            Ok(args)
+        }
+    }
+
+    fn check_arity(
+        &self,
+        name: &str,
+        arity: usize,
+        num_args: usize,
+        this: &This,
+    ) -> RuntimeResult {
+        if num_args != arity {
+            let ess = if arity == 1 { "" } else { "s" };
+            let msg = format!(
+                "{}{}() expected {arity} arg{ess}; got {num_args}",
+                this.clone().map_or_else(
+                    || "".to_owned(),
+                    |this_ref| {
+                        let this_obj = this_ref.read().unwrap();
+                        format!("{}.", this_obj.class().read().unwrap().full_name())
+                    }
+                ),
+                name
+            );
+            return Err(RuntimeErr::type_err(msg));
+        }
+        Ok(())
     }
 
     // Scopes ----------------------------------------------------------

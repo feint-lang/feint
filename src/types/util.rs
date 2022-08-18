@@ -1,26 +1,8 @@
 use num_bigint::BigInt;
 use num_traits::{FromPrimitive, ToPrimitive};
 
-use super::create;
-use super::result::{Args, This};
-
 use super::float::Float;
 use super::int::Int;
-
-/// Given an option `this` object, return a string representation.
-pub fn this_to_str(this: &This) -> String {
-    let t = this.clone().unwrap_or_else(create::new_nil);
-    let t = t.read().unwrap();
-    format!("{t} {}", t.class().read().unwrap())
-}
-
-/// Given a list of args (`ObjectRef`s), return a string joining them
-/// together into a comma separated string surround by parens.
-pub fn args_to_str(args: &Args) -> String {
-    let strings: Vec<String> =
-        args.iter().map(|item| format!("{:?}", &*item.read().unwrap())).collect();
-    format!("({})", strings.join(", "))
-}
 
 /// Compare Int and Float for equality.
 pub fn eq_int_float(int: &Int, float: &Float) -> bool {

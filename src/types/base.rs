@@ -7,11 +7,10 @@ use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 
 use crate::modules;
-use crate::vm::{RuntimeBoolResult, RuntimeErr, RuntimeObjResult, RuntimeResult, VM};
+use crate::vm::{RuntimeBoolResult, RuntimeErr, RuntimeObjResult};
 
 use super::create;
-use super::result::{Args, GetAttrResult, SetAttrResult};
-use super::util::args_to_str;
+use super::result::{GetAttrResult, SetAttrResult};
 
 use super::bool::{Bool, BoolType};
 use super::bound_func::{BoundFunc, BoundFuncType};
@@ -60,7 +59,7 @@ pub trait TypeTrait {
 
 // Object Trait --------------------------------------------------------
 
-/// Create associated function to check is object ref a specific impl
+/// Create associated function to check is object ref is a specific impl
 /// type.
 macro_rules! make_type_checker {
     ( $func:ident, $ty:ty) => {
@@ -351,15 +350,6 @@ pub trait ObjectTrait {
     make_bin_op!(sub, "-", RuntimeObjResult);
 
     // Call ------------------------------------------------------------
-
-    // This is here so that functions can be called directly, in
-    // particular so that user functions can be called from builtin
-    // functions.
-    fn call(&self, args: Args, _vm: &mut VM) -> RuntimeResult {
-        log::trace!("BEGIN: base call");
-        log::trace!("ARGS: {}", args_to_str(&args));
-        Err(self.not_callable())
-    }
 
     fn not_callable(&self) -> RuntimeErr {
         RuntimeErr::not_callable(self.class().read().unwrap().full_name())

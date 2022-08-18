@@ -88,8 +88,8 @@ pub enum Inst {
 
     // Make closure wrapping function.
     MakeClosure(
-        usize,               // constant index of wrapped function
-        Vec<(usize, usize)>, // (relative call stack index, local index within frame)+
+        usize,      // constant index of wrapped function
+        Vec<usize>, // local/cell var indexes within parent frame
     ),
 
     LoadModule(String),

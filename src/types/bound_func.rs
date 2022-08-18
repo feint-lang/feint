@@ -4,11 +4,7 @@ use std::sync::{Arc, RwLock};
 
 use once_cell::sync::Lazy;
 
-use crate::vm::{RuntimeResult, VM};
-
 use super::create;
-use super::result::Args;
-use super::util::{args_to_str, this_to_str};
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
 use super::class::TYPE_TYPE;
@@ -110,26 +106,6 @@ impl ObjectTrait for BoundFunc {
 
     fn namespace(&self) -> &Namespace {
         &self.namespace
-    }
-
-    fn call(&self, args: Args, vm: &mut VM) -> RuntimeResult {
-        log::trace!("BEGIN: call bound function");
-        log::trace!("THIS: {}", this_to_str(&Some(self.this.clone())));
-        log::trace!("ARGS: {}", args_to_str(&args));
-        let func_ref = self.func.read().unwrap();
-        if let Some(func) = func_ref.down_to_builtin_func() {
-            log::trace!("BOUND: {func}");
-            let this = Some(self.this.clone());
-            vm.call_builtin_func(func, this, args)
-        } else if let Some(func) = func_ref.down_to_func() {
-            log::trace!("BOUND: {func}");
-            func.call(args, vm)
-        } else if let Some(func) = func_ref.down_to_closure() {
-            log::trace!("BOUND: {func}");
-            func.call(args, vm)
-        } else {
-            Err(self.not_callable())
-        }
     }
 }
 
