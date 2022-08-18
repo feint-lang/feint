@@ -54,6 +54,9 @@ impl ObjectTrait for MapType {
         self
     }
 
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
     fn class(&self) -> TypeRef {
         TYPE_TYPE.clone()
     }
@@ -104,6 +107,9 @@ impl ObjectTrait for Map {
         self
     }
 
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
     fn class(&self) -> TypeRef {
         MAP_TYPE.clone()
     }

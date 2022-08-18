@@ -19,8 +19,7 @@ pub enum Inst {
     LoadTrue,  // 1
     LoadFalse, // 2
 
-    FuncScopeStart(usize),
-    ScopeStart,
+    ScopeStart(usize), // number of top-level locals in scope
     ScopeEnd,
 
     StatementStart(Location, Location),
@@ -35,14 +34,11 @@ pub enum Inst {
     // from slot lower in stack and push it onto TOS.
     LoadLocal(usize),
 
-    StoreLocalAndCell(usize, usize), // local index, cell index
+    // Store value from TOS into cell.
+    StoreCell(usize),
 
-    // Load a captured var from the "heap" to TOS.
+    // Load value from cell to TOS.
     LoadCell(usize),
-
-    // Convert arg at offset from TOS to local for use as call arg.
-    ToArg(usize),
-    ToArgAndCell(usize, usize),
 
     DeclareVar(String),
     AssignVar(String),
@@ -99,6 +95,7 @@ pub enum Inst {
     LoadModule(String),
 
     Placeholder(usize, Box<Inst>, String), // address, instruction, error message
+    ScopeStartPlaceholder(usize),          // address, number of locals
     VarPlaceholder(usize, String),         // address, var name
     BreakPlaceholder(usize, usize),        // jump address, scope depth
     ContinuePlaceholder(usize, usize),     // jump address, scope depth

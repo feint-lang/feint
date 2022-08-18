@@ -55,6 +55,9 @@ impl ObjectTrait for ClosureType {
         self
     }
 
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
     fn class(&self) -> TypeRef {
         TYPE_TYPE.clone()
     }
@@ -75,7 +78,7 @@ pub struct Closure {
     name: String,
     params: Params,
     pub func: ObjectRef,
-    pub cells: RwLock<Vec<ObjectRef>>,
+    pub cells: Vec<ObjectRef>,
 }
 
 unsafe impl Send for Closure {}
@@ -90,7 +93,7 @@ impl Closure {
             name: func.name().to_owned(),
             params: func.params().clone(),
             func: func_ref.clone(),
-            cells: RwLock::new(cells),
+            cells,
         }
     }
 }
@@ -110,6 +113,9 @@ impl ObjectTrait for Closure {
         self
     }
 
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
     fn class(&self) -> TypeRef {
         CLOSURE_TYPE.clone()
     }

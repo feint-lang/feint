@@ -7,7 +7,6 @@ use std::sync::{Arc, RwLock};
 use num_bigint::BigInt;
 use num_traits::{FromPrimitive, Num, Signed, ToPrimitive, Zero};
 
-use crate::types::map::Map;
 use once_cell::sync::Lazy;
 
 use crate::vm::Code;
@@ -16,12 +15,14 @@ use super::base::ObjectRef;
 use super::bool::Bool;
 use super::bound_func::BoundFunc;
 use super::builtin_func::{BuiltinFn, BuiltinFunc};
+use super::cell::Cell;
 use super::closure::Closure;
 use super::custom::{CustomObj, CustomType};
 use super::float::Float;
 use super::func::Func;
 use super::int::Int;
 use super::list::List;
+use super::map::Map;
 use super::module::Module;
 use super::nil::Nil;
 use super::ns::Namespace;
@@ -88,6 +89,14 @@ pub fn new_builtin_module(name: &str, ns: Namespace) -> Arc<RwLock<Module>> {
     Arc::new(RwLock::new(Module::new(name.into(), ns, Code::new())))
 }
 
+pub fn new_cell() -> ObjectRef {
+    Arc::new(RwLock::new(Cell::new()))
+}
+
+pub fn new_cell_with_value(value: ObjectRef) -> ObjectRef {
+    Arc::new(RwLock::new(Cell::with_value(value)))
+}
+
 pub fn new_closure(func: ObjectRef, cells: Vec<ObjectRef>) -> ObjectRef {
     Arc::new(RwLock::new(Closure::new(func, cells)))
 }
@@ -105,8 +114,13 @@ pub fn new_float_from_string<S: Into<String>>(value: S) -> ObjectRef {
 /// NOTE: User functions are created in the compiler where name and
 ///       params are already owned, so we don't do any conversion here
 ///       like with builtin functions above.
-pub fn new_func(name: String, params: Params, code: Code) -> ObjectRef {
-    Arc::new(RwLock::new(Func::new(name, params, code)))
+pub fn new_func(
+    name: String,
+    params: Params,
+    code: Code,
+    num_locals: usize,
+) -> ObjectRef {
+    Arc::new(RwLock::new(Func::new(name, params, code, num_locals)))
 }
 
 pub fn new_int<I: Into<BigInt>>(value: I) -> ObjectRef {

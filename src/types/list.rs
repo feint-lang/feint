@@ -136,6 +136,9 @@ impl ObjectTrait for ListType {
         self
     }
 
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
     fn class(&self) -> TypeRef {
         TYPE_TYPE.clone()
     }
@@ -218,6 +221,9 @@ impl ObjectTrait for List {
         self
     }
 
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
     fn class(&self) -> TypeRef {
         LIST_TYPE.clone()
     }

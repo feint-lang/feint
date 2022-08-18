@@ -11,9 +11,13 @@ pub struct ScopeTree {
 }
 
 impl ScopeTree {
-    pub fn new(initial_scope_kind: ScopeKind) -> Self {
-        let global_scope = Scope::new(initial_scope_kind, 0, None);
+    pub fn new(addr: usize, initial_scope_kind: ScopeKind) -> Self {
+        let global_scope = Scope::new(addr, initial_scope_kind, 0, None);
         Self { storage: vec![global_scope], pointer: 0 }
+    }
+
+    pub fn addr(&self) -> usize {
+        self.current().addr
     }
 
     pub fn pointer(&self) -> usize {
@@ -26,6 +30,10 @@ impl ScopeTree {
 
     pub fn in_func_scope(&self) -> bool {
         self.current().is_func()
+    }
+
+    pub fn num_locals(&self) -> usize {
+        self.current().locals.len()
     }
 
     fn get(&self, index: usize) -> &Scope {
@@ -105,9 +113,9 @@ impl ScopeTree {
 
     /// Add nested scope to current scope then make the new scope the
     /// current scope.
-    pub fn add(&mut self, kind: ScopeKind) -> usize {
+    pub fn add(&mut self, addr: usize, kind: ScopeKind) -> usize {
         let index = self.storage.len();
-        self.storage.push(Scope::new(kind, index, Some(self.pointer)));
+        self.storage.push(Scope::new(addr, kind, index, Some(self.pointer)));
         self.storage[self.pointer].children.push(index);
         self.pointer = index;
         index
@@ -236,7 +244,8 @@ impl ScopeTree {
 
 #[derive(Debug)]
 pub struct Scope {
-    pub(crate) kind: ScopeKind,
+    addr: usize, // address in code block
+    kind: ScopeKind,
     index: usize,
     parent: Option<usize>,
     children: Vec<usize>,
@@ -256,8 +265,9 @@ pub enum ScopeKind {
 }
 
 impl Scope {
-    fn new(kind: ScopeKind, index: usize, parent: Option<usize>) -> Self {
+    fn new(addr: usize, kind: ScopeKind, index: usize, parent: Option<usize>) -> Self {
         Self {
+            addr,
             kind,
             index,
             parent,
@@ -269,15 +279,15 @@ impl Scope {
         }
     }
 
-    fn is_global(&self) -> bool {
+    pub fn is_global(&self) -> bool {
         self.kind == ScopeKind::Module
     }
 
-    fn is_func(&self) -> bool {
+    pub fn is_func(&self) -> bool {
         self.kind == ScopeKind::Func
     }
 
-    fn is_leaf(&self) -> bool {
+    pub fn is_leaf(&self) -> bool {
         self.children.is_empty()
     }
 

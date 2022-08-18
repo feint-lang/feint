@@ -16,6 +16,7 @@ use super::util::args_to_str;
 use super::bool::{Bool, BoolType};
 use super::bound_func::{BoundFunc, BoundFuncType};
 use super::builtin_func::{BuiltinFunc, BuiltinFuncType};
+use super::cell::{Cell, CellType};
 use super::class::{Type, TypeType};
 use super::closure::{Closure, ClosureType};
 use super::custom::{CustomObj, CustomType};
@@ -121,6 +122,7 @@ macro_rules! make_bin_op {
 /// implementation of `ObjectTrait`. Example: `Int`.
 pub trait ObjectTrait {
     fn as_any(&self) -> &dyn Any;
+    fn as_any_mut(&mut self) -> &mut dyn Any;
 
     /// Get an instance's type as a type. This is needed to retrieve
     /// type level attributes.
@@ -222,6 +224,7 @@ pub trait ObjectTrait {
     make_type_checker!(is_bool_type, BoolType);
     make_type_checker!(is_bound_func_type, BoundFuncType);
     make_type_checker!(is_builtin_func_type, BuiltinFuncType);
+    make_type_checker!(is_cell_type, CellType);
     make_type_checker!(is_closure_type, ClosureType);
     make_type_checker!(is_float_type, FloatType);
     make_type_checker!(is_func_type, FuncType);
@@ -237,6 +240,7 @@ pub trait ObjectTrait {
     make_type_checker!(is_bool, Bool);
     make_type_checker!(is_bound_func, BoundFunc);
     make_type_checker!(is_builtin_func, BuiltinFunc);
+    make_type_checker!(is_cell, Cell);
     make_type_checker!(is_closure, Closure);
     make_type_checker!(is_float, Float);
     make_type_checker!(is_func, Func);
@@ -256,6 +260,7 @@ pub trait ObjectTrait {
     make_down_to!(down_to_bool_type, BoolType);
     make_down_to!(down_to_bound_func_type, BoundFuncType);
     make_down_to!(down_to_builtin_func_type, BuiltinFuncType);
+    make_down_to!(down_to_cell_type, CellType);
     make_down_to!(down_to_closure_type, ClosureType);
     make_down_to!(down_to_float_type, FloatType);
     make_down_to!(down_to_func_type, FuncType);
@@ -271,6 +276,7 @@ pub trait ObjectTrait {
     make_down_to!(down_to_bool, Bool);
     make_down_to!(down_to_bound_func, BoundFunc);
     make_down_to!(down_to_builtin_func, BuiltinFunc);
+    make_down_to!(down_to_cell, Cell);
     make_down_to!(down_to_closure, Closure);
     make_down_to!(down_to_float, Float);
     make_down_to!(down_to_func, Func);
@@ -282,11 +288,16 @@ pub trait ObjectTrait {
     make_down_to!(down_to_str, Str);
     make_down_to!(down_to_tuple, Tuple);
 
+    fn down_to_cell_mut(&mut self) -> Option<&mut Cell> {
+        self.as_any_mut().downcast_mut::<Cell>()
+    }
+
     // Value extractors ------------------------------------------------
     //
     // These extract the inner value from an object.
 
     make_value_extractor!(get_bool_val, Bool, &bool);
+    make_value_extractor!(get_cell_val, Cell, ObjectRef);
     make_value_extractor!(get_float_val, Float, &f64);
     make_value_extractor!(get_int_val, Int, &BigInt);
     make_value_extractor!(get_str_val, Str, &str);
@@ -410,6 +421,7 @@ impl fmt::Display for dyn ObjectTrait {
             BoolType,
             BoundFuncType,
             BuiltinFuncType,
+            CellType,
             ClosureType,
             CustomType,
             FloatType,
@@ -429,6 +441,7 @@ impl fmt::Display for dyn ObjectTrait {
             Bool,
             BoundFunc,
             BuiltinFunc,
+            Cell,
             Closure,
             CustomObj,
             Float,
@@ -454,6 +467,7 @@ impl fmt::Debug for dyn ObjectTrait {
             BoolType,
             BoundFuncType,
             BuiltinFuncType,
+            CellType,
             ClosureType,
             CustomType,
             FloatType,
@@ -473,6 +487,7 @@ impl fmt::Debug for dyn ObjectTrait {
             Bool,
             BoundFunc,
             BuiltinFunc,
+            Cell,
             Closure,
             CustomObj,
             Float,

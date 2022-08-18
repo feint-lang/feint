@@ -55,6 +55,9 @@ impl ObjectTrait for TypeType {
         self
     }
 
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
     fn class(&self) -> TypeRef {
         TYPE_TYPE.clone()
     }
@@ -89,6 +92,9 @@ impl ObjectTrait for Type {
         self
     }
 
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
     fn class(&self) -> TypeRef {
         TYPE_TYPE.clone()
     }

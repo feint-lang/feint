@@ -66,10 +66,9 @@ impl Disassembler {
             LoadNil => self.align("LOAD_NIL", "nil"),
             LoadTrue => self.align("LOAD_TRUE", "true"),
             LoadFalse => self.align("LOAD_FALSE", "false"),
-            FuncScopeStart(args_offset) => {
-                self.align("FUNC_SCOPE_START", format!("({args_offset}) ->"))
+            ScopeStart(num_locals) => {
+                self.align("SCOPE_START", format!("-> {num_locals} locals"))
             }
-            ScopeStart => self.align("SCOPE_START", "->"),
             ScopeEnd => self.align("SCOPE_END", ""),
             StatementStart(start, _) => {
                 self.new_line = start.line != self.curr_line_no;
@@ -85,16 +84,8 @@ impl Disassembler {
             }
             StoreLocal(index) => self.align("STORE_LOCAL", index),
             LoadLocal(index) => self.align("LOAD_LOCAL", index),
-            StoreLocalAndCell(local_index, cell_index) => self.align(
-                "STORE_LOCAL_AND_CELL",
-                format!("local index = {local_index} cell index = {cell_index}"),
-            ),
+            StoreCell(index) => self.align("STORE_CELL", index),
             LoadCell(index) => self.align("LOAD_CELL", index),
-            ToArg(index) => self.align("TO_ARG", index),
-            ToArgAndCell(local_index, cell_index) => self.align(
-                "TO_ARG_AND_CELL",
-                format!("local index = {local_index} cell index = {cell_index}"),
-            ),
             DeclareVar(name) => self.align("DECLARE_VAR", name),
             AssignVar(name) => self.align("ASSIGN_VAR", name),
             LoadVar(name) => self.align("LOAD_VAR", name),
@@ -139,6 +130,9 @@ impl Disassembler {
                     "PLACEHOLDER",
                     format!("{formatted_inst} @ {addr} ({message})"),
                 )
+            }
+            ScopeStartPlaceholder(addr) => {
+                self.align("PLACEHOLDER", format!("SCOPE_START @ {addr}"))
             }
             VarPlaceholder(addr, name) => {
                 self.align("PLACEHOLDER", format!("VAR {name} @ {addr}"))

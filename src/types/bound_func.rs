@@ -57,6 +57,10 @@ impl ObjectTrait for BoundFuncType {
         self
     }
 
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+
     fn class(&self) -> TypeRef {
         TYPE_TYPE.clone()
     }
@@ -89,6 +93,10 @@ impl BoundFunc {
 
 impl ObjectTrait for BoundFunc {
     fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
 

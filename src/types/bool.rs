@@ -55,6 +55,10 @@ impl ObjectTrait for BoolType {
         self
     }
 
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+
     fn class(&self) -> TypeRef {
         TYPE_TYPE.clone()
     }
@@ -90,6 +94,10 @@ impl Bool {
 
 impl ObjectTrait for Bool {
     fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
 

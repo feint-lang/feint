@@ -55,6 +55,9 @@ impl ObjectTrait for NilType {
         self
     }
 
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
     fn class(&self) -> TypeRef {
         TYPE_TYPE.clone()
     }
@@ -88,6 +91,9 @@ impl ObjectTrait for Nil {
         self
     }
 
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
     fn class(&self) -> TypeRef {
         NIL_TYPE.clone()
     }

@@ -10,6 +10,7 @@ use super::result::RuntimeErr;
 type CellVarEntry = Vec<(
     usize,  // address
     String, // name
+    usize,  // local index
 )>;
 
 type FreeVarEntry = Vec<(
@@ -127,9 +128,9 @@ impl Code {
         &self.cell_vars
     }
 
-    pub fn add_cell_var<S: Into<String>>(&mut self, name: S) {
+    pub fn add_cell_var<S: Into<String>>(&mut self, name: S, index: usize) {
         let addr = self.len_chunk();
-        self.cell_vars.push((addr, name.into()));
+        self.cell_vars.push((addr, name.into(), index));
     }
 
     pub fn free_vars(&self) -> &FreeVarEntry {

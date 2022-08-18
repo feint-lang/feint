@@ -58,6 +58,9 @@ impl ObjectTrait for FuncType {
         self
     }
 
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
     fn class(&self) -> TypeRef {
         TYPE_TYPE.clone()
     }
@@ -78,13 +81,15 @@ pub struct Func {
     name: String,
     params: Params,
     pub code: Code,
+    // Total number of locals, including params
+    pub num_locals: usize,
 }
 
 unsafe impl Send for Func {}
 unsafe impl Sync for Func {}
 
 impl Func {
-    pub fn new(name: String, params: Params, code: Code) -> Self {
+    pub fn new(name: String, params: Params, code: Code, num_locals: usize) -> Self {
         Self {
             namespace: Namespace::with_entries(&[
                 // Instance Attributes
@@ -93,7 +98,12 @@ impl Func {
             name,
             params,
             code,
+            num_locals,
         }
+    }
+
+    pub fn is_cell_var(&self, local_index: usize) -> bool {
+        self.code.cell_vars().iter().any(|(.., i)| *i == local_index)
     }
 }
 
@@ -112,6 +122,9 @@ impl ObjectTrait for Func {
         self
     }
 
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
     fn class(&self) -> TypeRef {
         FUNC_TYPE.clone()
     }
@@ -125,8 +138,8 @@ impl ObjectTrait for Func {
     }
 
     fn call(&self, args: Args, vm: &mut VM) -> RuntimeResult {
-        log::trace!("BEGIN: call {self} directly with args: {}", args_to_str(&args));
-        vm.call_func_direct(self, args)
+        log::trace!("BEGIN: call {self} with args: {}", args_to_str(&args));
+        vm.call_func(self, args, None)
     }
 }
 

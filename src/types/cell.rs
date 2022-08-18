@@ -4,7 +4,7 @@ use std::sync::{Arc, RwLock};
 
 use once_cell::sync::Lazy;
 
-use crate::vm::Code;
+use crate::vm::RuntimeBoolResult;
 
 use super::create;
 
@@ -12,37 +12,37 @@ use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
 use super::class::TYPE_TYPE;
 use super::ns::Namespace;
 
-// Module Type ---------------------------------------------------------
+// Cell Type -----------------------------------------------------------
 
-pub static MODULE_TYPE: Lazy<Arc<RwLock<ModuleType>>> =
-    Lazy::new(|| Arc::new(RwLock::new(ModuleType::new())));
+pub static CELL_TYPE: Lazy<Arc<RwLock<CellType>>> =
+    Lazy::new(|| Arc::new(RwLock::new(CellType::new())));
 
-pub struct ModuleType {
+pub struct CellType {
     namespace: Namespace,
 }
 
-unsafe impl Send for ModuleType {}
-unsafe impl Sync for ModuleType {}
+unsafe impl Send for CellType {}
+unsafe impl Sync for CellType {}
 
-impl ModuleType {
+impl CellType {
     pub fn new() -> Self {
         Self {
             namespace: Namespace::with_entries(&[
                 // Class Attributes
-                ("$name", create::new_str("Module")),
-                ("$full_name", create::new_str("builtins.Module")),
+                ("$name", create::new_str("Cell")),
+                ("$full_name", create::new_str("builtins.Cell")),
             ]),
         }
     }
 }
 
-impl TypeTrait for ModuleType {
+impl TypeTrait for CellType {
     fn name(&self) -> &str {
-        "Module"
+        "Cell"
     }
 
     fn full_name(&self) -> &str {
-        "builtins.Module"
+        "builtins.Cell"
     }
 
     fn namespace(&self) -> &Namespace {
@@ -50,7 +50,7 @@ impl TypeTrait for ModuleType {
     }
 }
 
-impl ObjectTrait for ModuleType {
+impl ObjectTrait for CellType {
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -71,28 +71,37 @@ impl ObjectTrait for ModuleType {
     }
 }
 
-// Module Object ----------------------------------------------------------
+// Cell Object ---------------------------------------------------------
 
-pub struct Module {
-    name: String,
+pub struct Cell {
     namespace: Namespace,
-    pub code: Code,
+    value: ObjectRef,
 }
 
-unsafe impl Send for Module {}
-unsafe impl Sync for Module {}
+unsafe impl Send for Cell {}
+unsafe impl Sync for Cell {}
 
-impl Module {
-    pub fn new(name: String, namespace: Namespace, code: Code) -> Self {
-        Self { namespace, name, code }
+impl Cell {
+    pub fn new() -> Self {
+        Self { namespace: Namespace::new(), value: create::new_nil() }
     }
 
-    pub fn name(&self) -> &str {
-        self.name.as_str()
+    pub fn with_value(value: ObjectRef) -> Self {
+        let mut cell = Self::new();
+        cell.set_value(value);
+        cell
+    }
+
+    pub fn value(&self) -> ObjectRef {
+        self.value.clone()
+    }
+
+    pub fn set_value(&mut self, new_value: ObjectRef) {
+        self.value = new_value;
     }
 }
 
-impl ObjectTrait for Module {
+impl ObjectTrait for Cell {
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -100,29 +109,34 @@ impl ObjectTrait for Module {
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
+
     fn class(&self) -> TypeRef {
-        MODULE_TYPE.clone()
+        CELL_TYPE.clone()
     }
 
     fn type_obj(&self) -> ObjectRef {
-        MODULE_TYPE.clone()
+        CELL_TYPE.clone()
     }
 
     fn namespace(&self) -> &Namespace {
         &self.namespace
+    }
+
+    fn bool_val(&self) -> RuntimeBoolResult {
+        Ok(false)
     }
 }
 
 // Display -------------------------------------------------------------
 
-impl fmt::Display for Module {
+impl fmt::Display for Cell {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "<module {}>", self.name())
+        write!(f, "{}", self.value.read().unwrap())
     }
 }
 
-impl fmt::Debug for Module {
+impl fmt::Debug for Cell {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "<module {} @ {}>", self.name(), self.id())
+        write!(f, "{self}")
     }
 }

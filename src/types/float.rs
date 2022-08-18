@@ -75,6 +75,9 @@ impl ObjectTrait for FloatType {
         self
     }
 
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
     fn class(&self) -> TypeRef {
         TYPE_TYPE.clone()
     }
@@ -133,6 +136,9 @@ impl ObjectTrait for Float {
         self
     }
 
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
     fn class(&self) -> TypeRef {
         FLOAT_TYPE.clone()
     }
