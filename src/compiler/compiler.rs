@@ -149,7 +149,7 @@ impl Compiler {
                     .scope_tree
                     .find_local(name.as_str(), Some(current_scope_pointer));
 
-                if let Some((_, _, index, _)) = result {
+                if let Some((index, ..)) = result {
                     log::trace!(
                         "RESOLVED AS CAPTURED: {name} @ {index} : \
                         visitor stack index = {found_stack_index} : {}",
@@ -159,9 +159,9 @@ impl Compiler {
                     found = true;
                     captured.push((*addr, found_stack_index, index, name.clone()));
 
-                    // Note all the STORE_LOCAL and TO_ARG instructions
-                    // in the upward visitor (they'll be replaced
-                    // below).
+                    // Note all the STORE_LOCAL and LOAD_LOCAL
+                    // instructions in the upward visitor (they'll be
+                    // replaced below).
                     for (addr, inst) in up_visitor.code.iter_chunk().enumerate() {
                         match inst {
                             Inst::StoreLocal(local_index) if *local_index == index => {
@@ -186,7 +186,7 @@ impl Compiler {
         }
 
         // Update STORE_LOCAL instructions in ancestor visitors to store
-        // to in cell.
+        // into cell.
         for (kind, addr, found_stack_index, local_index) in cell_vars.into_iter() {
             let up_visitor = &mut stack[found_stack_index].0;
             println!("{found_stack_index} {}", up_visitor);
@@ -200,13 +200,27 @@ impl Compiler {
         }
 
         // Update placeholder instructions in current visitor/function
-        // to load from cell.
-        for (i, (addr, found_stack_index, local_index, name)) in
-            captured.iter().enumerate()
-        {
+        // to load from cell. Also add cell vars to upward visitors.
+        let mut cell_indexes = vec![];
+        let iter = captured.iter().enumerate();
+        for (i, (addr, found_stack_index, local_index, name)) in iter {
+            visitor.replace(*addr, Inst::LoadCell(i));
+
+            // In the upward visitor where the captured var was found,
+            // note that the var is a cell var.
             let up_visitor = &mut stack[*found_stack_index].0;
             up_visitor.code.add_cell_var(name, *local_index);
-            visitor.replace(*addr, Inst::LoadCell(i));
+
+            // For each upward visitor after the one where the var was
+            // found, add a local var and note that it's a cell var.
+            let next_stack_index = found_stack_index + 1;
+            if next_stack_index < stack.len() {
+                for i in next_stack_index..stack.len() {
+                    let up_visitor = &mut stack[i].0;
+                    let index = up_visitor.scope_tree.add_local(name, true);
+                    up_visitor.code.add_cell_var(name, index);
+                }
+            }
         }
 
         // Resolve globals.
@@ -250,18 +264,14 @@ impl Compiler {
         let parent_code = &mut parent_visitor.code;
         let const_index = parent_code.add_const(func);
 
-        if captured.is_empty() {
-            parent_visitor.replace(func_addr, Inst::LoadConst(const_index));
-        } else {
-            let cell_info = captured
-                .iter()
-                .map(|(_, stack_index, local_index, _)| {
-                    (stack_len - stack_index, *local_index)
-                })
-                .collect();
-            parent_visitor
-                .replace(func_addr, Inst::MakeClosure(const_index, cell_info));
-        }
+        let cell_info = captured
+            .iter()
+            .map(|(_, stack_index, local_index, _)| {
+                (stack_len - stack_index, *local_index)
+            })
+            .collect();
+
+        parent_visitor.replace(func_addr, Inst::MakeClosure(const_index, cell_info));
 
         Ok(())
     }

@@ -329,18 +329,26 @@ impl VM {
 
                     for (call_stack_index, local_index) in cell_info {
                         let call_frame_index = self.call_stack.len() - call_stack_index;
-                        log::trace!("call_stack_index = {call_stack_index} call_frame_index = {call_frame_index}");
+
+                        log::trace!(
+                            "call_stack_index = {call_stack_index} \
+                            call_frame_index = {call_frame_index}"
+                        );
+
                         let frame = self
                             .call_stack
                             .peek_at(call_frame_index - 1)
                             .expect("Expected call frame at {call_frame_index}");
+
                         let index = frame.stack_pointer + local_index;
                         let cell_ref = self.peek_at_obj(index)?;
+
                         if !cell_ref.read().unwrap().is_cell() {
                             let class = cell_ref.read().unwrap().class();
                             let class = class.read().unwrap();
                             panic!("Expected a cell; got a {class}");
                         }
+
                         cells.push(cell_ref);
                     }
                     log::trace!("CELLS for closure: {cells:?} ({})", cells.len());
