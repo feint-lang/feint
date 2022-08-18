@@ -318,9 +318,22 @@ impl VM {
                 MakeClosure(func_const_index, cell_info) => {
                     let func = code.get_const(*func_const_index)?.clone();
                     let mut cells = vec![];
+
+                    let f = func.read().unwrap();
+                    log::trace!(
+                        "MAKE CLOSURE for {} at call stack depth = {}",
+                        f.down_to_func().unwrap().name(),
+                        self.call_stack.len()
+                    );
+                    drop(f);
+
                     for (call_stack_index, local_index) in cell_info {
                         let call_frame_index = self.call_stack.len() - call_stack_index;
-                        let frame = self.call_stack.peek_at(call_frame_index).unwrap();
+                        log::trace!("call_stack_index = {call_stack_index} call_frame_index = {call_frame_index}");
+                        let frame = self
+                            .call_stack
+                            .peek_at(call_frame_index - 1)
+                            .expect("Expected call frame at {call_frame_index}");
                         let index = frame.stack_pointer + local_index;
                         let cell_ref = self.peek_at_obj(index)?;
                         if !cell_ref.read().unwrap().is_cell() {

@@ -21,6 +21,7 @@ type FreeVarEntry = Vec<(
 )>;
 
 /// Code for a module or function.
+#[derive(Debug)]
 pub struct Code {
     chunk: Vec<Inst>,
     constants: Vec<ObjectRef>,

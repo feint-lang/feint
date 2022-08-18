@@ -1,4 +1,6 @@
 use num_traits::ToPrimitive;
+use std::fmt;
+use std::fmt::Formatter;
 
 use crate::ast;
 use crate::types::{create, ObjectRef};
@@ -31,7 +33,7 @@ impl Compiler {
     ) -> CompResult {
         log::trace!("BEGIN: compile script");
 
-        let mut visitor = Visitor::for_module();
+        let mut visitor = Visitor::for_module("$main");
 
         if program.statements.is_empty() {
             visitor.push(Inst::Halt(0));
@@ -99,10 +101,15 @@ impl Compiler {
         name: String,
         node: ast::Func,
     ) -> VisitResult {
+        log::trace!(
+            "BEGIN: compiling func {name} at stack level {}",
+            self.visitor_stack.len()
+        );
+
         let stack = &mut self.visitor_stack;
         let params = node.params.clone();
 
-        let mut visitor = Visitor::for_func();
+        let mut visitor = Visitor::for_func(name.as_str());
         visitor.visit_func(node)?;
 
         log::trace!("BEGIN: resolving names in outer scopes");
@@ -131,13 +138,23 @@ impl Compiler {
             let mut found_stack_index = stack.len();
             let mut current_scope_pointer = parent_scope_pointer;
 
-            for (up_visitor, up_scope_pointer) in stack.iter().rev() {
+            log::trace!("STARTING FOUND STACK INDEX: {found_stack_index}");
+
+            for (up_visitor, up_scope_pointer) in stack.iter() {
+                found_stack_index -= 1;
+
+                log::trace!("Looking for {name} at stack level {found_stack_index} in {up_visitor}");
+
                 let result = up_visitor
                     .scope_tree
                     .find_local(name.as_str(), Some(current_scope_pointer));
 
                 if let Some((_, _, index, _)) = result {
-                    log::trace!("RESOLVED VAR AS CAPTURED: {name} @ {index} [{found_stack_index}]");
+                    log::trace!(
+                        "RESOLVED AS CAPTURED: {name} @ {index} : \
+                        visitor stack index = {found_stack_index} : {}",
+                        &stack[found_stack_index].0
+                    );
 
                     found = true;
                     captured.push((*addr, found_stack_index, index, name.clone()));
@@ -160,7 +177,6 @@ impl Compiler {
                     break;
                 }
 
-                found_stack_index -= 1;
                 current_scope_pointer = *up_scope_pointer;
             }
 
@@ -173,10 +189,11 @@ impl Compiler {
         // to in cell.
         for (kind, addr, found_stack_index, local_index) in cell_vars.into_iter() {
             let up_visitor = &mut stack[found_stack_index].0;
+            println!("{found_stack_index} {}", up_visitor);
             if kind == "S" {
-                // up_visitor.replace(addr, Inst::StoreCell(local_index));
+                up_visitor.replace(addr, Inst::StoreCell(local_index));
             } else if kind == "L" {
-                // up_visitor.replace(addr, Inst::LoadCell(local_index));
+                up_visitor.replace(addr, Inst::LoadCell(local_index));
             } else {
                 panic!("Unexpected cell var type: {kind}");
             }
@@ -227,6 +244,8 @@ impl Compiler {
             visitor.scope_tree.num_locals(),
         );
 
+        let stack_len = self.visitor_stack.len();
+        log::trace!("V STACK LEN: {stack_len}");
         let (parent_visitor, _) = self.visitor_stack.peek_mut().unwrap();
         let parent_code = &mut parent_visitor.code;
         let const_index = parent_code.add_const(func);
@@ -236,7 +255,9 @@ impl Compiler {
         } else {
             let cell_info = captured
                 .iter()
-                .map(|(_, stack_index, local_index, _)| (*stack_index, *local_index))
+                .map(|(_, stack_index, local_index, _)| {
+                    (stack_len - stack_index, *local_index)
+                })
                 .collect();
             parent_visitor
                 .replace(func_addr, Inst::MakeClosure(const_index, cell_info));
@@ -261,10 +282,11 @@ pub struct Visitor {
         String, // name
         ast::Func,
     )>,
+    name: String,
 }
 
 impl Visitor {
-    fn new(initial_scope_kind: ScopeKind) -> Self {
+    fn new(initial_scope_kind: ScopeKind, name: &str) -> Self {
         assert!(matches!(initial_scope_kind, ScopeKind::Module | ScopeKind::Func));
         Self {
             initial_scope_kind,
@@ -272,15 +294,16 @@ impl Visitor {
             scope_tree: ScopeTree::new(0, initial_scope_kind),
             scope_depth: 0,
             func_nodes: vec![],
+            name: name.to_owned(),
         }
     }
 
-    fn for_module() -> Self {
-        Self::new(ScopeKind::Module)
+    fn for_module(name: &str) -> Self {
+        Self::new(ScopeKind::Module, name)
     }
 
-    fn for_func() -> Self {
-        Self::new(ScopeKind::Func)
+    fn for_func(name: &str) -> Self {
+        Self::new(ScopeKind::Func, name)
     }
 
     // Entry Point Visitors --------------------------------------------
@@ -1008,5 +1031,19 @@ impl Visitor {
             ));
         }
         Ok(())
+    }
+}
+
+impl fmt::Display for Visitor {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let suffix =
+            if self.initial_scope_kind == ScopeKind::Module { "" } else { "()" };
+        write!(f, "{}{suffix} with {} instructions", self.name, self.code.len_chunk())
+    }
+}
+
+impl fmt::Debug for Visitor {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{self}: {:?}", self.code)
     }
 }

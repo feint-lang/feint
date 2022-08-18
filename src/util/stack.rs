@@ -84,6 +84,7 @@ impl<T> Stack<T> {
         self.storage.truncate(len)
     }
 
+    /// NOTE: This iterates in REVERSE order (from stack top to bottom)
     pub fn iter(&self) -> Rev<Iter<T>> {
         self.storage.iter().rev()
     }
