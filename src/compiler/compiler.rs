@@ -133,7 +133,10 @@ impl Compiler {
             for (up_visitor, up_scope_pointer) in stack.iter() {
                 found_stack_index -= 1;
 
-                log::trace!("Looking for {name} at stack level {found_stack_index} in {up_visitor}");
+                log::trace!(
+                    "Looking for {name} at visitor stack level \
+                    {found_stack_index} in {up_visitor}"
+                );
 
                 let result = up_visitor
                     .scope_tree
@@ -194,6 +197,8 @@ impl Compiler {
         let mut cell_indexes = vec![];
         let iter = captured.iter().enumerate();
         for (i, (addr, found_stack_index, local_index, name)) in iter {
+            // NOTE: i is the closure cell index in the current closure,
+            //       not a local index.
             visitor.replace(*addr, Inst::LoadCell(i));
 
             // In the upward visitor where the captured var was found,
@@ -203,6 +208,8 @@ impl Compiler {
 
             // For each upward visitor after the one where the var was
             // found, add a local var and note that it's a cell var.
+            // TODO: Copy cell values from found visitor down to these
+            //       visitors
             let next_stack_index = found_stack_index + 1;
             if next_stack_index < stack.len() {
                 let mut local_index = *local_index;
@@ -250,7 +257,7 @@ impl Compiler {
         );
 
         let parent_visitor = &mut self.visitor_stack.peek_mut().unwrap().0;
-        let const_index = parent_visitor.add_const(func);
+        let const_index = parent_visitor.code.add_const(func);
         parent_visitor.replace(func_addr, Inst::MakeClosure(const_index, cell_indexes));
 
         Ok(())

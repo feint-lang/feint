@@ -201,7 +201,7 @@ impl VM {
                         self.load_local(*index)?;
                         let cell = self.pop_obj()?;
                         let cell = cell.read().unwrap();
-                        let cell = cell.down_to_cell().unwrap();
+                        let cell = cell.down_to_cell().expect("Expected cell");
                         self.push_temp(cell.value());
                     }
                 }
@@ -268,8 +268,10 @@ impl VM {
                 }
                 // Functions
                 Call(num_args) => {
+                    log::trace!("STACK before call:\n{}", self.format_stack());
                     let callable = self.pop_obj()?;
                     let args = self.pop_n_obj(*num_args)?;
+                    log::trace!("STACK before call:\n{}", self.format_stack());
                     self.call(callable, args)?;
                 }
                 Return => {
@@ -314,7 +316,9 @@ impl VM {
                     let map = create::new_map(entries);
                     self.push_temp(map);
                 }
-                // A closure is created in its parent's frame.
+                // A closure is created in its parent's frame. This
+                // copies the cells from the parent frame into the
+                // closure.
                 MakeClosure(func_const_index, cell_indexes) => {
                     let func = code.get_const(*func_const_index)?.clone();
                     let mut cells = vec![];
@@ -651,12 +655,16 @@ impl VM {
     pub fn call(&mut self, callable_ref: ObjectRef, args: Args) -> RuntimeResult {
         let callable = callable_ref.read().unwrap();
         if let Some(func) = callable.down_to_builtin_func() {
+            log::trace!("CALL builtin func");
             self.call_builtin_func(func, None, args)
         } else if let Some(func) = callable.down_to_func() {
+            log::trace!("CALL func");
             self.call_func(func, None, args, None)
         } else if callable.is_closure() {
+            log::trace!("CALL closure");
             self.call_closure(callable_ref.clone(), None, args)
         } else if let Some(bound_func) = callable.down_to_bound_func() {
+            log::trace!("CALL bound func");
             let func_ref = bound_func.func.clone();
             let func_obj = func_ref.read().unwrap();
             let this = Some(bound_func.this.clone());
@@ -708,6 +716,7 @@ impl VM {
         let num_locals = func.num_locals;
         let num_args = args.len();
 
+        log::trace!("CLOSURE: {closure:?}");
         self.push_call_frame(this, closure)?;
 
         let mut local_index = 0;
