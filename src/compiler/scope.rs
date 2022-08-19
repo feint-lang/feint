@@ -171,13 +171,11 @@ impl ScopeTree {
     }
 
     /// Find local var in current scope or any of its ancestor scopes.
-    /// The index returned is a pointer into the stack where the local
-    /// var lives at runtime.
     ///
     /// If the local is found, a tuple with the following fields is
-    /// returned: stack index (overall local index in scope tree), scope
-    /// pointer of scope where found, local index in scope where found,
-    /// assigned flag.
+    /// returned: stack index where the local var lives at runtime,
+    /// scope pointer of scope where found, local index in scope where
+    /// found, assigned flag.
     pub fn find_local(
         &self,
         name: &str,

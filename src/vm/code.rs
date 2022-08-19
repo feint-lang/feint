@@ -7,12 +7,6 @@ use crate::util::Location;
 use super::inst::Inst;
 use super::result::RuntimeErr;
 
-type CellVarEntry = Vec<(
-    usize,  // address
-    String, // name
-    usize,  // local index
-)>;
-
 type FreeVarEntry = Vec<(
     usize,    // address
     String,   // name
@@ -25,9 +19,6 @@ type FreeVarEntry = Vec<(
 pub struct Code {
     chunk: Vec<Inst>,
     constants: Vec<ObjectRef>,
-    // Vars defined in this unit of code that are referenced by free
-    // vars in other units of code.
-    cell_vars: CellVarEntry,
     // Vars defined outside of this unit of code.
     free_vars: FreeVarEntry,
 }
@@ -42,7 +33,7 @@ impl Index<usize> for Code {
 
 impl Code {
     pub fn new() -> Self {
-        Self { chunk: vec![], constants: vec![], cell_vars: vec![], free_vars: vec![] }
+        Self { chunk: vec![], constants: vec![], free_vars: vec![] }
     }
 
     /// Initialize code object with a list of instructions, also known
@@ -125,21 +116,12 @@ impl Code {
 
     // Vars ------------------------------------------------------------
 
-    pub fn cell_vars(&self) -> &CellVarEntry {
-        &self.cell_vars
-    }
-
-    pub fn add_cell_var<S: Into<String>>(&mut self, name: S, index: usize) {
-        let addr = self.len_chunk();
-        self.cell_vars.push((addr, name.into(), index));
-    }
-
     pub fn free_vars(&self) -> &FreeVarEntry {
         &self.free_vars
     }
 
     /// Add a free var, a reference to a var defined in an enclosing
-    /// scope. This also pushes a placeholder instruction for the var.
+    /// scope.
     pub fn add_free_var<S: Into<String>>(
         &mut self,
         name: S,
@@ -148,11 +130,6 @@ impl Code {
     ) {
         let addr = self.len_chunk();
         let name = name.into();
-        self.free_vars.push((addr, name.clone(), start, end));
-        self.push_inst(Inst::VarPlaceholder(addr, name));
-    }
-
-    pub fn has_free_var_at_addr(&self, addr: usize) -> bool {
-        self.free_vars().iter().any(|(a, ..)| *a == addr)
+        self.free_vars.push((addr, name, start, end));
     }
 }

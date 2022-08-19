@@ -93,12 +93,12 @@ pub fn new_cell() -> ObjectRef {
     Arc::new(RwLock::new(Cell::new()))
 }
 
-pub fn new_cell_with_value(value: ObjectRef) -> ObjectRef {
+pub fn _new_cell_with_value(value: ObjectRef) -> ObjectRef {
     Arc::new(RwLock::new(Cell::with_value(value)))
 }
 
-pub fn new_closure(func: ObjectRef, cells: Vec<ObjectRef>) -> ObjectRef {
-    Arc::new(RwLock::new(Closure::new(func, cells)))
+pub fn new_closure(func: ObjectRef, captured: Vec<ObjectRef>) -> ObjectRef {
+    Arc::new(RwLock::new(Closure::new(func, captured)))
 }
 
 pub fn new_float(value: f64) -> ObjectRef {

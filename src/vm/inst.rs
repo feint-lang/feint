@@ -34,11 +34,8 @@ pub enum Inst {
     // from slot lower in stack and push it onto TOS.
     LoadLocal(usize),
 
-    // Store value from TOS into cell.
-    StoreCell(usize),
-
-    // Load value from cell to TOS.
-    LoadCell(usize),
+    // Load captured value to TOS.
+    LoadCaptured(usize),
 
     DeclareVar(String),
     AssignVar(String),
@@ -89,7 +86,7 @@ pub enum Inst {
     // Make closure wrapping function.
     MakeClosure(
         usize,      // constant index of wrapped function
-        Vec<usize>, // local/cell var indexes within parent frame
+        Vec<usize>, // local indexes within parent frame
     ),
 
     LoadModule(String),

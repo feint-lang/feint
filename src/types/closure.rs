@@ -2,10 +2,10 @@ use std::any::Any;
 use std::fmt;
 use std::sync::{Arc, RwLock};
 
-use crate::types::Params;
 use once_cell::sync::Lazy;
 
 use super::create;
+use super::result::Params;
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
 use super::class::TYPE_TYPE;
@@ -78,14 +78,14 @@ pub struct Closure {
     name: String,
     params: Params,
     pub func: ObjectRef,
-    pub cells: Vec<ObjectRef>,
+    pub captured: Vec<ObjectRef>,
 }
 
 unsafe impl Send for Closure {}
 unsafe impl Sync for Closure {}
 
 impl Closure {
-    pub fn new(func_ref: ObjectRef, cells: Vec<ObjectRef>) -> Self {
+    pub fn new(func_ref: ObjectRef, captured: Vec<ObjectRef>) -> Self {
         let func = func_ref.read().unwrap();
         let func = func.down_to_func().unwrap();
         Self {
@@ -93,7 +93,7 @@ impl Closure {
             name: func.name().to_owned(),
             params: func.params().clone(),
             func: func_ref.clone(),
-            cells,
+            captured,
         }
     }
 }

@@ -100,10 +100,6 @@ impl Func {
             num_locals,
         }
     }
-
-    pub fn is_cell_var(&self, local_index: usize) -> bool {
-        self.code.cell_vars().iter().any(|(.., i)| *i == local_index)
-    }
 }
 
 impl FuncTrait for Func {
