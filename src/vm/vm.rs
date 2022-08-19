@@ -2,6 +2,7 @@
 //! then, implicitly, goes idle until it's passed some instructions to
 //! execute. After instructions are executed, it goes back into idle
 //! mode.
+use std::collections::HashMap;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
@@ -16,14 +17,14 @@ use crate::util::{
     BinaryOperator, CompareOperator, InplaceOperator, Location, Stack,
     UnaryCompareOperator, UnaryOperator,
 };
-use crate::vm::result::PeekResult;
 
 use super::code::Code;
 use super::context::RuntimeContext;
 use super::inst::Inst;
 use super::result::{
-    CallDepth, PeekObjResult, PopNObjResult, PopNResult, PopObjResult, PopResult,
-    RuntimeErr, RuntimeObjResult, RuntimeResult, VMExeResult, VMState, ValueStackKind,
+    CallDepth, PeekObjResult, PeekResult, PopNObjResult, PopNResult, PopObjResult,
+    PopResult, RuntimeErr, RuntimeObjResult, RuntimeResult, VMExeResult, VMState,
+    ValueStackKind,
 };
 
 pub const DEFAULT_MAX_CALL_DEPTH: CallDepth =
@@ -40,15 +41,15 @@ impl CallFrame {
         Self { stack_pointer, this, closure }
     }
 
-    pub fn get_captured(&self, index: usize) -> RuntimeObjResult {
+    pub fn get_captured(&self, name: &str) -> RuntimeObjResult {
         if let Some(closure) = &self.closure {
             let closure = closure.read().unwrap();
             let closure = closure.down_to_closure().unwrap();
-            if let Some(obj) = closure.captured.get(index) {
+            if let Some(obj) = closure.captured.get(name) {
                 return Ok(obj.clone());
             }
         }
-        Err(RuntimeErr::cell_not_found(index))
+        Err(RuntimeErr::captured_var_not_found(name))
     }
 }
 
@@ -127,11 +128,7 @@ impl VM {
                     // do nothing
                 }
                 Pop => {
-                    if let ValueStackKind::Local(..) = self.peek()? {
-                        // Locals are cleaned up separately
-                    } else {
-                        self.pop()?;
-                    }
+                    self.pop()?;
                 }
                 // Constants
                 LoadGlobalConst(index) => {
@@ -147,8 +144,8 @@ impl VM {
                     self.push_global_const(2)?;
                 }
                 // Scopes
-                ScopeStart(num_locals) => {
-                    self.enter_scope(*num_locals);
+                ScopeStart => {
+                    self.enter_scope();
                 }
                 ScopeEnd => {
                     self.exit_scope();
@@ -159,22 +156,11 @@ impl VM {
                 LoadConst(index) => {
                     self.push_const(code, *index)?;
                 }
-                // Locals
-                StoreLocal(index) => {
-                    // Store object at TOS into local slot. Note that
-                    // this leaves TOS in place.
-                    let obj = self.peek_obj()?;
-                    self.store_local(obj, *index)?;
-                }
-                LoadLocal(index) => {
-                    // Load (copy) specified local to TOS.
-                    self.load_local(*index)?;
-                }
-                LoadCaptured(index) => {
+                LoadCaptured(name) => {
                     // Load value from cell to TOS.
                     let frame = self.current_call_frame()?;
                     if frame.closure.is_some() {
-                        let obj = frame.get_captured(*index)?;
+                        let obj = frame.get_captured(name)?;
                         self.push_temp(obj);
                     } else {
                         panic!("Expected closure");
@@ -291,19 +277,20 @@ impl VM {
                     let map = create::new_map(entries);
                     self.push_temp(map);
                 }
-                MakeClosure(func_const_index, captured_indexes) => {
+                MakeClosure(func_const_index, captured_names) => {
                     let func_ref = code.get_const(*func_const_index)?.clone();
                     let func = func_ref.read().unwrap();
                     let func = func.down_to_func().unwrap();
 
                     log::trace!("CREATING CLOSURE FOR {}", func.name());
 
-                    let mut captured = vec![];
+                    let mut captured = HashMap::new();
 
-                    for index in captured_indexes {
-                        let obj = self.get_local(*index)?;
-                        log::trace!("ADDING CAPTURE FOR local {index} = {obj:?}");
-                        captured.push(obj);
+                    for name in captured_names.iter() {
+                        log::trace!("CAPTURing {name}");
+                        let obj = self.ctx.get_var(name)?;
+                        log::trace!("CAPTURED {name} = {obj:?}");
+                        captured.insert(name.to_owned(), obj);
                     }
 
                     let closure = create::new_closure(func_ref.clone(), captured);
@@ -541,10 +528,6 @@ impl VM {
         if let ValueStackKind::Var(_, depth, name) = a_kind {
             self.ctx.assign_var_at_depth(depth, name.as_str(), result.clone())?;
             self.push_temp(result);
-        } else if let ValueStackKind::TempLocal(_, index) = a_kind {
-            log::trace!("STORE LOCAL FOR INPLACE {index}");
-            self.store_local(result.clone(), index)?;
-            self.push_temp(result);
         } else {
             return Err(RuntimeErr::expected_var(format!("Binary op: {}", op)));
         }
@@ -563,6 +546,7 @@ impl VM {
             self.reset();
             return Err(RuntimeErr::recursion_depth_exceeded(self.max_call_depth));
         }
+        self.ctx.enter_scope();
         let stack_pointer = self.value_stack.len();
         let frame = CallFrame::new(stack_pointer, this, closure);
         self.call_stack.push(frame);
@@ -579,14 +563,11 @@ impl VM {
         }
         // Ensure the frame left a value on the stack.
         if let Ok(obj) = return_val {
-            if let Some(obj) = obj.read().unwrap().down_to_cell() {
-                self.push_return_val(obj.value())
-            } else {
-                self.push_return_val(obj.clone());
-            }
+            self.push_return_val(obj.clone());
         } else {
             panic!("Value stack unexpectedly empty when exiting scope");
         }
+        self.ctx.exit_scope();
         Ok(())
     }
 
@@ -681,22 +662,12 @@ impl VM {
         closure: Option<ObjectRef>,
     ) -> RuntimeResult {
         let args = self.check_call_args(func, &None, args)?;
-        let num_locals = func.num_locals;
-        let num_args = args.len();
-
         self.push_call_frame(this, closure)?;
 
-        let mut local_index = 0;
-        self.push_local(self.find_this(), local_index);
+        self.ctx.declare_and_assign_var("this", self.find_this())?;
 
-        for arg in args.into_iter() {
-            local_index += 1;
-            self.push_local(arg, local_index);
-        }
-
-        for _ in num_args..num_locals {
-            local_index += 1;
-            self.push_local(create::new_nil(), local_index);
+        for (name, arg) in func.arg_names().iter().zip(args) {
+            self.ctx.declare_and_assign_var(name, arg)?;
         }
 
         match self.execute(&func.code) {
@@ -776,14 +747,9 @@ impl VM {
 
     // Scopes ----------------------------------------------------------
 
-    fn enter_scope(&mut self, num_locals: usize) {
-        log::trace!("ENTER SCOPE\n{}", self.format_stack());
-        self.scope_stack.push(self.value_stack.len());
-        for index in 0..num_locals {
-            self.push_local(create::new_cell(), index);
-        }
-        log::trace!("ENTER SCOPE after adding locals\n{}", self.format_stack());
+    fn enter_scope(&mut self) {
         self.ctx.enter_scope();
+        self.scope_stack.push(self.value_stack.len());
     }
 
     /// When exiting a scope, we first save the top of the stack (which
@@ -792,7 +758,6 @@ impl VM {
     /// scope's "return value" back onto the stack. Finally, the scope's
     /// namespace is then cleared and removed.
     fn exit_scope(&mut self) {
-        log::trace!("STACK BEFORE EXIT SCOPE:\n{}", self.format_stack());
         let return_val = self.pop_obj();
         if let Some(pointer) = self.scope_stack.pop() {
             self.value_stack.truncate(pointer);
@@ -801,17 +766,11 @@ impl VM {
         };
         // Ensure the scope left a value on the stack.
         if let Ok(obj) = return_val {
-            if let Some(obj) = obj.read().unwrap().down_to_cell() {
-                self.push_return_val(obj.value())
-            } else {
-                self.push_return_val(obj.clone());
-            }
+            self.push_return_val(obj.clone());
         } else {
             panic!("Value stack unexpectedly empty when exiting scope");
         }
-        // Clear scope namespaces.
         self.ctx.exit_scope();
-        log::trace!("STACK AFTER EXIT SCOPE:\n{}", self.format_stack());
     }
 
     /// This is a convenience for jumping out multiple scopes when
@@ -840,62 +799,6 @@ impl VM {
         let obj = code.get_const(index)?.clone();
         self.push(ValueStackKind::Constant(obj, index));
         Ok(())
-    }
-
-    /// This is used to create new local slots on the stack. These slots
-    /// remain on the stack until the current scope is exited.
-    ///
-    /// NOTE: This is only used when calling a user function to store
-    ///       its args as locals.
-    fn push_local(&mut self, obj: ObjectRef, index: usize) {
-        self.push(ValueStackKind::Local(obj, index));
-    }
-
-    /// This is used when loading (copying) a local from its slot to
-    /// TOS. These "temporary locals" are cleaned up normally.
-    fn push_temp_local(&mut self, obj: ObjectRef, index: usize) {
-        self.push(ValueStackKind::TempLocal(obj, index));
-    }
-
-    /// Replace value stack item at index.
-    fn replace(&mut self, index: usize, kind: ValueStackKind) -> RuntimeResult {
-        if index < self.value_stack.len() {
-            self.value_stack.set_at(index, kind);
-            Ok(())
-        } else {
-            Err(RuntimeErr::stack_index_out_of_bounds(index))
-        }
-    }
-
-    /// Store object into local slot.
-    fn store_local(&mut self, obj: ObjectRef, index: usize) -> RuntimeResult {
-        let frame_index = self.call_frame_pointer() + index;
-        if frame_index < self.value_stack.len() {
-            self.replace(frame_index, ValueStackKind::Local(obj, index))
-        } else {
-            Err(RuntimeErr::frame_index_out_of_bounds(frame_index))
-        }
-    }
-
-    /// Load (copy) object from local slot to TOS.
-    fn load_local(&mut self, index: usize) -> RuntimeResult {
-        let obj = self.get_local(index)?;
-        self.push_temp_local(obj, index);
-        Ok(())
-    }
-
-    /// Get object from local slot.
-    fn get_local(&mut self, index: usize) -> RuntimeObjResult {
-        let frame_index = self.call_frame_pointer() + index;
-        if let Some(kind) = self.value_stack.peek_at(frame_index) {
-            if let ValueStackKind::Local(obj, _) = kind {
-                Ok(obj.clone())
-            } else {
-                panic!("Expected local; got {kind:?}");
-            }
-        } else {
-            Err(RuntimeErr::frame_index_out_of_bounds(frame_index))
-        }
     }
 
     fn push_var(&mut self, depth: usize, name: String) -> RuntimeResult {
@@ -955,26 +858,12 @@ impl VM {
         Ok(self.get_obj(kind))
     }
 
-    fn _peek_at(&self, index: usize) -> PeekResult {
-        match self.value_stack.peek_at(index) {
-            Some(kind) => Ok(kind),
-            None => Err(RuntimeErr::stack_index_out_of_bounds(index)),
-        }
-    }
-
-    fn _peek_at_obj(&self, index: usize) -> PeekObjResult {
-        let kind = self._peek_at(index)?;
-        Ok(self.get_obj(kind))
-    }
-
     fn get_obj(&self, kind: &ValueStackKind) -> ObjectRef {
         use ValueStackKind::*;
         match kind {
             GlobalConstant(obj, ..) => obj.clone(),
             Constant(obj, ..) => obj.clone(),
             Var(obj, ..) => obj.clone(),
-            Local(obj, ..) => obj.clone(),
-            TempLocal(obj, ..) => obj.clone(),
             Temp(obj) => obj.clone(),
             ReturnVal(obj) => obj.clone(),
         }
@@ -998,9 +887,7 @@ impl VM {
                 GlobalConstant(..) => "G",
                 Constant(..) => "C",
                 Var(..) => "V",
-                Local(..) => "L",
                 Temp(..) => "T",
-                TempLocal(..) => "TL",
                 ReturnVal(..) => "R",
             };
             let obj = self.get_obj(kind);

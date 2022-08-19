@@ -28,9 +28,7 @@ pub enum ValueStackKind {
     GlobalConstant(ObjectRef, usize),
     Constant(ObjectRef, usize),
     Var(ObjectRef, usize, String),
-    Local(ObjectRef, usize),
     Temp(ObjectRef),
-    TempLocal(ObjectRef, usize),
     ReturnVal(ObjectRef),
 }
 
@@ -78,8 +76,8 @@ impl RuntimeErr {
         Self::new(RuntimeErrKind::ConstantNotFound(index))
     }
 
-    pub fn cell_not_found(index: usize) -> Self {
-        Self::new(RuntimeErrKind::CellNotFound(index))
+    pub fn captured_var_not_found<S: Into<String>>(name: S) -> Self {
+        Self::new(RuntimeErrKind::CapturedVarNotFound(name.into()))
     }
 
     pub fn expected_var<S: Into<String>>(message: S) -> Self {
@@ -143,7 +141,7 @@ pub enum RuntimeErrKind {
     FrameIndexOutOfBounds(usize),
     RecursionDepthExceeded(CallDepth),
     ConstantNotFound(usize),
-    CellNotFound(usize),
+    CapturedVarNotFound(String),
     ExpectedVar(String),
     ParseErr(ParseErr),
     CompErr(CompErr),

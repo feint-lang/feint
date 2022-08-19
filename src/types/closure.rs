@@ -1,4 +1,5 @@
 use std::any::Any;
+use std::collections::HashMap;
 use std::fmt;
 use std::sync::{Arc, RwLock};
 
@@ -78,14 +79,14 @@ pub struct Closure {
     name: String,
     params: Params,
     pub func: ObjectRef,
-    pub captured: Vec<ObjectRef>,
+    pub captured: HashMap<String, ObjectRef>,
 }
 
 unsafe impl Send for Closure {}
 unsafe impl Sync for Closure {}
 
 impl Closure {
-    pub fn new(func_ref: ObjectRef, captured: Vec<ObjectRef>) -> Self {
+    pub fn new(func_ref: ObjectRef, captured: HashMap<String, ObjectRef>) -> Self {
         let func = func_ref.read().unwrap();
         let func = func.down_to_func().unwrap();
         Self {

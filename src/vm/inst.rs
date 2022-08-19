@@ -19,7 +19,7 @@ pub enum Inst {
     LoadTrue,  // 1
     LoadFalse, // 2
 
-    ScopeStart(usize), // number of top-level locals in scope
+    ScopeStart,
     ScopeEnd,
 
     StatementStart(Location, Location),
@@ -27,15 +27,8 @@ pub enum Inst {
     // Other constants are local to a given code unit.
     LoadConst(usize),
 
-    // Store value at TOS as local.
-    StoreLocal(usize),
-
-    // Load local value onto top of stack--retrieve (copy) local value
-    // from slot lower in stack and push it onto TOS.
-    LoadLocal(usize),
-
     // Load captured value to TOS.
-    LoadCaptured(usize),
+    LoadCaptured(String),
 
     DeclareVar(String),
     AssignVar(String),
@@ -85,8 +78,8 @@ pub enum Inst {
 
     // Make closure wrapping function.
     MakeClosure(
-        usize,      // constant index of wrapped function
-        Vec<usize>, // local indexes within parent frame
+        usize,       // constant index of wrapped function
+        Vec<String>, // local indexes within parent frame
     ),
 
     LoadModule(String),

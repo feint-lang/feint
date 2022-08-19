@@ -62,7 +62,11 @@ impl RuntimeContext {
     }
 
     #[inline]
-    fn current_namespace(&mut self) -> &mut Namespace {
+    fn current_ns(&self) -> &Namespace {
+        &self.namespace_stack[self.current_depth]
+    }
+
+    fn current_ns_mut(&mut self) -> &mut Namespace {
         &mut self.namespace_stack[self.current_depth]
     }
 
@@ -113,7 +117,7 @@ impl RuntimeContext {
     /// nil.
     pub fn declare_var(&mut self, name: &str) {
         let initial = create::new_nil();
-        let namespace = self.current_namespace();
+        let namespace = self.current_ns_mut();
         namespace.add_obj(name, initial);
     }
 
@@ -127,7 +131,7 @@ impl RuntimeContext {
         name: &str,
         obj: ObjectRef,
     ) -> Result<usize, RuntimeErr> {
-        let namespace = self.current_namespace();
+        let namespace = self.current_ns_mut();
         if namespace.set_obj(name, obj) {
             Ok(self.current_depth)
         } else {
@@ -164,7 +168,7 @@ impl RuntimeContext {
 
     /// Get the depth of the namespace where the specified var is
     /// defined.
-    pub fn get_var_depth(&mut self, name: &str) -> Result<usize, RuntimeErr> {
+    pub fn get_var_depth(&self, name: &str) -> Result<usize, RuntimeErr> {
         let ns_stack = &self.namespace_stack;
         let mut var_depth = self.current_depth;
         loop {
@@ -180,17 +184,17 @@ impl RuntimeContext {
     }
 
     /// Get var in current namespace or any ancestor namespace.
-    pub fn get_var(&mut self, name: &str) -> Result<ObjectRef, RuntimeErr> {
+    pub fn get_var(&self, name: &str) -> Result<ObjectRef, RuntimeErr> {
         let depth = self.get_var_depth(name)?;
         self.get_var_at_depth(depth, name)
     }
 
     /// Get var from current namespace.
     pub fn get_var_in_current_namespace(
-        &mut self,
+        &self,
         name: &str,
     ) -> Result<ObjectRef, RuntimeErr> {
-        let namespace = self.current_namespace();
+        let namespace = self.current_ns();
         if let Some(obj) = namespace.get_obj(name) {
             Ok(obj)
         } else {

@@ -66,9 +66,7 @@ impl Disassembler {
             LoadNil => self.align("LOAD_NIL", "nil"),
             LoadTrue => self.align("LOAD_TRUE", "true"),
             LoadFalse => self.align("LOAD_FALSE", "false"),
-            ScopeStart(num_locals) => {
-                self.align("SCOPE_START", format!("-> {num_locals} locals"))
-            }
+            ScopeStart => self.align("SCOPE_START", ""),
             ScopeEnd => self.align("SCOPE_END", ""),
             StatementStart(start, _) => {
                 self.new_line = start.line != self.curr_line_no;
@@ -82,8 +80,6 @@ impl Disassembler {
                 };
                 self.align("LOAD_CONST", format!("{index} ({constant:?})"))
             }
-            StoreLocal(index) => self.align("STORE_LOCAL", index),
-            LoadLocal(index) => self.align("LOAD_LOCAL", index),
             LoadCaptured(index) => self.align("LOAD_CELL", index),
             DeclareVar(name) => self.align("DECLARE_VAR", name),
             AssignVar(name) => self.align("ASSIGN_VAR", name),

@@ -1,6 +1,6 @@
 //! The scope tree keeps track of nested scopes during compilation.
 //! Currently, it's only used resolve jump targets to labels.
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 
 use crate::modules;
 use crate::types::ObjectTrait;
@@ -11,13 +11,9 @@ pub struct ScopeTree {
 }
 
 impl ScopeTree {
-    pub fn new(addr: usize, initial_scope_kind: ScopeKind) -> Self {
-        let global_scope = Scope::new(addr, initial_scope_kind, 0, None);
+    pub fn new(initial_scope_kind: ScopeKind) -> Self {
+        let global_scope = Scope::new(initial_scope_kind, 0, None);
         Self { storage: vec![global_scope], pointer: 0 }
-    }
-
-    pub fn addr(&self) -> usize {
-        self.current().addr
     }
 
     pub fn pointer(&self) -> usize {
@@ -30,10 +26,6 @@ impl ScopeTree {
 
     pub fn in_func_scope(&self) -> bool {
         self.current().is_func()
-    }
-
-    pub fn num_locals(&self) -> usize {
-        self.current().locals.len()
     }
 
     fn get(&self, index: usize) -> &Scope {
@@ -113,9 +105,9 @@ impl ScopeTree {
 
     /// Add nested scope to current scope then make the new scope the
     /// current scope.
-    pub fn add(&mut self, addr: usize, kind: ScopeKind) -> usize {
+    pub fn add(&mut self, kind: ScopeKind) -> usize {
         let index = self.storage.len();
-        self.storage.push(Scope::new(addr, kind, index, Some(self.pointer)));
+        self.storage.push(Scope::new(kind, index, Some(self.pointer)));
         self.storage[self.pointer].children.push(index);
         self.pointer = index;
         index
@@ -152,75 +144,54 @@ impl ScopeTree {
         false
     }
 
-    // Locals ----------------------------------------------------------
+    // Vars ------------------------------------------------------------
 
-    /// Add local var to current scope and return its index within that
-    /// scope. If the local already exists in the current scope, just
-    /// return its existing stack index.
-    pub fn add_local<S: Into<String>>(&mut self, name: S, assigned: bool) -> usize {
+    /// Add var to current scope if it's not already present.
+    pub fn add_var<S: Into<String>>(&mut self, name: S, assigned: bool) {
         let name = name.into();
-        let current = self.current_mut();
-        let locals = &mut current.locals;
-        if let Some((_, index, _, _)) = locals.iter().find(|(_, _, n, _)| n == &name) {
-            *index
+        if self.in_global_scope() {
+            panic!("Cannot add var while in global scope");
         } else {
-            let index = locals.len();
-            locals.push((current.index, index, name, assigned));
-            index
+            if !self.find_var(name.as_str(), None).is_some() {
+                self.current_mut().vars.push((name, assigned));
+            }
         }
     }
 
-    /// Find local var in current scope or any of its ancestor scopes.
+    /// Mark var as assigned.
+    pub fn mark_assigned(&mut self, pointer: usize, name: &str) {
+        let scope = self.get_mut(pointer);
+        if let Some(index) = scope.vars.iter().position(|(n, _)| n == name) {
+            scope.vars[index] = (name.to_owned(), true);
+        }
+    }
+
+    /// Find var in current scope or any of its ancestor scopes.
     ///
-    /// If the local is found, a tuple with the following fields is
-    /// returned: stack index where the local var lives at runtime,
-    /// scope pointer of scope where found, local index in scope where
-    /// found, assigned flag.
-    pub fn find_local(
+    /// If the var is found, a tuple with the following fields is
+    /// returned: scope pointer of scope where found, name, assigned
+    /// flag.
+    pub fn find_var(
         &self,
         name: &str,
         pointer: Option<usize>,
-    ) -> Option<(usize, usize, usize, bool)> {
-        let locals = self.all_locals(pointer);
-        if !locals.is_empty() {
-            let mut stack_index = locals.len();
-            let iter = locals.iter().rev();
-            for (pointer, local_index, local_name, assigned) in iter {
-                stack_index -= 1;
-                if *local_name == name {
-                    return Some((stack_index, *pointer, *local_index, *assigned));
-                }
-            }
-        }
-        None
-    }
-
-    /// Mark local as assigned.
-    pub fn mark_assigned(&mut self, pointer: usize, local_index: usize) {
-        let scope = self.get_mut(pointer);
-        let (pointer, index, name, _) = &scope.locals[local_index];
-        scope.locals[local_index] = (*pointer, *index, name.clone(), true);
-    }
-
-    /// Flatten locals of scope (current by default) and its ancestors.
-    /// The scope's locals will be at the end and the search must
-    /// proceed in reverse.
-    fn all_locals(&self, pointer: Option<usize>) -> Vec<&(usize, usize, String, bool)> {
-        let mut locals = VecDeque::new();
+    ) -> Option<(usize, String, bool)> {
         let mut scope = if let Some(pointer) = pointer {
             self.get(pointer)
         } else {
             self.current()
         };
         loop {
-            locals.push_front(&scope.locals);
+            if let Some(entry) = scope.vars.iter().find(|(n, a)| n == name) {
+                return Some((scope.index, entry.0.to_owned(), entry.1));
+            }
             if let Some(parent_index) = scope.parent {
                 scope = &self.storage[parent_index];
             } else {
                 break;
             }
         }
-        locals.into_iter().flatten().collect()
+        None
     }
 
     // Jumps & Labels --------------------------------------------------
@@ -242,13 +213,12 @@ impl ScopeTree {
 
 #[derive(Debug)]
 pub struct Scope {
-    addr: usize, // address in code block
     kind: ScopeKind,
     index: usize,
     parent: Option<usize>,
     children: Vec<usize>,
-    globals: Vec<String>,                      // name
-    locals: Vec<(usize, usize, String, bool)>, // scope pointer, index, name, assigned
+    globals: Vec<String>,
+    vars: Vec<(String, bool)>, // name, assigned
     /// target label name => jump inst address
     jumps: Vec<(String, usize)>,
     /// label name => label inst address
@@ -263,15 +233,14 @@ pub enum ScopeKind {
 }
 
 impl Scope {
-    fn new(addr: usize, kind: ScopeKind, index: usize, parent: Option<usize>) -> Self {
+    fn new(kind: ScopeKind, index: usize, parent: Option<usize>) -> Self {
         Self {
-            addr,
             kind,
             index,
             parent,
             children: vec![],
             globals: vec![],
-            locals: vec![],
+            vars: vec![],
             jumps: vec![],
             labels: HashMap::new(),
         }

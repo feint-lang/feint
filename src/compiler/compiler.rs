@@ -113,14 +113,17 @@ impl Compiler {
             let mut found = false;
             let mut current_scope_pointer = parent_scope_pointer;
 
+            log::trace!("Searching for free var: {name}");
+
             for (up_visitor, up_scope_pointer) in stack.iter() {
                 let result = up_visitor
                     .scope_tree
-                    .find_local(name.as_str(), Some(current_scope_pointer));
+                    .find_var(name.as_str(), Some(current_scope_pointer));
 
-                if let Some((index, ..)) = result {
+                if let Some((_, name, _)) = result {
+                    log::trace!("Found free var: {name}");
                     found = true;
-                    captured.push((*addr, index));
+                    captured.push((*addr, name));
                     break;
                 }
 
@@ -132,15 +135,19 @@ impl Compiler {
             }
         }
 
-        for (i, (addr, ..)) in captured.iter().enumerate() {
-            visitor.replace(*addr, Inst::LoadCaptured(i));
+        for (addr, name) in captured.iter() {
+            visitor.replace(*addr, Inst::LoadCaptured(name.to_string()));
         }
 
         // Resolve globals.
         let global_visitor = &stack[0].0;
         for (addr, name, start, end) in presumed_globals.into_iter() {
             if global_visitor.scope_tree.has_global(name.as_str()) {
-                visitor.code.replace_inst(addr, Inst::LoadVar(name));
+                visitor.code.replace_inst(addr, Inst::LoadVar(name.clone()));
+                if visitor.scope_tree.find_var(name.as_str(), None).is_some() {
+                    visitor.code.replace_inst(addr - 1, Inst::NoOp);
+                    visitor.code.replace_inst(addr + 1, Inst::NoOp);
+                }
             } else {
                 return Err(CompErr::global_not_found(name, start, end));
             }
@@ -157,12 +164,7 @@ impl Compiler {
 
         // END Inner Functions -----------------------------------------
 
-        let func = create::new_func(
-            name,
-            params,
-            visitor.code,
-            visitor.scope_tree.num_locals(),
-        );
+        let func = create::new_func(name, params, visitor.code);
 
         let parent_visitor = &mut self.visitor_stack.peek_mut().unwrap().0;
         let const_index = parent_visitor.code.add_const(func);
@@ -170,7 +172,8 @@ impl Compiler {
         if captured.is_empty() {
             parent_visitor.replace(func_addr, Inst::LoadConst(const_index));
         } else {
-            let captured = captured.iter().map(|(_, i)| *i).collect();
+            let captured = captured.iter().map(|(_, name)| name.to_string()).collect();
+            log::trace!("CAPTURED: {captured:?}");
             parent_visitor.replace(func_addr, Inst::MakeClosure(const_index, captured));
         }
 
@@ -202,7 +205,7 @@ impl Visitor {
         Self {
             initial_scope_kind,
             code: Code::new(),
-            scope_tree: ScopeTree::new(0, initial_scope_kind),
+            scope_tree: ScopeTree::new(initial_scope_kind),
             scope_depth: 0,
             func_nodes: vec![],
             name: name.to_owned(),
@@ -235,21 +238,20 @@ impl Visitor {
             .statements
             .last()
             .expect("Block for function contains no statements");
+
         let return_nil = !matches!(last_statement.kind, ast::StatementKind::Expr(_));
 
-        // Add local slot for this.
-        // TODO: Rethink this handling.
-        self.scope_tree.add_local("this", true);
+        // Add var for this.
+        self.scope_tree.add_var("this", true);
 
-        // Add local slots for function parameters.
-        // NOTE: Upon entry, the args will be at TOS.
+        // Add vars for function parameters.
         let param_count = params.len();
         if param_count > 0 {
             let last = param_count - 1;
             for (i, name) in params.iter().enumerate() {
                 if name.is_empty() {
                     if i == last {
-                        self.scope_tree.add_local("$args", true);
+                        self.scope_tree.add_var("$args", true);
                     } else {
                         return Err(CompErr::var_args_must_be_last(
                             node.block.start,
@@ -257,7 +259,7 @@ impl Visitor {
                         ));
                     }
                 } else {
-                    self.scope_tree.add_local(name, true);
+                    self.scope_tree.add_var(name, true);
                 }
             }
         }
@@ -487,41 +489,39 @@ impl Visitor {
         end: Location,
     ) -> VisitResult {
         let name = node.name();
-        let name = name.as_str();
         if self.scope_tree.in_global_scope() {
             // Quick check for global var, avoiding unnecessary search
             // for local below.
-            self.load_global_var(name, start, end)?;
+            self.load_global_var(name.as_str(), start, end)?;
             return Ok(());
         }
-        // NOTE: When a function is being compiled, find_local will
+        // NOTE: When a function is being compiled, find_var will
         //       traverse upward as far as the top level scope of the
         //       function. It will NOT proceed up into a function's
         //       enclosing scope.
-        match self.scope_tree.find_local(name, None) {
-            Some((stack_index, _, _, true)) => {
-                // Local exists and has been assigned.
-                self.push(Inst::LoadLocal(stack_index));
+        match self.scope_tree.find_var(name.as_str(), None) {
+            Some((.., true)) => {
+                self.push(Inst::LoadVar(name));
             }
-            Some((_, _, _, false)) | None => {
-                // 1. The local exists but has not been assigned
+            Some((.., false)) | None => {
+                // 1. The var exists but has not been assigned
                 //    (e.g., `f = () -> x = x` where RHS `x` is
                 //    defined in an enclosing scope.
                 //
-                // 2. The name wasn't found, it's either a global or
+                // 2. The var wasn't found--it's either a global or
                 //    a free var, depending on the initial scope.
                 if self.initial_scope_kind == ScopeKind::Func {
                     // In a function enclosed in an outer function
-                    // names may resolve to locals in an outer
-                    // function, locals in an outer block, or to global
-                    // vars. These names will be resolved later.
+                    // names may resolve to vars in an outer function,
+                    // vars in an outer block, or to global vars. These
+                    // names will be resolved later.
                     let addr = self.len();
-                    self.code.add_free_var(name, start, end);
+                    self.code.add_free_var(name.as_str(), start, end);
                     self.push(Inst::VarPlaceholder(addr, name.to_owned()));
                 } else {
                     // In a block or function defined in module/global
                     // scope, all free vars resolve to global vars.
-                    self.load_global_var(name, start, end)?;
+                    self.load_global_var(name.as_str(), start, end)?;
                 }
             }
         }
@@ -654,12 +654,17 @@ impl Visitor {
         let loop_scope_depth = self.scope_depth;
 
         // Evaluate loop expression. If the expression is an assignment,
-        // evaluate the value of the local var instead.
+        // evaluate the value of the var instead.
         let loop_addr = if let DeclarationAndAssignment(lhs, val) = expr.kind {
+            let name = if let Some(name) = lhs.ident_name() {
+                name
+            } else {
+                return Err(CompErr::expected_ident(lhs.start, lhs.end));
+            };
             self.visit_declaration(*lhs.clone())?;
             self.visit_assignment(*lhs, *val)?;
             let loop_addr = self.len();
-            self.push(Inst::LoadLocal(0));
+            self.push(Inst::LoadVar(name));
             loop_addr
         } else {
             let loop_addr = self.len();
@@ -755,7 +760,6 @@ impl Visitor {
     }
 
     fn visit_declaration(&mut self, ident_expr: ast::Expr) -> VisitResult {
-        log::trace!("BEGIN: declaration of {ident_expr:?}");
         let name = if let Some(name) = ident_expr.is_ident() {
             if name == "this" {
                 return Err(CompErr::cannot_assign_special_ident(
@@ -767,7 +771,6 @@ impl Visitor {
             name
         } else if let Some(name) = ident_expr.is_special_ident() {
             if name == "$main" && self.scope_tree.in_global_scope() {
-                log::trace!("FOUND $main");
                 name
             } else {
                 return Err(CompErr::cannot_assign_special_ident(
@@ -782,18 +785,11 @@ impl Visitor {
             return Err(CompErr::expected_ident(ident_expr.start, ident_expr.end));
         };
         if self.scope_tree.in_global_scope() {
-            log::trace!("DECLARE GLOBAL: {name}");
             self.scope_tree.add_global(name.as_str());
-            self.push(Inst::DeclareVar(name));
         } else {
-            log::trace!("DECLARE (ADD) LOCAL: {name}");
-            self.scope_tree.add_local(name, false);
-            // There's no instruction for declaring locals, because
-            // locals initially appear on the stack by being loaded as
-            // the RHS of an assignment. When the local is assigned,
-            // that temp TOS value will be converted in place to a Local
-            // type (remaining at TOS).
+            self.scope_tree.add_var(name.as_str(), false);
         }
+        self.push(Inst::DeclareVar(name));
         Ok(())
     }
 
@@ -803,19 +799,14 @@ impl Visitor {
         value_expr: ast::Expr,
     ) -> VisitResult {
         // TODO: Allow assignment to attributes
-        log::trace!("BEGIN: assignment {lhs_expr:?} = {value_expr:?}");
         if let Some(name) = lhs_expr.ident_name() {
             self.visit_expr(value_expr, Some(name.clone()))?;
-            match self.scope_tree.find_local(name.as_str(), None) {
-                Some((stack_index, pointer, local_index, _)) => {
-                    log::trace!("ASSIGN (STORE) LOCAL: {name} @ {stack_index}");
-                    self.scope_tree.mark_assigned(pointer, local_index);
-                    self.push(Inst::StoreLocal(stack_index));
-                }
-                None => {
-                    log::trace!("ASSIGN VAR: {name}");
+            match self.scope_tree.find_var(name.as_str(), None) {
+                Some((pointer, n, _)) => {
+                    self.scope_tree.mark_assigned(pointer, n.as_str());
                     self.push(Inst::AssignVar(name))
                 }
+                None => self.push(Inst::AssignVar(name)),
             }
             Ok(())
         } else {
@@ -892,17 +883,13 @@ impl Visitor {
     /// Add nested scope to current scope then make the new scope the
     /// current scope.
     fn enter_scope(&mut self, kind: ScopeKind) {
-        let addr = self.len();
-        self.push(Inst::ScopeStartPlaceholder(addr));
-        self.scope_tree.add(addr, kind);
+        self.push(Inst::ScopeStart);
+        self.scope_tree.add(kind);
         self.scope_depth += 1;
     }
 
     /// Move up to the parent scope of the current scope.
     fn exit_scope(&mut self) {
-        let addr = self.scope_tree.addr();
-        let num_locals = self.scope_tree.num_locals();
-        self.replace(addr, Inst::ScopeStart(num_locals));
         self.push(Inst::ScopeEnd);
         self.scope_tree.move_up();
         self.scope_depth -= 1;

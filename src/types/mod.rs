@@ -24,7 +24,6 @@ pub(crate) mod ns;
 pub(crate) mod bool;
 pub(crate) mod bound_func;
 pub(crate) mod builtin_func;
-pub(crate) mod cell;
 pub(crate) mod class;
 pub(crate) mod closure;
 pub(crate) mod custom;

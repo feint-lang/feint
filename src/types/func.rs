@@ -80,15 +80,13 @@ pub struct Func {
     name: String,
     params: Params,
     pub code: Code,
-    // Total number of locals, including params
-    pub num_locals: usize,
 }
 
 unsafe impl Send for Func {}
 unsafe impl Sync for Func {}
 
 impl Func {
-    pub fn new(name: String, params: Params, code: Code, num_locals: usize) -> Self {
+    pub fn new(name: String, params: Params, code: Code) -> Self {
         Self {
             namespace: Namespace::with_entries(&[
                 // Instance Attributes
@@ -97,8 +95,19 @@ impl Func {
             name,
             params,
             code,
-            num_locals,
         }
+    }
+
+    pub fn arg_names(&self) -> Vec<&str> {
+        let mut names = vec![];
+        for name in self.params.iter() {
+            if name.is_empty() {
+                names.push("$args");
+            } else {
+                names.push(name);
+            }
+        }
+        names
     }
 }
 
