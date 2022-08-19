@@ -33,6 +33,7 @@ pub enum Inst {
     DeclareVar(String),
     AssignVar(String),
     LoadVar(String),
+    LoadOuterVar(String),
 
     // Jumps -----------------------------------------------------------
     //
@@ -86,7 +87,7 @@ pub enum Inst {
 
     Placeholder(usize, Box<Inst>, String), // address, instruction, error message
     ScopeStartPlaceholder(usize),          // address, number of locals
-    VarPlaceholder(usize, String),         // address, var name
+    FreeVarPlaceholder(usize, String),     // address, var name
     BreakPlaceholder(usize, usize),        // jump address, scope depth
     ContinuePlaceholder(usize, usize),     // jump address, scope depth
 

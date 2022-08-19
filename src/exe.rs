@@ -335,6 +335,7 @@ impl<'a> Executor<'a> {
         use CompErrKind::*;
         let (start, end) = err.loc();
         let message = match &err.kind {
+            NameNotFound(name, ..) =>format!("Name not found: {name}"),
             LabelNotFoundInScope(name, ..) => format!("label not found in scope: {name}"),
             CannotJumpOutOfFunc(name, ..) => format!(
                 "cannot jump out of function: label {name} not found or defined in outer scope"

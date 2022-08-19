@@ -121,7 +121,8 @@ impl Code {
     }
 
     /// Add a free var, a reference to a var defined in an enclosing
-    /// scope.
+    /// scope. This also adds a placeholder instruction for the free
+    /// var that will replaced in the compiler's name resolution stage.
     pub fn add_free_var<S: Into<String>>(
         &mut self,
         name: S,
@@ -130,6 +131,7 @@ impl Code {
     ) {
         let addr = self.len_chunk();
         let name = name.into();
-        self.free_vars.push((addr, name, start, end));
+        self.free_vars.push((addr, name.clone(), start, end));
+        self.push_inst(Inst::FreeVarPlaceholder(addr, name));
     }
 }

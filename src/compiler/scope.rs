@@ -113,48 +113,13 @@ impl ScopeTree {
         index
     }
 
-    // Globals ---------------------------------------------------------
-
-    /// Keep track of global vars so we can check to be sure that they
-    /// exist when compiling.
-    pub fn add_global<S: Into<String>>(&mut self, name: S) {
-        if self.in_global_scope() {
-            self.current_mut().globals.push(name.into());
-        } else {
-            panic!("Cannot add global while not in global scope");
-        }
-    }
-
-    /// See if global exists in or above current scope.
-    pub fn has_global(&self, name: &str) -> bool {
-        let mut current = self.current();
-        loop {
-            if current.is_global() {
-                return current.globals.iter().any(|n| n == name) || {
-                    let builtins = modules::BUILTINS.read().unwrap();
-                    builtins.namespace().has(name)
-                };
-            }
-            if let Some(parent_index) = current.parent {
-                current = &self.storage[parent_index];
-            } else {
-                break;
-            }
-        }
-        false
-    }
-
     // Vars ------------------------------------------------------------
 
     /// Add var to current scope if it's not already present.
     pub fn add_var<S: Into<String>>(&mut self, name: S, assigned: bool) {
         let name = name.into();
-        if self.in_global_scope() {
-            panic!("Cannot add var while in global scope");
-        } else {
-            if !self.find_var(name.as_str(), None).is_some() {
-                self.current_mut().vars.push((name, assigned));
-            }
+        if !self.find_var(name.as_str(), None).is_some() {
+            self.current_mut().vars.push((name, assigned));
         }
     }
 
@@ -192,6 +157,14 @@ impl ScopeTree {
             }
         }
         None
+    }
+
+    pub fn find_var_in_parent(&self, name: &str) -> Option<(usize, String, bool)> {
+        if self.pointer == 0 {
+            None
+        } else {
+            self.find_var(name, Some(self.pointer - 1))
+        }
     }
 
     // Jumps & Labels --------------------------------------------------

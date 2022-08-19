@@ -178,7 +178,11 @@ impl VM {
                     self.push_var(depth, name.clone())?;
                 }
                 LoadVar(name) => {
-                    let depth = self.ctx.get_var_depth(name.as_str())?;
+                    let depth = self.ctx.get_var_depth(name.as_str(), None)?;
+                    self.push_var(depth, name.clone())?;
+                }
+                LoadOuterVar(name) => {
+                    let depth = self.ctx.get_outer_var_depth(name.as_str())?;
                     self.push_var(depth, name.clone())?;
                 }
                 // Jumps
@@ -315,7 +319,7 @@ impl VM {
                     eprintln!("ScopeStart placeholder at {addr} was not updated");
                     break Ok(VMState::Halted(255));
                 }
-                VarPlaceholder(addr, name) => {
+                FreeVarPlaceholder(addr, name) => {
                     self.halt();
                     eprintln!("Var placeholder at {addr} was not updated: {name}");
                     break Ok(VMState::Halted(255));

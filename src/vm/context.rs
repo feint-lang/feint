@@ -166,11 +166,15 @@ impl RuntimeContext {
         }
     }
 
-    /// Get the depth of the namespace where the specified var is
-    /// defined.
-    pub fn get_var_depth(&self, name: &str) -> Result<usize, RuntimeErr> {
+    /// Get depth of namespace where var is defined.
+    pub fn get_var_depth(
+        &self,
+        name: &str,
+        starting_depth: Option<usize>,
+    ) -> Result<usize, RuntimeErr> {
         let ns_stack = &self.namespace_stack;
-        let mut var_depth = self.current_depth;
+        let mut var_depth =
+            if let Some(depth) = starting_depth { depth } else { self.current_depth };
         loop {
             if ns_stack[var_depth].get_obj(name).is_some() {
                 break Ok(var_depth);
@@ -183,9 +187,19 @@ impl RuntimeContext {
         }
     }
 
+    /// Get depth of namespace where outer var is defined (skips current
+    /// namespace, starts search from parent namespace).
+    pub fn get_outer_var_depth(&self, name: &str) -> Result<usize, RuntimeErr> {
+        if self.current_depth == 0 {
+            let message = format!("Name not found: {name}");
+            return Err(RuntimeErr::name_err(message));
+        }
+        self.get_var_depth(name, Some(self.current_depth - 1))
+    }
+
     /// Get var in current namespace or any ancestor namespace.
     pub fn get_var(&self, name: &str) -> Result<ObjectRef, RuntimeErr> {
-        let depth = self.get_var_depth(name)?;
+        let depth = self.get_var_depth(name, None)?;
         self.get_var_at_depth(depth, name)
     }
 

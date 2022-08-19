@@ -12,6 +12,9 @@ impl CompErr {
     fn new(kind: CompErrKind) -> Self {
         Self { kind }
     }
+    pub fn name_not_found(name: String, start: Location, end: Location) -> Self {
+        Self::new(CompErrKind::NameNotFound(name, start, end))
+    }
 
     pub fn label_not_found_in_scope(
         name: String,
@@ -64,6 +67,7 @@ impl CompErr {
     pub fn loc(&self) -> (Location, Location) {
         use CompErrKind::*;
         let (start, end) = match &self.kind {
+            NameNotFound(_, start, end) => (start, end),
             LabelNotFoundInScope(_, start, end) => (start, end),
             CannotJumpOutOfFunc(_, start, end) => (start, end),
             DuplicateLabelInScope(_, start, end) => (start, end),
@@ -79,6 +83,7 @@ impl CompErr {
 // TODO: Add start and end locations to all error types
 #[derive(Clone, Debug)]
 pub enum CompErrKind {
+    NameNotFound(String, Location, Location),
     LabelNotFoundInScope(String, Location, Location),
     CannotJumpOutOfFunc(String, Location, Location),
     DuplicateLabelInScope(String, Location, Location),

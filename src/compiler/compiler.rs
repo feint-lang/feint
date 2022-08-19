@@ -1,8 +1,10 @@
-use num_traits::ToPrimitive;
 use std::fmt;
 use std::fmt::Formatter;
 
+use num_traits::ToPrimitive;
+
 use crate::ast;
+use crate::modules::BUILTINS;
 use crate::types::{create, ObjectRef};
 use crate::util::{
     BinaryOperator, CompareOperator, InplaceOperator, Location, Stack,
@@ -97,17 +99,18 @@ impl Compiler {
         let mut visitor = Visitor::for_func(name.as_str());
         visitor.visit_func(node)?;
 
+        // Unresolved names are assumed to be builtins.
+        let builtins = BUILTINS.read().unwrap();
+        let mut presumed_builtins = vec![];
+
         // Captured vars in current function. These are free vars in the
-        // current function that are defined in an enclosing function.
+        // current function that are defined in an enclosing function or
+        // module.
         //
         // Each entry contains the address of the free var in the
         // current function and the local var index in the enclosing
         // function.
         let mut captured = vec![];
-
-        // Names that weren't found in any enclosing function are
-        // presumed to be globals.
-        let mut presumed_globals = vec![];
 
         for (addr, name, start, end) in visitor.code.free_vars().iter() {
             let mut found = false;
@@ -131,26 +134,20 @@ impl Compiler {
             }
 
             if !found {
-                presumed_globals.push((*addr, name.clone(), *start, *end));
+                presumed_builtins.push((*addr, name.to_owned(), *start, *end));
+            }
+        }
+
+        for (addr, name, start, end) in presumed_builtins.into_iter() {
+            if builtins.has_name(name.as_str()) {
+                visitor.replace(addr, Inst::LoadVar(name.to_owned()));
+            } else {
+                return Err(CompErr::name_not_found(name.to_owned(), start, end));
             }
         }
 
         for (addr, name) in captured.iter() {
             visitor.replace(*addr, Inst::LoadCaptured(name.to_string()));
-        }
-
-        // Resolve globals.
-        let global_visitor = &stack[0].0;
-        for (addr, name, start, end) in presumed_globals.into_iter() {
-            if global_visitor.scope_tree.has_global(name.as_str()) {
-                visitor.code.replace_inst(addr, Inst::LoadVar(name.clone()));
-                if visitor.scope_tree.find_var(name.as_str(), None).is_some() {
-                    visitor.code.replace_inst(addr - 1, Inst::NoOp);
-                    visitor.code.replace_inst(addr + 1, Inst::NoOp);
-                }
-            } else {
-                return Err(CompErr::global_not_found(name, start, end));
-            }
         }
 
         // Inner Functions ---------------------------------------------
@@ -173,7 +170,6 @@ impl Compiler {
             parent_visitor.replace(func_addr, Inst::LoadConst(const_index));
         } else {
             let captured = captured.iter().map(|(_, name)| name.to_string()).collect();
-            log::trace!("CAPTURED: {captured:?}");
             parent_visitor.replace(func_addr, Inst::MakeClosure(const_index, captured));
         }
 
@@ -366,7 +362,7 @@ impl Visitor {
     }
 
     fn visit_import(&mut self, name: String) -> VisitResult {
-        self.scope_tree.add_global(name.as_str());
+        self.scope_tree.add_var(name.as_str(), true);
         self.push(Inst::LoadModule(name));
         Ok(())
     }
@@ -390,7 +386,6 @@ impl Visitor {
             Kind::FormatString(items) => self.visit_format_string(items)?,
             Kind::Ident(ident) => self.visit_ident(ident, node.start, node.end)?,
             Kind::DeclarationAndAssignment(lhs_expr, value_expr) => {
-                log::trace!("BEGIN: declare and assign {lhs_expr:?} = {value_expr:?}");
                 self.visit_declaration(*lhs_expr.clone())?;
                 self.visit_assignment(*lhs_expr, *value_expr)?
             }
@@ -406,7 +401,6 @@ impl Visitor {
                 let name = name.map_or_else(|| "<anonymous>".to_owned(), |name| name);
                 let addr = self.len();
                 let pointer = self.scope_tree.pointer();
-                log::trace!("FOUND FUNC {name} @ {addr} in {pointer}");
                 self.func_nodes.push((addr, pointer, name, func));
                 self.push(Inst::Placeholder(
                     addr,
@@ -489,59 +483,62 @@ impl Visitor {
         end: Location,
     ) -> VisitResult {
         let name = node.name();
-        if self.scope_tree.in_global_scope() {
-            // Quick check for global var, avoiding unnecessary search
-            // for local below.
-            self.load_global_var(name.as_str(), start, end)?;
-            return Ok(());
-        }
         // NOTE: When a function is being compiled, find_var will
-        //       traverse upward as far as the top level scope of the
+        //       traverse up as far as the top level scope of the
         //       function. It will NOT proceed up into a function's
-        //       enclosing scope.
+        //       enclosing scope, whether that's an outer function or
+        //       a module.
         match self.scope_tree.find_var(name.as_str(), None) {
             Some((.., true)) => {
                 self.push(Inst::LoadVar(name));
             }
-            Some((.., false)) | None => {
-                // 1. The var exists but has not been assigned
-                //    (e.g., `f = () -> x = x` where RHS `x` is
-                //    defined in an enclosing scope.
-                //
-                // 2. The var wasn't found--it's either a global or
-                //    a free var, depending on the initial scope.
-                if self.initial_scope_kind == ScopeKind::Func {
-                    // In a function enclosed in an outer function
-                    // names may resolve to vars in an outer function,
-                    // vars in an outer block, or to global vars. These
-                    // names will be resolved later.
-                    let addr = self.len();
+            // The var exists but has not yet been assigned--where the
+            // RHS side name shadows a name from an outer scope. E.g.:
+            //
+            //     x = "global"
+            //     block -> x = x
+            //     f = () -> x = x
+            // defined in an enclosing scope.
+            Some((.., false)) => {
+                if self.initial_scope_kind == ScopeKind::Module {
+                    // When compiling a module, the RHS must be defined
+                    // in an outer scope. If it isn't, that's an error.
+                    if self.scope_tree.find_var_in_parent(name.as_str()).is_some() {
+                        self.push(Inst::LoadOuterVar(name));
+                    } else {
+                        if BUILTINS.read().unwrap().has_name(name.as_str()) {
+                            self.push(Inst::LoadOuterVar(name));
+                        } else {
+                            return Err(CompErr::name_not_found(name, start, end));
+                        }
+                    }
+                } else if self.initial_scope_kind == ScopeKind::Func {
+                    // When compiling a function, the RHS is considered
+                    // a free var and will be resolved later.
                     self.code.add_free_var(name.as_str(), start, end);
-                    self.push(Inst::VarPlaceholder(addr, name.to_owned()));
+                }
+            }
+            // Var wasn't found in current scope or its ancestors.
+            None => {
+                if self.initial_scope_kind == ScopeKind::Module {
+                    // When compiling a module, all vars should resolve
+                    // at this stage, so this is an error.
+                    if BUILTINS.read().unwrap().has_name(name.as_str()) {
+                        self.push(Inst::LoadVar(name));
+                    } else {
+                        return Err(CompErr::name_not_found(name, start, end));
+                    }
+                } else if self.initial_scope_kind == ScopeKind::Func {
+                    // When compiling a function, vars may be defined in
+                    // an enclosing scope. These free vars will be
+                    // resolved later.
+                    self.code.add_free_var(name.as_str(), start, end);
                 } else {
-                    // In a block or function defined in module/global
-                    // scope, all free vars resolve to global vars.
-                    self.load_global_var(name.as_str(), start, end)?;
+                    panic!("Unexpected scope type: {:?}", self.initial_scope_kind);
                 }
             }
         }
         Ok(())
-    }
-
-    /// Emit a LOAD_VAR instruction for the specified global var if it
-    /// exists. Otherwise, return an error.
-    fn load_global_var(
-        &mut self,
-        name: &str,
-        start: Location,
-        end: Location,
-    ) -> Result<(), CompErr> {
-        if self.scope_tree.has_global(name) {
-            self.push(Inst::LoadVar(name.to_owned()));
-            Ok(())
-        } else {
-            Err(CompErr::global_not_found(name, start, end))
-        }
     }
 
     fn visit_get_attr(
@@ -784,11 +781,7 @@ impl Visitor {
         } else {
             return Err(CompErr::expected_ident(ident_expr.start, ident_expr.end));
         };
-        if self.scope_tree.in_global_scope() {
-            self.scope_tree.add_global(name.as_str());
-        } else {
-            self.scope_tree.add_var(name.as_str(), false);
-        }
+        self.scope_tree.add_var(name.as_str(), false);
         self.push(Inst::DeclareVar(name));
         Ok(())
     }

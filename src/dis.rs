@@ -80,10 +80,11 @@ impl Disassembler {
                 };
                 self.align("LOAD_CONST", format!("{index} ({constant:?})"))
             }
-            LoadCaptured(index) => self.align("LOAD_CELL", index),
+            LoadCaptured(name) => self.align("LOAD_CAPTURED", name),
             DeclareVar(name) => self.align("DECLARE_VAR", name),
             AssignVar(name) => self.align("ASSIGN_VAR", name),
             LoadVar(name) => self.align("LOAD_VAR", name),
+            LoadOuterVar(name) => self.align("LOAD_OUTER_VAR", name),
             Jump(rel_addr, forward, _) => {
                 let kind = if *forward { "forward" } else { "backward" };
                 self.align("JUMP", format!("{rel_addr} ({kind})"))
@@ -129,7 +130,7 @@ impl Disassembler {
             ScopeStartPlaceholder(addr) => {
                 self.align("PLACEHOLDER", format!("SCOPE_START @ {addr}"))
             }
-            VarPlaceholder(addr, name) => {
+            FreeVarPlaceholder(addr, name) => {
                 self.align("PLACEHOLDER", format!("VAR {name} @ {addr}"))
             }
             BreakPlaceholder(addr, _) => {

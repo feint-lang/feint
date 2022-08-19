@@ -90,6 +90,10 @@ impl Module {
     pub fn name(&self) -> &str {
         self.name.as_str()
     }
+    
+    pub fn has_name(&self, name: &str) -> bool {
+        self.namespace.has(name)
+    }
 }
 
 impl ObjectTrait for Module {
