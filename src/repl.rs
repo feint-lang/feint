@@ -138,6 +138,7 @@ impl<'a> Repl<'a> {
                 Ok(val_ref) => {
                     // Print the result if it's not nil
                     let val = &*val_ref.read().unwrap();
+                    log::trace!("GOT OBJ: {val}");
                     if !val.is_nil() {
                         eprintln!("{val:?}");
                     }

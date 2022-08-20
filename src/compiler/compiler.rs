@@ -22,6 +22,17 @@ pub struct Compiler {
     visitor_stack: Stack<(Visitor, usize)>, // visitor, scope tree pointer
 }
 
+struct CaptureInfo {
+    name: String,
+    free_var_addr: usize,
+    found_stack_index: usize,
+    // Cell vars in enclosing functions. These are discovered while
+    // processing the free vars of the current function (assuming it's
+    // an inner function).
+    cell_var_assignments: Vec<usize>, // address
+    cell_var_loads: Vec<usize>,       // address
+}
+
 impl Compiler {
     pub fn new() -> Self {
         Self { visitor_stack: Stack::new() }
@@ -90,24 +101,18 @@ impl Compiler {
         // is needed so that we can start the search for cell vars in
         // the correct scope in the parent visitor.
         parent_scope_pointer: usize,
-        name: String,
+        func_name: String,
         node: ast::Func,
     ) -> VisitResult {
         let stack = &mut self.visitor_stack;
         let params = node.params.clone();
 
-        let mut visitor = Visitor::for_func(name.as_str());
+        let mut visitor = Visitor::for_func(func_name.as_str());
         visitor.visit_func(node)?;
 
         // Unresolved names are assumed to be builtins.
         let builtins = BUILTINS.read().unwrap();
         let mut presumed_builtins = vec![];
-
-        // Cell vars in enclosing functions. These are discovered while
-        // processing the free vars of the current function (assuming
-        // it's an inner function).
-        let mut cell_var_assignments = vec![];
-        let mut cell_var_loads = vec![];
 
         // Captured vars in current function. These are free vars in the
         // current function that are defined in an enclosing function or
@@ -116,7 +121,7 @@ impl Compiler {
         // Each entry contains the address of the free var in the
         // current function and the local var index in the enclosing
         // function.
-        let mut captured = vec![];
+        let mut captured: Vec<CaptureInfo> = vec![];
 
         for (free_var_addr, name, start, end) in visitor.code.free_vars().iter() {
             let mut found = false;
@@ -132,11 +137,23 @@ impl Compiler {
                     .scope_tree
                     .find_var(name.as_str(), Some(current_scope_pointer));
 
-                if let Some((_, cell_var_addr, name, _)) = result {
+                if let Some(cell_var) = result {
+                    let cell_var_addr = cell_var.addr;
+
                     log::trace!(
-                        "FOUND CELL VAR FOR FREE VAR: {name} @ {cell_var_addr}"
+                        "FOUND CELL VAR FOR FREE VAR: {name} @ {}",
+                        cell_var_addr
                     );
+
                     found = true;
+
+                    let mut info = CaptureInfo {
+                        name: name.clone(),
+                        free_var_addr: *free_var_addr,
+                        found_stack_index,
+                        cell_var_assignments: vec![],
+                        cell_var_loads: vec![],
+                    };
 
                     for (addr, inst) in up_visitor.code.iter_chunk().enumerate() {
                         if addr >= cell_var_addr {
@@ -144,31 +161,18 @@ impl Compiler {
                                 Inst::ScopeEnd => {
                                     break;
                                 }
-                                Inst::AssignVar(n) if *n == name => {
-                                    cell_var_assignments.push((
-                                        addr,
-                                        found_stack_index,
-                                        name.clone(),
-                                    ));
+                                Inst::AssignVar(n) if n == name => {
+                                    info.cell_var_assignments.push(addr);
                                 }
-                                Inst::LoadVar(n) if *n == name => {
-                                    cell_var_loads.push((
-                                        addr,
-                                        found_stack_index,
-                                        name.clone(),
-                                    ));
+                                Inst::LoadVar(n) if n == name => {
+                                    info.cell_var_loads.push(addr);
                                 }
                                 _ => (),
                             }
                         }
                     }
 
-                    captured.push((
-                        name,
-                        *free_var_addr,
-                        found_stack_index,
-                        cell_var_addr,
-                    ));
+                    captured.push(info);
 
                     break;
                 }
@@ -189,24 +193,31 @@ impl Compiler {
             }
         }
 
-        // Update ASSIGN_VAR instructions in ancestor visitors to assign
-        // into cell.
-        for (addr, found_stack_index, name) in cell_var_assignments.into_iter() {
-            let up_visitor = &mut stack[found_stack_index].0;
-            up_visitor.replace(addr, Inst::AssignCell(name));
-        }
+        for info in captured.iter() {
+            let name = info.name.as_str();
+            let found_stack_index = info.found_stack_index;
 
-        // Update LOAD_VAR instructions in ancestor visitors to load
-        // from cell.
-        for (addr, found_stack_index, name) in cell_var_loads.into_iter() {
-            let up_visitor = &mut stack[found_stack_index].0;
-            up_visitor.replace(addr, Inst::LoadCell(name));
-        }
+            // Update LOAD_VAR instructions in current visitor /
+            // function to load free vars from captured cells.
+            visitor.replace(info.free_var_addr, Inst::LoadCaptured(name.to_string()));
 
-        // Update intermediate closures to capture vars so they can be
-        // passed down.
-        for (name, _, found_stack_index, _) in captured.iter() {
-            for i in *found_stack_index..stack.len() {
+            // Update ASSIGN_VAR instructions in upward visitor to
+            // assign into cell.
+            for addr in info.cell_var_assignments.iter() {
+                let up_visitor = &mut stack[found_stack_index].0;
+                up_visitor.replace(*addr, Inst::AssignCell(name.to_owned()));
+            }
+
+            // Update LOAD_VAR instructions in upward visitor to load
+            // from cell.
+            for addr in info.cell_var_loads.iter() {
+                let up_visitor = &mut stack[found_stack_index].0;
+                up_visitor.replace(*addr, Inst::LoadCell(name.to_owned()));
+            }
+
+            // Update intermediate closures to capture vars so they can
+            // be passed down.
+            for i in info.found_stack_index..stack.len() {
                 let up_visitor = &mut stack[i].0;
 
                 log::trace!(
@@ -216,7 +227,6 @@ impl Compiler {
 
                 let mut replacements = vec![];
                 for (addr, inst) in up_visitor.code.iter_chunk().enumerate() {
-                    // log::trace!("{addr} = {inst:?}");
                     if let Inst::CaptureSet(names) = inst {
                         log::trace!("FOUND CAPTURE SET AT {addr}");
                         if !names.iter().any(|n| n == name) {
@@ -227,17 +237,11 @@ impl Compiler {
 
                 for (addr, mut names) in replacements {
                     log::trace!("REPLACING CAPTURE_SET {names:?} with");
-                    names.push(name.clone());
+                    names.push(name.to_owned());
                     log::trace!("... WITH {names:?}");
                     up_visitor.replace(addr, Inst::CaptureSet(names));
                 }
             }
-        }
-
-        // Update LOAD_VAR instructions in current visitor / function to
-        // load free vars from captured cells.
-        for (name, free_var_addr, ..) in captured.iter() {
-            visitor.replace(*free_var_addr, Inst::LoadCaptured(name.to_string()));
         }
 
         // Inner Functions ---------------------------------------------
@@ -251,12 +255,12 @@ impl Compiler {
 
         // END Inner Functions -----------------------------------------
 
-        let func = create::new_func(name, params, visitor.code);
+        let func = create::new_func(func_name, params, visitor.code);
         let parent_visitor = &mut self.visitor_stack.peek_mut().unwrap().0;
         let const_index = parent_visitor.code.add_const(func);
 
         let mut captured_names: Vec<String> =
-            captured.into_iter().map(|(n, ..)| n).collect();
+            captured.into_iter().map(|info| info.name).collect();
         captured_names.sort();
         captured_names.dedup();
 
@@ -581,38 +585,46 @@ impl Visitor {
         //       a module.
         log::trace!("VISIT IDENT {name}");
         match self.scope_tree.find_var(name.as_str(), None) {
-            Some((.., true)) => {
-                log::trace!("assigned");
-                self.push(Inst::LoadVar(name));
-            }
-            // The var exists but has not yet been assigned--where the
-            // RHS side name shadows a name from an outer scope. E.g.:
-            //
-            //     x = "global"
-            //     block -> x = x
-            //     f = () -> x = x
-            // defined in an enclosing scope.
-            Some((.., false)) => {
-                if self.initial_scope_kind == ScopeKind::Module {
-                    // When compiling a module, the RHS must be defined
-                    // in an outer scope. If it isn't, that's an error.
-                    log::trace!("1");
-                    let found =
-                        self.scope_tree.find_var_in_parent(name.as_str()).is_some();
-                    if found || BUILTINS.read().unwrap().has_name(name.as_str()) {
+            Some(v) => {
+                if v.assigned {
+                    log::trace!("IDENT {name} exists and is assigned at {}", v.pointer);
+                    log::trace!("CURRENT DEPTH: {}", self.scope_depth);
+                    if v.pointer < self.scope_tree.pointer() {
+                        log::trace!("LOAD OUTER {name}");
                         self.push(Inst::LoadOuterVar(name));
                     } else {
-                        return Err(CompErr::name_not_found(name, start, end));
+                        self.push(Inst::LoadVar(name));
                     }
-                } else if self.initial_scope_kind == ScopeKind::Func {
-                    // When compiling a function, the RHS is considered
-                    // a free var and will be resolved later.
-                    log::trace!("2");
-                    self.code.add_free_var(name.as_str(), start, end);
+                } else {
+                    // The var exists but has not been assigned--where
+                    // the RHS side name shadows a name from an outer
+                    // scope. E.g.:
+                    //
+                    //     x = "global"
+                    //     block -> x = x
+                    //     f = () -> x = x
+                    //
+                    log::trace!("IDENT {name} exists and is NOT assigned");
+                    if self.initial_scope_kind == ScopeKind::Module {
+                        // When compiling a module, the RHS must be defined
+                        // in an outer scope. If it isn't, that's an error.
+                        let found =
+                            self.scope_tree.find_var_in_parent(name.as_str()).is_some();
+                        if found || BUILTINS.read().unwrap().has_name(name.as_str()) {
+                            self.push(Inst::LoadOuterVar(name));
+                        } else {
+                            return Err(CompErr::name_not_found(name, start, end));
+                        }
+                    } else if self.initial_scope_kind == ScopeKind::Func {
+                        // When compiling a function, the RHS is considered
+                        // a free var and will be resolved later.
+                        self.code.add_free_var(name.as_str(), start, end);
+                    }
                 }
             }
             // Var wasn't found in current scope or its ancestors.
             None => {
+                log::trace!("IDENT {name} does NOT exist");
                 if self.initial_scope_kind == ScopeKind::Module {
                     // When compiling a module, all vars should resolve
                     // at this stage, so this is an error.
@@ -625,7 +637,6 @@ impl Visitor {
                     // When compiling a function, vars may be defined in
                     // an enclosing scope. These free vars will be
                     // resolved later.
-                    log::trace!("3");
                     self.code.add_free_var(name.as_str(), start, end);
                 } else {
                     panic!("Unexpected scope type: {:?}", self.initial_scope_kind);
@@ -875,6 +886,11 @@ impl Visitor {
         } else {
             return Err(CompErr::expected_ident(ident_expr.start, ident_expr.end));
         };
+        log::trace!(
+            "ADD VAR: {name} @ {} {}",
+            self.scope_depth,
+            self.scope_tree.pointer()
+        );
         self.scope_tree.add_var(self.len(), name.as_str(), false);
         self.push(Inst::DeclareVar(name));
         Ok(())
@@ -885,15 +901,20 @@ impl Visitor {
         lhs_expr: ast::Expr,
         value_expr: ast::Expr,
     ) -> VisitResult {
+        log::trace!("VISIT ASS {lhs_expr:?} = {value_expr:?}");
         // TODO: Allow assignment to attributes
         if let Some(name) = lhs_expr.ident_name() {
             self.visit_expr(value_expr, Some(name.clone()))?;
-            match self.scope_tree.find_var(name.as_str(), None) {
-                Some((pointer, ..)) => {
+            let pointer = self.scope_tree.pointer();
+            match self.scope_tree.find_var_in_scope(name.as_str(), pointer) {
+                Some(_) => {
+                    log::trace!("FINISH ASS {name}\n");
                     self.scope_tree.mark_assigned(pointer, name.as_str());
                     self.push(Inst::AssignVar(name))
                 }
-                None => self.push(Inst::AssignVar(name)),
+                None => {
+                    panic!("Expected var to exist: {name}");
+                }
             }
             Ok(())
         } else {

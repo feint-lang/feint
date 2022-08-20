@@ -25,6 +25,10 @@ impl ScopeTree {
         self.current().is_func()
     }
 
+    pub fn _in_block_scope(&self) -> bool {
+        self.current()._is_block()
+    }
+
     fn get(&self, index: usize) -> &Scope {
         &self.storage[index]
     }
@@ -112,44 +116,51 @@ impl ScopeTree {
 
     // Vars ------------------------------------------------------------
 
-    /// Add var to current scope if it's not already present.
+    /// Add var to *current* scope if it's not already present.
     pub fn add_var<S: Into<String>>(&mut self, addr: usize, name: S, assigned: bool) {
         let name = name.into();
-        if self.find_var(name.as_str(), None).is_none() {
-            self.current_mut().vars.push((addr, name, assigned));
+        let pointer = self.pointer;
+        if self.find_var_in_scope(name.as_str(), pointer).is_none() {
+            self.current_mut().vars.push(Var { addr, pointer, name, assigned });
         }
     }
 
-    /// Mark var as assigned.
+    /// Mark var in scope with name as assigned. Note that var *must*
+    /// exist in the specified scope or this will panic.
     pub fn mark_assigned(&mut self, pointer: usize, name: &str) {
         let scope = self.get_mut(pointer);
-        if let Some(index) = scope.vars.iter().position(|(_, n, _)| n == name) {
-            let (addr, ..) = &scope.vars[index];
-            scope.vars[index] = (*addr, name.to_owned(), true);
+        let result =
+            scope.vars.iter().position(|v| v.pointer == pointer && v.name == name);
+        if let Some(index) = result {
+            let var = &scope.vars[index];
+            let mut new_var = var.clone();
+            new_var.assigned = true;
+            scope.vars[index] = new_var;
+        } else {
+            panic!("Var does not exist in scope {pointer}: {name}")
         }
+    }
+
+    /// Find var in specified scope. This will *panic* if the specified
+    /// scope doesn't exist.
+    pub fn find_var_in_scope(&self, name: &str, pointer: usize) -> Option<Var> {
+        self.get(pointer).vars.iter().find(|v| v.name == name).cloned()
     }
 
     /// Find var in current scope or any of its ancestor scopes.
-    ///
-    /// If the var is found, a tuple with the following fields is
-    /// returned: scope pointer of scope where found, address, name,
-    /// assigned flag.
-    pub fn find_var(
-        &self,
-        name: &str,
-        pointer: Option<usize>,
-    ) -> Option<(usize, usize, String, bool)> {
+    pub fn find_var(&self, name: &str, pointer: Option<usize>) -> Option<Var> {
         let mut scope = if let Some(pointer) = pointer {
             self.get(pointer)
         } else {
             self.current()
         };
         loop {
-            if let Some(var) = scope.vars.iter().find(|(_, n, _)| n == name) {
-                return Some((scope.index, var.0, var.1.to_owned(), var.2));
+            let var = self.find_var_in_scope(name, scope.index);
+            if var.is_some() {
+                return var;
             }
             if let Some(parent_index) = scope.parent {
-                scope = &self.storage[parent_index];
+                scope = self.get(parent_index)
             } else {
                 break;
             }
@@ -157,13 +168,11 @@ impl ScopeTree {
         None
     }
 
-    pub fn find_var_in_parent(
-        &self,
-        name: &str,
-    ) -> Option<(usize, usize, String, bool)> {
+    pub fn find_var_in_parent(&self, name: &str) -> Option<Var> {
         if self.pointer == 0 {
             None
         } else {
+            log::trace!("FINDING VAR {name} from parent");
             self.find_var(name, Some(self.pointer - 1))
         }
     }
@@ -185,24 +194,32 @@ impl ScopeTree {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum ScopeKind {
+    Module,
+    Func,
+    Block,
+}
+
+#[derive(Clone, Debug)]
+pub struct Var {
+    pub addr: usize,
+    pub pointer: usize,
+    pub name: String,
+    pub assigned: bool,
+}
+
 #[derive(Debug)]
 pub struct Scope {
     kind: ScopeKind,
     index: usize,
     parent: Option<usize>,
     children: Vec<usize>,
-    vars: Vec<(usize, String, bool)>, // address, name, assigned
+    vars: Vec<Var>,
     /// target label name => jump inst address
     jumps: Vec<(String, usize)>,
     /// label name => label inst address
     labels: HashMap<String, usize>,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum ScopeKind {
-    Module,
-    Func,
-    Block,
 }
 
 impl Scope {
@@ -224,6 +241,10 @@ impl Scope {
 
     pub fn is_func(&self) -> bool {
         self.kind == ScopeKind::Func
+    }
+
+    pub fn _is_block(&self) -> bool {
+        self.kind == ScopeKind::Block
     }
 
     pub fn is_leaf(&self) -> bool {
