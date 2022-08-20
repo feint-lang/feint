@@ -87,6 +87,11 @@ impl Map {
         entries.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        let entries = self.entries.read().unwrap();
+        entries.is_empty()
+    }
+
     pub fn add<S: Into<String>>(&self, key: S, val: ObjectRef) {
         let entries = &mut self.entries.write().unwrap();
         entries.insert(key.into(), val);
@@ -99,6 +104,10 @@ impl Map {
         } else {
             None
         }
+    }
+
+    pub fn to_hash_map(&self) -> HashMap<String, ObjectRef> {
+        self.entries.read().unwrap().clone()
     }
 }
 

@@ -16,7 +16,8 @@ MIT. See the LICENSE file.
 - Everything is an object of some type
 - Strong typing
 - Lexical scoping
-- Almost everything is an expression
+- Everything is an expression or acts like an expression; every
+  statement returns some value
 - Significant whitespace (by default, but maybe consider `{...}` blocks
   for certain special cases like passing functions)
 - No this/self on methods but this/self is required to access attributes
@@ -41,6 +42,7 @@ TODO
 - Str (can use `"` or `'`, multiline)
 - Tuple
 - List
+- Map
 - BuiltinFunc (e.g., `print()`)
 - Func
 - Module
@@ -226,6 +228,36 @@ my_func = (func) -> func()
 my_func(() -> nil)
 # -> nil
 ```
+
+### Closures
+
+Closures work pretty much like Python or JavaScript. One difference is
+that names defined *after* a function won't be captured. Allowing this
+seems a little bit wonky in the first place and it also adds a bit of
+complexity for no apparent benefit (or, at least, I'm not sure what the
+benefit of this capability is off the top of my head.)
+
+Here's an extremely artificial example:
+
+```
+f = (x) ->
+    g = (y) ->
+        z = "z"
+        h = () ->
+            (x, y, z)
+            
+f1 = f("x1")("y1")
+f2 = f("x2")("y2")
+
+r1 = f1()
+r2 = f2()
+
+assert(r1 == ("x1", "y1", "z"))
+assert(r2 == ("x2", "y2", "z"))
+```
+
+NOTE: The implementation hasn't been well-tested and complex closures
+      might not work as expected.
 
 ## Custom Types
 

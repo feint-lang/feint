@@ -80,11 +80,13 @@ impl Disassembler {
                 };
                 self.align("LOAD_CONST", format!("{index} ({constant:?})"))
             }
-            LoadCaptured(name) => self.align("LOAD_CAPTURED", name),
             DeclareVar(name) => self.align("DECLARE_VAR", name),
             AssignVar(name) => self.align("ASSIGN_VAR", name),
             LoadVar(name) => self.align("LOAD_VAR", name),
             LoadOuterVar(name) => self.align("LOAD_OUTER_VAR", name),
+            AssignCell(name) => self.align("ASSIGN_CELL", name),
+            LoadCell(name) => self.align("LOAD_CELL", name),
+            LoadCaptured(name) => self.align("LOAD_CAPTURED", name),
             Jump(rel_addr, forward, _) => {
                 let kind = if *forward { "forward" } else { "backward" };
                 self.align("JUMP", format!("{rel_addr} ({kind})"))
@@ -108,12 +110,15 @@ impl Disassembler {
             MakeTuple(n) => self.align("MAKE_TUPLE", n),
             MakeList(n) => self.align("MAKE_LIST", n),
             MakeMap(n) => self.align("MAKE_MAP", n),
-            MakeClosure(index, captured) => {
+            CaptureSet(names) => {
+                self.align("CAPTURE_SET", format!("[{}]", names.join(", ")))
+            }
+            MakeFunc(index) => {
                 let func = match code.get_const(*index) {
                     Ok(obj) => obj.read().unwrap().to_string(),
                     Err(err) => err.to_string(),
                 };
-                self.align("MAKE_CLOSURE", format!("{func} : {captured:?}"))
+                self.align("MAKE_FUNC", func)
             }
             LoadModule(name) => self.align("IMPORT", name),
             Halt(code) => self.align("HALT", code),

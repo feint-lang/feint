@@ -27,13 +27,19 @@ pub enum Inst {
     // Other constants are local to a given code unit.
     LoadConst(usize),
 
-    // Load captured value to TOS.
-    LoadCaptured(String),
-
     DeclareVar(String),
     AssignVar(String),
     LoadVar(String),
     LoadOuterVar(String),
+
+    // These are analogous to AssignVar and LoadVar. Assignment wraps
+    // the value in a cell so that it can be shared. Loading unwraps the
+    // value.
+    AssignCell(String),
+    LoadCell(String),
+
+    // Load captured value to TOS (a special case of LoadCell).
+    LoadCaptured(String),
 
     // Jumps -----------------------------------------------------------
     //
@@ -77,11 +83,12 @@ pub enum Inst {
     MakeList(usize),
     MakeMap(usize),
 
-    // Make closure wrapping function.
-    MakeClosure(
-        usize,       // constant index of wrapped function
-        Vec<String>, // local indexes within parent frame
-    ),
+    // Capture set for function--a list of names for the function to
+    // capture. If empty, a regular function will be created.
+    CaptureSet(Vec<String>),
+
+    // Make function or closure depending on capture set.
+    MakeFunc(usize),
 
     LoadModule(String),
 

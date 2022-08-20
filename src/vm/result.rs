@@ -28,6 +28,7 @@ pub enum ValueStackKind {
     GlobalConstant(ObjectRef, usize),
     Constant(ObjectRef, usize),
     Var(ObjectRef, usize, String),
+    CellVar(ObjectRef, usize, String),
     Temp(ObjectRef),
     ReturnVal(ObjectRef),
 }

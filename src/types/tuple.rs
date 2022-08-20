@@ -40,7 +40,7 @@ impl TupleType {
                 make_meth!(Tuple, "is_empty", &[], |this: ObjectRef, _, _| {
                     let this = use_this!(this);
                     let this = this.down_to_tuple().unwrap();
-                    Ok(create::new_bool(this.len() == 0))
+                    Ok(create::new_bool(this.is_empty()))
                 }),
                 make_meth!(
                     Tuple,
@@ -123,6 +123,10 @@ impl Tuple {
 
     pub fn len(&self) -> usize {
         self.items.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
     }
 }
 

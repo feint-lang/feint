@@ -38,14 +38,3 @@ f(1, 2, 3)  # -> 3
 
 f = (required, ...) -> print($args.length(), "var args")
 f(1, 2, 3)  # -> 2
-
-# TODO: Implement closures
-# This will throw a name error because `captured` isn't actual captured
-make_closure = (captured) ->
-    closure = () -> captured
-
-closure_1 = make_closure("x")
-closure_2 = make_closure("y")
-
-assert(closure_1() == "x", $"closure 1: {closure_1()} != 'x'")
-assert(closure_2() == "y", $"closure 2: {closure_2()} != 'y'")

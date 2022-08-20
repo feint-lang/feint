@@ -4,7 +4,7 @@
 - [x] Implement format strings (AKA $ strings)
 - [x] Implement `Tuple`
 - [x] Implement `List`
-- [ ] Implement `Map`
+- [x] Implement `Map`
 - [ ] Implement `Set`
 - [x] Implement vars
 - [x] Implement dot operator (attribute & item access)
@@ -26,6 +26,8 @@
 - [x] Implement function calls
   - [ ] Verify implementation
   - [x] Implement `return`
+- [x] Implement closures
+  - [ ] Verify implementation
 - [x] Implement native functions
   - [x] Implement `print` function (`print` is currently implemented as
         a statement and has limited functionality)
@@ -37,6 +39,7 @@
   - [ ] Implement module loading
 - [ ] Implement `import`
   - [ ] `import <name>`
+    - There's a basic version of this that works for builtin modules
   - [ ] `import from <name>: <names>`
 - [ ] Implement custom classes
 - [ ] Figure out a nice way to do multi-line lambdas

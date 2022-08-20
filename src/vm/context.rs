@@ -197,12 +197,6 @@ impl RuntimeContext {
         self.get_var_depth(name, Some(self.current_depth - 1))
     }
 
-    /// Get var in current namespace or any ancestor namespace.
-    pub fn get_var(&self, name: &str) -> Result<ObjectRef, RuntimeErr> {
-        let depth = self.get_var_depth(name, None)?;
-        self.get_var_at_depth(depth, name)
-    }
-
     /// Get var from current namespace.
     pub fn get_var_in_current_namespace(
         &self,
@@ -229,6 +223,19 @@ impl RuntimeContext {
             let message = format!("Name not defined at depth {depth}: {name}");
             Err(RuntimeErr::name_err(message))
         }
+    }
+
+    /// Get var in current namespace or any ancestor namespace.
+    pub fn get_var(&self, name: &str) -> Result<ObjectRef, RuntimeErr> {
+        let depth = self.get_var_depth(name, None)?;
+        self.get_var_at_depth(depth, name)
+    }
+
+    /// Get var in parent namespace or any ancestor of the parent
+    /// namespace.
+    pub fn get_outer_var(&self, name: &str) -> Result<ObjectRef, RuntimeErr> {
+        let depth = self.get_outer_var_depth(name)?;
+        self.get_var_at_depth(depth, name)
     }
 
     pub fn iter_vars(&self) -> hash_map::Iter<'_, String, ObjectRef> {

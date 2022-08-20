@@ -2,9 +2,6 @@
 //! Currently, it's only used resolve jump targets to labels.
 use std::collections::HashMap;
 
-use crate::modules;
-use crate::types::ObjectTrait;
-
 pub struct ScopeTree {
     storage: Vec<Scope>,
     pointer: usize,
@@ -116,39 +113,40 @@ impl ScopeTree {
     // Vars ------------------------------------------------------------
 
     /// Add var to current scope if it's not already present.
-    pub fn add_var<S: Into<String>>(&mut self, name: S, assigned: bool) {
+    pub fn add_var<S: Into<String>>(&mut self, addr: usize, name: S, assigned: bool) {
         let name = name.into();
-        if !self.find_var(name.as_str(), None).is_some() {
-            self.current_mut().vars.push((name, assigned));
+        if self.find_var(name.as_str(), None).is_none() {
+            self.current_mut().vars.push((addr, name, assigned));
         }
     }
 
     /// Mark var as assigned.
     pub fn mark_assigned(&mut self, pointer: usize, name: &str) {
         let scope = self.get_mut(pointer);
-        if let Some(index) = scope.vars.iter().position(|(n, _)| n == name) {
-            scope.vars[index] = (name.to_owned(), true);
+        if let Some(index) = scope.vars.iter().position(|(_, n, _)| n == name) {
+            let (addr, ..) = &scope.vars[index];
+            scope.vars[index] = (*addr, name.to_owned(), true);
         }
     }
 
     /// Find var in current scope or any of its ancestor scopes.
     ///
     /// If the var is found, a tuple with the following fields is
-    /// returned: scope pointer of scope where found, name, assigned
-    /// flag.
+    /// returned: scope pointer of scope where found, address, name,
+    /// assigned flag.
     pub fn find_var(
         &self,
         name: &str,
         pointer: Option<usize>,
-    ) -> Option<(usize, String, bool)> {
+    ) -> Option<(usize, usize, String, bool)> {
         let mut scope = if let Some(pointer) = pointer {
             self.get(pointer)
         } else {
             self.current()
         };
         loop {
-            if let Some(entry) = scope.vars.iter().find(|(n, a)| n == name) {
-                return Some((scope.index, entry.0.to_owned(), entry.1));
+            if let Some(var) = scope.vars.iter().find(|(_, n, _)| n == name) {
+                return Some((scope.index, var.0, var.1.to_owned(), var.2));
             }
             if let Some(parent_index) = scope.parent {
                 scope = &self.storage[parent_index];
@@ -159,7 +157,10 @@ impl ScopeTree {
         None
     }
 
-    pub fn find_var_in_parent(&self, name: &str) -> Option<(usize, String, bool)> {
+    pub fn find_var_in_parent(
+        &self,
+        name: &str,
+    ) -> Option<(usize, usize, String, bool)> {
         if self.pointer == 0 {
             None
         } else {
@@ -190,8 +191,7 @@ pub struct Scope {
     index: usize,
     parent: Option<usize>,
     children: Vec<usize>,
-    globals: Vec<String>,
-    vars: Vec<(String, bool)>, // name, assigned
+    vars: Vec<(usize, String, bool)>, // address, name, assigned
     /// target label name => jump inst address
     jumps: Vec<(String, usize)>,
     /// label name => label inst address
@@ -212,7 +212,6 @@ impl Scope {
             index,
             parent,
             children: vec![],
-            globals: vec![],
             vars: vec![],
             jumps: vec![],
             labels: HashMap::new(),

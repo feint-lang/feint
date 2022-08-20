@@ -15,6 +15,7 @@ use super::base::ObjectRef;
 use super::bool::Bool;
 use super::bound_func::BoundFunc;
 use super::builtin_func::{BuiltinFn, BuiltinFunc};
+use super::cell::Cell;
 use super::closure::Closure;
 use super::custom::{CustomObj, CustomType};
 use super::float::Float;
@@ -86,6 +87,14 @@ pub fn new_builtin_func(name: &str, params: &[&str], func: BuiltinFn) -> ObjectR
 
 pub fn new_builtin_module(name: &str, ns: Namespace) -> Arc<RwLock<Module>> {
     Arc::new(RwLock::new(Module::new(name.into(), ns, Code::new())))
+}
+
+pub fn new_cell() -> ObjectRef {
+    Arc::new(RwLock::new(Cell::new()))
+}
+
+pub fn new_cell_with_value(value: ObjectRef) -> ObjectRef {
+    Arc::new(RwLock::new(Cell::with_value(value)))
 }
 
 pub fn new_closure(func: ObjectRef, captured: HashMap<String, ObjectRef>) -> ObjectRef {

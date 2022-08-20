@@ -103,6 +103,12 @@ impl Compiler {
         let builtins = BUILTINS.read().unwrap();
         let mut presumed_builtins = vec![];
 
+        // Cell vars in enclosing functions. These are discovered while
+        // processing the free vars of the current function (assuming
+        // it's an inner function).
+        let mut cell_var_assignments = vec![];
+        let mut cell_var_loads = vec![];
+
         // Captured vars in current function. These are free vars in the
         // current function that are defined in an enclosing function or
         // module.
@@ -112,21 +118,58 @@ impl Compiler {
         // function.
         let mut captured = vec![];
 
-        for (addr, name, start, end) in visitor.code.free_vars().iter() {
+        for (free_var_addr, name, start, end) in visitor.code.free_vars().iter() {
             let mut found = false;
+            let mut found_stack_index = stack.len();
             let mut current_scope_pointer = parent_scope_pointer;
 
-            log::trace!("Searching for free var: {name}");
+            log::trace!("SEARCHING FOR FREE VAR: {name}");
 
             for (up_visitor, up_scope_pointer) in stack.iter() {
+                found_stack_index -= 1;
+
                 let result = up_visitor
                     .scope_tree
                     .find_var(name.as_str(), Some(current_scope_pointer));
 
-                if let Some((_, name, _)) = result {
-                    log::trace!("Found free var: {name}");
+                if let Some((_, cell_var_addr, name, _)) = result {
+                    log::trace!(
+                        "FOUND CELL VAR FOR FREE VAR: {name} @ {cell_var_addr}"
+                    );
                     found = true;
-                    captured.push((*addr, name));
+
+                    for (addr, inst) in up_visitor.code.iter_chunk().enumerate() {
+                        if addr >= cell_var_addr {
+                            match inst {
+                                Inst::ScopeEnd => {
+                                    break;
+                                }
+                                Inst::AssignVar(n) if *n == name => {
+                                    cell_var_assignments.push((
+                                        addr,
+                                        found_stack_index,
+                                        name.clone(),
+                                    ));
+                                }
+                                Inst::LoadVar(n) if *n == name => {
+                                    cell_var_loads.push((
+                                        addr,
+                                        found_stack_index,
+                                        name.clone(),
+                                    ));
+                                }
+                                _ => (),
+                            }
+                        }
+                    }
+
+                    captured.push((
+                        name,
+                        *free_var_addr,
+                        found_stack_index,
+                        cell_var_addr,
+                    ));
+
                     break;
                 }
 
@@ -134,7 +177,7 @@ impl Compiler {
             }
 
             if !found {
-                presumed_builtins.push((*addr, name.to_owned(), *start, *end));
+                presumed_builtins.push((*free_var_addr, name.to_owned(), *start, *end));
             }
         }
 
@@ -142,19 +185,66 @@ impl Compiler {
             if builtins.has_name(name.as_str()) {
                 visitor.replace(addr, Inst::LoadVar(name.to_owned()));
             } else {
-                return Err(CompErr::name_not_found(name.to_owned(), start, end));
+                return Err(CompErr::name_not_found(name, start, end));
             }
         }
 
-        for (addr, name) in captured.iter() {
-            visitor.replace(*addr, Inst::LoadCaptured(name.to_string()));
+        // Update ASSIGN_VAR instructions in ancestor visitors to assign
+        // into cell.
+        for (addr, found_stack_index, name) in cell_var_assignments.into_iter() {
+            let up_visitor = &mut stack[found_stack_index].0;
+            up_visitor.replace(addr, Inst::AssignCell(name));
+        }
+
+        // Update LOAD_VAR instructions in ancestor visitors to load
+        // from cell.
+        for (addr, found_stack_index, name) in cell_var_loads.into_iter() {
+            let up_visitor = &mut stack[found_stack_index].0;
+            up_visitor.replace(addr, Inst::LoadCell(name));
+        }
+
+        // Update intermediate closures to capture vars so they can be
+        // passed down.
+        for (name, _, found_stack_index, _) in captured.iter() {
+            for i in *found_stack_index..stack.len() {
+                let up_visitor = &mut stack[i].0;
+
+                log::trace!(
+                    "UPDATING CAPTURE_SETs for captured {name} in visitor {:?} @ {i}",
+                    up_visitor.name
+                );
+
+                let mut replacements = vec![];
+                for (addr, inst) in up_visitor.code.iter_chunk().enumerate() {
+                    // log::trace!("{addr} = {inst:?}");
+                    if let Inst::CaptureSet(names) = inst {
+                        log::trace!("FOUND CAPTURE SET AT {addr}");
+                        if !names.iter().any(|n| n == name) {
+                            replacements.push((addr, names.to_vec()));
+                        }
+                    }
+                }
+
+                for (addr, mut names) in replacements {
+                    log::trace!("REPLACING CAPTURE_SET {names:?} with");
+                    names.push(name.clone());
+                    log::trace!("... WITH {names:?}");
+                    up_visitor.replace(addr, Inst::CaptureSet(names));
+                }
+            }
+        }
+
+        // Update LOAD_VAR instructions in current visitor / function to
+        // load free vars from captured cells.
+        for (name, free_var_addr, ..) in captured.iter() {
+            visitor.replace(*free_var_addr, Inst::LoadCaptured(name.to_string()));
         }
 
         // Inner Functions ---------------------------------------------
 
-        let func_nodes = visitor.func_nodes.to_vec();
+        let inner_func_nodes = visitor.func_nodes.to_vec();
         self.visitor_stack.push((visitor, parent_scope_pointer));
-        for (addr, scope_tree_pointer, name, node) in func_nodes {
+        for (addr, scope_tree_pointer, name, node) in inner_func_nodes {
             self.compile_func(addr, scope_tree_pointer, name, node)?;
         }
         let visitor = self.visitor_stack.pop().unwrap().0;
@@ -162,16 +252,16 @@ impl Compiler {
         // END Inner Functions -----------------------------------------
 
         let func = create::new_func(name, params, visitor.code);
-
         let parent_visitor = &mut self.visitor_stack.peek_mut().unwrap().0;
         let const_index = parent_visitor.code.add_const(func);
 
-        if captured.is_empty() {
-            parent_visitor.replace(func_addr, Inst::LoadConst(const_index));
-        } else {
-            let captured = captured.iter().map(|(_, name)| name.to_string()).collect();
-            parent_visitor.replace(func_addr, Inst::MakeClosure(const_index, captured));
-        }
+        let mut captured_names: Vec<String> =
+            captured.into_iter().map(|(n, ..)| n).collect();
+        captured_names.sort();
+        captured_names.dedup();
+
+        log::trace!("CAPTURED NAMES: {captured_names:?}");
+        parent_visitor.replace(func_addr + 1, Inst::MakeFunc(const_index));
 
         Ok(())
     }
@@ -238,7 +328,7 @@ impl Visitor {
         let return_nil = !matches!(last_statement.kind, ast::StatementKind::Expr(_));
 
         // Add var for this.
-        self.scope_tree.add_var("this", true);
+        self.scope_tree.add_var(0, "this", true);
 
         // Add vars for function parameters.
         let param_count = params.len();
@@ -247,7 +337,7 @@ impl Visitor {
             for (i, name) in params.iter().enumerate() {
                 if name.is_empty() {
                     if i == last {
-                        self.scope_tree.add_var("$args", true);
+                        self.scope_tree.add_var(0, "$args", true);
                     } else {
                         return Err(CompErr::var_args_must_be_last(
                             node.block.start,
@@ -255,7 +345,7 @@ impl Visitor {
                         ));
                     }
                 } else {
-                    self.scope_tree.add_var(name, true);
+                    self.scope_tree.add_var(0, name, true);
                 }
             }
         }
@@ -362,7 +452,7 @@ impl Visitor {
     }
 
     fn visit_import(&mut self, name: String) -> VisitResult {
-        self.scope_tree.add_var(name.as_str(), true);
+        self.scope_tree.add_var(self.len(), name.as_str(), true);
         self.push(Inst::LoadModule(name));
         Ok(())
     }
@@ -402,9 +492,10 @@ impl Visitor {
                 let addr = self.len();
                 let pointer = self.scope_tree.pointer();
                 self.func_nodes.push((addr, pointer, name, func));
+                self.push(Inst::CaptureSet(vec![]));
                 self.push(Inst::Placeholder(
                     addr,
-                    Box::new(Inst::LoadConst(0)),
+                    Box::new(Inst::MakeFunc(0)),
                     "Function placeholder not updated".to_owned(),
                 ));
             }
@@ -488,8 +579,10 @@ impl Visitor {
         //       function. It will NOT proceed up into a function's
         //       enclosing scope, whether that's an outer function or
         //       a module.
+        log::trace!("VISIT IDENT {name}");
         match self.scope_tree.find_var(name.as_str(), None) {
             Some((.., true)) => {
+                log::trace!("assigned");
                 self.push(Inst::LoadVar(name));
             }
             // The var exists but has not yet been assigned--where the
@@ -503,18 +596,18 @@ impl Visitor {
                 if self.initial_scope_kind == ScopeKind::Module {
                     // When compiling a module, the RHS must be defined
                     // in an outer scope. If it isn't, that's an error.
-                    if self.scope_tree.find_var_in_parent(name.as_str()).is_some() {
+                    log::trace!("1");
+                    let found =
+                        self.scope_tree.find_var_in_parent(name.as_str()).is_some();
+                    if found || BUILTINS.read().unwrap().has_name(name.as_str()) {
                         self.push(Inst::LoadOuterVar(name));
                     } else {
-                        if BUILTINS.read().unwrap().has_name(name.as_str()) {
-                            self.push(Inst::LoadOuterVar(name));
-                        } else {
-                            return Err(CompErr::name_not_found(name, start, end));
-                        }
+                        return Err(CompErr::name_not_found(name, start, end));
                     }
                 } else if self.initial_scope_kind == ScopeKind::Func {
                     // When compiling a function, the RHS is considered
                     // a free var and will be resolved later.
+                    log::trace!("2");
                     self.code.add_free_var(name.as_str(), start, end);
                 }
             }
@@ -532,6 +625,7 @@ impl Visitor {
                     // When compiling a function, vars may be defined in
                     // an enclosing scope. These free vars will be
                     // resolved later.
+                    log::trace!("3");
                     self.code.add_free_var(name.as_str(), start, end);
                 } else {
                     panic!("Unexpected scope type: {:?}", self.initial_scope_kind);
@@ -781,7 +875,7 @@ impl Visitor {
         } else {
             return Err(CompErr::expected_ident(ident_expr.start, ident_expr.end));
         };
-        self.scope_tree.add_var(name.as_str(), false);
+        self.scope_tree.add_var(self.len(), name.as_str(), false);
         self.push(Inst::DeclareVar(name));
         Ok(())
     }
@@ -795,8 +889,8 @@ impl Visitor {
         if let Some(name) = lhs_expr.ident_name() {
             self.visit_expr(value_expr, Some(name.clone()))?;
             match self.scope_tree.find_var(name.as_str(), None) {
-                Some((pointer, n, _)) => {
-                    self.scope_tree.mark_assigned(pointer, n.as_str());
+                Some((pointer, ..)) => {
+                    self.scope_tree.mark_assigned(pointer, name.as_str());
                     self.push(Inst::AssignVar(name))
                 }
                 None => self.push(Inst::AssignVar(name)),

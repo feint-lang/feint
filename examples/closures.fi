@@ -1,0 +1,37 @@
+# This example works because `captured` is found in the immediately
+# enclosing scope (i.e., in `make_closure`).
+print("Single-level closure works")
+make_closure = (captured) ->
+    closure = () -> captured
+
+closure_1 = make_closure("x")
+closure_2 = make_closure("y")
+
+assert(closure_1() == "x", $"closure 1: {closure_1()} != 'x'")
+assert(closure_2() == "y", $"closure 2: {closure_2()} != 'y'")
+
+# Vars that appear *after* the definition of a function won't be
+# captured. So the following will throw a name error on `z`:
+f = (x) ->
+    g = (y) ->
+        (x, y, z)
+    z = 3
+    g
+
+# TODO: Implement a way to catch errors
+# r = f(1)(2)
+
+# This example doesn't work because the captured `x` isn't passed down
+# to `h()`.
+print("Multi-level closure needs work")
+
+f = (x) ->
+    g = (y) ->
+        z = "z"
+        h = () ->
+            (x, y, z)
+
+r1 = f("x1")("y1")()
+r2 = f("x2")("y2")()
+assert(r1 == ("x1", "y1", "z"), r1)
+assert(r2 == ("x2", "y2", "z"), r1)

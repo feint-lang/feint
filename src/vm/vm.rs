@@ -2,7 +2,6 @@
 //! then, implicitly, goes idle until it's passed some instructions to
 //! execute. After instructions are executed, it goes back into idle
 //! mode.
-use std::collections::HashMap;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
@@ -156,16 +155,6 @@ impl VM {
                 LoadConst(index) => {
                     self.push_const(code, *index)?;
                 }
-                LoadCaptured(name) => {
-                    // Load value from cell to TOS.
-                    let frame = self.current_call_frame()?;
-                    if frame.closure.is_some() {
-                        let obj = frame.get_captured(name)?;
-                        self.push_temp(obj);
-                    } else {
-                        panic!("Expected closure");
-                    }
-                }
                 // Vars
                 DeclareVar(name) => {
                     if self.ctx.get_var_in_current_namespace(name).is_err() {
@@ -184,6 +173,57 @@ impl VM {
                 LoadOuterVar(name) => {
                     let depth = self.ctx.get_outer_var_depth(name.as_str())?;
                     self.push_var(depth, name.clone())?;
+                }
+                AssignCell(name) => {
+                    // Store TOS value into cell. This is similar to
+                    // AssignVar except that it wraps the TOS value in
+                    // a cell before storing it as var.
+                    let value = self.pop_obj()?;
+                    // Get the var, which might not already be a cell.
+                    let var_ref = self.ctx.get_var(name.as_str())?;
+                    let mut var = var_ref.write().unwrap();
+                    let depth = if let Some(cell) = var.down_to_cell_mut() {
+                        // Wrap TOS in existing cell.
+                        cell.set_value(value.clone());
+                        self.ctx.assign_var(name, var_ref.clone())?
+                    } else {
+                        // Create new cell to wrap TOS in.
+                        assert!(var.is_nil());
+                        let cell_ref = create::new_cell_with_value(value.clone());
+                        self.ctx.assign_var(name, cell_ref)?
+                    };
+                    // Push cell *value* to TOS.
+                    self.push(ValueStackKind::CellVar(value, depth, name.to_owned()));
+                }
+                LoadCell(name) => {
+                    // Load cell value onto TOS. This is similar to
+                    // LoadVar except that it unwraps the value from the
+                    // retrieved cell.
+                    log::trace!("LOAD CELL: {name}");
+                    let depth = self.ctx.get_var_depth(name.as_str(), None)?;
+                    let cell = self.ctx.get_var_at_depth(depth, name.as_str())?;
+                    let cell = cell.read().unwrap();
+                    let cell =
+                        cell.down_to_cell().expect("Expected cell: {name} @ {ip}");
+                    let value = cell.value();
+                    // Push cell *value* to TOS.
+                    self.push(ValueStackKind::CellVar(value, depth, name.to_owned()));
+                }
+                LoadCaptured(name) => {
+                    // This is similar to LoadCell except that it loads
+                    // a cell from the current closure, unwraps its
+                    // value, and loads it to TOS as a temporary.
+                    let frame = self.current_call_frame()?;
+                    if frame.closure.is_some() {
+                        let cell = frame.get_captured(name)?;
+                        let cell = cell.read().unwrap();
+                        let cell =
+                            cell.down_to_cell().expect("Expected cell: {name} @ {ip}");
+                        let value = cell.value();
+                        self.push_temp(value);
+                    } else {
+                        panic!("Expected closure");
+                    }
                 }
                 // Jumps
                 Jump(addr, forward, scope_exit_count) => {
@@ -281,24 +321,76 @@ impl VM {
                     let map = create::new_map(entries);
                     self.push_temp(map);
                 }
-                MakeClosure(func_const_index, captured_names) => {
-                    let func_ref = code.get_const(*func_const_index)?.clone();
-                    let func = func_ref.read().unwrap();
-                    let func = func.down_to_func().unwrap();
-
-                    log::trace!("CREATING CLOSURE FOR {}", func.name());
-
-                    let mut captured = HashMap::new();
-
-                    for name in captured_names.iter() {
-                        log::trace!("CAPTURing {name}");
-                        let obj = self.ctx.get_var(name)?;
-                        log::trace!("CAPTURED {name} = {obj:?}");
-                        captured.insert(name.to_owned(), obj);
+                CaptureSet(names) => {
+                    let mut entries = vec![];
+                    for name in names.iter() {
+                        log::trace!("GETTING CAPTURED: {name}");
+                        if let Ok(var_ref) = self.ctx.get_var(name) {
+                            // Capture cell already exists.
+                            let var = var_ref.read().unwrap();
+                            if var.is_cell() {
+                                entries.push((name.to_owned(), var_ref.clone()));
+                            } else {
+                                assert!(var.is_nil());
+                                entries.push((name.to_owned(), create::new_cell()));
+                            }
+                        } else {
+                            // Capture cell does not exist.
+                            if let Some(frame) = self.call_stack.peek() {
+                                if let Some(closure) = &frame.closure {
+                                    log::trace!("CAPTURING OUTER");
+                                    let closure = closure.read().unwrap();
+                                    let closure = closure.down_to_closure().unwrap();
+                                    let result = closure
+                                        .captured
+                                        .iter()
+                                        .find(|(n, _)| *n == name);
+                                    if let Some((name, cell)) = result {
+                                        entries.push((name.to_owned(), cell.clone()));
+                                        log::trace!(
+                                            "CAPTURED FROM OUTER: {name} = {cell:?}"
+                                        );
+                                    }
+                                }
+                            }
+                        }
                     }
+                    self.push_temp(create::new_map(entries));
+                }
+                MakeFunc(func_const_index) => {
+                    let capture_set = self.pop_obj()?;
+                    let capture_set = capture_set.read().unwrap();
+                    let capture_set = capture_set.down_to_map().unwrap();
 
-                    let closure = create::new_closure(func_ref.clone(), captured);
-                    self.push_temp(closure);
+                    if capture_set.is_empty() {
+                        self.push_const(code, *func_const_index)?;
+                    } else {
+                        let func_ref = code.get_const(*func_const_index)?.clone();
+                        let func = func_ref.read().unwrap();
+                        let func = func.down_to_func().unwrap();
+
+                        log::trace!("CREATING CLOSURE FOR {}", func.name());
+
+                        let mut captured = capture_set.to_hash_map();
+
+                        // XXX: This gets around a chicken-and-egg
+                        //      problem when the closure references
+                        //      itself.
+                        let func_captured = captured.contains_key(func.name());
+                        if func_captured && ip + 1 < code.len_chunk() {
+                            if let AssignCell(_) = &code[ip + 1] {
+                                let closure_cell =
+                                    create::new_cell_with_value(func_ref.clone());
+                                self.ctx
+                                    .assign_var(func.name(), closure_cell.clone())?;
+                                captured.insert(func.name().to_owned(), closure_cell);
+                            }
+                        }
+
+                        let closure = create::new_closure(func_ref.clone(), captured);
+
+                        self.push_temp(closure);
+                    }
                 }
                 // Modules
                 LoadModule(name) => {
@@ -532,6 +624,12 @@ impl VM {
         if let ValueStackKind::Var(_, depth, name) = a_kind {
             self.ctx.assign_var_at_depth(depth, name.as_str(), result.clone())?;
             self.push_temp(result);
+        } else if let ValueStackKind::CellVar(_, depth, name) = a_kind {
+            let cell = self.ctx.get_var_at_depth(depth, name.as_str())?;
+            let mut cell = cell.write().unwrap();
+            let cell = cell.down_to_cell_mut().expect("Expected cell");
+            cell.set_value(result.clone());
+            self.push_temp(result);
         } else {
             return Err(RuntimeErr::expected_var(format!("Binary op: {}", op)));
         }
@@ -667,13 +765,16 @@ impl VM {
     ) -> RuntimeResult {
         let args = self.check_call_args(func, &None, args)?;
         self.push_call_frame(this, closure)?;
-
         self.ctx.declare_and_assign_var("this", self.find_this())?;
-
+        // XXX: All args are created as cells, which allows them to be
+        //      captured without having to track whether they were in
+        //      fact captured. This isn't a great solution--it would be
+        //      better to track which params are captured. See related
+        //      note in push_var().
         for (name, arg) in func.arg_names().iter().zip(args) {
-            self.ctx.declare_and_assign_var(name, arg)?;
+            let cell = create::new_cell_with_value(arg);
+            self.ctx.declare_and_assign_var(name, cell)?;
         }
-
         match self.execute(&func.code) {
             Ok(_) => {
                 self.pop_call_frame()?;
@@ -806,8 +907,16 @@ impl VM {
     }
 
     fn push_var(&mut self, depth: usize, name: String) -> RuntimeResult {
-        let obj = self.ctx.get_var_at_depth(depth, name.as_str())?;
-        self.push(ValueStackKind::Var(obj, depth, name));
+        let obj_ref = self.ctx.get_var_at_depth(depth, name.as_str())?;
+        // XXX: This is a workaround for function args being created
+        //      as cells.
+        let obj = obj_ref.read().unwrap();
+        if let Some(cell) = obj.down_to_cell() {
+            let value = cell.value();
+            self.push(ValueStackKind::CellVar(value, depth, name));
+        } else {
+            self.push(ValueStackKind::Var(obj_ref.clone(), depth, name));
+        }
         Ok(())
     }
 
@@ -868,6 +977,7 @@ impl VM {
             GlobalConstant(obj, ..) => obj.clone(),
             Constant(obj, ..) => obj.clone(),
             Var(obj, ..) => obj.clone(),
+            CellVar(obj, ..) => obj.clone(),
             Temp(obj) => obj.clone(),
             ReturnVal(obj) => obj.clone(),
         }
@@ -891,6 +1001,7 @@ impl VM {
                 GlobalConstant(..) => "G",
                 Constant(..) => "C",
                 Var(..) => "V",
+                CellVar(..) => "CV",
                 Temp(..) => "T",
                 ReturnVal(..) => "R",
             };
