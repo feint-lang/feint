@@ -56,7 +56,7 @@ impl Clone for Error {
 }
 
 impl ObjectTrait for Error {
-    gen::object_trait_header!(ERROR_TYPE, Error);
+    gen::object_trait_header!(ERROR_TYPE);
 }
 
 // Display -------------------------------------------------------------

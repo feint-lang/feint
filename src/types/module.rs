@@ -6,6 +6,7 @@ use once_cell::sync::Lazy;
 
 use crate::vm::Code;
 
+use super::gen;
 use super::new;
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
@@ -14,66 +15,10 @@ use super::ns::Namespace;
 
 // Module Type ---------------------------------------------------------
 
+gen::type_and_impls!(ModuleType, Module);
+
 pub static MODULE_TYPE: Lazy<new::obj_ref_t!(ModuleType)> =
     Lazy::new(|| new::obj_ref!(ModuleType::new()));
-
-pub struct ModuleType {
-    ns: Namespace,
-}
-
-unsafe impl Send for ModuleType {}
-unsafe impl Sync for ModuleType {}
-
-impl ModuleType {
-    pub fn new() -> Self {
-        Self {
-            ns: Namespace::with_entries(&[
-                // Class Attributes
-                ("$name", new::str("Module")),
-                ("$full_name", new::str("builtins.Module")),
-            ]),
-        }
-    }
-}
-
-impl TypeTrait for ModuleType {
-    fn name(&self) -> &str {
-        "Module"
-    }
-
-    fn full_name(&self) -> &str {
-        "builtins.Module"
-    }
-
-    fn ns(&self) -> &Namespace {
-        &self.ns
-    }
-}
-
-impl ObjectTrait for ModuleType {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-    fn class(&self) -> TypeRef {
-        TYPE_TYPE.clone()
-    }
-
-    fn type_obj(&self) -> ObjectRef {
-        TYPE_TYPE.clone()
-    }
-
-    fn ns(&self) -> &Namespace {
-        &self.ns
-    }
-
-    fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.ns
-    }
-}
 
 // Module Object ----------------------------------------------------------
 
@@ -83,8 +28,7 @@ pub struct Module {
     pub code: Code,
 }
 
-unsafe impl Send for Module {}
-unsafe impl Sync for Module {}
+gen::standard_object_impls!(Module);
 
 impl Module {
     pub fn new(name: String, ns: Namespace, code: Code) -> Self {
@@ -101,28 +45,7 @@ impl Module {
 }
 
 impl ObjectTrait for Module {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-    fn class(&self) -> TypeRef {
-        MODULE_TYPE.clone()
-    }
-
-    fn type_obj(&self) -> ObjectRef {
-        MODULE_TYPE.clone()
-    }
-
-    fn ns(&self) -> &Namespace {
-        &self.ns
-    }
-
-    fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.ns
-    }
+    gen::object_trait_header!(MODULE_TYPE);
 }
 
 // Display -------------------------------------------------------------

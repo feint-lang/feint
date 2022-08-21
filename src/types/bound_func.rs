@@ -35,7 +35,7 @@ impl BoundFunc {
 }
 
 impl ObjectTrait for BoundFunc {
-    gen::object_trait_header!(BOUND_FUNC_TYPE, BoundFunc);
+    gen::object_trait_header!(BOUND_FUNC_TYPE);
 }
 
 // Display -------------------------------------------------------------

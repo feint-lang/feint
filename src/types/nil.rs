@@ -35,7 +35,7 @@ impl Nil {
 }
 
 impl ObjectTrait for Nil {
-    gen::object_trait_header!(NIL_TYPE, Nil);
+    gen::object_trait_header!(NIL_TYPE);
 
     fn bool_val(&self) -> RuntimeBoolResult {
         Ok(false)

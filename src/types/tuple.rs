@@ -5,6 +5,7 @@ use std::sync::{Arc, RwLock};
 
 use once_cell::sync::Lazy;
 
+use super::gen;
 use super::meth::make_meth;
 use super::new;
 use super::result::GetAttrResult;
@@ -14,6 +15,8 @@ use super::class::TYPE_TYPE;
 use super::ns::Namespace;
 
 // Tuple Type ----------------------------------------------------------
+
+gen::type_and_impls!(TupleType, Tuple);
 
 pub static TUPLE_TYPE: Lazy<new::obj_ref_t!(TupleType)> = Lazy::new(|| {
     let type_ref = new::obj_ref!(TupleType::new());
@@ -54,64 +57,14 @@ pub static TUPLE_TYPE: Lazy<new::obj_ref_t!(TupleType)> = Lazy::new(|| {
     type_ref.clone()
 });
 
-pub struct TupleType {
-    ns: Namespace,
-}
-
-impl TupleType {
-    pub fn new() -> Self {
-        Self { ns: Namespace::new() }
-    }
-}
-
-unsafe impl Send for TupleType {}
-unsafe impl Sync for TupleType {}
-
-impl TypeTrait for TupleType {
-    fn name(&self) -> &str {
-        "Tuple"
-    }
-
-    fn full_name(&self) -> &str {
-        "builtins.Tuple"
-    }
-
-    fn ns(&self) -> &Namespace {
-        &self.ns
-    }
-}
-
-impl ObjectTrait for TupleType {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-    fn class(&self) -> TypeRef {
-        TYPE_TYPE.clone()
-    }
-
-    fn type_obj(&self) -> ObjectRef {
-        TYPE_TYPE.clone()
-    }
-
-    fn ns(&self) -> &Namespace {
-        &self.ns
-    }
-
-    fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.ns
-    }
-}
-
 // Tuple Object --------------------------------------------------------
 
 pub struct Tuple {
     ns: Namespace,
     items: Vec<ObjectRef>,
 }
+
+gen::standard_object_impls!(Tuple);
 
 impl Tuple {
     pub fn new(items: Vec<ObjectRef>) -> Self {
@@ -132,28 +85,7 @@ impl Tuple {
 }
 
 impl ObjectTrait for Tuple {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-    fn class(&self) -> TypeRef {
-        TUPLE_TYPE.clone()
-    }
-
-    fn type_obj(&self) -> ObjectRef {
-        TUPLE_TYPE.clone()
-    }
-
-    fn ns(&self) -> &Namespace {
-        &self.ns
-    }
-
-    fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.ns
-    }
+    gen::object_trait_header!(TUPLE_TYPE);
 
     fn get_item(&self, index: usize) -> GetAttrResult {
         if index >= self.items.len() {

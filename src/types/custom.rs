@@ -2,6 +2,7 @@ use std::any::Any;
 use std::fmt;
 use std::sync::{Arc, RwLock};
 
+use super::gen;
 use super::new;
 use super::result::SetAttrResult;
 
@@ -35,8 +36,7 @@ impl CustomType {
     }
 }
 
-unsafe impl Send for CustomType {}
-unsafe impl Sync for CustomType {}
+gen::standard_object_impls!(CustomType);
 
 impl TypeTrait for CustomType {
     fn name(&self) -> &str {
@@ -57,28 +57,7 @@ impl TypeTrait for CustomType {
 }
 
 impl ObjectTrait for CustomType {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-    fn class(&self) -> TypeRef {
-        TYPE_TYPE.clone()
-    }
-
-    fn type_obj(&self) -> ObjectRef {
-        TYPE_TYPE.clone()
-    }
-
-    fn ns(&self) -> &Namespace {
-        &self.ns
-    }
-
-    fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.ns
-    }
+    gen::object_trait_header!(TYPE_TYPE);
 }
 
 // Custom Object -------------------------------------------------------
@@ -88,8 +67,7 @@ pub struct CustomObj {
     ns: Namespace,
 }
 
-unsafe impl Send for CustomObj {}
-unsafe impl Sync for CustomObj {}
+gen::standard_object_impls!(CustomObj);
 
 impl CustomObj {
     pub fn new(class: new::obj_ref_t!(CustomType), attrs: Namespace) -> Self {
@@ -105,6 +83,7 @@ impl ObjectTrait for CustomObj {
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
+
     fn class(&self) -> TypeRef {
         self.class.clone()
     }

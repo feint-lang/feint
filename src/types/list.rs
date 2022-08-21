@@ -6,6 +6,7 @@ use once_cell::sync::Lazy;
 
 use crate::vm::{RuntimeErr, RuntimeResult};
 
+use super::gen;
 use super::meth::{make_meth, use_arg, use_arg_usize};
 use super::new;
 use super::result::GetAttrResult;
@@ -15,6 +16,8 @@ use super::class::TYPE_TYPE;
 use super::ns::Namespace;
 
 // List Type -----------------------------------------------------------
+
+gen::type_and_impls!(ListType, List);
 
 pub static LIST_TYPE: Lazy<new::obj_ref_t!(ListType)> = Lazy::new(|| {
     let type_ref = new::obj_ref!(ListType::new());
@@ -94,64 +97,14 @@ pub static LIST_TYPE: Lazy<new::obj_ref_t!(ListType)> = Lazy::new(|| {
     type_ref.clone()
 });
 
-pub struct ListType {
-    ns: Namespace,
-}
-
-impl ListType {
-    pub fn new() -> Self {
-        Self { ns: Namespace::new() }
-    }
-}
-
-unsafe impl Send for ListType {}
-unsafe impl Sync for ListType {}
-
-impl TypeTrait for ListType {
-    fn name(&self) -> &str {
-        "List"
-    }
-
-    fn full_name(&self) -> &str {
-        "builtins.List"
-    }
-
-    fn ns(&self) -> &Namespace {
-        &self.ns
-    }
-}
-
-impl ObjectTrait for ListType {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-    fn class(&self) -> TypeRef {
-        TYPE_TYPE.clone()
-    }
-
-    fn type_obj(&self) -> ObjectRef {
-        TYPE_TYPE.clone()
-    }
-
-    fn ns(&self) -> &Namespace {
-        &self.ns
-    }
-
-    fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.ns
-    }
-}
-
 // List Object ---------------------------------------------------------
 
 pub struct List {
     ns: Namespace,
     items: RwLock<Vec<ObjectRef>>,
 }
+
+gen::standard_object_impls!(List);
 
 impl List {
     pub fn new(items: Vec<ObjectRef>) -> Self {
@@ -211,28 +164,7 @@ impl List {
 }
 
 impl ObjectTrait for List {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-    fn class(&self) -> TypeRef {
-        LIST_TYPE.clone()
-    }
-
-    fn type_obj(&self) -> ObjectRef {
-        LIST_TYPE.clone()
-    }
-
-    fn ns(&self) -> &Namespace {
-        &self.ns
-    }
-
-    fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.ns
-    }
+    gen::object_trait_header!(LIST_TYPE);
 
     fn get_item(&self, index: usize) -> GetAttrResult {
         if index >= self.len() {

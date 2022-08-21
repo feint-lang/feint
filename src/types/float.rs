@@ -7,6 +7,7 @@ use once_cell::sync::Lazy;
 
 use crate::vm::{RuntimeBoolResult, RuntimeErr, RuntimeObjResult};
 
+use super::gen;
 use super::meth::{make_meth, use_arg};
 use super::new;
 use super::util::{eq_int_float, gt_int_float, lt_int_float};
@@ -16,6 +17,8 @@ use super::class::TYPE_TYPE;
 use super::ns::Namespace;
 
 // Float Type ----------------------------------------------------------
+
+gen::type_and_impls!(FloatType, Float);
 
 pub static FLOAT_TYPE: Lazy<new::obj_ref_t!(FloatType)> = Lazy::new(|| {
     let type_ref = new::obj_ref!(FloatType::new());
@@ -45,58 +48,6 @@ pub static FLOAT_TYPE: Lazy<new::obj_ref_t!(FloatType)> = Lazy::new(|| {
     type_ref.clone()
 });
 
-pub struct FloatType {
-    ns: Namespace,
-}
-
-unsafe impl Send for FloatType {}
-unsafe impl Sync for FloatType {}
-
-impl FloatType {
-    pub fn new() -> Self {
-        Self { ns: Namespace::new() }
-    }
-}
-
-impl TypeTrait for FloatType {
-    fn name(&self) -> &str {
-        "Float"
-    }
-
-    fn full_name(&self) -> &str {
-        "builtins.Float"
-    }
-
-    fn ns(&self) -> &Namespace {
-        &self.ns
-    }
-}
-
-impl ObjectTrait for FloatType {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-    fn class(&self) -> TypeRef {
-        TYPE_TYPE.clone()
-    }
-
-    fn type_obj(&self) -> ObjectRef {
-        TYPE_TYPE.clone()
-    }
-
-    fn ns(&self) -> &Namespace {
-        &self.ns
-    }
-
-    fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.ns
-    }
-}
-
 // Float Object --------------------------------------------------------
 
 macro_rules! make_op {
@@ -124,8 +75,7 @@ pub struct Float {
     value: f64,
 }
 
-unsafe impl Send for Float {}
-unsafe impl Sync for Float {}
+gen::standard_object_impls!(Float);
 
 impl Float {
     pub fn new(value: f64) -> Self {
@@ -138,28 +88,7 @@ impl Float {
 }
 
 impl ObjectTrait for Float {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-    fn class(&self) -> TypeRef {
-        FLOAT_TYPE.clone()
-    }
-
-    fn type_obj(&self) -> ObjectRef {
-        FLOAT_TYPE.clone()
-    }
-
-    fn ns(&self) -> &Namespace {
-        &self.ns
-    }
-
-    fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.ns
-    }
+    gen::object_trait_header!(FLOAT_TYPE);
 
     fn negate(&self) -> RuntimeObjResult {
         Ok(new::float(-*self.value()))

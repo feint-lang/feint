@@ -5,6 +5,7 @@ use std::sync::{Arc, RwLock};
 
 use once_cell::sync::Lazy;
 
+use super::gen;
 use super::new;
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
@@ -13,66 +14,10 @@ use super::ns::Namespace;
 
 // Map Type ------------------------------------------------------------
 
+gen::type_and_impls!(MapType, Map);
+
 pub static MAP_TYPE: Lazy<new::obj_ref_t!(MapType)> =
     Lazy::new(|| new::obj_ref!(MapType::new()));
-
-pub struct MapType {
-    ns: Namespace,
-}
-
-impl MapType {
-    pub fn new() -> Self {
-        Self {
-            ns: Namespace::with_entries(&[
-                // Class Attributes
-                ("$name", new::str("Map")),
-                ("$full_name", new::str("builtins.Map")),
-            ]),
-        }
-    }
-}
-
-unsafe impl Send for MapType {}
-unsafe impl Sync for MapType {}
-
-impl TypeTrait for MapType {
-    fn name(&self) -> &str {
-        "Map"
-    }
-
-    fn full_name(&self) -> &str {
-        "builtins.Map"
-    }
-
-    fn ns(&self) -> &Namespace {
-        &self.ns
-    }
-}
-
-impl ObjectTrait for MapType {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-    fn class(&self) -> TypeRef {
-        TYPE_TYPE.clone()
-    }
-
-    fn type_obj(&self) -> ObjectRef {
-        TYPE_TYPE.clone()
-    }
-
-    fn ns(&self) -> &Namespace {
-        &self.ns
-    }
-
-    fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.ns
-    }
-}
 
 // Map Object ----------------------------------------------------------
 
@@ -80,6 +25,8 @@ pub struct Map {
     ns: Namespace,
     entries: RwLock<HashMap<String, ObjectRef>>,
 }
+
+gen::standard_object_impls!(Map);
 
 impl Map {
     pub fn new(entries: HashMap<String, ObjectRef>) -> Self {
@@ -116,28 +63,7 @@ impl Map {
 }
 
 impl ObjectTrait for Map {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-    fn class(&self) -> TypeRef {
-        MAP_TYPE.clone()
-    }
-
-    fn type_obj(&self) -> ObjectRef {
-        MAP_TYPE.clone()
-    }
-
-    fn ns(&self) -> &Namespace {
-        &self.ns
-    }
-
-    fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.ns
-    }
+    gen::object_trait_header!(MAP_TYPE);
 
     fn is_equal(&self, rhs: &dyn ObjectTrait) -> bool {
         if let Some(rhs) = rhs.down_to_map() {

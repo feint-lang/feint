@@ -9,6 +9,7 @@ use once_cell::sync::Lazy;
 
 use crate::vm::{RuntimeBoolResult, RuntimeErr, RuntimeObjResult};
 
+use super::gen;
 use super::meth::{make_meth, use_arg};
 use super::new;
 use super::util::{eq_int_float, gt_int_float, lt_int_float};
@@ -19,14 +20,13 @@ use super::ns::Namespace;
 
 // Int Type ------------------------------------------------------------
 
+gen::type_and_impls!(IntType, Int);
+
 pub static INT_TYPE: Lazy<new::obj_ref_t!(IntType)> = Lazy::new(|| {
     let type_ref = new::obj_ref!(IntType::new());
     let mut class = type_ref.write().unwrap();
 
     class.ns_mut().add_entries(&[
-        // Class Attributes
-        ("$name", new::str("Int")),
-        ("$full_name", new::str("builtins.Int")),
         // Class Methods
         make_meth!("new", type_ref, &["value"], |_, args, _| {
             let arg = use_arg!(args, 0);
@@ -46,58 +46,6 @@ pub static INT_TYPE: Lazy<new::obj_ref_t!(IntType)> = Lazy::new(|| {
 
     type_ref.clone()
 });
-
-pub struct IntType {
-    ns: Namespace,
-}
-
-unsafe impl Send for IntType {}
-unsafe impl Sync for IntType {}
-
-impl IntType {
-    pub fn new() -> Self {
-        Self { ns: Namespace::new() }
-    }
-}
-
-impl TypeTrait for IntType {
-    fn name(&self) -> &str {
-        "Int"
-    }
-
-    fn full_name(&self) -> &str {
-        "builtins.Int"
-    }
-
-    fn ns(&self) -> &Namespace {
-        &self.ns
-    }
-}
-
-impl ObjectTrait for IntType {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-    fn class(&self) -> TypeRef {
-        TYPE_TYPE.clone()
-    }
-
-    fn type_obj(&self) -> ObjectRef {
-        TYPE_TYPE.clone()
-    }
-
-    fn ns(&self) -> &Namespace {
-        &self.ns
-    }
-
-    fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.ns
-    }
-}
 
 // Int Object ----------------------------------------------------------
 
@@ -126,8 +74,7 @@ pub struct Int {
     value: BigInt,
 }
 
-unsafe impl Send for Int {}
-unsafe impl Sync for Int {}
+gen::standard_object_impls!(Int);
 
 impl Int {
     pub fn new(value: BigInt) -> Self {
@@ -156,28 +103,7 @@ impl Int {
 }
 
 impl ObjectTrait for Int {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-    fn class(&self) -> TypeRef {
-        INT_TYPE.clone()
-    }
-
-    fn type_obj(&self) -> ObjectRef {
-        INT_TYPE.clone()
-    }
-
-    fn ns(&self) -> &Namespace {
-        &self.ns
-    }
-
-    fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.ns
-    }
+    gen::object_trait_header!(INT_TYPE);
 
     fn negate(&self) -> RuntimeObjResult {
         Ok(new::int(-self.value.clone()))

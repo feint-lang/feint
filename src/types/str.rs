@@ -6,6 +6,7 @@ use once_cell::sync::Lazy;
 
 use crate::vm::{RuntimeBoolResult, RuntimeErr, RuntimeObjResult};
 
+use super::gen;
 use super::meth::{make_meth, use_arg, use_arg_str};
 use super::new;
 
@@ -14,6 +15,8 @@ use super::class::TYPE_TYPE;
 use super::ns::Namespace;
 
 // Str Type ------------------------------------------------------------
+
+gen::type_and_impls!(StrType, Str);
 
 pub static STR_TYPE: Lazy<new::obj_ref_t!(StrType)> = Lazy::new(|| {
     let type_ref = new::obj_ref!(StrType::new());
@@ -37,64 +40,14 @@ pub static STR_TYPE: Lazy<new::obj_ref_t!(StrType)> = Lazy::new(|| {
     type_ref.clone()
 });
 
-pub struct StrType {
-    ns: Namespace,
-}
-
-impl StrType {
-    pub fn new() -> Self {
-        Self { ns: Namespace::new() }
-    }
-}
-
-unsafe impl Send for StrType {}
-unsafe impl Sync for StrType {}
-
-impl TypeTrait for StrType {
-    fn name(&self) -> &str {
-        "Str"
-    }
-
-    fn full_name(&self) -> &str {
-        "builtins.Str"
-    }
-
-    fn ns(&self) -> &Namespace {
-        &self.ns
-    }
-}
-
-impl ObjectTrait for StrType {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-    fn class(&self) -> TypeRef {
-        TYPE_TYPE.clone()
-    }
-
-    fn type_obj(&self) -> ObjectRef {
-        TYPE_TYPE.clone()
-    }
-
-    fn ns(&self) -> &Namespace {
-        &self.ns
-    }
-
-    fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.ns
-    }
-}
-
 // Str Object ----------------------------------------------------------
 
 pub struct Str {
     ns: Namespace,
     value: String,
 }
+
+gen::standard_object_impls!(Str);
 
 impl Str {
     pub fn new(value: String) -> Self {
@@ -113,28 +66,7 @@ impl Str {
 }
 
 impl ObjectTrait for Str {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-    fn class(&self) -> TypeRef {
-        STR_TYPE.clone()
-    }
-
-    fn type_obj(&self) -> ObjectRef {
-        STR_TYPE.clone()
-    }
-
-    fn ns(&self) -> &Namespace {
-        &self.ns
-    }
-
-    fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.ns
-    }
+    gen::object_trait_header!(STR_TYPE);
 
     fn is_equal(&self, rhs: &dyn ObjectTrait) -> bool {
         if let Some(rhs) = rhs.down_to_str() {

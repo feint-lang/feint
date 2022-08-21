@@ -54,6 +54,7 @@ macro_rules! type_and_impls {
             fn as_any_mut(&mut self) -> &mut dyn Any {
                 self
             }
+
             fn class(&self) -> TypeRef {
                 TYPE_TYPE.clone()
             }
@@ -88,11 +89,8 @@ macro_rules! standard_object_impls {
 ///
 /// $class: ident
 ///     The singleton type instance. E.g. `NIL_TYPE`.
-///
-/// $name: ident
-///     The object name. E.g., `Nil`
 macro_rules! object_trait_header {
-    ( $class:ident, $name:ident ) => {
+    ( $class:ident ) => {
         fn as_any(&self) -> &dyn Any {
             self
         }
@@ -100,6 +98,7 @@ macro_rules! object_trait_header {
         fn as_any_mut(&mut self) -> &mut dyn Any {
             self
         }
+
         fn class(&self) -> TypeRef {
             $class.clone()
         }

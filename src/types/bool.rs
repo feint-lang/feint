@@ -40,7 +40,7 @@ impl Bool {
 }
 
 impl ObjectTrait for Bool {
-    gen::object_trait_header!(BOOL_TYPE, Bool);
+    gen::object_trait_header!(BOOL_TYPE);
 
     // Unary operations -----------------------------------------------
 
