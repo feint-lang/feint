@@ -19,6 +19,7 @@ use super::cell::{Cell, CellType};
 use super::class::{Type, TypeType};
 use super::closure::{Closure, ClosureType};
 use super::custom::{CustomObj, CustomType};
+use super::error::{Error, ErrorKind, ErrorType};
 use super::float::{Float, FloatType};
 use super::func::{Func, FuncType};
 use super::int::{Int, IntType};
@@ -177,6 +178,16 @@ pub trait ObjectTrait {
             let items = names.iter().map(new::str).collect();
             return Ok(new::tuple(items));
         }
+        if name == "is_err" {
+            return Ok(new::bool(self.is_error()));
+        }
+        if name == "err" {
+            return if let Some(error) = self.down_to_error() {
+                Ok(Arc::new(RwLock::new(error.clone())))
+            } else {
+                Ok(new::nil())
+            };
+        }
         if let Some(obj) = self.ns().get_obj(name) {
             return Ok(obj);
         }
@@ -226,6 +237,7 @@ pub trait ObjectTrait {
     make_type_checker!(is_builtin_func_type, BuiltinFuncType);
     make_type_checker!(is_cell_type, CellType);
     make_type_checker!(is_closure_type, ClosureType);
+    make_type_checker!(is_error_type, ErrorType);
     make_type_checker!(is_float_type, FloatType);
     make_type_checker!(is_func_type, FuncType);
     make_type_checker!(is_int_type, IntType);
@@ -242,6 +254,7 @@ pub trait ObjectTrait {
     make_type_checker!(is_builtin_func, BuiltinFunc);
     make_type_checker!(is_cell, Cell);
     make_type_checker!(is_closure, Closure);
+    make_type_checker!(is_error, Error);
     make_type_checker!(is_float, Float);
     make_type_checker!(is_func, Func);
     make_type_checker!(is_int, Int);
@@ -262,6 +275,7 @@ pub trait ObjectTrait {
     make_down_to!(down_to_builtin_func_type, BuiltinFuncType);
     make_down_to!(down_to_cell_type, CellType);
     make_down_to!(down_to_closure_type, ClosureType);
+    make_down_to!(down_to_error_type, ErrorType);
     make_down_to!(down_to_float_type, FloatType);
     make_down_to!(down_to_func_type, FuncType);
     make_down_to!(down_to_list_type, ListType);
@@ -278,6 +292,7 @@ pub trait ObjectTrait {
     make_down_to!(down_to_builtin_func, BuiltinFunc);
     make_down_to!(down_to_cell, Cell);
     make_down_to!(down_to_closure, Closure);
+    make_down_to!(down_to_error, Error);
     make_down_to!(down_to_float, Float);
     make_down_to!(down_to_func, Func);
     make_down_to!(down_to_int, Int);
@@ -415,6 +430,7 @@ impl fmt::Display for dyn ObjectTrait {
             CellType,
             ClosureType,
             CustomType,
+            ErrorType,
             FloatType,
             FuncType,
             IntType,
@@ -435,6 +451,7 @@ impl fmt::Display for dyn ObjectTrait {
             Cell,
             Closure,
             CustomObj,
+            Error,
             Float,
             Func,
             Int,
@@ -461,6 +478,7 @@ impl fmt::Debug for dyn ObjectTrait {
             CellType,
             ClosureType,
             CustomType,
+            ErrorType,
             FloatType,
             FuncType,
             IntType,
@@ -481,6 +499,7 @@ impl fmt::Debug for dyn ObjectTrait {
             Cell,
             Closure,
             CustomObj,
+            Error,
             Float,
             Func,
             Int,

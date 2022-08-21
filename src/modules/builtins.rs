@@ -11,6 +11,7 @@ use crate::types::bound_func::BOUND_FUNC_TYPE;
 use crate::types::builtin_func::BUILTIN_FUNC_TYPE;
 use crate::types::class::TYPE_TYPE;
 use crate::types::closure::CLOSURE_TYPE;
+use crate::types::error::ERROR_TYPE;
 use crate::types::float::FLOAT_TYPE;
 use crate::types::func::FUNC_TYPE;
 use crate::types::int::INT_TYPE;
@@ -29,6 +30,7 @@ pub static BUILTINS: Lazy<Arc<RwLock<Module>>> = Lazy::new(|| {
         ("BoundFunc", BOUND_FUNC_TYPE.clone()),
         ("BuiltinFunc", BUILTIN_FUNC_TYPE.clone()),
         ("Closure", CLOSURE_TYPE.clone()),
+        ("Error", ERROR_TYPE.clone()),
         ("Func", FUNC_TYPE.clone()),
         ("Float", FLOAT_TYPE.clone()),
         ("Int", INT_TYPE.clone()),

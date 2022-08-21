@@ -28,6 +28,7 @@ pub(crate) mod cell;
 pub(crate) mod class;
 pub(crate) mod closure;
 pub(crate) mod custom;
+pub(crate) mod error;
 pub(crate) mod float;
 pub(crate) mod func;
 pub(crate) mod int;
