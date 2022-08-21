@@ -6,6 +6,7 @@ use once_cell::sync::Lazy;
 
 use crate::vm::Code;
 
+use super::gen;
 use super::new;
 use super::result::Params;
 
@@ -16,66 +17,10 @@ use super::ns::Namespace;
 
 // Function Type -------------------------------------------------------
 
+gen::type_and_impls!(FuncType, Func);
+
 pub static FUNC_TYPE: Lazy<new::obj_ref_t!(FuncType)> =
     Lazy::new(|| new::obj_ref!(FuncType::new()));
-
-pub struct FuncType {
-    ns: Namespace,
-}
-
-unsafe impl Send for FuncType {}
-unsafe impl Sync for FuncType {}
-
-impl FuncType {
-    pub fn new() -> Self {
-        Self {
-            ns: Namespace::with_entries(&[
-                // Class Attributes
-                ("$name", new::str("Func")),
-                ("$full_name", new::str("builtins.Func")),
-            ]),
-        }
-    }
-}
-
-impl TypeTrait for FuncType {
-    fn name(&self) -> &str {
-        "Func"
-    }
-
-    fn full_name(&self) -> &str {
-        "builtins.Func"
-    }
-
-    fn ns(&self) -> &Namespace {
-        &self.ns
-    }
-}
-
-impl ObjectTrait for FuncType {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-    fn class(&self) -> TypeRef {
-        TYPE_TYPE.clone()
-    }
-
-    fn type_obj(&self) -> ObjectRef {
-        TYPE_TYPE.clone()
-    }
-
-    fn ns(&self) -> &Namespace {
-        &self.ns
-    }
-
-    fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.ns
-    }
-}
 
 // Func Object ----------------------------------------------------------
 
@@ -86,8 +31,7 @@ pub struct Func {
     pub code: Code,
 }
 
-unsafe impl Send for Func {}
-unsafe impl Sync for Func {}
+gen::standard_object_impls!(Func);
 
 impl Func {
     pub fn new(name: String, params: Params, code: Code) -> Self {
@@ -126,28 +70,7 @@ impl FuncTrait for Func {
 }
 
 impl ObjectTrait for Func {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-    fn class(&self) -> TypeRef {
-        FUNC_TYPE.clone()
-    }
-
-    fn type_obj(&self) -> ObjectRef {
-        FUNC_TYPE.clone()
-    }
-
-    fn ns(&self) -> &Namespace {
-        &self.ns
-    }
-
-    fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.ns
-    }
+    gen::object_trait_header!(FUNC_TYPE);
 }
 
 // Display -------------------------------------------------------------

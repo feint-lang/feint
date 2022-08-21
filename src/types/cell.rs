@@ -6,6 +6,7 @@ use once_cell::sync::Lazy;
 
 use crate::vm::RuntimeBoolResult;
 
+use super::gen;
 use super::new;
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
@@ -14,66 +15,10 @@ use super::ns::Namespace;
 
 // Cell Type -----------------------------------------------------------
 
+gen::type_and_impls!(CellType, Cell);
+
 pub static CELL_TYPE: Lazy<new::obj_ref_t!(CellType)> =
     Lazy::new(|| new::obj_ref!(CellType::new()));
-
-pub struct CellType {
-    ns: Namespace,
-}
-
-unsafe impl Send for CellType {}
-unsafe impl Sync for CellType {}
-
-impl CellType {
-    pub fn new() -> Self {
-        Self {
-            ns: Namespace::with_entries(&[
-                // Class Attributes
-                ("$name", new::str("Cell")),
-                ("$full_name", new::str("builtins.Cell")),
-            ]),
-        }
-    }
-}
-
-impl TypeTrait for CellType {
-    fn name(&self) -> &str {
-        "Cell"
-    }
-
-    fn full_name(&self) -> &str {
-        "builtins.Cell"
-    }
-
-    fn ns(&self) -> &Namespace {
-        &self.ns
-    }
-}
-
-impl ObjectTrait for CellType {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-    fn class(&self) -> TypeRef {
-        TYPE_TYPE.clone()
-    }
-
-    fn type_obj(&self) -> ObjectRef {
-        TYPE_TYPE.clone()
-    }
-
-    fn ns(&self) -> &Namespace {
-        &self.ns
-    }
-
-    fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.ns
-    }
-}
 
 // Cell Object ---------------------------------------------------------
 
@@ -82,8 +27,7 @@ pub struct Cell {
     value: ObjectRef,
 }
 
-unsafe impl Send for Cell {}
-unsafe impl Sync for Cell {}
+gen::standard_object_impls!(Cell);
 
 impl Cell {
     pub fn new() -> Self {
@@ -106,29 +50,7 @@ impl Cell {
 }
 
 impl ObjectTrait for Cell {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-
-    fn class(&self) -> TypeRef {
-        CELL_TYPE.clone()
-    }
-
-    fn type_obj(&self) -> ObjectRef {
-        CELL_TYPE.clone()
-    }
-
-    fn ns(&self) -> &Namespace {
-        &self.ns
-    }
-
-    fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.ns
-    }
+    gen::object_trait_header!(CELL_TYPE);
 
     fn bool_val(&self) -> RuntimeBoolResult {
         Ok(false)

@@ -6,6 +6,7 @@ use once_cell::sync::Lazy;
 
 use crate::vm::VM;
 
+use super::gen;
 use super::new;
 use super::result::{Args, CallResult, Params};
 
@@ -18,67 +19,10 @@ pub type BuiltinFn = fn(ObjectRef, Args, &mut VM) -> CallResult;
 
 // Builtin Function Type -----------------------------------------------
 
+gen::type_and_impls!(BuiltinFuncType, BuiltinFunc);
+
 pub static BUILTIN_FUNC_TYPE: Lazy<new::obj_ref_t!(BuiltinFuncType)> =
     Lazy::new(|| new::obj_ref!(BuiltinFuncType::new()));
-
-pub struct BuiltinFuncType {
-    ns: Namespace,
-}
-
-unsafe impl Send for BuiltinFuncType {}
-unsafe impl Sync for BuiltinFuncType {}
-
-impl BuiltinFuncType {
-    pub fn new() -> Self {
-        Self {
-            ns: Namespace::with_entries(&[
-                // Class Attributes
-                ("$name", new::str("BuiltinFunc")),
-                ("$full_name", new::str("builtins.BuiltinFunc")),
-            ]),
-        }
-    }
-}
-
-impl TypeTrait for BuiltinFuncType {
-    fn name(&self) -> &str {
-        "BuiltinFunc"
-    }
-
-    fn full_name(&self) -> &str {
-        "builtins.BuiltinFunc"
-    }
-
-    fn ns(&self) -> &Namespace {
-        &self.ns
-    }
-}
-
-impl ObjectTrait for BuiltinFuncType {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-
-    fn class(&self) -> TypeRef {
-        TYPE_TYPE.clone()
-    }
-
-    fn type_obj(&self) -> ObjectRef {
-        TYPE_TYPE.clone()
-    }
-
-    fn ns(&self) -> &Namespace {
-        &self.ns
-    }
-
-    fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.ns
-    }
-}
 
 // BuiltinFunc Object ----------------------------------------------------------
 
@@ -90,8 +34,7 @@ pub struct BuiltinFunc {
     pub func: BuiltinFn,
 }
 
-unsafe impl Send for BuiltinFunc {}
-unsafe impl Sync for BuiltinFunc {}
+gen::standard_object_impls!(BuiltinFunc);
 
 impl BuiltinFunc {
     pub fn new(
@@ -124,29 +67,7 @@ impl FuncTrait for BuiltinFunc {
 }
 
 impl ObjectTrait for BuiltinFunc {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-
-    fn class(&self) -> TypeRef {
-        BUILTIN_FUNC_TYPE.clone()
-    }
-
-    fn type_obj(&self) -> ObjectRef {
-        BUILTIN_FUNC_TYPE.clone()
-    }
-
-    fn ns(&self) -> &Namespace {
-        &self.ns
-    }
-
-    fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.ns
-    }
+    gen::object_trait_header!(BUILTIN_FUNC_TYPE);
 }
 
 // Display -------------------------------------------------------------
