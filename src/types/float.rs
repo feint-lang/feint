@@ -5,11 +5,10 @@ use std::sync::{Arc, RwLock};
 use num_traits::ToPrimitive;
 use once_cell::sync::Lazy;
 
-use crate::vm::{RuntimeBoolResult, RuntimeErr, RuntimeObjResult, VM};
+use crate::vm::{RuntimeBoolResult, RuntimeErr, RuntimeObjResult};
 
 use super::meth::{make_meth, use_arg};
 use super::new;
-use super::result::{Args, This};
 use super::util::{eq_int_float, gt_int_float, lt_int_float};
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
@@ -18,8 +17,33 @@ use super::ns::Namespace;
 
 // Float Type ----------------------------------------------------------
 
-pub static FLOAT_TYPE: Lazy<Arc<RwLock<FloatType>>> =
-    Lazy::new(|| Arc::new(RwLock::new(FloatType::new())));
+pub static FLOAT_TYPE: Lazy<Arc<RwLock<FloatType>>> = Lazy::new(|| {
+    let type_ref = Arc::new(RwLock::new(FloatType::new()));
+    let mut class = type_ref.write().unwrap();
+
+    class.ns_mut().add_entries(&[
+        // Class Attributes
+        ("$name", new::str("Float")),
+        ("$full_name", new::str("builtins.Float")),
+        // Class Methods
+        make_meth!("new", type_ref, &["value"], |_, args, _| {
+            let arg = use_arg!(args, 0);
+            let float = if let Some(val) = arg.get_float_val() {
+                new::float(*val)
+            } else if let Some(val) = arg.get_int_val() {
+                new::float(val.to_f64().unwrap())
+            } else if let Some(val) = arg.get_str_val() {
+                new::float_from_string(val)
+            } else {
+                let message = format!("Float new expected string or float; got {arg}");
+                return Err(RuntimeErr::type_err(message));
+            };
+            Ok(float)
+        }),
+    ]);
+
+    type_ref.clone()
+});
 
 pub struct FloatType {
     ns: Namespace,
@@ -30,29 +54,7 @@ unsafe impl Sync for FloatType {}
 
 impl FloatType {
     pub fn new() -> Self {
-        Self {
-            ns: Namespace::with_entries(&[
-                // Class Attributes
-                ("$name", new::str("Float")),
-                ("$full_name", new::str("builtins.Float")),
-                // Class Methods
-                make_meth!(FloatType, "new", &["value"], |_, args: Args, _| {
-                    let arg = use_arg!(args, 0);
-                    let float = if let Some(val) = arg.get_float_val() {
-                        new::float(*val)
-                    } else if let Some(val) = arg.get_int_val() {
-                        new::float(val.to_f64().unwrap())
-                    } else if let Some(val) = arg.get_str_val() {
-                        new::float_from_string(val)
-                    } else {
-                        let message =
-                            format!("Float new expected string or float; got {arg}");
-                        return Err(RuntimeErr::type_err(message));
-                    };
-                    Ok(float)
-                }),
-            ]),
-        }
+        Self { ns: Namespace::new() }
     }
 }
 

@@ -80,9 +80,14 @@ pub fn bound_func(func: ObjectRef, this: ObjectRef) -> ObjectRef {
     Arc::new(RwLock::new(BoundFunc::new(func, this)))
 }
 
-pub fn builtin_func(name: &str, params: &[&str], func: BuiltinFn) -> ObjectRef {
+pub fn builtin_func(
+    name: &str,
+    this_type: Option<ObjectRef>,
+    params: &[&str],
+    func: BuiltinFn,
+) -> ObjectRef {
     let params = params.iter().map(|n| n.to_string()).collect();
-    Arc::new(RwLock::new(BuiltinFunc::new(name.to_owned(), params, func)))
+    Arc::new(RwLock::new(BuiltinFunc::new(name.to_owned(), this_type, params, func)))
 }
 
 pub fn builtin_module(name: &str, ns: Namespace) -> Arc<RwLock<Module>> {

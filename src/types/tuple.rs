@@ -5,11 +5,9 @@ use std::sync::{Arc, RwLock};
 
 use once_cell::sync::Lazy;
 
-use crate::vm::{RuntimeErr, VM};
-
-use super::meth::{make_meth, use_this};
+use super::meth::make_meth;
 use super::new;
-use super::result::{Args, GetAttrResult, This};
+use super::result::GetAttrResult;
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
 use super::class::TYPE_TYPE;
@@ -17,8 +15,44 @@ use super::ns::Namespace;
 
 // Tuple Type ----------------------------------------------------------
 
-pub static TUPLE_TYPE: Lazy<Arc<RwLock<TupleType>>> =
-    Lazy::new(|| Arc::new(RwLock::new(TupleType::new())));
+pub static TUPLE_TYPE: Lazy<Arc<RwLock<TupleType>>> = Lazy::new(|| {
+    let type_ref = Arc::new(RwLock::new(TupleType::new()));
+    let mut class = type_ref.write().unwrap();
+
+    class.ns_mut().add_entries(&[
+        // Class Attributes
+        ("$name", new::str("Tuple")),
+        ("$full_name", new::str("builtins.Tuple")),
+        // Instance Methods
+        make_meth!("length", type_ref, &[], |this, _, _| {
+            let this = this.unwrap();
+            let this = this.read().unwrap();
+            let this = this.down_to_tuple().unwrap();
+            Ok(new::int(this.len()))
+        }),
+        make_meth!("is_empty", type_ref, &[], |this, _, _| {
+            let this = this.unwrap();
+            let this = this.read().unwrap();
+            let this = this.down_to_tuple().unwrap();
+            Ok(new::bool(this.is_empty()))
+        }),
+        make_meth!("map", type_ref, &["map_fn"], |this, args, vm| {
+            let this = this.unwrap();
+            let this = this.read().unwrap();
+            let this = this.down_to_tuple().unwrap();
+            let items = &this.items;
+            let map_fn = &args[0];
+            let mut results = vec![];
+            for (i, item) in items.iter().enumerate() {
+                vm.call(map_fn.clone(), vec![item.clone(), new::int(i)])?;
+                results.push(vm.pop_obj()?);
+            }
+            Ok(new::tuple(results))
+        }),
+    ]);
+
+    type_ref.clone()
+});
 
 pub struct TupleType {
     ns: Namespace,
@@ -26,41 +60,7 @@ pub struct TupleType {
 
 impl TupleType {
     pub fn new() -> Self {
-        Self {
-            ns: Namespace::with_entries(&[
-                // Class Attributes
-                ("$name", new::str("Tuple")),
-                ("$full_name", new::str("builtins.Tuple")),
-                // Instance Methods
-                make_meth!(Tuple, "length", &[], |this: ObjectRef, _, _| {
-                    let this = use_this!(this);
-                    let this = this.down_to_tuple().unwrap();
-                    Ok(new::int(this.len()))
-                }),
-                make_meth!(Tuple, "is_empty", &[], |this: ObjectRef, _, _| {
-                    let this = use_this!(this);
-                    let this = this.down_to_tuple().unwrap();
-                    Ok(new::bool(this.is_empty()))
-                }),
-                make_meth!(
-                    Tuple,
-                    "map",
-                    &["map_fn"],
-                    |this: ObjectRef, args: Args, vm: &mut VM| {
-                        let this = use_this!(this);
-                        let this = this.down_to_tuple().unwrap();
-                        let items = &this.items;
-                        let map_fn = &args[0];
-                        let mut results = vec![];
-                        for (i, item) in items.iter().enumerate() {
-                            vm.call(map_fn.clone(), vec![item.clone(), new::int(i)])?;
-                            results.push(vm.pop_obj()?);
-                        }
-                        Ok(new::tuple(results))
-                    }
-                ),
-            ]),
-        }
+        Self { ns: Namespace::new() }
     }
 }
 

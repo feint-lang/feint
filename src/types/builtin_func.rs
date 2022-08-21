@@ -85,6 +85,7 @@ impl ObjectTrait for BuiltinFuncType {
 pub struct BuiltinFunc {
     ns: Namespace,
     name: String,
+    this_type: Option<ObjectRef>,
     params: Params,
     pub func: BuiltinFn,
 }
@@ -93,13 +94,19 @@ unsafe impl Send for BuiltinFunc {}
 unsafe impl Sync for BuiltinFunc {}
 
 impl BuiltinFunc {
-    pub fn new(name: String, params: Params, func: BuiltinFn) -> Self {
+    pub fn new(
+        name: String,
+        this_type: Option<ObjectRef>,
+        params: Params,
+        func: BuiltinFn,
+    ) -> Self {
         Self {
             ns: Namespace::with_entries(&[
                 // Instance Attributes
                 ("$name", new::str(name.as_str())),
             ]),
             name,
+            this_type,
             params,
             func,
         }

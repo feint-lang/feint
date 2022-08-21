@@ -4,11 +4,10 @@ use std::sync::{Arc, RwLock};
 
 use once_cell::sync::Lazy;
 
-use crate::vm::{RuntimeBoolResult, RuntimeErr, RuntimeObjResult, VM};
+use crate::vm::{RuntimeBoolResult, RuntimeErr, RuntimeObjResult};
 
-use super::meth::{make_meth, use_arg, use_arg_str, use_this};
+use super::meth::{make_meth, use_arg, use_arg_str};
 use super::new;
-use super::result::{Args, This};
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
 use super::class::TYPE_TYPE;
@@ -16,8 +15,27 @@ use super::ns::Namespace;
 
 // Str Type ------------------------------------------------------------
 
-pub static STR_TYPE: Lazy<Arc<RwLock<StrType>>> =
-    Lazy::new(|| Arc::new(RwLock::new(StrType::new())));
+pub static STR_TYPE: Lazy<Arc<RwLock<StrType>>> = Lazy::new(|| {
+    let type_ref = Arc::new(RwLock::new(StrType::new()));
+    let mut class = type_ref.write().unwrap();
+
+    class.ns_mut().add_entries(&[
+        // Class Attributes
+        ("$name", new::str("Str")),
+        ("$full_name", new::str("builtins.Str")),
+        // Instance Methods
+        make_meth!("starts_with", type_ref, &["prefix"], |this, args, _| {
+            let this = this.unwrap();
+            let this = this.read().unwrap();
+            let this = this.down_to_str().unwrap();
+            let arg = use_arg!(args, 0);
+            let prefix = use_arg_str!(arg);
+            Ok(new::bool(this.value.starts_with(prefix)))
+        }),
+    ]);
+
+    type_ref.clone()
+});
 
 pub struct StrType {
     ns: Namespace,
@@ -25,25 +43,7 @@ pub struct StrType {
 
 impl StrType {
     pub fn new() -> Self {
-        Self {
-            ns: Namespace::with_entries(&[
-                // Class Attributes
-                ("$name", new::str("Str")),
-                ("$full_name", new::str("builtins.Str")),
-                make_meth!(
-                    Str,
-                    "starts_with",
-                    &["prefix"],
-                    |this: ObjectRef, args: Args, _| {
-                        let this = use_this!(this);
-                        let this = this.down_to_str().unwrap();
-                        let arg = use_arg!(args, 0);
-                        let prefix = use_arg_str!(arg);
-                        Ok(new::bool(this.value.starts_with(prefix)))
-                    }
-                ),
-            ]),
-        }
+        Self { ns: Namespace::new() }
     }
 }
 

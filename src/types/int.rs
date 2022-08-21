@@ -7,11 +7,10 @@ use num_traits::{FromPrimitive, ToPrimitive};
 
 use once_cell::sync::Lazy;
 
-use crate::vm::{RuntimeBoolResult, RuntimeErr, RuntimeObjResult, VM};
+use crate::vm::{RuntimeBoolResult, RuntimeErr, RuntimeObjResult};
 
 use super::meth::{make_meth, use_arg};
 use super::new;
-use super::result::{Args, This};
 use super::util::{eq_int_float, gt_int_float, lt_int_float};
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
@@ -20,8 +19,33 @@ use super::ns::Namespace;
 
 // Int Type ------------------------------------------------------------
 
-pub static INT_TYPE: Lazy<Arc<RwLock<IntType>>> =
-    Lazy::new(|| Arc::new(RwLock::new(IntType::new())));
+pub static INT_TYPE: Lazy<Arc<RwLock<IntType>>> = Lazy::new(|| {
+    let type_ref = Arc::new(RwLock::new(IntType::new()));
+    let mut class = type_ref.write().unwrap();
+
+    class.ns_mut().add_entries(&[
+        // Class Attributes
+        ("$name", new::str("Int")),
+        ("$full_name", new::str("builtins.Int")),
+        // Class Methods
+        make_meth!("new", type_ref, &["value"], |_, args, _| {
+            let arg = use_arg!(args, 0);
+            let int = if let Some(val) = arg.get_int_val() {
+                new::int(val.clone())
+            } else if let Some(val) = arg.get_float_val() {
+                new::int(BigInt::from_f64(*val).unwrap())
+            } else if let Some(val) = arg.get_str_val() {
+                new::int_from_string(val)
+            } else {
+                let message = format!("Int.new() expected number or string; got {arg}");
+                return Err(RuntimeErr::type_err(message));
+            };
+            Ok(int)
+        }),
+    ]);
+
+    type_ref.clone()
+});
 
 pub struct IntType {
     ns: Namespace,
@@ -32,29 +56,7 @@ unsafe impl Sync for IntType {}
 
 impl IntType {
     pub fn new() -> Self {
-        Self {
-            ns: Namespace::with_entries(&[
-                // Class Attributes
-                ("$name", new::str("Int")),
-                ("$full_name", new::str("builtins.Int")),
-                // Class Methods
-                make_meth!(IntType, "new", &["value"], |_, args: Args, _| {
-                    let arg = use_arg!(args, 0);
-                    let int = if let Some(val) = arg.get_int_val() {
-                        new::int(val.clone())
-                    } else if let Some(val) = arg.get_float_val() {
-                        new::int(BigInt::from_f64(*val).unwrap())
-                    } else if let Some(val) = arg.get_str_val() {
-                        new::int_from_string(val)
-                    } else {
-                        let message =
-                            format!("Int.new() expected number or string; got {arg}");
-                        return Err(RuntimeErr::type_err(message));
-                    };
-                    Ok(int)
-                }),
-            ]),
-        }
+        Self { ns: Namespace::new() }
     }
 }
 

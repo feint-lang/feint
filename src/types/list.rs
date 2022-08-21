@@ -4,11 +4,11 @@ use std::sync::{Arc, RwLock};
 
 use once_cell::sync::Lazy;
 
-use crate::vm::{RuntimeErr, RuntimeResult, VM};
+use crate::vm::{RuntimeErr, RuntimeResult};
 
-use super::meth::{make_meth, use_arg, use_arg_usize, use_this};
+use super::meth::{make_meth, use_arg, use_arg_usize};
 use super::new;
-use super::result::{Args, GetAttrResult, This};
+use super::result::GetAttrResult;
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
 use super::class::TYPE_TYPE;
@@ -16,8 +16,83 @@ use super::ns::Namespace;
 
 // List Type -----------------------------------------------------------
 
-pub static LIST_TYPE: Lazy<Arc<RwLock<ListType>>> =
-    Lazy::new(|| Arc::new(RwLock::new(ListType::new())));
+pub static LIST_TYPE: Lazy<Arc<RwLock<ListType>>> = Lazy::new(|| {
+    let type_ref = Arc::new(RwLock::new(ListType::new()));
+    let mut class = type_ref.write().unwrap();
+
+    class.ns_mut().add_entries(&[
+        // Class Attributes
+        ("$name", new::str("List")),
+        ("$full_name", new::str("builtins.List")),
+        // Instance Methods
+        make_meth!("length", type_ref, &[], |this, _, _| {
+            let this = this.unwrap();
+            let this = this.read().unwrap();
+            let this = this.down_to_list().unwrap();
+            Ok(new::int(this.len()))
+        }),
+        make_meth!("is_empty", type_ref, &[], |this, _, _| {
+            let this = this.unwrap();
+            let this = this.read().unwrap();
+            let this = this.down_to_list().unwrap();
+            Ok(new::bool(this.len() == 0))
+        }),
+        // Push item and return it.
+        make_meth!("push", type_ref, &["item"], |this, args, _| {
+            let this = this.unwrap();
+            let this = this.read().unwrap();
+            let this = this.down_to_list().unwrap();
+            let arg = args[0].clone();
+            this.push(arg.clone());
+            Ok(arg)
+        }),
+        // Push items and return this.
+        make_meth!("extend", type_ref, &["items"], |this, args, _| {
+            let this_ref = this.unwrap();
+            let this = this_ref.read().unwrap();
+            let this = this.down_to_list().unwrap();
+            this.extend(args[0].clone())?;
+            Ok(this_ref.clone())
+        }),
+        make_meth!("pop", type_ref, &[], |this, _, _| {
+            let this = this.unwrap();
+            let this = this.read().unwrap();
+            let this = this.down_to_list().unwrap();
+            let result = match this.pop() {
+                Some(obj) => obj,
+                None => new::nil(),
+            };
+            Ok(result)
+        }),
+        make_meth!("get", type_ref, &["index"], |this, args, _| {
+            let this = this.unwrap();
+            let this = this.read().unwrap();
+            let this = this.down_to_list().unwrap();
+            let arg = use_arg!(args, 0);
+            let index = use_arg_usize!(arg);
+            let result = match this.get(index) {
+                Some(obj) => obj,
+                None => new::nil(),
+            };
+            Ok(result)
+        }),
+        make_meth!("map", type_ref, &["map_fn"], |this, args, vm| {
+            let this = this.unwrap();
+            let this = this.read().unwrap();
+            let this = this.down_to_list().unwrap();
+            let items = this.items.read().unwrap();
+            let map_fn = &args[0];
+            let mut results = vec![];
+            for (i, item) in items.iter().enumerate() {
+                vm.call(map_fn.clone(), vec![item.clone(), new::int(i)])?;
+                results.push(vm.pop_obj()?);
+            }
+            Ok(new::tuple(results))
+        }),
+    ]);
+
+    type_ref.clone()
+});
 
 pub struct ListType {
     ns: Namespace,
@@ -25,92 +100,7 @@ pub struct ListType {
 
 impl ListType {
     pub fn new() -> Self {
-        Self {
-            ns: Namespace::with_entries(&[
-                // Class Attributes
-                ("$name", new::str("List")),
-                ("$full_name", new::str("builtins.List")),
-                // Instance Methods
-                make_meth!(List, "length", &[], |this: ObjectRef, _, _| {
-                    let this = use_this!(this);
-                    let this = this.down_to_list().unwrap();
-                    Ok(new::int(this.len()))
-                }),
-                make_meth!(List, "is_empty", &[], |this: ObjectRef, _, _| {
-                    let this = use_this!(this);
-                    let this = this.down_to_list().unwrap();
-                    Ok(new::bool(this.len() == 0))
-                }),
-                // Push item and return it.
-                make_meth!(
-                    List,
-                    "push",
-                    &["item"],
-                    |this: ObjectRef, args: Args, _| {
-                        let this = use_this!(this);
-                        let this = this.down_to_list().unwrap();
-                        let arg = args[0].clone();
-                        this.push(arg.clone());
-                        Ok(arg)
-                    }
-                ),
-                // Push items and return this.
-                make_meth!(
-                    List,
-                    "extend",
-                    &["items"],
-                    |this: ObjectRef, args: Args, _| {
-                        let return_val = this.clone();
-                        let this = use_this!(this);
-                        let this = this.down_to_list().unwrap();
-                        this.extend(args[0].clone())?;
-                        Ok(return_val)
-                    }
-                ),
-                make_meth!(List, "pop", &[], |this: ObjectRef, _, _| {
-                    let this = use_this!(this);
-                    let this = this.down_to_list().unwrap();
-                    let result = match this.pop() {
-                        Some(obj) => obj,
-                        None => new::nil(),
-                    };
-                    Ok(result)
-                }),
-                make_meth!(
-                    List,
-                    "get",
-                    &["index"],
-                    |this: ObjectRef, args: Args, _| {
-                        let this = use_this!(this);
-                        let this = this.down_to_list().unwrap();
-                        let arg = use_arg!(args, 0);
-                        let index = use_arg_usize!(arg);
-                        let result = match this.get(index) {
-                            Some(obj) => obj,
-                            None => new::nil(),
-                        };
-                        Ok(result)
-                    }
-                ),
-                make_meth!(
-                    List,
-                    "map",
-                    &["map_fn"],
-                    |this: ObjectRef, args: Args, vm: &mut VM| {
-                        let this = use_this!(this);
-                        let this = this.down_to_list().unwrap();
-                        let items = this.items.read().unwrap();
-                        let map_fn = &args[0];
-                        let mut results = vec![];
-                        for (i, item) in items.iter().enumerate() {
-                            vm.call(map_fn.clone(), vec![item.clone(), new::int(i)])?;
-                            results.push(vm.pop_obj()?);
-                        }
-                        Ok(new::tuple(results))
-                    }
-                ),
-            ]),
-        }
+        Self { ns: Namespace::new() }
     }
 }
 
