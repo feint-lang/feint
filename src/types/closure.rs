@@ -19,7 +19,7 @@ pub static CLOSURE_TYPE: Lazy<Arc<RwLock<ClosureType>>> =
     Lazy::new(|| Arc::new(RwLock::new(ClosureType::new())));
 
 pub struct ClosureType {
-    namespace: Namespace,
+    ns: Namespace,
 }
 
 unsafe impl Send for ClosureType {}
@@ -28,7 +28,7 @@ unsafe impl Sync for ClosureType {}
 impl ClosureType {
     pub fn new() -> Self {
         Self {
-            namespace: Namespace::with_entries(&[
+            ns: Namespace::with_entries(&[
                 // Class Attributes
                 ("$name", new::str("Closure")),
                 ("$full_name", new::str("builtins.Closure")),
@@ -47,7 +47,7 @@ impl TypeTrait for ClosureType {
     }
 
     fn ns(&self) -> &Namespace {
-        &self.namespace
+        &self.ns
     }
 }
 
@@ -68,18 +68,18 @@ impl ObjectTrait for ClosureType {
     }
 
     fn ns(&self) -> &Namespace {
-        &self.namespace
+        &self.ns
     }
 
     fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.namespace
+        &mut self.ns
     }
 }
 
 // Closure Object ------------------------------------------------------
 
 pub struct Closure {
-    namespace: Namespace,
+    ns: Namespace,
     name: String,
     params: Params,
     pub func: ObjectRef,
@@ -94,7 +94,7 @@ impl Closure {
         let func = func_ref.read().unwrap();
         let func = func.down_to_func().unwrap();
         Self {
-            namespace: Namespace::new(),
+            ns: Namespace::new(),
             name: func.name().to_owned(),
             params: func.params().clone(),
             func: func_ref.clone(),
@@ -130,11 +130,11 @@ impl ObjectTrait for Closure {
     }
 
     fn ns(&self) -> &Namespace {
-        &self.namespace
+        &self.ns
     }
 
     fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.namespace
+        &mut self.ns
     }
 }
 

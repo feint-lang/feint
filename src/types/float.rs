@@ -22,7 +22,7 @@ pub static FLOAT_TYPE: Lazy<Arc<RwLock<FloatType>>> =
     Lazy::new(|| Arc::new(RwLock::new(FloatType::new())));
 
 pub struct FloatType {
-    namespace: Namespace,
+    ns: Namespace,
 }
 
 unsafe impl Send for FloatType {}
@@ -31,7 +31,7 @@ unsafe impl Sync for FloatType {}
 impl FloatType {
     pub fn new() -> Self {
         Self {
-            namespace: Namespace::with_entries(&[
+            ns: Namespace::with_entries(&[
                 // Class Attributes
                 ("$name", new::str("Float")),
                 ("$full_name", new::str("builtins.Float")),
@@ -66,7 +66,7 @@ impl TypeTrait for FloatType {
     }
 
     fn ns(&self) -> &Namespace {
-        &self.namespace
+        &self.ns
     }
 }
 
@@ -87,11 +87,11 @@ impl ObjectTrait for FloatType {
     }
 
     fn ns(&self) -> &Namespace {
-        &self.namespace
+        &self.ns
     }
 
     fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.namespace
+        &mut self.ns
     }
 }
 
@@ -118,7 +118,7 @@ macro_rules! make_op {
 }
 
 pub struct Float {
-    namespace: Namespace,
+    ns: Namespace,
     value: f64,
 }
 
@@ -127,7 +127,7 @@ unsafe impl Sync for Float {}
 
 impl Float {
     pub fn new(value: f64) -> Self {
-        Self { namespace: Namespace::new(), value }
+        Self { ns: Namespace::new(), value }
     }
 
     pub fn value(&self) -> &f64 {
@@ -152,11 +152,11 @@ impl ObjectTrait for Float {
     }
 
     fn ns(&self) -> &Namespace {
-        &self.namespace
+        &self.ns
     }
 
     fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.namespace
+        &mut self.ns
     }
 
     fn negate(&self) -> RuntimeObjResult {

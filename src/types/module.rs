@@ -18,7 +18,7 @@ pub static MODULE_TYPE: Lazy<Arc<RwLock<ModuleType>>> =
     Lazy::new(|| Arc::new(RwLock::new(ModuleType::new())));
 
 pub struct ModuleType {
-    namespace: Namespace,
+    ns: Namespace,
 }
 
 unsafe impl Send for ModuleType {}
@@ -27,7 +27,7 @@ unsafe impl Sync for ModuleType {}
 impl ModuleType {
     pub fn new() -> Self {
         Self {
-            namespace: Namespace::with_entries(&[
+            ns: Namespace::with_entries(&[
                 // Class Attributes
                 ("$name", new::str("Module")),
                 ("$full_name", new::str("builtins.Module")),
@@ -46,7 +46,7 @@ impl TypeTrait for ModuleType {
     }
 
     fn ns(&self) -> &Namespace {
-        &self.namespace
+        &self.ns
     }
 }
 
@@ -67,11 +67,11 @@ impl ObjectTrait for ModuleType {
     }
 
     fn ns(&self) -> &Namespace {
-        &self.namespace
+        &self.ns
     }
 
     fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.namespace
+        &mut self.ns
     }
 }
 
@@ -79,7 +79,7 @@ impl ObjectTrait for ModuleType {
 
 pub struct Module {
     name: String,
-    namespace: Namespace,
+    ns: Namespace,
     pub code: Code,
 }
 
@@ -87,8 +87,8 @@ unsafe impl Send for Module {}
 unsafe impl Sync for Module {}
 
 impl Module {
-    pub fn new(name: String, namespace: Namespace, code: Code) -> Self {
-        Self { namespace, name, code }
+    pub fn new(name: String, ns: Namespace, code: Code) -> Self {
+        Self { ns, name, code }
     }
 
     pub fn name(&self) -> &str {
@@ -96,7 +96,7 @@ impl Module {
     }
 
     pub fn has_name(&self, name: &str) -> bool {
-        self.namespace.has(name)
+        self.ns.has(name)
     }
 }
 
@@ -117,11 +117,11 @@ impl ObjectTrait for Module {
     }
 
     fn ns(&self) -> &Namespace {
-        &self.namespace
+        &self.ns
     }
 
     fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.namespace
+        &mut self.ns
     }
 }
 

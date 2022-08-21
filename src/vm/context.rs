@@ -9,7 +9,7 @@ use super::result::{RuntimeErr, RuntimeResult};
 
 pub struct RuntimeContext {
     global_constants: Constants,
-    namespace_stack: Vec<Namespace>,
+    ns_stack: Vec<Namespace>,
     // Number of namespaces on stack
     size: usize,
     // Index of namespace associated with current scope
@@ -20,7 +20,7 @@ impl RuntimeContext {
     pub fn new() -> Self {
         let mut ctx = Self {
             global_constants: Constants::new(),
-            namespace_stack: vec![],
+            ns_stack: vec![],
             size: 0,
             current_depth: 0,
         };
@@ -63,16 +63,16 @@ impl RuntimeContext {
 
     #[inline]
     fn current_ns(&self) -> &Namespace {
-        &self.namespace_stack[self.current_depth]
+        &self.ns_stack[self.current_depth]
     }
 
     fn current_ns_mut(&mut self) -> &mut Namespace {
-        &mut self.namespace_stack[self.current_depth]
+        &mut self.ns_stack[self.current_depth]
     }
 
     pub fn enter_scope(&mut self) {
         self.current_depth = self.size;
-        self.namespace_stack.push(Namespace::new());
+        self.ns_stack.push(Namespace::new());
         self.size += 1;
     }
 
@@ -80,7 +80,7 @@ impl RuntimeContext {
         if self.current_depth == 0 {
             panic!("Can't remove global namespace");
         }
-        let mut ns = self.namespace_stack.pop().expect("Expected namespace");
+        let mut ns = self.ns_stack.pop().expect("Expected namespace");
         ns.clear();
         self.size -= 1;
         self.current_depth -= 1;
@@ -117,8 +117,8 @@ impl RuntimeContext {
     /// nil.
     pub fn declare_var(&mut self, name: &str) {
         let initial = new::nil();
-        let namespace = self.current_ns_mut();
-        namespace.add_obj(name, initial);
+        let ns = self.current_ns_mut();
+        ns.add_obj(name, initial);
     }
 
     /// Assign value to var in *current* namespace. This looks up the
@@ -131,8 +131,8 @@ impl RuntimeContext {
         name: &str,
         obj: ObjectRef,
     ) -> Result<usize, RuntimeErr> {
-        let namespace = self.current_ns_mut();
-        if namespace.set_obj(name, obj) {
+        let ns = self.current_ns_mut();
+        if ns.set_obj(name, obj) {
             Ok(self.current_depth)
         } else {
             let message = format!("Name not defined in current namespace: {name}");
@@ -158,7 +158,7 @@ impl RuntimeContext {
         name: &str,
         obj: ObjectRef,
     ) -> RuntimeResult {
-        if self.namespace_stack[depth].set_obj(name, obj) {
+        if self.ns_stack[depth].set_obj(name, obj) {
             Ok(())
         } else {
             let message = format!("Name not defined at depth {depth}: {name}");
@@ -172,7 +172,7 @@ impl RuntimeContext {
         name: &str,
         starting_depth: Option<usize>,
     ) -> Result<usize, RuntimeErr> {
-        let ns_stack = &self.namespace_stack;
+        let ns_stack = &self.ns_stack;
         let mut var_depth =
             if let Some(depth) = starting_depth { depth } else { self.current_depth };
         loop {
@@ -198,12 +198,9 @@ impl RuntimeContext {
     }
 
     /// Get var from current namespace.
-    pub fn get_var_in_current_namespace(
-        &self,
-        name: &str,
-    ) -> Result<ObjectRef, RuntimeErr> {
-        let namespace = self.current_ns();
-        if let Some(obj) = namespace.get_obj(name) {
+    pub fn get_var_in_current_ns(&self, name: &str) -> Result<ObjectRef, RuntimeErr> {
+        let ns = self.current_ns();
+        if let Some(obj) = ns.get_obj(name) {
             Ok(obj)
         } else {
             let message = format!("Name not defined in current namespace: {name}");
@@ -217,7 +214,7 @@ impl RuntimeContext {
         depth: usize,
         name: &str,
     ) -> Result<ObjectRef, RuntimeErr> {
-        if let Some(obj) = self.namespace_stack[depth].get_obj(name) {
+        if let Some(obj) = self.ns_stack[depth].get_obj(name) {
             Ok(obj)
         } else {
             let message = format!("Name not defined at depth {depth}: {name}");
@@ -239,6 +236,6 @@ impl RuntimeContext {
     }
 
     pub fn iter_vars(&self) -> hash_map::Iter<'_, String, ObjectRef> {
-        self.namespace_stack[self.current_depth].iter()
+        self.ns_stack[self.current_depth].iter()
     }
 }

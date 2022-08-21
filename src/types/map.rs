@@ -17,13 +17,13 @@ pub static MAP_TYPE: Lazy<Arc<RwLock<MapType>>> =
     Lazy::new(|| Arc::new(RwLock::new(MapType::new())));
 
 pub struct MapType {
-    namespace: Namespace,
+    ns: Namespace,
 }
 
 impl MapType {
     pub fn new() -> Self {
         Self {
-            namespace: Namespace::with_entries(&[
+            ns: Namespace::with_entries(&[
                 // Class Attributes
                 ("$name", new::str("Map")),
                 ("$full_name", new::str("builtins.Map")),
@@ -45,7 +45,7 @@ impl TypeTrait for MapType {
     }
 
     fn ns(&self) -> &Namespace {
-        &self.namespace
+        &self.ns
     }
 }
 
@@ -66,24 +66,24 @@ impl ObjectTrait for MapType {
     }
 
     fn ns(&self) -> &Namespace {
-        &self.namespace
+        &self.ns
     }
 
     fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.namespace
+        &mut self.ns
     }
 }
 
 // Map Object ----------------------------------------------------------
 
 pub struct Map {
-    namespace: Namespace,
+    ns: Namespace,
     entries: RwLock<HashMap<String, ObjectRef>>,
 }
 
 impl Map {
     pub fn new(entries: HashMap<String, ObjectRef>) -> Self {
-        Self { namespace: Namespace::new(), entries: RwLock::new(entries) }
+        Self { ns: Namespace::new(), entries: RwLock::new(entries) }
     }
 
     pub fn len(&self) -> usize {
@@ -132,11 +132,11 @@ impl ObjectTrait for Map {
     }
 
     fn ns(&self) -> &Namespace {
-        &self.namespace
+        &self.ns
     }
 
     fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.namespace
+        &mut self.ns
     }
 
     fn is_equal(&self, rhs: &dyn ObjectTrait) -> bool {

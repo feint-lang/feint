@@ -22,7 +22,7 @@ pub static BUILTIN_FUNC_TYPE: Lazy<Arc<RwLock<BuiltinFuncType>>> =
     Lazy::new(|| Arc::new(RwLock::new(BuiltinFuncType::new())));
 
 pub struct BuiltinFuncType {
-    namespace: Namespace,
+    ns: Namespace,
 }
 
 unsafe impl Send for BuiltinFuncType {}
@@ -31,7 +31,7 @@ unsafe impl Sync for BuiltinFuncType {}
 impl BuiltinFuncType {
     pub fn new() -> Self {
         Self {
-            namespace: Namespace::with_entries(&[
+            ns: Namespace::with_entries(&[
                 // Class Attributes
                 ("$name", new::str("BuiltinFunc")),
                 ("$full_name", new::str("builtins.BuiltinFunc")),
@@ -50,7 +50,7 @@ impl TypeTrait for BuiltinFuncType {
     }
 
     fn ns(&self) -> &Namespace {
-        &self.namespace
+        &self.ns
     }
 }
 
@@ -72,18 +72,18 @@ impl ObjectTrait for BuiltinFuncType {
     }
 
     fn ns(&self) -> &Namespace {
-        &self.namespace
+        &self.ns
     }
 
     fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.namespace
+        &mut self.ns
     }
 }
 
 // BuiltinFunc Object ----------------------------------------------------------
 
 pub struct BuiltinFunc {
-    namespace: Namespace,
+    ns: Namespace,
     name: String,
     params: Params,
     pub func: BuiltinFn,
@@ -95,7 +95,7 @@ unsafe impl Sync for BuiltinFunc {}
 impl BuiltinFunc {
     pub fn new(name: String, params: Params, func: BuiltinFn) -> Self {
         Self {
-            namespace: Namespace::with_entries(&[
+            ns: Namespace::with_entries(&[
                 // Instance Attributes
                 ("$name", new::str(name.as_str())),
             ]),
@@ -134,11 +134,11 @@ impl ObjectTrait for BuiltinFunc {
     }
 
     fn ns(&self) -> &Namespace {
-        &self.namespace
+        &self.ns
     }
 
     fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.namespace
+        &mut self.ns
     }
 }
 

@@ -18,7 +18,7 @@ pub static CELL_TYPE: Lazy<Arc<RwLock<CellType>>> =
     Lazy::new(|| Arc::new(RwLock::new(CellType::new())));
 
 pub struct CellType {
-    namespace: Namespace,
+    ns: Namespace,
 }
 
 unsafe impl Send for CellType {}
@@ -27,7 +27,7 @@ unsafe impl Sync for CellType {}
 impl CellType {
     pub fn new() -> Self {
         Self {
-            namespace: Namespace::with_entries(&[
+            ns: Namespace::with_entries(&[
                 // Class Attributes
                 ("$name", new::str("Cell")),
                 ("$full_name", new::str("builtins.Cell")),
@@ -46,7 +46,7 @@ impl TypeTrait for CellType {
     }
 
     fn ns(&self) -> &Namespace {
-        &self.namespace
+        &self.ns
     }
 }
 
@@ -67,18 +67,18 @@ impl ObjectTrait for CellType {
     }
 
     fn ns(&self) -> &Namespace {
-        &self.namespace
+        &self.ns
     }
 
     fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.namespace
+        &mut self.ns
     }
 }
 
 // Cell Object ---------------------------------------------------------
 
 pub struct Cell {
-    namespace: Namespace,
+    ns: Namespace,
     value: ObjectRef,
 }
 
@@ -87,7 +87,7 @@ unsafe impl Sync for Cell {}
 
 impl Cell {
     pub fn new() -> Self {
-        Self { namespace: Namespace::new(), value: new::nil() }
+        Self { ns: Namespace::new(), value: new::nil() }
     }
 
     pub fn with_value(value: ObjectRef) -> Self {
@@ -123,11 +123,11 @@ impl ObjectTrait for Cell {
     }
 
     fn ns(&self) -> &Namespace {
-        &self.namespace
+        &self.ns
     }
 
     fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.namespace
+        &mut self.ns
     }
 
     fn bool_val(&self) -> RuntimeBoolResult {

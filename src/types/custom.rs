@@ -13,7 +13,7 @@ use super::ns::Namespace;
 // Custom Type ---------------------------------------------------------
 
 pub struct CustomType {
-    namespace: Namespace,
+    ns: Namespace,
     module: Arc<RwLock<Module>>,
     name: String,
     full_name: String,
@@ -23,7 +23,7 @@ impl CustomType {
     pub fn new(module: Arc<RwLock<Module>>, name: String) -> Self {
         let full_name = format!("{}.{name}", module.read().unwrap().name());
         Self {
-            namespace: Namespace::with_entries(&[
+            ns: Namespace::with_entries(&[
                 // Class Attributes
                 ("$name", new::str(name.as_str())),
                 ("$full_name", new::str(full_name.as_str())),
@@ -48,7 +48,7 @@ impl TypeTrait for CustomType {
     }
 
     fn ns(&self) -> &Namespace {
-        &self.namespace
+        &self.ns
     }
 
     fn module(&self) -> ObjectRef {
@@ -73,11 +73,11 @@ impl ObjectTrait for CustomType {
     }
 
     fn ns(&self) -> &Namespace {
-        &self.namespace
+        &self.ns
     }
 
     fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.namespace
+        &mut self.ns
     }
 }
 
@@ -85,7 +85,7 @@ impl ObjectTrait for CustomType {
 
 pub struct CustomObj {
     class: Arc<RwLock<CustomType>>,
-    namespace: Namespace,
+    ns: Namespace,
 }
 
 unsafe impl Send for CustomObj {}
@@ -93,7 +93,7 @@ unsafe impl Sync for CustomObj {}
 
 impl CustomObj {
     pub fn new(class: Arc<RwLock<CustomType>>, attrs: Namespace) -> Self {
-        Self { class, namespace: attrs }
+        Self { class, ns: attrs }
     }
 }
 
@@ -114,15 +114,15 @@ impl ObjectTrait for CustomObj {
     }
 
     fn ns(&self) -> &Namespace {
-        &self.namespace
+        &self.ns
     }
 
     fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.namespace
+        &mut self.ns
     }
 
     fn set_attr(&mut self, name: &str, value: ObjectRef) -> SetAttrResult {
-        self.namespace.set_obj(name, value);
+        self.ns.set_obj(name, value);
         Ok(())
     }
 
@@ -130,7 +130,7 @@ impl ObjectTrait for CustomObj {
         if self.is(rhs) {
             return true;
         }
-        self.namespace.is_equal(rhs.ns())
+        self.ns.is_equal(rhs.ns())
     }
 }
 

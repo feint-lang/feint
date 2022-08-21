@@ -18,7 +18,7 @@ pub static BOOL_TYPE: Lazy<Arc<RwLock<BoolType>>> =
     Lazy::new(|| Arc::new(RwLock::new(BoolType::new())));
 
 pub struct BoolType {
-    namespace: Namespace,
+    ns: Namespace,
 }
 
 unsafe impl Send for BoolType {}
@@ -27,7 +27,7 @@ unsafe impl Sync for BoolType {}
 impl BoolType {
     pub fn new() -> Self {
         Self {
-            namespace: Namespace::with_entries(&[
+            ns: Namespace::with_entries(&[
                 // Class Attributes
                 ("$name", new::str("Bool")),
                 ("$full_name", new::str("builtins.Bool")),
@@ -46,7 +46,7 @@ impl TypeTrait for BoolType {
     }
 
     fn ns(&self) -> &Namespace {
-        &self.namespace
+        &self.ns
     }
 }
 
@@ -68,18 +68,18 @@ impl ObjectTrait for BoolType {
     }
 
     fn ns(&self) -> &Namespace {
-        &self.namespace
+        &self.ns
     }
 
     fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.namespace
+        &mut self.ns
     }
 }
 
 // Bool Object ---------------------------------------------------------
 
 pub struct Bool {
-    namespace: Namespace,
+    ns: Namespace,
     value: bool,
 }
 
@@ -88,7 +88,7 @@ unsafe impl Sync for Bool {}
 
 impl Bool {
     pub fn new(value: bool) -> Self {
-        Self { namespace: Namespace::new(), value }
+        Self { ns: Namespace::new(), value }
     }
 
     pub fn value(&self) -> &bool {
@@ -114,11 +114,11 @@ impl ObjectTrait for Bool {
     }
 
     fn ns(&self) -> &Namespace {
-        &self.namespace
+        &self.ns
     }
 
     fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.namespace
+        &mut self.ns
     }
 
     // Unary operations -----------------------------------------------

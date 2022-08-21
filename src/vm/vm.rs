@@ -157,7 +157,7 @@ impl VM {
                 }
                 // Vars
                 DeclareVar(name) => {
-                    if self.ctx.get_var_in_current_namespace(name).is_err() {
+                    if self.ctx.get_var_in_current_ns(name).is_err() {
                         self.ctx.declare_var(name.as_str());
                     }
                 }

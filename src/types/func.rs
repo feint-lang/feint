@@ -20,7 +20,7 @@ pub static FUNC_TYPE: Lazy<Arc<RwLock<FuncType>>> =
     Lazy::new(|| Arc::new(RwLock::new(FuncType::new())));
 
 pub struct FuncType {
-    namespace: Namespace,
+    ns: Namespace,
 }
 
 unsafe impl Send for FuncType {}
@@ -29,7 +29,7 @@ unsafe impl Sync for FuncType {}
 impl FuncType {
     pub fn new() -> Self {
         Self {
-            namespace: Namespace::with_entries(&[
+            ns: Namespace::with_entries(&[
                 // Class Attributes
                 ("$name", new::str("Func")),
                 ("$full_name", new::str("builtins.Func")),
@@ -48,7 +48,7 @@ impl TypeTrait for FuncType {
     }
 
     fn ns(&self) -> &Namespace {
-        &self.namespace
+        &self.ns
     }
 }
 
@@ -69,18 +69,18 @@ impl ObjectTrait for FuncType {
     }
 
     fn ns(&self) -> &Namespace {
-        &self.namespace
+        &self.ns
     }
 
     fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.namespace
+        &mut self.ns
     }
 }
 
 // Func Object ----------------------------------------------------------
 
 pub struct Func {
-    namespace: Namespace,
+    ns: Namespace,
     name: String,
     params: Params,
     pub code: Code,
@@ -92,7 +92,7 @@ unsafe impl Sync for Func {}
 impl Func {
     pub fn new(name: String, params: Params, code: Code) -> Self {
         Self {
-            namespace: Namespace::with_entries(&[
+            ns: Namespace::with_entries(&[
                 // Instance Attributes
                 ("$name", new::str(name.as_str())),
             ]),
@@ -142,11 +142,11 @@ impl ObjectTrait for Func {
     }
 
     fn ns(&self) -> &Namespace {
-        &self.namespace
+        &self.ns
     }
 
     fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.namespace
+        &mut self.ns
     }
 }
 

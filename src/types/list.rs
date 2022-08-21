@@ -20,13 +20,13 @@ pub static LIST_TYPE: Lazy<Arc<RwLock<ListType>>> =
     Lazy::new(|| Arc::new(RwLock::new(ListType::new())));
 
 pub struct ListType {
-    namespace: Namespace,
+    ns: Namespace,
 }
 
 impl ListType {
     pub fn new() -> Self {
         Self {
-            namespace: Namespace::with_entries(&[
+            ns: Namespace::with_entries(&[
                 // Class Attributes
                 ("$name", new::str("List")),
                 ("$full_name", new::str("builtins.List")),
@@ -127,7 +127,7 @@ impl TypeTrait for ListType {
     }
 
     fn ns(&self) -> &Namespace {
-        &self.namespace
+        &self.ns
     }
 }
 
@@ -148,24 +148,24 @@ impl ObjectTrait for ListType {
     }
 
     fn ns(&self) -> &Namespace {
-        &self.namespace
+        &self.ns
     }
 
     fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.namespace
+        &mut self.ns
     }
 }
 
 // List Object ---------------------------------------------------------
 
 pub struct List {
-    namespace: Namespace,
+    ns: Namespace,
     items: RwLock<Vec<ObjectRef>>,
 }
 
 impl List {
     pub fn new(items: Vec<ObjectRef>) -> Self {
-        Self { namespace: Namespace::new(), items: RwLock::new(items) }
+        Self { ns: Namespace::new(), items: RwLock::new(items) }
     }
 
     pub fn len(&self) -> usize {
@@ -237,11 +237,11 @@ impl ObjectTrait for List {
     }
 
     fn ns(&self) -> &Namespace {
-        &self.namespace
+        &self.ns
     }
 
     fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.namespace
+        &mut self.ns
     }
 
     fn get_item(&self, index: usize) -> GetAttrResult {

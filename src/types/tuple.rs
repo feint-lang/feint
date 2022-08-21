@@ -21,13 +21,13 @@ pub static TUPLE_TYPE: Lazy<Arc<RwLock<TupleType>>> =
     Lazy::new(|| Arc::new(RwLock::new(TupleType::new())));
 
 pub struct TupleType {
-    namespace: Namespace,
+    ns: Namespace,
 }
 
 impl TupleType {
     pub fn new() -> Self {
         Self {
-            namespace: Namespace::with_entries(&[
+            ns: Namespace::with_entries(&[
                 // Class Attributes
                 ("$name", new::str("Tuple")),
                 ("$full_name", new::str("builtins.Tuple")),
@@ -77,7 +77,7 @@ impl TypeTrait for TupleType {
     }
 
     fn ns(&self) -> &Namespace {
-        &self.namespace
+        &self.ns
     }
 }
 
@@ -98,24 +98,24 @@ impl ObjectTrait for TupleType {
     }
 
     fn ns(&self) -> &Namespace {
-        &self.namespace
+        &self.ns
     }
 
     fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.namespace
+        &mut self.ns
     }
 }
 
 // Tuple Object --------------------------------------------------------
 
 pub struct Tuple {
-    namespace: Namespace,
+    ns: Namespace,
     items: Vec<ObjectRef>,
 }
 
 impl Tuple {
     pub fn new(items: Vec<ObjectRef>) -> Self {
-        Self { namespace: Namespace::new(), items }
+        Self { ns: Namespace::new(), items }
     }
 
     pub fn iter(&self) -> Iter<'_, ObjectRef> {
@@ -148,11 +148,11 @@ impl ObjectTrait for Tuple {
     }
 
     fn ns(&self) -> &Namespace {
-        &self.namespace
+        &self.ns
     }
 
     fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.namespace
+        &mut self.ns
     }
 
     fn get_item(&self, index: usize) -> GetAttrResult {

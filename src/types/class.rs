@@ -18,13 +18,13 @@ pub static TYPE_TYPE: Lazy<Arc<RwLock<TypeType>>> =
     Lazy::new(|| Arc::new(RwLock::new(TypeType::new())));
 
 pub struct TypeType {
-    namespace: Namespace,
+    ns: Namespace,
 }
 
 impl TypeType {
     pub fn new() -> Self {
         Self {
-            namespace: Namespace::with_entries(&[
+            ns: Namespace::with_entries(&[
                 // Class Attributes
                 ("$name", new::str("Type")),
                 ("$full_name", new::str("builtins.Type")),
@@ -46,7 +46,7 @@ impl TypeTrait for TypeType {
     }
 
     fn ns(&self) -> &Namespace {
-        &self.namespace
+        &self.ns
     }
 }
 
@@ -67,18 +67,18 @@ impl ObjectTrait for TypeType {
     }
 
     fn ns(&self) -> &Namespace {
-        &self.namespace
+        &self.ns
     }
 
     fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.namespace
+        &mut self.ns
     }
 }
 
 // Type Object ---------------------------------------------------------
 
 pub struct Type {
-    namespace: Namespace,
+    ns: Namespace,
 }
 
 unsafe impl Send for Type {}
@@ -87,7 +87,7 @@ unsafe impl Sync for Type {}
 impl Type {
     pub fn new() -> Self {
         let ns = Namespace::new();
-        Self { namespace: ns }
+        Self { ns: ns }
     }
 }
 
@@ -108,11 +108,11 @@ impl ObjectTrait for Type {
     }
 
     fn ns(&self) -> &Namespace {
-        &self.namespace
+        &self.ns
     }
 
     fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.namespace
+        &mut self.ns
     }
 }
 

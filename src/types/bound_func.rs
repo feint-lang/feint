@@ -16,7 +16,7 @@ pub static BOUND_FUNC_TYPE: Lazy<Arc<RwLock<BoundFuncType>>> =
     Lazy::new(|| Arc::new(RwLock::new(BoundFuncType::new())));
 
 pub struct BoundFuncType {
-    namespace: Namespace,
+    ns: Namespace,
 }
 
 unsafe impl Send for BoundFuncType {}
@@ -25,7 +25,7 @@ unsafe impl Sync for BoundFuncType {}
 impl BoundFuncType {
     pub fn new() -> Self {
         Self {
-            namespace: Namespace::with_entries(&[
+            ns: Namespace::with_entries(&[
                 // Class Attributes
                 ("$name", new::str("BoundFunc")),
                 ("$full_name", new::str("builtins.BoundFunc")),
@@ -44,7 +44,7 @@ impl TypeTrait for BoundFuncType {
     }
 
     fn ns(&self) -> &Namespace {
-        &self.namespace
+        &self.ns
     }
 }
 
@@ -66,18 +66,18 @@ impl ObjectTrait for BoundFuncType {
     }
 
     fn ns(&self) -> &Namespace {
-        &self.namespace
+        &self.ns
     }
 
     fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.namespace
+        &mut self.ns
     }
 }
 
 // BoundFunc Object ----------------------------------------------------------
 
 pub struct BoundFunc {
-    namespace: Namespace,
+    ns: Namespace,
     pub func: ObjectRef,
     pub this: ObjectRef,
 }
@@ -87,7 +87,7 @@ unsafe impl Sync for BoundFunc {}
 
 impl BoundFunc {
     pub fn new(func: ObjectRef, this: ObjectRef) -> Self {
-        Self { namespace: Namespace::new(), func, this }
+        Self { ns: Namespace::new(), func, this }
     }
 }
 
@@ -109,11 +109,11 @@ impl ObjectTrait for BoundFunc {
     }
 
     fn ns(&self) -> &Namespace {
-        &self.namespace
+        &self.ns
     }
 
     fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.namespace
+        &mut self.ns
     }
 }
 

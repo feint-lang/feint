@@ -24,7 +24,7 @@ pub static INT_TYPE: Lazy<Arc<RwLock<IntType>>> =
     Lazy::new(|| Arc::new(RwLock::new(IntType::new())));
 
 pub struct IntType {
-    namespace: Namespace,
+    ns: Namespace,
 }
 
 unsafe impl Send for IntType {}
@@ -33,7 +33,7 @@ unsafe impl Sync for IntType {}
 impl IntType {
     pub fn new() -> Self {
         Self {
-            namespace: Namespace::with_entries(&[
+            ns: Namespace::with_entries(&[
                 // Class Attributes
                 ("$name", new::str("Int")),
                 ("$full_name", new::str("builtins.Int")),
@@ -68,7 +68,7 @@ impl TypeTrait for IntType {
     }
 
     fn ns(&self) -> &Namespace {
-        &self.namespace
+        &self.ns
     }
 }
 
@@ -89,11 +89,11 @@ impl ObjectTrait for IntType {
     }
 
     fn ns(&self) -> &Namespace {
-        &self.namespace
+        &self.ns
     }
 
     fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.namespace
+        &mut self.ns
     }
 }
 
@@ -120,7 +120,7 @@ macro_rules! make_op {
 }
 
 pub struct Int {
-    namespace: Namespace,
+    ns: Namespace,
     value: BigInt,
 }
 
@@ -129,7 +129,7 @@ unsafe impl Sync for Int {}
 
 impl Int {
     pub fn new(value: BigInt) -> Self {
-        Self { namespace: Namespace::new(), value }
+        Self { ns: Namespace::new(), value }
     }
 
     pub fn value(&self) -> &BigInt {
@@ -170,11 +170,11 @@ impl ObjectTrait for Int {
     }
 
     fn ns(&self) -> &Namespace {
-        &self.namespace
+        &self.ns
     }
 
     fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.namespace
+        &mut self.ns
     }
 
     fn negate(&self) -> RuntimeObjResult {

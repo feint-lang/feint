@@ -20,13 +20,13 @@ pub static STR_TYPE: Lazy<Arc<RwLock<StrType>>> =
     Lazy::new(|| Arc::new(RwLock::new(StrType::new())));
 
 pub struct StrType {
-    namespace: Namespace,
+    ns: Namespace,
 }
 
 impl StrType {
     pub fn new() -> Self {
         Self {
-            namespace: Namespace::with_entries(&[
+            ns: Namespace::with_entries(&[
                 // Class Attributes
                 ("$name", new::str("Str")),
                 ("$full_name", new::str("builtins.Str")),
@@ -60,7 +60,7 @@ impl TypeTrait for StrType {
     }
 
     fn ns(&self) -> &Namespace {
-        &self.namespace
+        &self.ns
     }
 }
 
@@ -81,25 +81,25 @@ impl ObjectTrait for StrType {
     }
 
     fn ns(&self) -> &Namespace {
-        &self.namespace
+        &self.ns
     }
 
     fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.namespace
+        &mut self.ns
     }
 }
 
 // Str Object ----------------------------------------------------------
 
 pub struct Str {
-    namespace: Namespace,
+    ns: Namespace,
     value: String,
 }
 
 impl Str {
     pub fn new(value: String) -> Self {
         Self {
-            namespace: Namespace::with_entries(&[
+            ns: Namespace::with_entries(&[
                 // Instance Attributes
                 ("len", new::int(value.len())),
             ]),
@@ -129,11 +129,11 @@ impl ObjectTrait for Str {
     }
 
     fn ns(&self) -> &Namespace {
-        &self.namespace
+        &self.ns
     }
 
     fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.namespace
+        &mut self.ns
     }
 
     fn is_equal(&self, rhs: &dyn ObjectTrait) -> bool {

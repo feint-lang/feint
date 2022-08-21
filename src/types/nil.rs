@@ -18,7 +18,7 @@ pub static NIL_TYPE: Lazy<Arc<RwLock<NilType>>> =
     Lazy::new(|| Arc::new(RwLock::new(NilType::new())));
 
 pub struct NilType {
-    namespace: Namespace,
+    ns: Namespace,
 }
 
 unsafe impl Send for NilType {}
@@ -27,7 +27,7 @@ unsafe impl Sync for NilType {}
 impl NilType {
     pub fn new() -> Self {
         Self {
-            namespace: Namespace::with_entries(&[
+            ns: Namespace::with_entries(&[
                 // Class Attributes
                 ("$name", new::str("Nil")),
                 ("$full_name", new::str("builtins.Nil")),
@@ -46,7 +46,7 @@ impl TypeTrait for NilType {
     }
 
     fn ns(&self) -> &Namespace {
-        &self.namespace
+        &self.ns
     }
 }
 
@@ -67,18 +67,18 @@ impl ObjectTrait for NilType {
     }
 
     fn ns(&self) -> &Namespace {
-        &self.namespace
+        &self.ns
     }
 
     fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.namespace
+        &mut self.ns
     }
 }
 
 // Nil Object ----------------------------------------------------------
 
 pub struct Nil {
-    namespace: Namespace,
+    ns: Namespace,
 }
 
 unsafe impl Send for Nil {}
@@ -86,7 +86,7 @@ unsafe impl Sync for Nil {}
 
 impl Nil {
     pub fn new() -> Self {
-        Self { namespace: Namespace::new() }
+        Self { ns: Namespace::new() }
     }
 }
 
@@ -107,11 +107,11 @@ impl ObjectTrait for Nil {
     }
 
     fn ns(&self) -> &Namespace {
-        &self.namespace
+        &self.ns
     }
 
     fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.namespace
+        &mut self.ns
     }
 
     fn bool_val(&self) -> RuntimeBoolResult {
