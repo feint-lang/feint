@@ -7,7 +7,6 @@ use once_cell::sync::Lazy;
 use crate::vm::{RuntimeBoolResult, RuntimeErr, RuntimeObjResult};
 
 use super::gen;
-use super::meth::{make_meth, use_arg, use_arg_str};
 use super::new;
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
@@ -27,12 +26,12 @@ pub static STR_TYPE: Lazy<new::obj_ref_t!(StrType)> = Lazy::new(|| {
         ("$name", new::str("Str")),
         ("$full_name", new::str("builtins.Str")),
         // Instance Methods
-        make_meth!("starts_with", type_ref, &["prefix"], |this, args, _| {
+        gen::meth!("starts_with", type_ref, &["prefix"], |this, args, _| {
             let this = this.unwrap();
             let this = this.read().unwrap();
             let this = this.down_to_str().unwrap();
-            let arg = use_arg!(args, 0);
-            let prefix = use_arg_str!(arg);
+            let arg = gen::use_arg!(args, 0);
+            let prefix = gen::use_arg_str!(arg);
             Ok(new::bool(this.value.starts_with(prefix)))
         }),
     ]);

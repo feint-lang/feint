@@ -6,7 +6,7 @@ use std::sync::{Arc, RwLock};
 use once_cell::sync::Lazy;
 
 use super::gen;
-use super::meth::make_meth;
+
 use super::new;
 use super::result::GetAttrResult;
 
@@ -27,19 +27,19 @@ pub static TUPLE_TYPE: Lazy<new::obj_ref_t!(TupleType)> = Lazy::new(|| {
         ("$name", new::str("Tuple")),
         ("$full_name", new::str("builtins.Tuple")),
         // Instance Methods
-        make_meth!("length", type_ref, &[], |this, _, _| {
+        gen::meth!("length", type_ref, &[], |this, _, _| {
             let this = this.unwrap();
             let this = this.read().unwrap();
             let this = this.down_to_tuple().unwrap();
             Ok(new::int(this.len()))
         }),
-        make_meth!("is_empty", type_ref, &[], |this, _, _| {
+        gen::meth!("is_empty", type_ref, &[], |this, _, _| {
             let this = this.unwrap();
             let this = this.read().unwrap();
             let this = this.down_to_tuple().unwrap();
             Ok(new::bool(this.is_empty()))
         }),
-        make_meth!("map", type_ref, &["map_fn"], |this, args, vm| {
+        gen::meth!("map", type_ref, &["map_fn"], |this, args, vm| {
             let this = this.unwrap();
             let this = this.read().unwrap();
             let this = this.down_to_tuple().unwrap();

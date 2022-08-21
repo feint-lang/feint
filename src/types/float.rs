@@ -8,7 +8,7 @@ use once_cell::sync::Lazy;
 use crate::vm::{RuntimeBoolResult, RuntimeErr, RuntimeObjResult};
 
 use super::gen;
-use super::meth::{make_meth, use_arg};
+
 use super::new;
 use super::util::{eq_int_float, gt_int_float, lt_int_float};
 
@@ -29,8 +29,8 @@ pub static FLOAT_TYPE: Lazy<new::obj_ref_t!(FloatType)> = Lazy::new(|| {
         ("$name", new::str("Float")),
         ("$full_name", new::str("builtins.Float")),
         // Class Methods
-        make_meth!("new", type_ref, &["value"], |_, args, _| {
-            let arg = use_arg!(args, 0);
+        gen::meth!("new", type_ref, &["value"], |_, args, _| {
+            let arg = gen::use_arg!(args, 0);
             let float = if let Some(val) = arg.get_float_val() {
                 new::float(*val)
             } else if let Some(val) = arg.get_int_val() {

@@ -10,7 +10,7 @@ use once_cell::sync::Lazy;
 use crate::vm::{RuntimeBoolResult, RuntimeErr, RuntimeObjResult};
 
 use super::gen;
-use super::meth::{make_meth, use_arg};
+
 use super::new;
 use super::util::{eq_int_float, gt_int_float, lt_int_float};
 
@@ -28,8 +28,8 @@ pub static INT_TYPE: Lazy<new::obj_ref_t!(IntType)> = Lazy::new(|| {
 
     class.ns_mut().add_entries(&[
         // Class Methods
-        make_meth!("new", type_ref, &["value"], |_, args, _| {
-            let arg = use_arg!(args, 0);
+        gen::meth!("new", type_ref, &["value"], |_, args, _| {
+            let arg = gen::use_arg!(args, 0);
             let int = if let Some(val) = arg.get_int_val() {
                 new::int(val.clone())
             } else if let Some(val) = arg.get_float_val() {

@@ -7,7 +7,7 @@ use once_cell::sync::Lazy;
 use crate::vm::{RuntimeErr, RuntimeResult};
 
 use super::gen;
-use super::meth::{make_meth, use_arg, use_arg_usize};
+
 use super::new;
 use super::result::GetAttrResult;
 
@@ -28,20 +28,20 @@ pub static LIST_TYPE: Lazy<new::obj_ref_t!(ListType)> = Lazy::new(|| {
         ("$name", new::str("List")),
         ("$full_name", new::str("builtins.List")),
         // Instance Methods
-        make_meth!("length", type_ref, &[], |this, _, _| {
+        gen::meth!("length", type_ref, &[], |this, _, _| {
             let this = this.unwrap();
             let this = this.read().unwrap();
             let this = this.down_to_list().unwrap();
             Ok(new::int(this.len()))
         }),
-        make_meth!("is_empty", type_ref, &[], |this, _, _| {
+        gen::meth!("is_empty", type_ref, &[], |this, _, _| {
             let this = this.unwrap();
             let this = this.read().unwrap();
             let this = this.down_to_list().unwrap();
             Ok(new::bool(this.len() == 0))
         }),
         // Push item and return it.
-        make_meth!("push", type_ref, &["item"], |this, args, _| {
+        gen::meth!("push", type_ref, &["item"], |this, args, _| {
             let this = this.unwrap();
             let this = this.read().unwrap();
             let this = this.down_to_list().unwrap();
@@ -50,14 +50,14 @@ pub static LIST_TYPE: Lazy<new::obj_ref_t!(ListType)> = Lazy::new(|| {
             Ok(arg)
         }),
         // Push items and return this.
-        make_meth!("extend", type_ref, &["items"], |this, args, _| {
+        gen::meth!("extend", type_ref, &["items"], |this, args, _| {
             let this_ref = this.unwrap();
             let this = this_ref.read().unwrap();
             let this = this.down_to_list().unwrap();
             this.extend(args[0].clone())?;
             Ok(this_ref.clone())
         }),
-        make_meth!("pop", type_ref, &[], |this, _, _| {
+        gen::meth!("pop", type_ref, &[], |this, _, _| {
             let this = this.unwrap();
             let this = this.read().unwrap();
             let this = this.down_to_list().unwrap();
@@ -67,19 +67,19 @@ pub static LIST_TYPE: Lazy<new::obj_ref_t!(ListType)> = Lazy::new(|| {
             };
             Ok(result)
         }),
-        make_meth!("get", type_ref, &["index"], |this, args, _| {
+        gen::meth!("get", type_ref, &["index"], |this, args, _| {
             let this = this.unwrap();
             let this = this.read().unwrap();
             let this = this.down_to_list().unwrap();
-            let arg = use_arg!(args, 0);
-            let index = use_arg_usize!(arg);
+            let arg = gen::use_arg!(args, 0);
+            let index = gen::use_arg_usize!(arg);
             let result = match this.get(index) {
                 Some(obj) => obj,
                 None => new::nil(),
             };
             Ok(result)
         }),
-        make_meth!("map", type_ref, &["map_fn"], |this, args, vm| {
+        gen::meth!("map", type_ref, &["map_fn"], |this, args, vm| {
             let this = this.unwrap();
             let this = this.read().unwrap();
             let this = this.down_to_list().unwrap();

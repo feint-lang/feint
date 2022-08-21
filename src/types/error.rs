@@ -5,7 +5,6 @@ use std::sync::{Arc, RwLock};
 use once_cell::sync::Lazy;
 
 use super::gen;
-use super::meth::make_meth;
 use super::new;
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
@@ -22,7 +21,7 @@ pub static ERROR_TYPE: Lazy<new::obj_ref_t!(ErrorType)> = Lazy::new(|| {
 
     class.ns_mut().add_entries(&[
         // Class Methods
-        make_meth!("new", type_ref, &[], |_, _, _| Ok(new::nil())),
+        gen::meth!("new", type_ref, &[], |_, _, _| Ok(new::nil())),
     ]);
 
     type_ref.clone()

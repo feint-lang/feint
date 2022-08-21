@@ -15,7 +15,6 @@ pub(crate) use result::{Args, CallResult, Params, This};
 
 mod base;
 mod func_trait;
-mod meth;
 
 // Namespace (not a type)
 pub(crate) mod ns;
