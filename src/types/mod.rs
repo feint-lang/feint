@@ -11,7 +11,7 @@ pub(crate) use func::Func;
 pub(crate) use func_trait::FuncTrait;
 
 pub(crate) mod new;
-pub(crate) use result::{Args, CallResult, Params, This};
+pub(crate) use result::{Args, CallResult, Params, ThisOpt};
 
 mod base;
 mod func_trait;

@@ -11,7 +11,7 @@ use ctrlc;
 use num_traits::ToPrimitive;
 
 use crate::modules;
-use crate::types::{new, Args, BuiltinFunc, Func, FuncTrait, ObjectRef, This};
+use crate::types::{new, Args, BuiltinFunc, Func, FuncTrait, ObjectRef, ThisOpt};
 use crate::util::{
     BinaryOperator, CompareOperator, InplaceOperator, Location, Stack,
     UnaryCompareOperator, UnaryOperator,
@@ -31,13 +31,17 @@ pub const DEFAULT_MAX_CALL_DEPTH: CallDepth =
 
 struct CallFrame {
     stack_pointer: usize,
-    this: This,
+    this_opt: ThisOpt,
     closure: Option<ObjectRef>,
 }
 
 impl CallFrame {
-    pub fn new(stack_pointer: usize, this: This, closure: Option<ObjectRef>) -> Self {
-        Self { stack_pointer, this, closure }
+    pub fn new(
+        stack_pointer: usize,
+        this_opt: ThisOpt,
+        closure: Option<ObjectRef>,
+    ) -> Self {
+        Self { stack_pointer, this_opt, closure }
     }
 
     pub fn get_captured(&self, name: &str) -> RuntimeObjResult {
@@ -641,7 +645,7 @@ impl VM {
     // NOTE: Pushing a call frame is similar to entering a scope.
     fn push_call_frame(
         &mut self,
-        this: This,
+        this_opt: ThisOpt,
         closure: Option<ObjectRef>,
     ) -> RuntimeResult {
         if self.call_stack.len() == self.max_call_depth {
@@ -650,7 +654,7 @@ impl VM {
         }
         self.ctx.enter_scope();
         let stack_pointer = self.value_stack.len();
-        let frame = CallFrame::new(stack_pointer, this, closure);
+        let frame = CallFrame::new(stack_pointer, this_opt, closure);
         self.call_stack.push(frame);
         Ok(())
     }
@@ -693,7 +697,7 @@ impl VM {
     /// Look up call chain for `this`.
     fn find_this(&self) -> ObjectRef {
         for frame in self.call_stack.iter().rev() {
-            if let Some(this) = &frame.this {
+            if let Some(this) = &frame.this_opt {
                 return this.clone();
             }
         }
@@ -737,12 +741,12 @@ impl VM {
     fn call_builtin_func(
         &mut self,
         func: &BuiltinFunc,
-        this: This,
+        this_opt: ThisOpt,
         args: Args,
     ) -> RuntimeResult {
-        let args = self.check_call_args(func, &this, args)?;
-        self.push_call_frame(this.clone(), None)?;
-        let result = (func.func)(this, args, self);
+        let args = self.check_call_args(func, &this_opt, args)?;
+        self.push_call_frame(this_opt.clone(), None)?;
+        let result = (func.func)(self.find_this(), args, self);
         match result {
             Ok(return_val) => {
                 self.push_return_val(return_val);
@@ -759,12 +763,12 @@ impl VM {
     pub fn call_func(
         &mut self,
         func: &Func,
-        this: This,
+        this_opt: ThisOpt,
         args: Args,
         closure: Option<ObjectRef>,
     ) -> RuntimeResult {
         let args = self.check_call_args(func, &None, args)?;
-        self.push_call_frame(this, closure)?;
+        self.push_call_frame(this_opt, closure)?;
         self.ctx.declare_and_assign_var("this", self.find_this())?;
         // XXX: All args are created as cells, which allows them to be
         //      captured without having to track whether they were in
@@ -790,14 +794,14 @@ impl VM {
     pub fn call_closure(
         &mut self,
         closure_ref: ObjectRef,
-        this: This,
+        this_opt: ThisOpt,
         args: Args,
     ) -> RuntimeResult {
         let closure = closure_ref.read().unwrap();
         let closure = closure.down_to_closure().unwrap();
         let func = closure.func.read().unwrap();
         let func = func.down_to_func().unwrap();
-        self.call_func(func, this, args, Some(closure_ref.clone()))
+        self.call_func(func, this_opt, args, Some(closure_ref.clone()))
     }
 
     /// Check call args to ensure they're valid. This ensures the
@@ -806,21 +810,21 @@ impl VM {
     fn check_call_args(
         &self,
         func: &dyn FuncTrait,
-        this: &This,
+        this_opt: &ThisOpt,
         args: Args,
     ) -> Result<Args, RuntimeErr> {
         let name = func.name();
         let arity = func.arity();
         if let Some(var_args_index) = func.var_args_index() {
             let n_args = args.iter().take(var_args_index).len();
-            self.check_arity(name, arity, n_args, this)?;
+            self.check_arity(name, arity, n_args, this_opt)?;
             let mut args = args.clone();
             let var_args_items = args.split_off(var_args_index);
             let var_args = new::tuple(var_args_items);
             args.push(var_args);
             Ok(args)
         } else {
-            self.check_arity(name, arity, args.len(), this)?;
+            self.check_arity(name, arity, args.len(), this_opt)?;
             Ok(args)
         }
     }
@@ -830,13 +834,13 @@ impl VM {
         name: &str,
         arity: usize,
         num_args: usize,
-        this: &This,
+        this_opt: &ThisOpt,
     ) -> RuntimeResult {
         if num_args != arity {
             let ess = if arity == 1 { "" } else { "s" };
             let msg = format!(
                 "{}{}() expected {arity} arg{ess}; got {num_args}",
-                this.clone().map_or_else(
+                this_opt.clone().map_or_else(
                     || "".to_owned(),
                     |this_ref| {
                         let this_obj = this_ref.read().unwrap();

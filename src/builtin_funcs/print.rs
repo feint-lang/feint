@@ -1,8 +1,8 @@
-use crate::types::{new, Args, CallResult, This};
+use crate::types::{new, Args, CallResult, ObjectRef};
 use crate::vm::VM;
 
 /// Returns Nil
-pub fn print(_this: This, args: Args, _vm: &mut VM) -> CallResult {
+pub fn print(_this: ObjectRef, args: Args, _vm: &mut VM) -> CallResult {
     let items = args.get(0).unwrap();
     let obj_ref = items.read().unwrap();
     let tuple = obj_ref.down_to_tuple().unwrap();

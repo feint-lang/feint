@@ -7,14 +7,14 @@ use once_cell::sync::Lazy;
 use crate::vm::VM;
 
 use super::new;
-use super::result::{Args, CallResult, Params, This};
+use super::result::{Args, CallResult, Params};
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
 use super::class::TYPE_TYPE;
 use super::func_trait::FuncTrait;
 use super::ns::Namespace;
 
-pub type BuiltinFn = fn(This, Args, &mut VM) -> CallResult;
+pub type BuiltinFn = fn(ObjectRef, Args, &mut VM) -> CallResult;
 
 // Builtin Function Type -----------------------------------------------
 

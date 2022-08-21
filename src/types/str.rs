@@ -27,7 +27,6 @@ pub static STR_TYPE: Lazy<new::obj_ref_t!(StrType)> = Lazy::new(|| {
         ("$full_name", new::str("builtins.Str")),
         // Instance Methods
         gen::meth!("starts_with", type_ref, &["prefix"], |this, args, _| {
-            let this = this.unwrap();
             let this = this.read().unwrap();
             let this = this.down_to_str().unwrap();
             let arg = gen::use_arg!(args, 0);

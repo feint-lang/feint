@@ -28,19 +28,16 @@ pub static TUPLE_TYPE: Lazy<new::obj_ref_t!(TupleType)> = Lazy::new(|| {
         ("$full_name", new::str("builtins.Tuple")),
         // Instance Methods
         gen::meth!("length", type_ref, &[], |this, _, _| {
-            let this = this.unwrap();
             let this = this.read().unwrap();
             let this = this.down_to_tuple().unwrap();
             Ok(new::int(this.len()))
         }),
         gen::meth!("is_empty", type_ref, &[], |this, _, _| {
-            let this = this.unwrap();
             let this = this.read().unwrap();
             let this = this.down_to_tuple().unwrap();
             Ok(new::bool(this.is_empty()))
         }),
         gen::meth!("map", type_ref, &["map_fn"], |this, args, vm| {
-            let this = this.unwrap();
             let this = this.read().unwrap();
             let this = this.down_to_tuple().unwrap();
             let items = &this.items;

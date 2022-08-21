@@ -1,4 +1,4 @@
-use crate::types::{new, Args, CallResult, ObjectTrait, This};
+use crate::types::{new, Args, CallResult, ObjectRef, ObjectTrait};
 use crate::vm::{RuntimeErr, VM};
 
 /// Check condition and return error if false.
@@ -6,7 +6,7 @@ use crate::vm::{RuntimeErr, VM};
 /// Args:
 ///     condition: Bool
 ///     message?: Any
-pub fn assert(_this: This, args: Args, _vm: &mut VM) -> CallResult {
+pub fn assert(_this: ObjectRef, args: Args, _vm: &mut VM) -> CallResult {
     let arg = args.get(0).unwrap();
     let arg = arg.read().unwrap();
     let success = arg.bool_val()?;
