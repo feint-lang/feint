@@ -31,6 +31,7 @@ pub(crate) mod custom;
 pub(crate) mod error;
 pub(crate) mod float;
 pub(crate) mod func;
+pub(crate) mod gen;
 pub(crate) mod int;
 pub(crate) mod list;
 pub(crate) mod map;

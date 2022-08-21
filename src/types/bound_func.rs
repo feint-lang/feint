@@ -4,6 +4,7 @@ use std::sync::{Arc, RwLock};
 
 use once_cell::sync::Lazy;
 
+use super::gen;
 use super::new;
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
@@ -12,67 +13,10 @@ use super::ns::Namespace;
 
 // Bound Function Type -------------------------------------------------
 
+gen::type_and_impls!(BoundFuncType, BoundFunc);
+
 pub static BOUND_FUNC_TYPE: Lazy<Arc<RwLock<BoundFuncType>>> =
     Lazy::new(|| Arc::new(RwLock::new(BoundFuncType::new())));
-
-pub struct BoundFuncType {
-    ns: Namespace,
-}
-
-unsafe impl Send for BoundFuncType {}
-unsafe impl Sync for BoundFuncType {}
-
-impl BoundFuncType {
-    pub fn new() -> Self {
-        Self {
-            ns: Namespace::with_entries(&[
-                // Class Attributes
-                ("$name", new::str("BoundFunc")),
-                ("$full_name", new::str("builtins.BoundFunc")),
-            ]),
-        }
-    }
-}
-
-impl TypeTrait for BoundFuncType {
-    fn name(&self) -> &str {
-        "BoundFunc"
-    }
-
-    fn full_name(&self) -> &str {
-        "builtins.BoundFunc"
-    }
-
-    fn ns(&self) -> &Namespace {
-        &self.ns
-    }
-}
-
-impl ObjectTrait for BoundFuncType {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-
-    fn class(&self) -> TypeRef {
-        TYPE_TYPE.clone()
-    }
-
-    fn type_obj(&self) -> ObjectRef {
-        TYPE_TYPE.clone()
-    }
-
-    fn ns(&self) -> &Namespace {
-        &self.ns
-    }
-
-    fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.ns
-    }
-}
 
 // BoundFunc Object ----------------------------------------------------------
 
@@ -82,8 +26,7 @@ pub struct BoundFunc {
     pub this: ObjectRef,
 }
 
-unsafe impl Send for BoundFunc {}
-unsafe impl Sync for BoundFunc {}
+gen::standard_object_impls!(BoundFunc);
 
 impl BoundFunc {
     pub fn new(func: ObjectRef, this: ObjectRef) -> Self {
@@ -92,29 +35,7 @@ impl BoundFunc {
 }
 
 impl ObjectTrait for BoundFunc {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-
-    fn class(&self) -> TypeRef {
-        BOUND_FUNC_TYPE.clone()
-    }
-
-    fn type_obj(&self) -> ObjectRef {
-        BOUND_FUNC_TYPE.clone()
-    }
-
-    fn ns(&self) -> &Namespace {
-        &self.ns
-    }
-
-    fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.ns
-    }
+    gen::object_trait_header!(BOUND_FUNC_TYPE, BoundFunc);
 }
 
 // Display -------------------------------------------------------------

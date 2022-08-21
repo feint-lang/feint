@@ -6,6 +6,7 @@ use once_cell::sync::Lazy;
 
 use crate::vm::RuntimeBoolResult;
 
+use super::gen;
 use super::new;
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
@@ -14,66 +15,10 @@ use super::ns::Namespace;
 
 // Nil Type ------------------------------------------------------------
 
+gen::type_and_impls!(NilType, Nil);
+
 pub static NIL_TYPE: Lazy<Arc<RwLock<NilType>>> =
     Lazy::new(|| Arc::new(RwLock::new(NilType::new())));
-
-pub struct NilType {
-    ns: Namespace,
-}
-
-unsafe impl Send for NilType {}
-unsafe impl Sync for NilType {}
-
-impl NilType {
-    pub fn new() -> Self {
-        Self {
-            ns: Namespace::with_entries(&[
-                // Class Attributes
-                ("$name", new::str("Nil")),
-                ("$full_name", new::str("builtins.Nil")),
-            ]),
-        }
-    }
-}
-
-impl TypeTrait for NilType {
-    fn name(&self) -> &str {
-        "Nil"
-    }
-
-    fn full_name(&self) -> &str {
-        "builtins.Nil"
-    }
-
-    fn ns(&self) -> &Namespace {
-        &self.ns
-    }
-}
-
-impl ObjectTrait for NilType {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-    fn class(&self) -> TypeRef {
-        TYPE_TYPE.clone()
-    }
-
-    fn type_obj(&self) -> ObjectRef {
-        TYPE_TYPE.clone()
-    }
-
-    fn ns(&self) -> &Namespace {
-        &self.ns
-    }
-
-    fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.ns
-    }
-}
 
 // Nil Object ----------------------------------------------------------
 
@@ -81,8 +26,7 @@ pub struct Nil {
     ns: Namespace,
 }
 
-unsafe impl Send for Nil {}
-unsafe impl Sync for Nil {}
+gen::standard_object_impls!(Nil);
 
 impl Nil {
     pub fn new() -> Self {
@@ -91,28 +35,7 @@ impl Nil {
 }
 
 impl ObjectTrait for Nil {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-    fn class(&self) -> TypeRef {
-        NIL_TYPE.clone()
-    }
-
-    fn type_obj(&self) -> ObjectRef {
-        NIL_TYPE.clone()
-    }
-
-    fn ns(&self) -> &Namespace {
-        &self.ns
-    }
-
-    fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.ns
-    }
+    gen::object_trait_header!(NIL_TYPE, Nil);
 
     fn bool_val(&self) -> RuntimeBoolResult {
         Ok(false)

@@ -4,8 +4,7 @@ use std::sync::{Arc, RwLock};
 
 use once_cell::sync::Lazy;
 
-use crate::vm::RuntimeBoolResult;
-
+use super::gen;
 use super::meth::make_meth;
 use super::new;
 
@@ -15,72 +14,19 @@ use super::ns::Namespace;
 
 // Error Type ------------------------------------------------------------
 
+gen::type_and_impls!(ErrorType, Error);
+
 pub static ERROR_TYPE: Lazy<Arc<RwLock<ErrorType>>> = Lazy::new(|| {
     let type_ref = Arc::new(RwLock::new(ErrorType::new()));
     let mut class = type_ref.write().unwrap();
 
     class.ns_mut().add_entries(&[
-        // Class Attributes
-        ("$name", new::str("Error")),
-        ("$full_name", new::str("builtins.Error")),
         // Class Methods
         make_meth!("new", type_ref, &[], |_, _, _| Ok(new::nil())),
     ]);
 
     type_ref.clone()
 });
-
-pub struct ErrorType {
-    namespace: Namespace,
-}
-
-unsafe impl Send for ErrorType {}
-unsafe impl Sync for ErrorType {}
-
-impl ErrorType {
-    pub fn new() -> Self {
-        Self { namespace: Namespace::new() }
-    }
-}
-
-impl TypeTrait for ErrorType {
-    fn name(&self) -> &str {
-        "Error"
-    }
-
-    fn full_name(&self) -> &str {
-        "builtins.Error"
-    }
-
-    fn ns(&self) -> &Namespace {
-        &self.namespace
-    }
-}
-
-impl ObjectTrait for ErrorType {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-    fn class(&self) -> TypeRef {
-        TYPE_TYPE.clone()
-    }
-
-    fn type_obj(&self) -> ObjectRef {
-        TYPE_TYPE.clone()
-    }
-
-    fn ns(&self) -> &Namespace {
-        &self.namespace
-    }
-
-    fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.namespace
-    }
-}
 
 // Error Object --------------------------------------------------------
 
@@ -90,17 +36,16 @@ pub enum ErrorKind {
 }
 
 pub struct Error {
-    namespace: Namespace,
+    ns: Namespace,
     kind: ErrorKind,
     message: String,
 }
 
-unsafe impl Send for Error {}
-unsafe impl Sync for Error {}
+gen::standard_object_impls!(Error);
 
 impl Error {
     pub fn new(kind: ErrorKind, message: String) -> Self {
-        Self { namespace: Namespace::new(), kind, message }
+        Self { ns: Namespace::new(), kind, message }
     }
 }
 
@@ -111,33 +56,7 @@ impl Clone for Error {
 }
 
 impl ObjectTrait for Error {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-
-    fn class(&self) -> TypeRef {
-        ERROR_TYPE.clone()
-    }
-
-    fn type_obj(&self) -> ObjectRef {
-        ERROR_TYPE.clone()
-    }
-
-    fn ns(&self) -> &Namespace {
-        &self.namespace
-    }
-
-    fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.namespace
-    }
-
-    fn bool_val(&self) -> RuntimeBoolResult {
-        Ok(false)
-    }
+    gen::object_trait_header!(ERROR_TYPE, Error);
 }
 
 // Display -------------------------------------------------------------

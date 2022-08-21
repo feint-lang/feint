@@ -6,6 +6,7 @@ use once_cell::sync::Lazy;
 
 use crate::vm::{RuntimeBoolResult, RuntimeErr};
 
+use super::gen;
 use super::new;
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
@@ -14,67 +15,10 @@ use super::ns::Namespace;
 
 // Bool Type -----------------------------------------------------------
 
+gen::type_and_impls!(BoolType, Bool);
+
 pub static BOOL_TYPE: Lazy<Arc<RwLock<BoolType>>> =
     Lazy::new(|| Arc::new(RwLock::new(BoolType::new())));
-
-pub struct BoolType {
-    ns: Namespace,
-}
-
-unsafe impl Send for BoolType {}
-unsafe impl Sync for BoolType {}
-
-impl BoolType {
-    pub fn new() -> Self {
-        Self {
-            ns: Namespace::with_entries(&[
-                // Class Attributes
-                ("$name", new::str("Bool")),
-                ("$full_name", new::str("builtins.Bool")),
-            ]),
-        }
-    }
-}
-
-impl TypeTrait for BoolType {
-    fn name(&self) -> &str {
-        "Bool"
-    }
-
-    fn full_name(&self) -> &str {
-        "builtins.Bool"
-    }
-
-    fn ns(&self) -> &Namespace {
-        &self.ns
-    }
-}
-
-impl ObjectTrait for BoolType {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-
-    fn class(&self) -> TypeRef {
-        TYPE_TYPE.clone()
-    }
-
-    fn type_obj(&self) -> ObjectRef {
-        TYPE_TYPE.clone()
-    }
-
-    fn ns(&self) -> &Namespace {
-        &self.ns
-    }
-
-    fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.ns
-    }
-}
 
 // Bool Object ---------------------------------------------------------
 
@@ -83,8 +27,7 @@ pub struct Bool {
     value: bool,
 }
 
-unsafe impl Send for Bool {}
-unsafe impl Sync for Bool {}
+gen::standard_object_impls!(Bool);
 
 impl Bool {
     pub fn new(value: bool) -> Self {
@@ -97,29 +40,7 @@ impl Bool {
 }
 
 impl ObjectTrait for Bool {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-
-    fn class(&self) -> TypeRef {
-        BOOL_TYPE.clone()
-    }
-
-    fn type_obj(&self) -> ObjectRef {
-        BOOL_TYPE.clone()
-    }
-
-    fn ns(&self) -> &Namespace {
-        &self.ns
-    }
-
-    fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.ns
-    }
+    gen::object_trait_header!(BOOL_TYPE, Bool);
 
     // Unary operations -----------------------------------------------
 
