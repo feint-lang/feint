@@ -1,3 +1,5 @@
+// Types ---------------------------------------------------------------
+
 /// Generate a builtin type definition. This includes the type's
 /// struct and impl as well as the TypeTrait, Send, and Sync impls.
 ///
@@ -117,6 +119,12 @@ macro_rules! object_trait_header {
     };
 }
 
+pub(crate) use object_trait_header;
+pub(crate) use standard_object_impls;
+pub(crate) use type_and_impls;
+
+// Methods -------------------------------------------------------------
+
 /// Make a class or instance method for a builtin type.
 ///
 /// Args:
@@ -194,10 +202,6 @@ macro_rules! use_arg_usize {
         }
     }};
 }
-
-pub(crate) use object_trait_header;
-pub(crate) use standard_object_impls;
-pub(crate) use type_and_impls;
 
 pub(crate) use meth;
 pub(crate) use use_arg;
