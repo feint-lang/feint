@@ -16,8 +16,8 @@ use super::ns::Namespace;
 
 gen::type_and_impls!(ErrorType, Error);
 
-pub static ERROR_TYPE: Lazy<Arc<RwLock<ErrorType>>> = Lazy::new(|| {
-    let type_ref = Arc::new(RwLock::new(ErrorType::new()));
+pub static ERROR_TYPE: Lazy<new::obj_ref_t!(ErrorType)> = Lazy::new(|| {
+    let type_ref = new::obj_ref!(ErrorType::new());
     let mut class = type_ref.write().unwrap();
 
     class.ns_mut().add_entries(&[

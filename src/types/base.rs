@@ -31,8 +31,8 @@ use super::ns::Namespace;
 use super::str::{Str, StrType};
 use super::tuple::{Tuple, TupleType};
 
-pub type TypeRef = Arc<RwLock<dyn TypeTrait>>;
-pub type ObjectRef = Arc<RwLock<dyn ObjectTrait>>;
+pub type TypeRef = new::obj_ref_t!(dyn TypeTrait);
+pub type ObjectRef = new::obj_ref_t!(dyn ObjectTrait);
 
 // Type Trait ----------------------------------------------------------
 
@@ -183,7 +183,7 @@ pub trait ObjectTrait {
         }
         if name == "err" {
             return if let Some(error) = self.down_to_error() {
-                Ok(Arc::new(RwLock::new(error.clone())))
+                Ok(new::obj_ref!(error.clone()))
             } else {
                 Ok(new::nil())
             };

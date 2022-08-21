@@ -16,8 +16,8 @@ use super::ns::Namespace;
 
 // List Type -----------------------------------------------------------
 
-pub static LIST_TYPE: Lazy<Arc<RwLock<ListType>>> = Lazy::new(|| {
-    let type_ref = Arc::new(RwLock::new(ListType::new()));
+pub static LIST_TYPE: Lazy<new::obj_ref_t!(ListType)> = Lazy::new(|| {
+    let type_ref = new::obj_ref!(ListType::new());
     let mut class = type_ref.write().unwrap();
 
     class.ns_mut().add_entries(&[

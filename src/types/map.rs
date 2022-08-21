@@ -13,8 +13,8 @@ use super::ns::Namespace;
 
 // Map Type ------------------------------------------------------------
 
-pub static MAP_TYPE: Lazy<Arc<RwLock<MapType>>> =
-    Lazy::new(|| Arc::new(RwLock::new(MapType::new())));
+pub static MAP_TYPE: Lazy<new::obj_ref_t!(MapType)> =
+    Lazy::new(|| new::obj_ref!(MapType::new()));
 
 pub struct MapType {
     ns: Namespace,

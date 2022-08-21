@@ -18,8 +18,8 @@ pub type BuiltinFn = fn(This, Args, &mut VM) -> CallResult;
 
 // Builtin Function Type -----------------------------------------------
 
-pub static BUILTIN_FUNC_TYPE: Lazy<Arc<RwLock<BuiltinFuncType>>> =
-    Lazy::new(|| Arc::new(RwLock::new(BuiltinFuncType::new())));
+pub static BUILTIN_FUNC_TYPE: Lazy<new::obj_ref_t!(BuiltinFuncType)> =
+    Lazy::new(|| new::obj_ref!(BuiltinFuncType::new()));
 
 pub struct BuiltinFuncType {
     ns: Namespace,

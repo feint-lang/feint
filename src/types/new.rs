@@ -31,19 +31,17 @@ use super::tuple::Tuple;
 
 use super::result::Params;
 
-static NIL: Lazy<Arc<RwLock<Nil>>> = Lazy::new(|| Arc::new(RwLock::new(Nil::new())));
+static NIL: Lazy<obj_ref_t!(Nil)> = Lazy::new(|| obj_ref!(Nil::new()));
 
-static TRUE: Lazy<Arc<RwLock<Bool>>> =
-    Lazy::new(|| Arc::new(RwLock::new(Bool::new(true))));
+static TRUE: Lazy<obj_ref_t!(Bool)> = Lazy::new(|| obj_ref!(Bool::new(true)));
 
-static FALSE: Lazy<Arc<RwLock<Bool>>> =
-    Lazy::new(|| Arc::new(RwLock::new(Bool::new(false))));
+static FALSE: Lazy<obj_ref_t!(Bool)> = Lazy::new(|| obj_ref!(Bool::new(false)));
 
 pub static GLOBAL_INT_MAX: Lazy<BigInt> = Lazy::new(|| BigInt::from(256));
 
-pub static SHARED_INTS: Lazy<Vec<Arc<RwLock<Int>>>> = Lazy::new(|| {
+pub static SHARED_INTS: Lazy<Vec<obj_ref_t!(Int)>> = Lazy::new(|| {
     let end = GLOBAL_INT_MAX.to_u32().unwrap();
-    (0..=end).map(|i| Arc::new(RwLock::new(Int::new(BigInt::from(i))))).collect()
+    (0..=end).map(|i| obj_ref!(Int::new(BigInt::from(i)))).collect()
 });
 
 pub fn in_shared_int_range(value: &BigInt) -> bool {
@@ -51,6 +49,22 @@ pub fn in_shared_int_range(value: &BigInt) -> bool {
 }
 
 // Builtin type constructors -------------------------------------------
+
+macro_rules! obj_ref_t {
+    ( $ty:ty ) => {
+        Arc<RwLock<$ty>>
+    };
+}
+
+pub(crate) use obj_ref_t;
+
+macro_rules! obj_ref {
+    ( $obj:expr ) => {
+        Arc::new(RwLock::new($obj))
+    };
+}
+
+pub(crate) use obj_ref;
 
 #[inline]
 pub fn nil() -> ObjectRef {
@@ -77,7 +91,7 @@ pub fn false_() -> ObjectRef {
 }
 
 pub fn bound_func(func: ObjectRef, this: ObjectRef) -> ObjectRef {
-    Arc::new(RwLock::new(BoundFunc::new(func, this)))
+    obj_ref!(BoundFunc::new(func, this))
 }
 
 pub fn builtin_func(
@@ -87,27 +101,27 @@ pub fn builtin_func(
     func: BuiltinFn,
 ) -> ObjectRef {
     let params = params.iter().map(|n| n.to_string()).collect();
-    Arc::new(RwLock::new(BuiltinFunc::new(name.to_owned(), this_type, params, func)))
+    obj_ref!(BuiltinFunc::new(name.to_owned(), this_type, params, func))
 }
 
-pub fn builtin_module(name: &str, ns: Namespace) -> Arc<RwLock<Module>> {
-    Arc::new(RwLock::new(Module::new(name.into(), ns, Code::new())))
+pub fn builtin_module(name: &str, ns: Namespace) -> obj_ref_t!(Module) {
+    obj_ref!(Module::new(name.into(), ns, Code::new()))
 }
 
 pub fn cell() -> ObjectRef {
-    Arc::new(RwLock::new(Cell::new()))
+    obj_ref!(Cell::new())
 }
 
 pub fn cell_with_value(value: ObjectRef) -> ObjectRef {
-    Arc::new(RwLock::new(Cell::with_value(value)))
+    obj_ref!(Cell::with_value(value))
 }
 
 pub fn closure(func: ObjectRef, captured: HashMap<String, ObjectRef>) -> ObjectRef {
-    Arc::new(RwLock::new(Closure::new(func, captured)))
+    obj_ref!(Closure::new(func, captured))
 }
 
 pub fn float(value: f64) -> ObjectRef {
-    Arc::new(RwLock::new(Float::new(value)))
+    obj_ref!(Float::new(value))
 }
 
 pub fn float_from_string<S: Into<String>>(value: S) -> ObjectRef {
@@ -120,7 +134,7 @@ pub fn float_from_string<S: Into<String>>(value: S) -> ObjectRef {
 ///       params are already owned, so we don't do any conversion here
 ///       like with builtin functions above.
 pub fn func(name: String, params: Params, code: Code) -> ObjectRef {
-    Arc::new(RwLock::new(Func::new(name, params, code)))
+    obj_ref!(Func::new(name, params, code))
 }
 
 pub fn int<I: Into<BigInt>>(value: I) -> ObjectRef {
@@ -129,7 +143,7 @@ pub fn int<I: Into<BigInt>>(value: I) -> ObjectRef {
         let index = value.to_usize().unwrap();
         SHARED_INTS[index].clone()
     } else {
-        Arc::new(RwLock::new(Int::new(value)))
+        obj_ref!(Int::new(value))
     }
 }
 
@@ -145,38 +159,38 @@ pub fn int_from_string<S: Into<String>>(value: S) -> ObjectRef {
 }
 
 pub fn list(items: Vec<ObjectRef>) -> ObjectRef {
-    Arc::new(RwLock::new(List::new(items.to_vec())))
+    obj_ref!(List::new(items.to_vec()))
 }
 
 pub fn map(entries: Vec<(String, ObjectRef)>) -> ObjectRef {
     let entries: HashMap<String, ObjectRef> = entries.into_iter().collect();
-    Arc::new(RwLock::new(Map::new(entries)))
+    obj_ref!(Map::new(entries))
 }
 
 pub fn module<S: Into<String>>(
     name: S,
     ns: Namespace,
     code: Code,
-) -> Arc<RwLock<Module>> {
-    Arc::new(RwLock::new(Module::new(name.into(), ns, code)))
+) -> obj_ref_t!(Module) {
+    obj_ref!(Module::new(name.into(), ns, code))
 }
 
 pub fn str<S: Into<String>>(value: S) -> ObjectRef {
-    Arc::new(RwLock::new(Str::new(value.into())))
+    obj_ref!(Str::new(value.into()))
 }
 
 pub fn tuple(items: Vec<ObjectRef>) -> ObjectRef {
-    Arc::new(RwLock::new(Tuple::new(items)))
+    obj_ref!(Tuple::new(items))
 }
 
 // Custom type constructor ---------------------------------------------
 
 #[allow(dead_code)]
-pub fn custom_type(module: Arc<RwLock<Module>>, name: &str) -> Arc<RwLock<CustomType>> {
-    Arc::new(RwLock::new(CustomType::new(module, name.into())))
+pub fn custom_type(module: obj_ref_t!(Module), name: &str) -> obj_ref_t!(CustomType) {
+    obj_ref!(CustomType::new(module, name.into()))
 }
 
 #[allow(dead_code)]
-pub fn custom_instance(class: Arc<RwLock<CustomType>>, attrs: Namespace) -> ObjectRef {
-    Arc::new(RwLock::new(CustomObj::new(class, attrs)))
+pub fn custom_instance(class: obj_ref_t!(CustomType), attrs: Namespace) -> ObjectRef {
+    obj_ref!(CustomObj::new(class, attrs))
 }

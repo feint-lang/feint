@@ -22,7 +22,7 @@ use crate::types::nil::NIL_TYPE;
 use crate::types::str::STR_TYPE;
 use crate::types::tuple::TUPLE_TYPE;
 
-pub static BUILTINS: Lazy<Arc<RwLock<Module>>> = Lazy::new(|| {
+pub static BUILTINS: Lazy<new::obj_ref_t!(Module)> = Lazy::new(|| {
     let mut entries = vec![
         ("$name", new::str("builtins")),
         ("Type", TYPE_TYPE.clone()),

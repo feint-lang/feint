@@ -17,8 +17,8 @@ use super::ns::Namespace;
 
 gen::type_and_impls!(BoolType, Bool);
 
-pub static BOOL_TYPE: Lazy<Arc<RwLock<BoolType>>> =
-    Lazy::new(|| Arc::new(RwLock::new(BoolType::new())));
+pub static BOOL_TYPE: Lazy<new::obj_ref_t!(BoolType)> =
+    Lazy::new(|| new::obj_ref!(BoolType::new()));
 
 // Bool Object ---------------------------------------------------------
 

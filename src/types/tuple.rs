@@ -15,8 +15,8 @@ use super::ns::Namespace;
 
 // Tuple Type ----------------------------------------------------------
 
-pub static TUPLE_TYPE: Lazy<Arc<RwLock<TupleType>>> = Lazy::new(|| {
-    let type_ref = Arc::new(RwLock::new(TupleType::new()));
+pub static TUPLE_TYPE: Lazy<new::obj_ref_t!(TupleType)> = Lazy::new(|| {
+    let type_ref = new::obj_ref!(TupleType::new());
     let mut class = type_ref.write().unwrap();
 
     class.ns_mut().add_entries(&[

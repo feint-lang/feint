@@ -9,7 +9,7 @@ use crate::vm::RuntimeErr;
 
 use crate::types::{new, Args, Module, Namespace};
 
-pub static FILE: Lazy<Arc<RwLock<Module>>> = Lazy::new(|| {
+pub static FILE: Lazy<new::obj_ref_t!(Module)> = Lazy::new(|| {
     new::builtin_module(
         "file",
         Namespace::with_entries(&[

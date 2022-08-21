@@ -15,8 +15,8 @@ use super::ns::Namespace;
 
 gen::type_and_impls!(BoundFuncType, BoundFunc);
 
-pub static BOUND_FUNC_TYPE: Lazy<Arc<RwLock<BoundFuncType>>> =
-    Lazy::new(|| Arc::new(RwLock::new(BoundFuncType::new())));
+pub static BOUND_FUNC_TYPE: Lazy<new::obj_ref_t!(BoundFuncType)> =
+    Lazy::new(|| new::obj_ref!(BoundFuncType::new()));
 
 // BoundFunc Object ----------------------------------------------------------
 

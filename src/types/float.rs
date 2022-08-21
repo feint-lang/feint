@@ -17,8 +17,8 @@ use super::ns::Namespace;
 
 // Float Type ----------------------------------------------------------
 
-pub static FLOAT_TYPE: Lazy<Arc<RwLock<FloatType>>> = Lazy::new(|| {
-    let type_ref = Arc::new(RwLock::new(FloatType::new()));
+pub static FLOAT_TYPE: Lazy<new::obj_ref_t!(FloatType)> = Lazy::new(|| {
+    let type_ref = new::obj_ref!(FloatType::new());
     let mut class = type_ref.write().unwrap();
 
     class.ns_mut().add_entries(&[

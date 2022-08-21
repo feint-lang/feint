@@ -14,8 +14,8 @@ use super::ns::Namespace;
 
 // Module Type ---------------------------------------------------------
 
-pub static MODULE_TYPE: Lazy<Arc<RwLock<ModuleType>>> =
-    Lazy::new(|| Arc::new(RwLock::new(ModuleType::new())));
+pub static MODULE_TYPE: Lazy<new::obj_ref_t!(ModuleType)> =
+    Lazy::new(|| new::obj_ref!(ModuleType::new()));
 
 pub struct ModuleType {
     ns: Namespace,

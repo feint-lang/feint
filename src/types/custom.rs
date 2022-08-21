@@ -14,13 +14,13 @@ use super::ns::Namespace;
 
 pub struct CustomType {
     ns: Namespace,
-    module: Arc<RwLock<Module>>,
+    module: new::obj_ref_t!(Module),
     name: String,
     full_name: String,
 }
 
 impl CustomType {
-    pub fn new(module: Arc<RwLock<Module>>, name: String) -> Self {
+    pub fn new(module: new::obj_ref_t!(Module), name: String) -> Self {
         let full_name = format!("{}.{name}", module.read().unwrap().name());
         Self {
             ns: Namespace::with_entries(&[
@@ -84,7 +84,7 @@ impl ObjectTrait for CustomType {
 // Custom Object -------------------------------------------------------
 
 pub struct CustomObj {
-    class: Arc<RwLock<CustomType>>,
+    class: new::obj_ref_t!(CustomType),
     ns: Namespace,
 }
 
@@ -92,7 +92,7 @@ unsafe impl Send for CustomObj {}
 unsafe impl Sync for CustomObj {}
 
 impl CustomObj {
-    pub fn new(class: Arc<RwLock<CustomType>>, attrs: Namespace) -> Self {
+    pub fn new(class: new::obj_ref_t!(CustomType), attrs: Namespace) -> Self {
         Self { class, ns: attrs }
     }
 }

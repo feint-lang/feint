@@ -14,8 +14,8 @@ use super::ns::Namespace;
 
 // Type Type -----------------------------------------------------------
 
-pub static TYPE_TYPE: Lazy<Arc<RwLock<TypeType>>> =
-    Lazy::new(|| Arc::new(RwLock::new(TypeType::new())));
+pub static TYPE_TYPE: Lazy<new::obj_ref_t!(TypeType)> =
+    Lazy::new(|| new::obj_ref!(TypeType::new()));
 
 pub struct TypeType {
     ns: Namespace,
@@ -87,7 +87,7 @@ unsafe impl Sync for Type {}
 impl Type {
     pub fn new() -> Self {
         let ns = Namespace::new();
-        Self { ns: ns }
+        Self { ns }
     }
 }
 

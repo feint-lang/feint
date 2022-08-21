@@ -15,8 +15,8 @@ use super::ns::Namespace;
 
 // Closure Type --------------------------------------------------------
 
-pub static CLOSURE_TYPE: Lazy<Arc<RwLock<ClosureType>>> =
-    Lazy::new(|| Arc::new(RwLock::new(ClosureType::new())));
+pub static CLOSURE_TYPE: Lazy<new::obj_ref_t!(ClosureType)> =
+    Lazy::new(|| new::obj_ref!(ClosureType::new()));
 
 pub struct ClosureType {
     ns: Namespace,

@@ -16,8 +16,8 @@ use super::ns::Namespace;
 
 // Function Type -------------------------------------------------------
 
-pub static FUNC_TYPE: Lazy<Arc<RwLock<FuncType>>> =
-    Lazy::new(|| Arc::new(RwLock::new(FuncType::new())));
+pub static FUNC_TYPE: Lazy<new::obj_ref_t!(FuncType)> =
+    Lazy::new(|| new::obj_ref!(FuncType::new()));
 
 pub struct FuncType {
     ns: Namespace,

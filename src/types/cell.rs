@@ -14,8 +14,8 @@ use super::ns::Namespace;
 
 // Cell Type -----------------------------------------------------------
 
-pub static CELL_TYPE: Lazy<Arc<RwLock<CellType>>> =
-    Lazy::new(|| Arc::new(RwLock::new(CellType::new())));
+pub static CELL_TYPE: Lazy<new::obj_ref_t!(CellType)> =
+    Lazy::new(|| new::obj_ref!(CellType::new()));
 
 pub struct CellType {
     ns: Namespace,

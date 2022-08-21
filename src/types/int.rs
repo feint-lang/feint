@@ -19,8 +19,8 @@ use super::ns::Namespace;
 
 // Int Type ------------------------------------------------------------
 
-pub static INT_TYPE: Lazy<Arc<RwLock<IntType>>> = Lazy::new(|| {
-    let type_ref = Arc::new(RwLock::new(IntType::new()));
+pub static INT_TYPE: Lazy<new::obj_ref_t!(IntType)> = Lazy::new(|| {
+    let type_ref = new::obj_ref!(IntType::new());
     let mut class = type_ref.write().unwrap();
 
     class.ns_mut().add_entries(&[

@@ -9,7 +9,7 @@ use crate::vm::{Code, RuntimeErr, RuntimeObjResult};
 use super::builtins::BUILTINS;
 use super::file::FILE;
 
-pub static SYSTEM: Lazy<Arc<RwLock<Module>>> = Lazy::new(|| {
+pub static SYSTEM: Lazy<new::obj_ref_t!(Module)> = Lazy::new(|| {
     let modules = new::map(vec![
         ("builtins".to_string(), BUILTINS.clone()),
         ("file".to_string(), FILE.clone()),

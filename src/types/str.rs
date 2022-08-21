@@ -15,8 +15,8 @@ use super::ns::Namespace;
 
 // Str Type ------------------------------------------------------------
 
-pub static STR_TYPE: Lazy<Arc<RwLock<StrType>>> = Lazy::new(|| {
-    let type_ref = Arc::new(RwLock::new(StrType::new()));
+pub static STR_TYPE: Lazy<new::obj_ref_t!(StrType)> = Lazy::new(|| {
+    let type_ref = new::obj_ref!(StrType::new());
     let mut class = type_ref.write().unwrap();
 
     class.ns_mut().add_entries(&[
