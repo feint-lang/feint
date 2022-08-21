@@ -10,7 +10,7 @@ pub(crate) use builtin_func::{BuiltinFn, BuiltinFunc};
 pub(crate) use func::Func;
 pub(crate) use func_trait::FuncTrait;
 
-pub(crate) mod create;
+pub(crate) mod new;
 pub(crate) use result::{Args, CallResult, Params, This};
 
 mod base;
@@ -24,7 +24,7 @@ pub(crate) mod ns;
 pub(crate) mod bool;
 pub(crate) mod bound_func;
 pub(crate) mod builtin_func;
-mod cell;
+pub(crate) mod cell;
 pub(crate) mod class;
 pub(crate) mod closure;
 pub(crate) mod custom;

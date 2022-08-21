@@ -9,7 +9,7 @@ use num_traits::ToPrimitive;
 use crate::modules;
 use crate::vm::{RuntimeBoolResult, RuntimeErr, RuntimeObjResult};
 
-use super::create;
+use super::new;
 use super::result::{GetAttrResult, SetAttrResult};
 
 use super::bool::{Bool, BoolType};
@@ -141,7 +141,7 @@ pub trait ObjectTrait {
 
     fn id_obj(&self) -> ObjectRef {
         // TODO: Cache?
-        create::new_int(self.id())
+        new::int(self.id())
     }
 
     fn module(&self) -> ObjectRef {
@@ -173,8 +173,8 @@ pub trait ObjectTrait {
             names.extend(obj_ns.iter().map(|(n, _)| n).cloned());
             names.sort();
             names.dedup();
-            let items = names.iter().map(create::new_str).collect();
-            return Ok(create::new_tuple(items));
+            let items = names.iter().map(new::str).collect();
+            return Ok(new::tuple(items));
         }
         if let Some(obj) = self.namespace().get_obj(name) {
             return Ok(obj);

@@ -6,7 +6,7 @@ use once_cell::sync::Lazy;
 
 use crate::vm::Code;
 
-use super::create;
+use super::new;
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
 use super::class::TYPE_TYPE;
@@ -29,8 +29,8 @@ impl ModuleType {
         Self {
             namespace: Namespace::with_entries(&[
                 // Class Attributes
-                ("$name", create::new_str("Module")),
-                ("$full_name", create::new_str("builtins.Module")),
+                ("$name", new::str("Module")),
+                ("$full_name", new::str("builtins.Module")),
             ]),
         }
     }
@@ -90,7 +90,7 @@ impl Module {
     pub fn name(&self) -> &str {
         self.name.as_str()
     }
-    
+
     pub fn has_name(&self, name: &str) -> bool {
         self.namespace.has(name)
     }

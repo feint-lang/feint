@@ -1,13 +1,13 @@
-use crate::types::{create, Namespace, ObjectTrait};
+use crate::types::{new, Namespace, ObjectTrait};
 
 mod float {
     use super::*;
 
     #[test]
     fn test_float() {
-        let float1 = create::new_float(0.0);
-        let float2 = create::new_float(0.0);
-        let float3 = create::new_float(1.0);
+        let float1 = new::float(0.0);
+        let float2 = new::float(0.0);
+        let float3 = new::float(1.0);
 
         let float1 = float1.read().unwrap();
         let float2 = float2.read().unwrap();
@@ -29,8 +29,8 @@ mod float {
 
     #[test]
     fn test_compare_to_int() {
-        let float = create::new_float(1.0);
-        let int = create::new_int(1);
+        let float = new::float(1.0);
+        let int = new::int(1);
         assert!(float.read().unwrap().is_equal(&*int.read().unwrap()));
         assert!(int.read().unwrap().is_equal(&*float.read().unwrap()));
     }
@@ -41,7 +41,7 @@ mod list {
 
     #[test]
     fn test_push_exists() {
-        let obj_ref = create::new_list(vec![]);
+        let obj_ref = new::list(vec![]);
         let list = obj_ref.read().unwrap();
         let push = list.get_attr("push");
         assert!(push.is_ok());
@@ -53,28 +53,28 @@ mod custom {
 
     #[test]
     fn test_custom() {
-        let mod1 = create::new_builtin_module("test1", Namespace::new());
+        let mod1 = new::builtin_module("test1", Namespace::new());
 
-        let t1 = create::new_custom_type(mod1, "Custom1");
-
-        let mut ns = Namespace::new();
-        ns.add_obj("value", create::new_nil());
-        let t1_obj1 = create::new_custom_instance(t1.clone(), ns);
+        let t1 = new::custom_type(mod1, "Custom1");
 
         let mut ns = Namespace::new();
-        ns.add_obj("value", create::new_nil());
-        let t1_obj2 = create::new_custom_instance(t1.clone(), ns);
+        ns.add_obj("value", new::nil());
+        let t1_obj1 = new::custom_instance(t1.clone(), ns);
 
         let mut ns = Namespace::new();
-        ns.add_obj("value", create::new_nil());
-        let t1_obj3 = create::new_custom_instance(t1.clone(), ns);
+        ns.add_obj("value", new::nil());
+        let t1_obj2 = new::custom_instance(t1.clone(), ns);
+
+        let mut ns = Namespace::new();
+        ns.add_obj("value", new::nil());
+        let t1_obj3 = new::custom_instance(t1.clone(), ns);
 
         assert!(t1.clone().read().unwrap().get_attr("$id").is_ok());
         assert!(t1.clone().read().unwrap().get_attr("$type").is_ok());
         assert!(t1_obj1.read().unwrap().get_attr("$id").is_ok());
         assert!(t1_obj1.read().unwrap().get_attr("$type").is_ok());
 
-        let was_set = t1_obj3.write().unwrap().set_attr("value", create::new_int(1));
+        let was_set = t1_obj3.write().unwrap().set_attr("value", new::int(1));
         assert!(was_set.is_ok(), "Could not set `value` on t1_obj3");
         assert!(t1_obj3.read().unwrap().get_attr("value").is_ok());
         assert!(t1_obj3
@@ -84,12 +84,12 @@ mod custom {
             .unwrap()
             .read()
             .unwrap()
-            .is_equal(&*create::new_int(1).read().unwrap()));
+            .is_equal(&*new::int(1).read().unwrap()));
 
-        let mod2 = create::new_builtin_module("test2", Namespace::new());
+        let mod2 = new::builtin_module("test2", Namespace::new());
 
-        let t2 = create::new_custom_type(mod2, "Custom2");
-        let t2_obj1 = create::new_custom_instance(t2, Namespace::new());
+        let t2 = new::custom_type(mod2, "Custom2");
+        let t2_obj1 = new::custom_instance(t2, Namespace::new());
 
         // An object should be equal to itself.
         assert!(t1_obj1.read().unwrap().is_equal(&*t1_obj1.read().unwrap()));

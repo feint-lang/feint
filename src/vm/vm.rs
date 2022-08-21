@@ -11,7 +11,7 @@ use ctrlc;
 use num_traits::ToPrimitive;
 
 use crate::modules;
-use crate::types::{create, Args, BuiltinFunc, Func, FuncTrait, ObjectRef, This};
+use crate::types::{new, Args, BuiltinFunc, Func, FuncTrait, ObjectRef, This};
 use crate::util::{
     BinaryOperator, CompareOperator, InplaceOperator, Location, Stack,
     UnaryCompareOperator, UnaryOperator,
@@ -189,7 +189,7 @@ impl VM {
                     } else {
                         // Create new cell to wrap TOS in.
                         assert!(var.is_nil());
-                        let cell_ref = create::new_cell_with_value(value.clone());
+                        let cell_ref = new::cell_with_value(value.clone());
                         self.ctx.assign_var(name, cell_ref)?
                     };
                     // Push cell *value* to TOS.
@@ -290,17 +290,17 @@ impl VM {
                         let obj = obj.read().unwrap();
                         string.push_str(obj.to_string().as_str());
                     }
-                    let string_obj = create::new_str(string);
+                    let string_obj = new::str(string);
                     self.push_temp(string_obj);
                 }
                 MakeTuple(n) => {
                     let objects = self.pop_n_obj(*n)?;
-                    let tuple = create::new_tuple(objects);
+                    let tuple = new::tuple(objects);
                     self.push_temp(tuple);
                 }
                 MakeList(n) => {
                     let objects = self.pop_n_obj(*n)?;
-                    let list = create::new_list(objects);
+                    let list = new::list(objects);
                     self.push_temp(list);
                 }
                 MakeMap(n) => {
@@ -318,7 +318,7 @@ impl VM {
                     }
                     let entries: Vec<(String, ObjectRef)> =
                         keys.into_iter().zip(vals).collect();
-                    let map = create::new_map(entries);
+                    let map = new::map(entries);
                     self.push_temp(map);
                 }
                 CaptureSet(names) => {
@@ -332,7 +332,7 @@ impl VM {
                                 entries.push((name.to_owned(), var_ref.clone()));
                             } else {
                                 assert!(var.is_nil());
-                                entries.push((name.to_owned(), create::new_cell()));
+                                entries.push((name.to_owned(), new::cell()));
                             }
                         } else {
                             // Capture cell does not exist.
@@ -355,7 +355,7 @@ impl VM {
                             }
                         }
                     }
-                    self.push_temp(create::new_map(entries));
+                    self.push_temp(new::map(entries));
                 }
                 MakeFunc(func_const_index) => {
                     let capture_set = self.pop_obj()?;
@@ -380,14 +380,14 @@ impl VM {
                         if func_captured && ip + 1 < code.len_chunk() {
                             if let AssignCell(_) = &code[ip + 1] {
                                 let closure_cell =
-                                    create::new_cell_with_value(func_ref.clone());
+                                    new::cell_with_value(func_ref.clone());
                                 self.ctx
                                     .assign_var(func.name(), closure_cell.clone())?;
                                 captured.insert(func.name().to_owned(), closure_cell);
                             }
                         }
 
-                        let closure = create::new_closure(func_ref.clone(), captured);
+                        let closure = new::closure(func_ref.clone(), captured);
 
                         self.push_temp(closure);
                     }
@@ -531,7 +531,7 @@ impl VM {
             AsBool => a.bool_val()?,
             Not => a.not()?,
         };
-        self.push_temp(create::new_bool(result));
+        self.push_temp(new::bool(result));
         Ok(())
     }
 
@@ -568,7 +568,7 @@ impl VM {
                 };
                 if bind {
                     // If `b` in `a.b` is a function, bind `b` to `a`.
-                    create::new_bound_func(obj_ref.clone(), a_ref.clone())
+                    new::bound_func(obj_ref.clone(), a_ref.clone())
                 } else {
                     obj_ref
                 }
@@ -601,7 +601,7 @@ impl VM {
             GreaterThan => a.greater_than(b)?,
             GreaterThanOrEqual => a.greater_than(b)? || a.is_equal(b),
         };
-        self.push_temp(create::new_bool(result));
+        self.push_temp(new::bool(result));
         Ok(())
     }
 
@@ -697,7 +697,7 @@ impl VM {
                 return this.clone();
             }
         }
-        create::new_nil()
+        new::nil()
     }
 
     // Function calls --------------------------------------------------
@@ -772,7 +772,7 @@ impl VM {
         //      better to track which params are captured. See related
         //      note in push_var().
         for (name, arg) in func.arg_names().iter().zip(args) {
-            let cell = create::new_cell_with_value(arg);
+            let cell = new::cell_with_value(arg);
             self.ctx.declare_and_assign_var(name, cell)?;
         }
         match self.execute(&func.code) {
@@ -816,7 +816,7 @@ impl VM {
             self.check_arity(name, arity, n_args, this)?;
             let mut args = args.clone();
             let var_args_items = args.split_off(var_args_index);
-            let var_args = create::new_tuple(var_args_items);
+            let var_args = new::tuple(var_args_items);
             args.push(var_args);
             Ok(args)
         } else {

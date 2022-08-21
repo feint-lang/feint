@@ -28,8 +28,8 @@ macro_rules! make_meth {
     ( $ty:ty, $name:literal, $params:expr, $func:expr ) => {(
         $name,
 
-        create::new_builtin_func(
-            $name, $params, |this_opt: This, args: Args, vm: &mut VM| {
+        new::builtin_func(
+            $name, None, $params, |this_opt: This, args: Args, vm: &mut VM| {
                 if this_opt.is_none() {
                     return Err(RuntimeErr::type_err(format!(
                         "Method {}.{}() expected receiver", stringify!($ty), $name,

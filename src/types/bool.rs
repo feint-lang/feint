@@ -6,7 +6,7 @@ use once_cell::sync::Lazy;
 
 use crate::vm::{RuntimeBoolResult, RuntimeErr};
 
-use super::create;
+use super::new;
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
 use super::class::TYPE_TYPE;
@@ -29,8 +29,8 @@ impl BoolType {
         Self {
             namespace: Namespace::with_entries(&[
                 // Class Attributes
-                ("$name", create::new_str("Bool")),
-                ("$full_name", create::new_str("builtins.Bool")),
+                ("$name", new::str("Bool")),
+                ("$full_name", new::str("builtins.Bool")),
             ]),
         }
     }

@@ -6,7 +6,7 @@ use once_cell::sync::Lazy;
 
 use crate::vm::VM;
 
-use super::create;
+use super::new;
 use super::result::{Args, CallResult, Params, This};
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
@@ -33,8 +33,8 @@ impl BuiltinFuncType {
         Self {
             namespace: Namespace::with_entries(&[
                 // Class Attributes
-                ("$name", create::new_str("BuiltinFunc")),
-                ("$full_name", create::new_str("builtins.BuiltinFunc")),
+                ("$name", new::str("BuiltinFunc")),
+                ("$full_name", new::str("builtins.BuiltinFunc")),
             ]),
         }
     }
@@ -93,7 +93,7 @@ impl BuiltinFunc {
         Self {
             namespace: Namespace::with_entries(&[
                 // Instance Attributes
-                ("$name", create::new_str(name.as_str())),
+                ("$name", new::str(name.as_str())),
             ]),
             name,
             params,

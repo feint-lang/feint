@@ -6,7 +6,7 @@ use once_cell::sync::Lazy;
 
 use crate::vm::RuntimeBoolResult;
 
-use super::create;
+use super::new;
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
 use super::class::TYPE_TYPE;
@@ -29,8 +29,8 @@ impl CellType {
         Self {
             namespace: Namespace::with_entries(&[
                 // Class Attributes
-                ("$name", create::new_str("Cell")),
-                ("$full_name", create::new_str("builtins.Cell")),
+                ("$name", new::str("Cell")),
+                ("$full_name", new::str("builtins.Cell")),
             ]),
         }
     }
@@ -83,7 +83,7 @@ unsafe impl Sync for Cell {}
 
 impl Cell {
     pub fn new() -> Self {
-        Self { namespace: Namespace::new(), value: create::new_nil() }
+        Self { namespace: Namespace::new(), value: new::nil() }
     }
 
     pub fn with_value(value: ObjectRef) -> Self {

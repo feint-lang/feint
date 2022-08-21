@@ -2,7 +2,7 @@ use std::collections::hash_map;
 use std::slice;
 
 use crate::modules;
-use crate::types::{create, Namespace, ObjectRef, ObjectTrait};
+use crate::types::{new, Namespace, ObjectRef, ObjectTrait};
 
 use super::constants::Constants;
 use super::result::{RuntimeErr, RuntimeResult};
@@ -30,11 +30,11 @@ impl RuntimeContext {
 
     fn init(&mut self) {
         // Add singleton constants.
-        self.add_global_const(create::new_nil()); // 0
-        self.add_global_const(create::new_true()); // 1
-        self.add_global_const(create::new_false()); // 2
+        self.add_global_const(new::nil()); // 0
+        self.add_global_const(new::true_()); // 1
+        self.add_global_const(new::false_()); // 2
 
-        for int in create::SHARED_INTS.iter() {
+        for int in new::SHARED_INTS.iter() {
             self.add_global_const(int.clone());
         }
 
@@ -116,7 +116,7 @@ impl RuntimeContext {
     /// the var in the current namespace and sets its initial value to
     /// nil.
     pub fn declare_var(&mut self, name: &str) {
-        let initial = create::new_nil();
+        let initial = new::nil();
         let namespace = self.current_ns_mut();
         namespace.add_obj(name, initial);
     }

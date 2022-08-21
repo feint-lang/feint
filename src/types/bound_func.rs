@@ -4,7 +4,7 @@ use std::sync::{Arc, RwLock};
 
 use once_cell::sync::Lazy;
 
-use super::create;
+use super::new;
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
 use super::class::TYPE_TYPE;
@@ -27,8 +27,8 @@ impl BoundFuncType {
         Self {
             namespace: Namespace::with_entries(&[
                 // Class Attributes
-                ("$name", create::new_str("BoundFunc")),
-                ("$full_name", create::new_str("builtins.BoundFunc")),
+                ("$name", new::str("BoundFunc")),
+                ("$full_name", new::str("builtins.BoundFunc")),
             ]),
         }
     }

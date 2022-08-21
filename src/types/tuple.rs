@@ -7,8 +7,8 @@ use once_cell::sync::Lazy;
 
 use crate::vm::{RuntimeErr, VM};
 
-use super::create;
 use super::meth::{make_meth, use_this};
+use super::new;
 use super::result::{Args, GetAttrResult, This};
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
@@ -29,18 +29,18 @@ impl TupleType {
         Self {
             namespace: Namespace::with_entries(&[
                 // Class Attributes
-                ("$name", create::new_str("Tuple")),
-                ("$full_name", create::new_str("builtins.Tuple")),
+                ("$name", new::str("Tuple")),
+                ("$full_name", new::str("builtins.Tuple")),
                 // Instance Methods
                 make_meth!(Tuple, "length", &[], |this: ObjectRef, _, _| {
                     let this = use_this!(this);
                     let this = this.down_to_tuple().unwrap();
-                    Ok(create::new_int(this.len()))
+                    Ok(new::int(this.len()))
                 }),
                 make_meth!(Tuple, "is_empty", &[], |this: ObjectRef, _, _| {
                     let this = use_this!(this);
                     let this = this.down_to_tuple().unwrap();
-                    Ok(create::new_bool(this.is_empty()))
+                    Ok(new::bool(this.is_empty()))
                 }),
                 make_meth!(
                     Tuple,
@@ -53,13 +53,10 @@ impl TupleType {
                         let map_fn = &args[0];
                         let mut results = vec![];
                         for (i, item) in items.iter().enumerate() {
-                            vm.call(
-                                map_fn.clone(),
-                                vec![item.clone(), create::new_int(i)],
-                            )?;
+                            vm.call(map_fn.clone(), vec![item.clone(), new::int(i)])?;
                             results.push(vm.pop_obj()?);
                         }
-                        Ok(create::new_tuple(results))
+                        Ok(new::tuple(results))
                     }
                 ),
             ]),

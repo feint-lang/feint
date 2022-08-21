@@ -6,8 +6,8 @@ use once_cell::sync::Lazy;
 
 use crate::vm::{RuntimeErr, RuntimeResult, VM};
 
-use super::create;
 use super::meth::{make_meth, use_arg, use_arg_usize, use_this};
+use super::new;
 use super::result::{Args, GetAttrResult, This};
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
@@ -28,18 +28,18 @@ impl ListType {
         Self {
             namespace: Namespace::with_entries(&[
                 // Class Attributes
-                ("$name", create::new_str("List")),
-                ("$full_name", create::new_str("builtins.List")),
+                ("$name", new::str("List")),
+                ("$full_name", new::str("builtins.List")),
                 // Instance Methods
                 make_meth!(List, "length", &[], |this: ObjectRef, _, _| {
                     let this = use_this!(this);
                     let this = this.down_to_list().unwrap();
-                    Ok(create::new_int(this.len()))
+                    Ok(new::int(this.len()))
                 }),
                 make_meth!(List, "is_empty", &[], |this: ObjectRef, _, _| {
                     let this = use_this!(this);
                     let this = this.down_to_list().unwrap();
-                    Ok(create::new_bool(this.len() == 0))
+                    Ok(new::bool(this.len() == 0))
                 }),
                 // Push item and return it.
                 make_meth!(
@@ -72,7 +72,7 @@ impl ListType {
                     let this = this.down_to_list().unwrap();
                     let result = match this.pop() {
                         Some(obj) => obj,
-                        None => create::new_nil(),
+                        None => new::nil(),
                     };
                     Ok(result)
                 }),
@@ -87,7 +87,7 @@ impl ListType {
                         let index = use_arg_usize!(arg);
                         let result = match this.get(index) {
                             Some(obj) => obj,
-                            None => create::new_nil(),
+                            None => new::nil(),
                         };
                         Ok(result)
                     }
@@ -103,13 +103,10 @@ impl ListType {
                         let map_fn = &args[0];
                         let mut results = vec![];
                         for (i, item) in items.iter().enumerate() {
-                            vm.call(
-                                map_fn.clone(),
-                                vec![item.clone(), create::new_int(i)],
-                            )?;
+                            vm.call(map_fn.clone(), vec![item.clone(), new::int(i)])?;
                             results.push(vm.pop_obj()?);
                         }
-                        Ok(create::new_tuple(results))
+                        Ok(new::tuple(results))
                     }
                 ),
             ]),

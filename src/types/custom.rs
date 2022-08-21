@@ -2,7 +2,7 @@ use std::any::Any;
 use std::fmt;
 use std::sync::{Arc, RwLock};
 
-use super::create;
+use super::new;
 use super::result::SetAttrResult;
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
@@ -25,8 +25,8 @@ impl CustomType {
         Self {
             namespace: Namespace::with_entries(&[
                 // Class Attributes
-                ("$name", create::new_str(name.as_str())),
-                ("$full_name", create::new_str(full_name.as_str())),
+                ("$name", new::str(name.as_str())),
+                ("$full_name", new::str(full_name.as_str())),
             ]),
             module,
             name,

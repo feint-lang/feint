@@ -9,8 +9,8 @@ use once_cell::sync::Lazy;
 
 use crate::vm::{RuntimeBoolResult, RuntimeErr, RuntimeObjResult, VM};
 
-use super::create;
 use super::meth::{make_meth, use_arg};
+use super::new;
 use super::result::{Args, This};
 use super::util::{eq_int_float, gt_int_float, lt_int_float};
 
@@ -35,17 +35,17 @@ impl IntType {
         Self {
             namespace: Namespace::with_entries(&[
                 // Class Attributes
-                ("$name", create::new_str("Int")),
-                ("$full_name", create::new_str("builtins.Int")),
+                ("$name", new::str("Int")),
+                ("$full_name", new::str("builtins.Int")),
                 // Class Methods
                 make_meth!(IntType, "new", &["value"], |_, args: Args, _| {
                     let arg = use_arg!(args, 0);
                     let int = if let Some(val) = arg.get_int_val() {
-                        create::new_int(val.clone())
+                        new::int(val.clone())
                     } else if let Some(val) = arg.get_float_val() {
-                        create::new_int(BigInt::from_f64(*val).unwrap())
+                        new::int(BigInt::from_f64(*val).unwrap())
                     } else if let Some(val) = arg.get_str_val() {
-                        create::new_int_from_string(val)
+                        new::int_from_string(val)
                     } else {
                         let message =
                             format!("Int.new() expected number or string; got {arg}");
@@ -101,12 +101,12 @@ macro_rules! make_op {
             if let Some(rhs) = rhs.down_to_int() {
                 // XXX: Return Int
                 let value = self.value() $op rhs.value();
-                let value = create::new_int(value);
+                let value = new::int(value);
                 Ok(value)
             } else if let Some(rhs) = rhs.down_to_float() {
                 // XXX: Return Float
                 let value = self.value().to_f64().unwrap() $op rhs.value();
-                let value = create::new_float(value);
+                let value = new::float(value);
                 Ok(value)
             } else {
                 Err(RuntimeErr::type_err(format!($message, rhs.class().read().unwrap())))
@@ -170,7 +170,7 @@ impl ObjectTrait for Int {
     }
 
     fn negate(&self) -> RuntimeObjResult {
-        Ok(create::new_int(-self.value.clone()))
+        Ok(new::int(-self.value.clone()))
     }
 
     fn is_equal(&self, rhs: &dyn ObjectTrait) -> bool {
@@ -217,14 +217,14 @@ impl ObjectTrait for Int {
             let base = self.value();
             let exp = rhs.value().to_u32().unwrap();
             let value = base.pow(exp);
-            let value = create::new_int(value);
+            let value = new::int(value);
             Ok(value)
         } else if let Some(rhs) = rhs.down_to_float() {
             // XXX: Return Float
             let base = self.value().to_f64().unwrap();
             let exp = *rhs.value();
             let value = base.powf(exp);
-            let value = create::new_float(value);
+            let value = new::float(value);
             Ok(value)
         } else {
             Err(RuntimeErr::type_err(format!(
@@ -243,7 +243,7 @@ impl ObjectTrait for Int {
     // Int division *always* returns a Float
     fn div(&self, rhs: &dyn ObjectTrait) -> RuntimeObjResult {
         let value = self.div_f64(rhs)?;
-        let value = create::new_float(value);
+        let value = new::float(value);
         Ok(value)
     }
 
@@ -251,7 +251,7 @@ impl ObjectTrait for Int {
     fn floor_div(&self, rhs: &dyn ObjectTrait) -> RuntimeObjResult {
         let value = self.div_f64(rhs)?;
         let value = BigInt::from_f64(value).unwrap();
-        let value = create::new_int(value);
+        let value = new::int(value);
         Ok(value)
     }
 }

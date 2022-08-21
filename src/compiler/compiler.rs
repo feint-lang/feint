@@ -5,7 +5,7 @@ use num_traits::ToPrimitive;
 
 use crate::ast;
 use crate::modules::BUILTINS;
-use crate::types::{create, ObjectRef};
+use crate::types::{new, ObjectRef};
 use crate::util::{
     BinaryOperator, CompareOperator, InplaceOperator, Location, Stack,
     UnaryCompareOperator, UnaryOperator,
@@ -76,7 +76,7 @@ impl Compiler {
         if has_main {
             let argc = argv.len();
             for arg in argv {
-                visitor.add_const(create::new_str(arg));
+                visitor.add_const(new::str(arg));
             }
             visitor.push(Inst::LoadVar("$main".to_string()));
             visitor.push(Inst::Call(argc));
@@ -255,7 +255,7 @@ impl Compiler {
 
         // END Inner Functions -----------------------------------------
 
-        let func = create::new_func(func_name, params, visitor.code);
+        let func = new::func(func_name, params, visitor.code);
         let parent_visitor = &mut self.visitor_stack.peek_mut().unwrap().0;
         let const_index = parent_visitor.code.add_const(func);
 
@@ -545,18 +545,18 @@ impl Visitor {
             Kind::Bool(false) => self.push_false(),
             Kind::Ellipsis => self.push_nil(),
             Kind::Int(value) => {
-                if create::in_shared_int_range(&value) {
+                if new::in_shared_int_range(&value) {
                     let index = value.to_usize().unwrap() + 3;
                     self.push(Inst::LoadGlobalConst(index))
                 } else {
-                    self.add_const(create::new_int(value));
+                    self.add_const(new::int(value));
                 }
             }
             Kind::Float(value) => {
-                self.add_const(create::new_float(value));
+                self.add_const(new::float(value));
             }
             Kind::String(value) => {
-                self.add_const(create::new_str(value));
+                self.add_const(new::str(value));
             }
         }
         Ok(())

@@ -6,8 +6,8 @@ use once_cell::sync::Lazy;
 
 use crate::vm::{RuntimeBoolResult, RuntimeErr, RuntimeObjResult, VM};
 
-use super::create;
 use super::meth::{make_meth, use_arg, use_arg_str, use_this};
+use super::new;
 use super::result::{Args, This};
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
@@ -28,8 +28,8 @@ impl StrType {
         Self {
             namespace: Namespace::with_entries(&[
                 // Class Attributes
-                ("$name", create::new_str("Str")),
-                ("$full_name", create::new_str("builtins.Str")),
+                ("$name", new::str("Str")),
+                ("$full_name", new::str("builtins.Str")),
                 make_meth!(
                     Str,
                     "starts_with",
@@ -39,7 +39,7 @@ impl StrType {
                         let this = this.down_to_str().unwrap();
                         let arg = use_arg!(args, 0);
                         let prefix = use_arg_str!(arg);
-                        Ok(create::new_bool(this.value.starts_with(prefix)))
+                        Ok(new::bool(this.value.starts_with(prefix)))
                     }
                 ),
             ]),
@@ -97,7 +97,7 @@ impl Str {
         Self {
             namespace: Namespace::with_entries(&[
                 // Instance Attributes
-                ("len", create::new_int(value.len())),
+                ("len", new::int(value.len())),
             ]),
             value,
         }
@@ -143,7 +143,7 @@ impl ObjectTrait for Str {
             let mut value = String::with_capacity(a.len() + b.len());
             value.push_str(a);
             value.push_str(b);
-            let value = create::new_str(value);
+            let value = new::str(value);
             Ok(value)
         } else {
             Err(RuntimeErr::type_err(format!(

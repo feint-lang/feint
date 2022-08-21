@@ -1,4 +1,4 @@
-use crate::types::create;
+use crate::types::new;
 use crate::util::BinaryOperator;
 use crate::vm::*;
 
@@ -6,8 +6,8 @@ use crate::vm::*;
 fn execute_simple_program() {
     let mut vm = VM::default();
     let mut code = Code::new();
-    let i = code.add_const(create::new_int(1));
-    let j = code.add_const(create::new_int(2));
+    let i = code.add_const(new::int(1));
+    let j = code.add_const(new::int(2));
     code.push_inst(Inst::LoadConst(i));
     code.push_inst(Inst::LoadConst(j));
     code.push_inst(Inst::BinaryOp(BinaryOperator::Add));
@@ -20,7 +20,7 @@ fn execute_simple_program() {
 #[test]
 fn test_add_get_global_const() {
     let mut ctx = RuntimeContext::new();
-    let int = create::new_int(0);
+    let int = new::int(0);
     let int_copy = int.clone();
     let index = ctx.add_global_const(int.clone());
     let retrieved = ctx.get_global_const(index).unwrap();

@@ -7,8 +7,8 @@ use once_cell::sync::Lazy;
 
 use crate::vm::{RuntimeBoolResult, RuntimeErr, RuntimeObjResult, VM};
 
-use super::create;
 use super::meth::{make_meth, use_arg};
+use super::new;
 use super::result::{Args, This};
 use super::util::{eq_int_float, gt_int_float, lt_int_float};
 
@@ -33,17 +33,17 @@ impl FloatType {
         Self {
             namespace: Namespace::with_entries(&[
                 // Class Attributes
-                ("$name", create::new_str("Float")),
-                ("$full_name", create::new_str("builtins.Float")),
+                ("$name", new::str("Float")),
+                ("$full_name", new::str("builtins.Float")),
                 // Class Methods
                 make_meth!(FloatType, "new", &["value"], |_, args: Args, _| {
                     let arg = use_arg!(args, 0);
                     let float = if let Some(val) = arg.get_float_val() {
-                        create::new_float(*val)
+                        new::float(*val)
                     } else if let Some(val) = arg.get_int_val() {
-                        create::new_float(val.to_f64().unwrap())
+                        new::float(val.to_f64().unwrap())
                     } else if let Some(val) = arg.get_str_val() {
-                        create::new_float_from_string(val)
+                        new::float_from_string(val)
                     } else {
                         let message =
                             format!("Float new expected string or float; got {arg}");
@@ -107,7 +107,7 @@ macro_rules! make_op {
             if $trunc {
                 value = value.trunc();
             }
-            let value = create::new_float(value);
+            let value = new::float(value);
             Ok(value)
         }
     };
@@ -152,7 +152,7 @@ impl ObjectTrait for Float {
     }
 
     fn negate(&self) -> RuntimeObjResult {
-        Ok(create::new_float(-*self.value()))
+        Ok(new::float(-*self.value()))
     }
 
     fn is_equal(&self, rhs: &dyn ObjectTrait) -> bool {
@@ -206,7 +206,7 @@ impl ObjectTrait for Float {
             )));
         };
         let value = self.value().powf(exp);
-        let value = create::new_float(value);
+        let value = new::float(value);
         Ok(value)
     }
 
