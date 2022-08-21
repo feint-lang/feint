@@ -146,6 +146,9 @@ impl<'a> Executor<'a> {
             log::trace!("END: disassemble code ======================");
             Ok(VMState::Halted(0))
         } else {
+            if let Err(err) = modules::add_system_module_to_system() {
+                return Err(ExeErr::new(ExeErrKind::RuntimeErr(err.kind)));
+            }
             match modules::add_module("$main", code) {
                 Ok(main_module) => {
                     let main_module = main_module.read().unwrap();

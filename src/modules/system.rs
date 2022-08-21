@@ -4,15 +4,15 @@ use std::sync::{Arc, RwLock};
 use once_cell::sync::Lazy;
 
 use crate::types::{new, Module, Namespace, ObjectTrait};
-use crate::vm::{Code, RuntimeErr, RuntimeObjResult};
+use crate::vm::{Code, RuntimeErr, RuntimeObjResult, RuntimeResult};
 
 use super::builtins::BUILTINS;
 use super::file::FILE;
 
 pub static SYSTEM: Lazy<new::obj_ref_t!(Module)> = Lazy::new(|| {
     let modules = new::map(vec![
-        ("builtins".to_string(), BUILTINS.clone()),
-        ("file".to_string(), FILE.clone()),
+        ("builtins".to_owned(), BUILTINS.clone()),
+        ("file".to_owned(), FILE.clone()),
     ]);
 
     new::builtin_module(
@@ -20,6 +20,17 @@ pub static SYSTEM: Lazy<new::obj_ref_t!(Module)> = Lazy::new(|| {
         Namespace::with_entries(&[("$name", new::str("system")), ("modules", modules)]),
     )
 });
+
+/// Add system module to system.modules. This has to be done after
+/// `SYSTEM` is created at some point during startup.
+pub fn add_system_module_to_system() -> RuntimeResult {
+    let system = SYSTEM.read().unwrap();
+    let modules = system.get_attr("modules")?;
+    let modules = modules.write().unwrap();
+    let modules = modules.down_to_map().expect("Expected system.modules to be a Map");
+    modules.add("system".to_owned(), SYSTEM.clone());
+    Ok(())
+}
 
 /// Add a module to system.modules.
 pub fn add_module(name: &str, code: Code) -> RuntimeObjResult {
