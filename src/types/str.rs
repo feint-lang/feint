@@ -22,9 +22,6 @@ pub static STR_TYPE: Lazy<new::obj_ref_t!(StrType)> = Lazy::new(|| {
     let mut class = type_ref.write().unwrap();
 
     class.ns_mut().add_entries(&[
-        // Class Attributes
-        ("$name", new::str("Str")),
-        ("$full_name", new::str("builtins.Str")),
         // Instance Methods
         gen::meth!("starts_with", type_ref, &["prefix"], |this, args, _| {
             let this = this.read().unwrap();

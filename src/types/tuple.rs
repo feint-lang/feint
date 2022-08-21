@@ -23,9 +23,6 @@ pub static TUPLE_TYPE: Lazy<new::obj_ref_t!(TupleType)> = Lazy::new(|| {
     let mut class = type_ref.write().unwrap();
 
     class.ns_mut().add_entries(&[
-        // Class Attributes
-        ("$name", new::str("Tuple")),
-        ("$full_name", new::str("builtins.Tuple")),
         // Instance Methods
         gen::meth!("length", type_ref, &[], |this, _, _| {
             let this = this.read().unwrap();

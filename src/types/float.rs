@@ -25,9 +25,6 @@ pub static FLOAT_TYPE: Lazy<new::obj_ref_t!(FloatType)> = Lazy::new(|| {
     let mut class = type_ref.write().unwrap();
 
     class.ns_mut().add_entries(&[
-        // Class Attributes
-        ("$name", new::str("Float")),
-        ("$full_name", new::str("builtins.Float")),
         // Class Methods
         gen::meth!("new", type_ref, &["value"], |_, args, _| {
             let arg = gen::use_arg!(args, 0);

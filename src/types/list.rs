@@ -24,9 +24,6 @@ pub static LIST_TYPE: Lazy<new::obj_ref_t!(ListType)> = Lazy::new(|| {
     let mut class = type_ref.write().unwrap();
 
     class.ns_mut().add_entries(&[
-        // Class Attributes
-        ("$name", new::str("List")),
-        ("$full_name", new::str("builtins.List")),
         // Instance Methods
         gen::meth!("length", type_ref, &[], |this, _, _| {
             let this = this.read().unwrap();
