@@ -45,7 +45,7 @@ impl TypeTrait for CellType {
         "builtins.Cell"
     }
 
-    fn namespace(&self) -> &Namespace {
+    fn ns(&self) -> &Namespace {
         &self.namespace
     }
 }
@@ -66,8 +66,12 @@ impl ObjectTrait for CellType {
         TYPE_TYPE.clone()
     }
 
-    fn namespace(&self) -> &Namespace {
+    fn ns(&self) -> &Namespace {
         &self.namespace
+    }
+
+    fn ns_mut(&mut self) -> &mut Namespace {
+        &mut self.namespace
     }
 }
 
@@ -118,8 +122,12 @@ impl ObjectTrait for Cell {
         CELL_TYPE.clone()
     }
 
-    fn namespace(&self) -> &Namespace {
+    fn ns(&self) -> &Namespace {
         &self.namespace
+    }
+
+    fn ns_mut(&mut self) -> &mut Namespace {
+        &mut self.namespace
     }
 
     fn bool_val(&self) -> RuntimeBoolResult {

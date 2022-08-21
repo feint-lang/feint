@@ -126,7 +126,7 @@ impl TypeTrait for ListType {
         "builtins.List"
     }
 
-    fn namespace(&self) -> &Namespace {
+    fn ns(&self) -> &Namespace {
         &self.namespace
     }
 }
@@ -147,8 +147,12 @@ impl ObjectTrait for ListType {
         TYPE_TYPE.clone()
     }
 
-    fn namespace(&self) -> &Namespace {
+    fn ns(&self) -> &Namespace {
         &self.namespace
+    }
+
+    fn ns_mut(&mut self) -> &mut Namespace {
+        &mut self.namespace
     }
 }
 
@@ -232,8 +236,12 @@ impl ObjectTrait for List {
         LIST_TYPE.clone()
     }
 
-    fn namespace(&self) -> &Namespace {
+    fn ns(&self) -> &Namespace {
         &self.namespace
+    }
+
+    fn ns_mut(&mut self) -> &mut Namespace {
+        &mut self.namespace
     }
 
     fn get_item(&self, index: usize) -> GetAttrResult {

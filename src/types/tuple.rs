@@ -76,7 +76,7 @@ impl TypeTrait for TupleType {
         "builtins.Tuple"
     }
 
-    fn namespace(&self) -> &Namespace {
+    fn ns(&self) -> &Namespace {
         &self.namespace
     }
 }
@@ -97,8 +97,12 @@ impl ObjectTrait for TupleType {
         TYPE_TYPE.clone()
     }
 
-    fn namespace(&self) -> &Namespace {
+    fn ns(&self) -> &Namespace {
         &self.namespace
+    }
+
+    fn ns_mut(&mut self) -> &mut Namespace {
+        &mut self.namespace
     }
 }
 
@@ -143,8 +147,12 @@ impl ObjectTrait for Tuple {
         TUPLE_TYPE.clone()
     }
 
-    fn namespace(&self) -> &Namespace {
+    fn ns(&self) -> &Namespace {
         &self.namespace
+    }
+
+    fn ns_mut(&mut self) -> &mut Namespace {
+        &mut self.namespace
     }
 
     fn get_item(&self, index: usize) -> GetAttrResult {

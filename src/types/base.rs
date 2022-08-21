@@ -41,7 +41,7 @@ pub type ObjectRef = Arc<RwLock<dyn ObjectTrait>>;
 pub trait TypeTrait {
     fn name(&self) -> &str;
     fn full_name(&self) -> &str;
-    fn namespace(&self) -> &Namespace;
+    fn ns(&self) -> &Namespace;
 
     fn module(&self) -> ObjectRef {
         modules::BUILTINS.clone()
@@ -132,7 +132,8 @@ pub trait ObjectTrait {
     fn type_obj(&self) -> ObjectRef;
 
     /// Each object has a namespace that holds its attributes.
-    fn namespace(&self) -> &Namespace;
+    fn ns(&self) -> &Namespace;
+    fn ns_mut(&mut self) -> &mut Namespace;
 
     fn id(&self) -> usize {
         let p = self as *const Self;
@@ -166,8 +167,8 @@ pub trait ObjectTrait {
         if name == "$names" {
             let class = self.class();
             let class = class.read().unwrap();
-            let class_ns = class.namespace();
-            let obj_ns = self.namespace();
+            let class_ns = class.ns();
+            let obj_ns = self.ns();
             let mut names: Vec<String> =
                 class_ns.iter().map(|(n, _)| n).cloned().collect();
             names.extend(obj_ns.iter().map(|(n, _)| n).cloned());
@@ -176,10 +177,10 @@ pub trait ObjectTrait {
             let items = names.iter().map(new::str).collect();
             return Ok(new::tuple(items));
         }
-        if let Some(obj) = self.namespace().get_obj(name) {
+        if let Some(obj) = self.ns().get_obj(name) {
             return Ok(obj);
         }
-        if let Some(obj) = self.type_obj().read().unwrap().namespace().get_obj(name) {
+        if let Some(obj) = self.type_obj().read().unwrap().ns().get_obj(name) {
             return Ok(obj);
         }
         Err(self.attr_does_not_exist(name))

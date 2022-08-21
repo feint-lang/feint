@@ -53,7 +53,7 @@ impl RuntimeContext {
         // scope.
         let builtins = modules::BUILTINS.clone();
         let reader = builtins.read().unwrap();
-        let ns = reader.namespace();
+        let ns = reader.ns();
         for (name, obj) in ns.iter().filter(|(n, _)| !n.starts_with('$')) {
             if let Err(err) = self.declare_and_assign_var(name, (*obj).clone()) {
                 panic!("Could not add alias for builtin object `{name}` to global scope: {err}");

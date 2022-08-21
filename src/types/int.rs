@@ -67,7 +67,7 @@ impl TypeTrait for IntType {
         "builtins.Int"
     }
 
-    fn namespace(&self) -> &Namespace {
+    fn ns(&self) -> &Namespace {
         &self.namespace
     }
 }
@@ -88,8 +88,12 @@ impl ObjectTrait for IntType {
         TYPE_TYPE.clone()
     }
 
-    fn namespace(&self) -> &Namespace {
+    fn ns(&self) -> &Namespace {
         &self.namespace
+    }
+
+    fn ns_mut(&mut self) -> &mut Namespace {
+        &mut self.namespace
     }
 }
 
@@ -165,8 +169,12 @@ impl ObjectTrait for Int {
         INT_TYPE.clone()
     }
 
-    fn namespace(&self) -> &Namespace {
+    fn ns(&self) -> &Namespace {
         &self.namespace
+    }
+
+    fn ns_mut(&mut self) -> &mut Namespace {
+        &mut self.namespace
     }
 
     fn negate(&self) -> RuntimeObjResult {

@@ -47,7 +47,7 @@ impl TypeTrait for CustomType {
         self.full_name.as_str()
     }
 
-    fn namespace(&self) -> &Namespace {
+    fn ns(&self) -> &Namespace {
         &self.namespace
     }
 
@@ -72,8 +72,12 @@ impl ObjectTrait for CustomType {
         TYPE_TYPE.clone()
     }
 
-    fn namespace(&self) -> &Namespace {
+    fn ns(&self) -> &Namespace {
         &self.namespace
+    }
+
+    fn ns_mut(&mut self) -> &mut Namespace {
+        &mut self.namespace
     }
 }
 
@@ -109,8 +113,12 @@ impl ObjectTrait for CustomObj {
         self.class.clone()
     }
 
-    fn namespace(&self) -> &Namespace {
+    fn ns(&self) -> &Namespace {
         &self.namespace
+    }
+
+    fn ns_mut(&mut self) -> &mut Namespace {
+        &mut self.namespace
     }
 
     fn set_attr(&mut self, name: &str, value: ObjectRef) -> SetAttrResult {
@@ -122,7 +130,7 @@ impl ObjectTrait for CustomObj {
         if self.is(rhs) {
             return true;
         }
-        self.namespace.is_equal(rhs.namespace())
+        self.namespace.is_equal(rhs.ns())
     }
 }
 
