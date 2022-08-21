@@ -720,16 +720,28 @@ impl VM {
         } else if let Some(bound_func) = callable.down_to_bound_func() {
             let func_ref = bound_func.func.clone();
             let func_obj = func_ref.read().unwrap();
-            let this = Some(bound_func.this.clone());
+            let this_opt = Some(bound_func.this.clone());
             if let Some(func) = func_obj.down_to_builtin_func() {
                 log::trace!("CALL bound builtin func");
-                self.call_builtin_func(func, this, args)
+                if let Some(expected_type) = func.this_type() {
+                    let expected_type = &*expected_type.read().unwrap();
+                    let this = bound_func.this.read().unwrap();
+                    let this_type = this.type_obj();
+                    let this_type = this_type.read().unwrap();
+                    // class method || instance method
+                    // XXX: Not sure this is the best way to distinguish
+                    //      between class vs instance methods
+                    if !(this.is(expected_type) || this_type.is(expected_type)) {
+                        panic!("Expected this type {expected_type}; got {this_type}");
+                    }
+                }
+                self.call_builtin_func(func, this_opt, args)
             } else if let Some(func) = func_obj.down_to_func() {
                 log::trace!("CALL bound func");
-                self.call_func(func, this, args, None)
+                self.call_func(func, this_opt, args, None)
             } else if callable.is_closure() {
                 log::trace!("CALL bound closure");
-                self.call_closure(func_ref.clone(), this, args)
+                self.call_closure(func_ref.clone(), this_opt, args)
             } else {
                 Err(func_obj.not_callable())
             }

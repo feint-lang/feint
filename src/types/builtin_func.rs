@@ -54,6 +54,10 @@ impl BuiltinFunc {
             func,
         }
     }
+
+    pub fn this_type(&self) -> Option<ObjectRef> {
+        self.this_type.clone()
+    }
 }
 
 impl FuncTrait for BuiltinFunc {
