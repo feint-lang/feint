@@ -12,6 +12,7 @@ use crate::types::builtin_func::BUILTIN_FUNC_TYPE;
 use crate::types::class::TYPE_TYPE;
 use crate::types::closure::CLOSURE_TYPE;
 use crate::types::error::ERROR_TYPE;
+use crate::types::file::FILE_TYPE;
 use crate::types::float::FLOAT_TYPE;
 use crate::types::func::FUNC_TYPE;
 use crate::types::int::INT_TYPE;
@@ -30,6 +31,7 @@ pub static BUILTINS: Lazy<new::obj_ref_t!(Module)> = Lazy::new(|| {
         ("BuiltinFunc", BUILTIN_FUNC_TYPE.clone()),
         ("Closure", CLOSURE_TYPE.clone()),
         ("Error", ERROR_TYPE.clone()),
+        ("File", FILE_TYPE.clone()),
         ("Func", FUNC_TYPE.clone()),
         ("Float", FLOAT_TYPE.clone()),
         ("Int", INT_TYPE.clone()),

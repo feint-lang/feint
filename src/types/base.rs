@@ -20,6 +20,7 @@ use super::class::{Type, TypeType};
 use super::closure::{Closure, ClosureType};
 use super::custom::{CustomObj, CustomType};
 use super::error::{Error, ErrorKind, ErrorType};
+use super::file::{File, FileType};
 use super::float::{Float, FloatType};
 use super::func::{Func, FuncType};
 use super::int::{Int, IntType};
@@ -247,6 +248,7 @@ pub trait ObjectTrait {
     make_type_checker!(is_cell_type, CellType);
     make_type_checker!(is_closure_type, ClosureType);
     make_type_checker!(is_error_type, ErrorType);
+    make_type_checker!(is_file_type, FileType);
     make_type_checker!(is_float_type, FloatType);
     make_type_checker!(is_func_type, FuncType);
     make_type_checker!(is_int_type, IntType);
@@ -264,6 +266,7 @@ pub trait ObjectTrait {
     make_type_checker!(is_cell, Cell);
     make_type_checker!(is_closure, Closure);
     make_type_checker!(is_error, Error);
+    make_type_checker!(is_file, File);
     make_type_checker!(is_float, Float);
     make_type_checker!(is_func, Func);
     make_type_checker!(is_int, Int);
@@ -285,6 +288,7 @@ pub trait ObjectTrait {
     make_down_to!(down_to_cell_type, CellType);
     make_down_to!(down_to_closure_type, ClosureType);
     make_down_to!(down_to_error_type, ErrorType);
+    make_down_to!(down_to_file_type, FileType);
     make_down_to!(down_to_float_type, FloatType);
     make_down_to!(down_to_func_type, FuncType);
     make_down_to!(down_to_list_type, ListType);
@@ -303,6 +307,8 @@ pub trait ObjectTrait {
     make_down_to_mut!(down_to_cell_mut, Cell);
     make_down_to!(down_to_closure, Closure);
     make_down_to!(down_to_error, Error);
+    make_down_to!(down_to_file, File);
+    make_down_to_mut!(down_to_file_mut, File);
     make_down_to!(down_to_float, Float);
     make_down_to!(down_to_func, Func);
     make_down_to!(down_to_int, Int);
@@ -438,6 +444,7 @@ impl fmt::Display for dyn ObjectTrait {
             ClosureType,
             CustomType,
             ErrorType,
+            FileType,
             FloatType,
             FuncType,
             IntType,
@@ -459,6 +466,7 @@ impl fmt::Display for dyn ObjectTrait {
             Closure,
             CustomObj,
             Error,
+            File,
             Float,
             Func,
             Int,
@@ -486,6 +494,7 @@ impl fmt::Debug for dyn ObjectTrait {
             ClosureType,
             CustomType,
             ErrorType,
+            FileType,
             FloatType,
             FuncType,
             IntType,
@@ -507,6 +516,7 @@ impl fmt::Debug for dyn ObjectTrait {
             Closure,
             CustomObj,
             Error,
+            File,
             Float,
             Func,
             Int,

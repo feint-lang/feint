@@ -18,6 +18,7 @@ use super::builtin_func::{BuiltinFn, BuiltinFunc};
 use super::cell::Cell;
 use super::closure::Closure;
 use super::custom::{CustomObj, CustomType};
+use super::file::File;
 use super::float::Float;
 use super::func::Func;
 use super::int::Int;
@@ -118,6 +119,10 @@ pub fn cell_with_value(value: ObjectRef) -> ObjectRef {
 
 pub fn closure(func: ObjectRef, captured: IndexMap<String, ObjectRef>) -> ObjectRef {
     obj_ref!(Closure::new(func, captured))
+}
+
+pub fn file<S: Into<String>>(file_name: S) -> ObjectRef {
+    obj_ref!(File::new(file_name.into()))
 }
 
 pub fn float(value: f64) -> ObjectRef {

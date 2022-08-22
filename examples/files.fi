@@ -1,13 +1,11 @@
-import file
-
 # Read file as text
 print("Read file as text:")
-text = file.read("Cargo.toml")
-print(text)
+file = File.new("Cargo.toml")
+print(file.text())
 
 print()
 
 # Read file as lines (and print the first line)
 print("Read file as lines:")
-lines = file.read_lines("Cargo.toml")
-print(lines)
+file = File.new("Cargo.toml")
+print(file.lines())

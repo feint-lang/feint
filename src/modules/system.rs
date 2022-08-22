@@ -7,13 +7,9 @@ use crate::types::{new, Module, Namespace, ObjectTrait};
 use crate::vm::{Code, RuntimeErr, RuntimeObjResult, RuntimeResult};
 
 use super::builtins::BUILTINS;
-use super::file::FILE;
 
 pub static SYSTEM: Lazy<new::obj_ref_t!(Module)> = Lazy::new(|| {
-    let modules = new::map(vec![
-        ("builtins".to_owned(), BUILTINS.clone()),
-        ("file".to_owned(), FILE.clone()),
-    ]);
+    let modules = new::map(vec![("builtins".to_owned(), BUILTINS.clone())]);
 
     new::builtin_module("system", Namespace::with_entries(&[("modules", modules)]))
 });
