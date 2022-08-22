@@ -1,5 +1,6 @@
-use std::collections::hash_map;
 use std::slice;
+
+use indexmap;
 
 use crate::modules;
 use crate::types::{new, Namespace, ObjectRef, ObjectTrait};
