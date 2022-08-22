@@ -32,7 +32,10 @@ gen::standard_object_impls!(Module);
 
 impl Module {
     pub fn new(name: String, ns: Namespace, code: Code) -> Self {
-        Self { ns, name, code }
+        let name_global = new::str(name.as_str());
+        let mut module = Self { ns, name, code };
+        module.add_global("$name", name_global);
+        module
     }
 
     pub fn name(&self) -> &str {
@@ -40,6 +43,10 @@ impl Module {
     }
 
     pub fn has_name(&self, name: &str) -> bool {
+    pub fn add_global(&mut self, name: &str, val: ObjectRef) {
+        self.ns.add_obj(name, val.clone());
+    }
+
         self.ns.has(name)
     }
 }

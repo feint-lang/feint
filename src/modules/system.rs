@@ -15,10 +15,7 @@ pub static SYSTEM: Lazy<new::obj_ref_t!(Module)> = Lazy::new(|| {
         ("file".to_owned(), FILE.clone()),
     ]);
 
-    new::builtin_module(
-        "system",
-        Namespace::with_entries(&[("$name", new::str("system")), ("modules", modules)]),
-    )
+    new::builtin_module("system", Namespace::with_entries(&[("modules", modules)]))
 });
 
 /// Add system module to system.modules. This has to be done after

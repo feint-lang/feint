@@ -13,7 +13,6 @@ pub static FILE: Lazy<new::obj_ref_t!(Module)> = Lazy::new(|| {
     new::builtin_module(
         "file",
         Namespace::with_entries(&[
-            ("$name", new::str("file")),
             (
                 "read",
                 new::builtin_func("read", None, &["file_name"], |_, args: Args, _| {

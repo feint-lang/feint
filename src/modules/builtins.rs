@@ -4,7 +4,7 @@ use std::sync::{Arc, RwLock};
 use once_cell::sync::Lazy;
 
 use crate::builtin_funcs::get_builtin_func_specs;
-use crate::types::{new, Module, Namespace};
+use crate::types::{new, Module, Namespace, ObjectRef};
 
 use crate::types::bool::BOOL_TYPE;
 use crate::types::bound_func::BOUND_FUNC_TYPE;
@@ -23,8 +23,7 @@ use crate::types::str::STR_TYPE;
 use crate::types::tuple::TUPLE_TYPE;
 
 pub static BUILTINS: Lazy<new::obj_ref_t!(Module)> = Lazy::new(|| {
-    let mut entries = vec![
-        ("$name", new::str("builtins")),
+    let mut entries: Vec<(&str, ObjectRef)> = vec![
         ("Type", TYPE_TYPE.clone()),
         ("Bool", BOOL_TYPE.clone()),
         ("BoundFunc", BOUND_FUNC_TYPE.clone()),
