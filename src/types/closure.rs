@@ -1,8 +1,8 @@
 use std::any::Any;
-use std::collections::HashMap;
 use std::fmt;
 use std::sync::{Arc, RwLock};
 
+use indexmap::IndexMap;
 use once_cell::sync::Lazy;
 
 use super::gen;
@@ -28,13 +28,13 @@ pub struct Closure {
     name: String,
     params: Params,
     pub func: ObjectRef,
-    pub captured: HashMap<String, ObjectRef>,
+    pub captured: IndexMap<String, ObjectRef>,
 }
 
 gen::standard_object_impls!(Closure);
 
 impl Closure {
-    pub fn new(func_ref: ObjectRef, captured: HashMap<String, ObjectRef>) -> Self {
+    pub fn new(func_ref: ObjectRef, captured: IndexMap<String, ObjectRef>) -> Self {
         let func = func_ref.read().unwrap();
         let func = func.down_to_func().unwrap();
         Self {

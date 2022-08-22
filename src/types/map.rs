@@ -1,8 +1,8 @@
 use std::any::Any;
-use std::collections::HashMap;
 use std::fmt;
 use std::sync::{Arc, RwLock};
 
+use indexmap::IndexMap;
 use once_cell::sync::Lazy;
 
 use super::gen;
@@ -23,13 +23,13 @@ pub static MAP_TYPE: Lazy<new::obj_ref_t!(MapType)> =
 
 pub struct Map {
     ns: Namespace,
-    entries: RwLock<HashMap<String, ObjectRef>>,
+    entries: RwLock<IndexMap<String, ObjectRef>>,
 }
 
 gen::standard_object_impls!(Map);
 
 impl Map {
-    pub fn new(entries: HashMap<String, ObjectRef>) -> Self {
+    pub fn new(entries: IndexMap<String, ObjectRef>) -> Self {
         Self { ns: Namespace::new(), entries: RwLock::new(entries) }
     }
 
@@ -57,7 +57,7 @@ impl Map {
         }
     }
 
-    pub fn to_hash_map(&self) -> HashMap<String, ObjectRef> {
+    pub fn to_hash_map(&self) -> IndexMap<String, ObjectRef> {
         self.entries.read().unwrap().clone()
     }
 }

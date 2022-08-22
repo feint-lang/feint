@@ -1,12 +1,12 @@
 //! Type Constructors.
 //!
 //! These constructors simplify the creation system objects.
-use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 use num_bigint::BigInt;
 use num_traits::{FromPrimitive, Num, Signed, ToPrimitive, Zero};
 
+use indexmap::IndexMap;
 use once_cell::sync::Lazy;
 
 use crate::vm::Code;
@@ -116,7 +116,7 @@ pub fn cell_with_value(value: ObjectRef) -> ObjectRef {
     obj_ref!(Cell::with_value(value))
 }
 
-pub fn closure(func: ObjectRef, captured: HashMap<String, ObjectRef>) -> ObjectRef {
+pub fn closure(func: ObjectRef, captured: IndexMap<String, ObjectRef>) -> ObjectRef {
     obj_ref!(Closure::new(func, captured))
 }
 
@@ -163,7 +163,7 @@ pub fn list(items: Vec<ObjectRef>) -> ObjectRef {
 }
 
 pub fn map(entries: Vec<(String, ObjectRef)>) -> ObjectRef {
-    let entries: HashMap<String, ObjectRef> = entries.into_iter().collect();
+    let entries: IndexMap<String, ObjectRef> = entries.into_iter().collect();
     obj_ref!(Map::new(entries))
 }
 
