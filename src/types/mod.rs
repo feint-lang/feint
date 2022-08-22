@@ -6,12 +6,12 @@ pub(crate) use module::Module;
 pub(crate) use ns::Namespace;
 
 // Functions
-pub(crate) use builtin_func::{BuiltinFn, BuiltinFunc};
+pub(crate) use builtin_func::BuiltinFunc;
 pub(crate) use func::Func;
 pub(crate) use func_trait::FuncTrait;
 
 pub(crate) mod new;
-pub(crate) use result::{Args, CallResult, Params, ThisOpt};
+pub(crate) use result::{Args, Params, ThisOpt};
 
 mod base;
 mod func_trait;

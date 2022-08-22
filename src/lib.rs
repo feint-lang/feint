@@ -8,7 +8,6 @@ pub mod run;
 pub mod vm;
 
 mod ast;
-mod builtin_funcs;
 mod compiler;
 mod format;
 mod modules;

@@ -1,18 +1,18 @@
 # Objects are instances of a type
-print("Type of 1:", type_of(1))
-print("ID of 1:", obj_id(1))
+print("Type of 1:", type(1))
+print("ID of 1:", id(1))
 
 # Integers from 0 to 256 are singletons
-print("ID of 1 (same as above):", obj_id(1))
+print("ID of 1 (same as above):", id(1))
 
 # Types are also objects (singletons)
-print("Type of Type:", type_of(Type))
-print("Type of type of Type:", type_of(type_of((Type))))
-print("ID of type:", obj_id(Type))
+print("Type of Type:", type(Type))
+print("Type of type of Type:", type(type((Type))))
+print("ID of type:", id(Type))
 
 # Every object has a unique ID
-print("ID of ID of 1:", obj_id(obj_id(1)))
-print("Type of ID of 1:", type_of(obj_id(1)))
+print("ID of ID of 1:", id(id(1)))
+print("Type of ID of 1:", type(id(1)))
 
 # Create new instances using `new` constructor
 print("Int from '100':", Int.new("100"))
