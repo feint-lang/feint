@@ -42,7 +42,6 @@ impl Compiler {
         &mut self,
         program: ast::Module,
         argv: Vec<&str>,
-        keep_top_on_halt: bool,
     ) -> CompResult {
         let mut visitor = Visitor::for_module("$main");
 
@@ -82,9 +81,7 @@ impl Compiler {
             visitor.push(Inst::Call(argc));
             visitor.push(Inst::HaltTop);
         } else {
-            if !keep_top_on_halt {
-                visitor.push(Inst::Pop);
-            }
+            visitor.push(Inst::Pop);
             visitor.push(Inst::Halt(0));
         }
 
@@ -186,7 +183,7 @@ impl Compiler {
         }
 
         for (addr, name, start, end) in presumed_builtins.into_iter() {
-            if builtins.has_name(name.as_str()) {
+            if builtins.has_global(name.as_str()) {
                 visitor.replace(addr, Inst::LoadVar(name.to_owned()));
             } else {
                 return Err(CompErr::name_not_found(name, start, end));
@@ -610,7 +607,7 @@ impl Visitor {
                         // in an outer scope. If it isn't, that's an error.
                         let found =
                             self.scope_tree.find_var_in_parent(name.as_str()).is_some();
-                        if found || BUILTINS.read().unwrap().has_name(name.as_str()) {
+                        if found || BUILTINS.read().unwrap().has_global(name.as_str()) {
                             self.push(Inst::LoadOuterVar(name));
                         } else {
                             return Err(CompErr::name_not_found(name, start, end));
@@ -628,7 +625,7 @@ impl Visitor {
                 if self.initial_scope_kind == ScopeKind::Module {
                     // When compiling a module, all vars should resolve
                     // at this stage, so this is an error.
-                    if BUILTINS.read().unwrap().has_name(name.as_str()) {
+                    if BUILTINS.read().unwrap().has_global(name.as_str()) {
                         self.push(Inst::LoadVar(name));
                     } else {
                         return Err(CompErr::name_not_found(name, start, end));

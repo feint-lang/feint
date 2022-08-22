@@ -5,7 +5,7 @@ use crate::vm::{RuntimeContext, RuntimeErrKind, VM};
 fn execute(source: &str) -> ExeResult {
     let mut vm = VM::new(RuntimeContext::new(), 16);
     let mut exe = Executor::default(&mut vm);
-    exe.execute_text(source, None)
+    exe.execute_text(source)
 }
 
 #[test]

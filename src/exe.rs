@@ -7,6 +7,7 @@ use crate::modules;
 use crate::parser::{ParseErr, ParseErrKind, Parser};
 use crate::result::{ExeErr, ExeErrKind, ExeResult};
 use crate::scanner::{ScanErr, ScanErrKind, Scanner, Token, TokenWithLocation};
+use crate::types::{Module, ObjectRef};
 use crate::util::{
     source_from_file, source_from_stdin, source_from_text, Location, Source,
 };
@@ -15,35 +16,20 @@ use crate::vm::{Code, RuntimeErr, RuntimeErrKind, VMExeResult, VMState, VM};
 pub struct Executor<'a> {
     pub vm: &'a mut VM,
     incremental: bool,
-    keep_top_on_halt: bool,
     dis: bool,
     debug: bool,
     current_file_name: &'a str,
 }
 
 impl<'a> Executor<'a> {
-    pub fn new(
-        vm: &'a mut VM,
-        incremental: bool,
-        keep_top_on_halt: bool,
-        dis: bool,
-        debug: bool,
-    ) -> Self {
-        Self {
-            vm,
-            incremental,
-            keep_top_on_halt,
-            dis,
-            debug,
-            current_file_name: "<none>",
-        }
+    pub fn new(vm: &'a mut VM, incremental: bool, dis: bool, debug: bool) -> Self {
+        Self { vm, incremental, dis, debug, current_file_name: "<none>" }
     }
 
     pub fn default(vm: &'a mut VM) -> Self {
         Self {
             vm,
             incremental: false,
-            keep_top_on_halt: false,
             dis: false,
             debug: false,
             current_file_name: "<default>",
@@ -72,12 +58,8 @@ impl<'a> Executor<'a> {
     }
 
     /// Execute text.
-    pub fn execute_text(
-        &mut self,
-        text: &str,
-        file_name: Option<&'a str>,
-    ) -> ExeResult {
-        self.current_file_name = file_name.unwrap_or("<text>");
+    pub fn execute_text(&mut self, text: &str) -> ExeResult {
+        self.current_file_name = "<text>";
         let mut source = source_from_text(text);
         self.execute_source(&mut source, vec![])
     }
@@ -88,39 +70,105 @@ impl<'a> Executor<'a> {
         source: &mut Source<T>,
         argv: Vec<&str>,
     ) -> ExeResult {
+        let code = self.compile_source(source, argv)?;
+        if self.dis {
+            let mut disassembler = dis::Disassembler::new();
+            disassembler.disassemble(&code);
+            if self.debug {
+                println!();
+                self.display_stack();
+            }
+            Ok(VMState::Halted(0))
+        } else {
+            if let Err(err) = modules::add_system_module_to_system() {
+                return Err(ExeErr::new(ExeErrKind::RuntimeErr(err.kind)));
+            }
+            match modules::add_module("$main", code) {
+                Ok(main_module) => {
+                    let mut main_module = main_module.write().unwrap();
+                    let main_module = main_module.down_to_mod_mut().unwrap();
+                    self.execute_module(main_module, self.debug, source)
+                }
+                Err(err) => Err(ExeErr::new(ExeErrKind::RuntimeErr(err.kind))),
+            }
+        }
+    }
+
+    pub fn execute_repl(&mut self, text: &str, module: ObjectRef) -> ExeResult {
+        self.current_file_name = "<repl>";
+        let source = &mut source_from_text(text);
+        let code = self.compile_source(source, vec![])?;
+        let mut module = module.write().unwrap();
+        let module = module.down_to_mod_mut().unwrap();
+        module.set_code(code);
+        let result = self.execute_module(module, self.debug, source);
+
+        // Add globals to REPL module namespace.
+        // TODO: Find a better way to do this.
+        for (name, val) in self.vm.ctx.iter_vars() {
+            module.add_global(name, val.clone());
+        }
+
+        result
+    }
+
+    /// Execute a code (a list of instructions).
+    pub fn execute_module<T: BufRead>(
+        &mut self,
+        module: &mut Module,
+        debug: bool,
+        source: &mut Source<T>,
+    ) -> ExeResult {
+        let result = self.vm.execute(module.code());
+        if debug {
+            self.display_stack();
+            self.display_vm_state(&result);
+        }
+        result.map_err(|err| {
+            let start = self.vm.loc().0;
+            let line =
+                source.get_line(start.line).unwrap_or("<source line not available>");
+            self.print_err_line(start.line, line);
+            self.handle_runtime_err(&err);
+            ExeErr::new(ExeErrKind::RuntimeErr(err.kind))
+        })
+    }
+
+    /// Compile source into a `Code` object.
+    fn compile_source<T: BufRead>(
+        &self,
+        source: &mut Source<T>,
+        argv: Vec<&str>,
+    ) -> Result<Code, ExeErr> {
         let scanner = Scanner::new(source);
         let mut parser = Parser::new(scanner);
         let program = match parser.parse() {
             Ok(program) => program,
             Err(err) => {
-                return match err.kind {
-                    ParseErrKind::ScanErr(scan_err) => {
-                        if !self.ignore_scan_err(&scan_err) {
-                            self.print_err_line(
-                                source.line_no,
-                                source.get_current_line().unwrap_or("<none>"),
-                            );
-                            self.handle_scan_err(&scan_err);
-                        }
-                        Err(ExeErr::new(ExeErrKind::ScanErr(scan_err.kind)))
+                return if let ParseErrKind::ScanErr(scan_err) = err.kind {
+                    if !self.ignore_scan_err(&scan_err) {
+                        self.print_err_line(
+                            source.line_no,
+                            source.get_current_line().unwrap_or("<none>"),
+                        );
+                        self.handle_scan_err(&scan_err);
                     }
-                    _ => {
-                        if !self.ignore_parse_err(&err) {
-                            let loc = err.loc();
-                            self.print_err_line(
-                                loc.line,
-                                source.get_line(loc.line).unwrap_or("<none>"),
-                            );
-                            self.handle_parse_err(&err);
-                        }
-                        Err(ExeErr::new(ExeErrKind::ParseErr(err.kind)))
+                    Err(ExeErr::new(ExeErrKind::ScanErr(scan_err.kind)))
+                } else {
+                    if !self.ignore_parse_err(&err) {
+                        let loc = err.loc();
+                        self.print_err_line(
+                            loc.line,
+                            source.get_line(loc.line).unwrap_or("<none>"),
+                        );
+                        self.handle_parse_err(&err);
                     }
+                    Err(ExeErr::new(ExeErrKind::ParseErr(err.kind)))
                 };
             }
         };
-
         let mut compiler = Compiler::new();
-        let code = match compiler.compile_script(program, argv, self.keep_top_on_halt) {
+        let code = match compiler.compile_script(program, argv) {
             Ok(code) => code,
             Err(err) => {
                 if !self.ignore_comp_err(&err) {
@@ -134,55 +182,7 @@ impl<'a> Executor<'a> {
                 return Err(ExeErr::new(ExeErrKind::CompErr(err.kind)));
             }
         };
-
-        if self.dis {
-            log::trace!("BEGIN: disassemble code ====================");
-            let mut disassembler = dis::Disassembler::new();
-            disassembler.disassemble(&code);
-            if self.debug {
-                println!();
-                self.display_stack();
-            }
-            log::trace!("END: disassemble code ======================");
-            Ok(VMState::Halted(0))
-        } else {
-            if let Err(err) = modules::add_system_module_to_system() {
-                return Err(ExeErr::new(ExeErrKind::RuntimeErr(err.kind)));
-            }
-            match modules::add_module("$main", code) {
-                Ok(main_module) => {
-                    let main_module = main_module.read().unwrap();
-                    let main_module = main_module.down_to_mod().unwrap();
-                    self.execute_code(&main_module.code, self.debug, source)
-                }
-                Err(err) => Err(ExeErr::new(ExeErrKind::RuntimeErr(err.kind))),
-            }
-        }
-    }
-
-    /// Execute a code (a list of instructions).
-    pub fn execute_code<T: BufRead>(
-        &mut self,
-        code: &Code,
-        debug: bool,
-        source: &mut Source<T>,
-    ) -> ExeResult {
-        log::trace!("BEGIN: execute code ============================");
-        let result = self.vm.execute(code);
-        if debug {
-            self.display_stack();
-            self.display_vm_state(&result);
-        }
-        let result = result.map_err(|err| {
-            let start = self.vm.loc().0;
-            let line =
-                source.get_line(start.line).unwrap_or("<source line not available>");
-            self.print_err_line(start.line, line);
-            self.handle_runtime_err(&err);
-            ExeErr::new(ExeErrKind::RuntimeErr(err.kind))
-        });
-        log::trace!("END: execute code ==============================");
-        result
+        Ok(code)
     }
 
     fn display_stack(&self) {

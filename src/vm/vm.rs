@@ -57,7 +57,7 @@ impl CallFrame {
 }
 
 pub struct VM {
-    ctx: RuntimeContext,
+    pub(crate) ctx: RuntimeContext,
     // The scope stack contains pointers into the value stack. When a
     // scope is entered, the current, pre-scope stack position is
     // recorded. When a scope is exited, its corresponding pointer is

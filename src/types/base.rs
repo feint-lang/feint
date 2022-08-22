@@ -79,6 +79,15 @@ macro_rules! make_down_to {
     };
 }
 
+/// Create associated function to downcast from object ref to mut impl.
+macro_rules! make_down_to_mut {
+    ( $func:ident, $ty:ty) => {
+        fn $func(&mut self) -> Option<&mut $ty> {
+            self.as_any_mut().downcast_mut::<$ty>()
+        }
+    };
+}
+
 /// Create associated function to extract value from object. This is
 /// used only for types that have a simple inner value that's exposed
 /// through a `value()` method.
@@ -291,6 +300,7 @@ pub trait ObjectTrait {
     make_down_to!(down_to_bound_func, BoundFunc);
     make_down_to!(down_to_builtin_func, BuiltinFunc);
     make_down_to!(down_to_cell, Cell);
+    make_down_to_mut!(down_to_cell_mut, Cell);
     make_down_to!(down_to_closure, Closure);
     make_down_to!(down_to_error, Error);
     make_down_to!(down_to_float, Float);
@@ -299,13 +309,10 @@ pub trait ObjectTrait {
     make_down_to!(down_to_list, List);
     make_down_to!(down_to_map, Map);
     make_down_to!(down_to_mod, Module);
+    make_down_to_mut!(down_to_mod_mut, Module);
     make_down_to!(down_to_nil, Nil);
     make_down_to!(down_to_str, Str);
     make_down_to!(down_to_tuple, Tuple);
-
-    fn down_to_cell_mut(&mut self) -> Option<&mut Cell> {
-        self.as_any_mut().downcast_mut::<Cell>()
-    }
 
     // Value extractors ------------------------------------------------
     //

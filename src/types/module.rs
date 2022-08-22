@@ -25,7 +25,7 @@ pub static MODULE_TYPE: Lazy<new::obj_ref_t!(ModuleType)> =
 pub struct Module {
     name: String,
     ns: Namespace,
-    pub code: Code,
+    code: Code,
 }
 
 gen::standard_object_impls!(Module);
@@ -42,12 +42,29 @@ impl Module {
         self.name.as_str()
     }
 
-    pub fn has_name(&self, name: &str) -> bool {
     pub fn add_global(&mut self, name: &str, val: ObjectRef) {
         self.ns.add_obj(name, val.clone());
     }
 
+    pub fn get_global(&self, name: &str) -> Option<ObjectRef> {
+        self.ns.get_obj(name)
+    }
+
+    pub fn get_last_added_global(&self) -> ObjectRef {
+        let (_, obj) = self.ns.get_last_obj().unwrap();
+        obj.clone()
+    }
+
+    pub fn has_global(&self, name: &str) -> bool {
         self.ns.has(name)
+    }
+
+    pub fn code(&self) -> &Code {
+        &self.code
+    }
+
+    pub fn set_code(&mut self, code: Code) {
+        self.code = code;
     }
 }
 

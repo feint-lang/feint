@@ -5,34 +5,45 @@ use rustyline::config::Configurer;
 use rustyline::error::ReadlineError;
 
 use crate::exe::Executor;
+use crate::modules;
 use crate::parser::ParseErrKind;
 use crate::result::{ExeErr, ExeErrKind, ExitResult};
 use crate::scanner::ScanErrKind;
-use crate::util::source_from_text;
-use crate::vm::{Code, Inst, RuntimeContext, VMState, VM};
+use crate::types::{ObjectRef, ObjectTrait};
+use crate::vm::{Code, RuntimeContext, VMState, VM};
 
 /// Run FeInt REPL until user exits.
 pub fn run(history_path: Option<&Path>, dis: bool, debug: bool) -> ExitResult {
     let mut vm = VM::new(RuntimeContext::new(), 256);
     vm.install_sigint_handler();
-    let executor = Executor::new(&mut vm, true, true, dis, debug);
-    let mut repl = Repl::new(history_path, executor);
+    let executor = Executor::new(&mut vm, true, dis, debug);
+    let module = if let Ok(module) = modules::add_module("$repl", Code::new()) {
+        module
+    } else {
+        panic!("Could not add $repl module");
+    };
+    let mut repl = Repl::new(history_path, executor, module);
     repl.run()
 }
 
-pub(crate) struct Repl<'a> {
+pub struct Repl<'a> {
     reader: rustyline::Editor<()>,
     history_path: Option<&'a Path>,
     executor: Executor<'a>,
+    module: ObjectRef,
 }
 
 impl<'a> Repl<'a> {
-    pub(crate) fn new(history_path: Option<&'a Path>, executor: Executor<'a>) -> Self {
+    pub fn new(
+        history_path: Option<&'a Path>,
+        executor: Executor<'a>,
+        module: ObjectRef,
+    ) -> Self {
         let mut reader =
             rustyline::Editor::<()>::new().expect("Could initialize readline");
         reader.set_indent_size(4);
         reader.set_tab_stop(4);
-        Repl { reader, history_path, executor }
+        Repl { reader, history_path, executor, module }
     }
 
     fn run(&mut self) -> ExitResult {
@@ -96,7 +107,7 @@ impl<'a> Repl<'a> {
     /// Evaluate text. Returns None to indicate to the main loop to
     /// continue reading and evaluating input. Returns some result to
     /// indicate to the main loop to exit.
-    pub(crate) fn eval(&mut self, text: &str, no_continue: bool) -> Option<ExitResult> {
+    pub fn eval(&mut self, text: &str, no_continue: bool) -> Option<ExitResult> {
         self.add_history_entry(text);
 
         let result = match text.trim() {
@@ -121,6 +132,18 @@ impl<'a> Repl<'a> {
                 self.executor.vm.display_stack();
                 return None;
             }
+            ".globals" => {
+                let module = self.module.read().unwrap();
+                let module = module.down_to_mod().unwrap();
+                eprintln!("{:=>72}", "");
+                eprintln!("GLOBALS for module {:?} ", module.name());
+                eprintln!("{:->72}", "");
+                for (name, val) in module.ns().iter() {
+                    println!("{name} = {:?}", &*val.read().unwrap());
+                }
+                eprintln!("{:=>72}", "");
+                return None;
+            }
             ".emacs" => {
                 self.reader.set_edit_mode(rustyline::config::EditMode::Emacs);
                 return None;
@@ -129,37 +152,31 @@ impl<'a> Repl<'a> {
                 self.reader.set_edit_mode(rustyline::config::EditMode::Vi);
                 return None;
             }
-            _ => self.executor.execute_text(text, Some("<repl>")),
+            _ => {
+                let module_guard = self.module.read().unwrap();
+                let module = module_guard.down_to_mod().unwrap();
+                if let Some(obj_ref) = module.get_global(text) {
+                    self.print(obj_ref);
+                    return None;
+                } else {
+                    drop(module_guard); // prevent deadlock
+                    self.executor.execute_repl(text, self.module.clone())
+                }
+            }
         };
 
         if let Ok(vm_state) = result {
-            // Assign _ to value at top of stack
-            match self.executor.vm.peek_obj() {
-                Ok(val_ref) => {
-                    // Print the result if it's not nil
-                    let val = &*val_ref.read().unwrap();
-                    log::trace!("GOT OBJ: {val}");
-                    if !val.is_nil() {
-                        eprintln!("{val:?}");
-                    }
-                    // Assign result to _
-                    let var = "_";
-                    let code = Code::with_chunk(vec![
-                        Inst::DeclareVar(var.to_owned()),
-                        Inst::AssignVar(var.to_owned()),
-                        Inst::Pop,
-                    ]);
-                    let source_text = format!("_ = {}", val);
-                    let mut source = source_from_text(source_text.as_str());
-                    let result = self.executor.execute_code(&code, false, &mut source);
-                    if let Err(err) = result {
-                        eprintln!("ERROR: Could not assign or print _:\n{err:?}");
-                    }
-                }
-                Err(err) => {
-                    eprintln!("ERROR: {err}");
-                }
-            }
+            let module_guard = self.module.read().unwrap();
+            let module = module_guard.down_to_mod().unwrap();
+            let val = module.get_last_added_global();
+
+            self.print(val.clone());
+            drop(module_guard); // prevent deadlock
+
+            let mut module = self.module.write().unwrap();
+            let module = module.down_to_mod_mut().unwrap();
+            module.add_global("_", val);
+
             return self.vm_state_to_exit_result(vm_state);
         }
 
@@ -195,6 +212,14 @@ impl<'a> Repl<'a> {
             }
         } else {
             None
+        }
+    }
+
+    /// Print eval result if it's not nil.
+    fn print(&self, obj_ref: ObjectRef) {
+        let obj = obj_ref.read().unwrap();
+        if !obj.is_nil() {
+            println!("{:?}", &*obj);
         }
     }
 

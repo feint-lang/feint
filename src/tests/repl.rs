@@ -1,6 +1,7 @@
 use crate::exe::Executor;
+use crate::modules;
 use crate::repl::Repl;
-use crate::vm::VM;
+use crate::vm::{Code, VM};
 
 #[test]
 fn eval_empty() {
@@ -38,8 +39,13 @@ fn eval_if_with_no_block() {
 
 fn eval(input: &str) {
     let mut vm = VM::default();
-    let executor = Executor::new(&mut vm, false, false, false, false);
-    let mut repl = Repl::new(None, executor);
+    let executor = Executor::new(&mut vm, false, false, false);
+    let module = if let Ok(module) = modules::add_module("$repl", Code::new()) {
+        module
+    } else {
+        panic!("Could not add $repl module");
+    };
+    let mut repl = Repl::new(None, executor, module);
     match repl.eval(input, true) {
         Some(Ok(_)) => assert!(false),
         Some(Err(_)) => assert!(false),
