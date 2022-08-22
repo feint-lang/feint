@@ -18,7 +18,7 @@ eventually) work.
     │  ├──api.fi    => Exported/public API
     │  ├──main.fi   => main(), like Rust
     │  └──lib/      => The bulk of the package's code; nothing is
-    │     ├── x.fi     importable directly from here
+    │     ├── x.fi     externally importable directly from here
     │     ├── y.fi
     │     ├── z.fi
     │     └── <module_name>/
@@ -31,7 +31,7 @@ eventually) work.
 # Exported API
 
 `src/api.fi` defines a package's public API. There is no other way to
-access objects from the package. Example:
+externally access objects from the package. Example:
 
     export package.x               # exports package.x under <package_name>.x
     export package.x.obj           # exports package.x.obj under <package_name>.x.obj
@@ -52,8 +52,8 @@ Within a package, imports look like:
     import from package: x as alias  # pulls `x` into namespace as `alias`
 
 `package` is reserved word for this purpose in the import context. There
-can't be a package named `package`, but the `package` can still be used
-as an identifier elsewhere.
+can't be a package named `package`, but `package` can still be used as
+an identifier elsewhere.
 
 From an external package, imports look like this. Basically, it's the
 same as above except the actual package name is used instead of the

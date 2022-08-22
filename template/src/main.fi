@@ -6,15 +6,17 @@
 import package
 import from package: Type
 
-main (argv: List<String>) ->
-    i, arg <- argv
+# $main is a special name. If it's defined, it will automatically be
+# called whenever a module is run as a script.
+$main = (argv) ->
+    loop arg <- argv
         t = Type.new(arg)
-        print(i, t)
+        print(t)
 
-# some ideas about how functions are defined
-f (x: Int): Int -> x * x
+f = (x) ->
+    x * x
 
-g (h: Func) ->
+g = (h) ->
     h()
 
 g((x) -> x)

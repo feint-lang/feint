@@ -1,21 +1,23 @@
 # lib/type.fi
-Type ()
-    "A type definition"
+Type = () =>
+    "A type definition with a docstring"
 
-    @new (x) ->
+    @new = (x) ->
         this.x = x
 
-    func (x) ->
+    func = (x) ->
         this.x + x
 
     # The $ prefix indicates a computed field (like @property in Python)
-    $computed () ->
+    # TODO: Select a different prefix since $ is used for other stuff
+    $computed = () ->
         result
         # alternatively, do some complex stuff and cache the result
         # this.computed = result
 
-    $computed.set (value) ->
+    $computed.set = (value) ->
         this.computed = value
 
-    + (x) ->
+    # TODO: Use special names like $add or a different symbolic syntax
+    + = (x) ->
         this.x + x

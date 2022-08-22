@@ -1,2 +1,6 @@
 name = "template"
 version = "1.0.0"
+
+[dependencies]
+x = "^1.2.3"
+y = "^3.2.1"
