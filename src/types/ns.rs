@@ -1,10 +1,10 @@
-use std::collections::hash_map;
-use std::collections::HashMap;
 use std::fmt;
+
+use indexmap::IndexMap;
 
 use super::base::ObjectRef;
 
-pub type NamespaceObjects = HashMap<String, ObjectRef>;
+pub type NamespaceObjects = IndexMap<String, ObjectRef>;
 
 /// A namespace is a container for object attributes. Note that the
 /// `Namespace` type is not a *system* type.
@@ -17,7 +17,7 @@ unsafe impl Sync for Namespace {}
 
 impl Namespace {
     pub fn new() -> Self {
-        Self { objects: HashMap::new() }
+        Self { objects: IndexMap::new() }
     }
 
     pub fn with_entries(entries: &[(&str, ObjectRef)]) -> Self {
@@ -30,7 +30,7 @@ impl Namespace {
         self.objects.clear()
     }
 
-    pub fn iter(&self) -> hash_map::Iter<'_, String, ObjectRef> {
+    pub fn iter(&self) -> indexmap::map::Iter<'_, String, ObjectRef> {
         self.objects.iter()
     }
 
@@ -40,6 +40,10 @@ impl Namespace {
 
     pub fn get_obj(&self, name: &str) -> Option<ObjectRef> {
         self.objects.get(name).cloned()
+    }
+
+    pub fn get_last_obj(&self) -> Option<(&String, &ObjectRef)> {
+        self.objects.last()
     }
 
     /// Add an object, settings its initial value as specified (usually

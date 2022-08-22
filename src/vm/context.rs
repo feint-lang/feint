@@ -235,7 +235,7 @@ impl RuntimeContext {
         self.get_var_at_depth(depth, name)
     }
 
-    pub fn iter_vars(&self) -> hash_map::Iter<'_, String, ObjectRef> {
+    pub fn iter_vars(&self) -> indexmap::map::Iter<'_, String, ObjectRef> {
         self.ns_stack[self.current_depth].iter()
     }
 }
