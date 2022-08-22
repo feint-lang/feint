@@ -171,12 +171,20 @@ impl VM {
                     self.push_var(depth, name.clone())?;
                 }
                 LoadVar(name) => {
-                    let depth = self.ctx.get_var_depth(name.as_str(), None)?;
-                    self.push_var(depth, name.clone())?;
+                    if let Ok(depth) = self.ctx.get_var_depth(name.as_str(), None) {
+                        self.push_var(depth, name.clone())?;
+                    } else {
+                        let obj = self.ctx.get_builtin(name.as_str())?;
+                        self.push_temp(obj);
+                    }
                 }
                 LoadOuterVar(name) => {
-                    let depth = self.ctx.get_outer_var_depth(name.as_str())?;
-                    self.push_var(depth, name.clone())?;
+                    if let Ok(depth) = self.ctx.get_outer_var_depth(name.as_str()) {
+                        self.push_var(depth, name.clone())?;
+                    } else {
+                        let obj = self.ctx.get_builtin(name.as_str())?;
+                        self.push_temp(obj);
+                    }
                 }
                 AssignCell(name) => {
                     // Store TOS value into cell. This is similar to

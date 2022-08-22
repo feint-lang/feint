@@ -4,6 +4,7 @@ use indexmap;
 
 use crate::modules;
 use crate::types::{new, Namespace, ObjectRef, ObjectTrait};
+use crate::vm::RuntimeObjResult;
 
 use super::constants::Constants;
 use super::result::{RuntimeErr, RuntimeResult};
@@ -48,17 +49,6 @@ impl RuntimeContext {
         let builtins = modules::BUILTINS.clone();
         if let Err(err) = self.declare_and_assign_var("builtins", builtins) {
             panic!("Could not define builtins module: {err}");
-        }
-
-        // Add shorthand aliases for builtin types and objects to global
-        // scope.
-        let builtins = modules::BUILTINS.clone();
-        let reader = builtins.read().unwrap();
-        let ns = reader.ns();
-        for (name, obj) in ns.iter().filter(|(n, _)| !n.starts_with('$')) {
-            if let Err(err) = self.declare_and_assign_var(name, (*obj).clone()) {
-                panic!("Could not add alias for builtin object `{name}` to global scope: {err}");
-            }
         }
     }
 
@@ -199,7 +189,7 @@ impl RuntimeContext {
     }
 
     /// Get var from current namespace.
-    pub fn get_var_in_current_ns(&self, name: &str) -> Result<ObjectRef, RuntimeErr> {
+    pub fn get_var_in_current_ns(&self, name: &str) -> RuntimeObjResult {
         let ns = self.current_ns();
         if let Some(obj) = ns.get_obj(name) {
             Ok(obj)
@@ -210,11 +200,7 @@ impl RuntimeContext {
     }
 
     /// Reach into the namespace at depth and get the specified var.
-    pub fn get_var_at_depth(
-        &self,
-        depth: usize,
-        name: &str,
-    ) -> Result<ObjectRef, RuntimeErr> {
+    pub fn get_var_at_depth(&self, depth: usize, name: &str) -> RuntimeObjResult {
         if let Some(obj) = self.ns_stack[depth].get_obj(name) {
             Ok(obj)
         } else {
@@ -224,16 +210,31 @@ impl RuntimeContext {
     }
 
     /// Get var in current namespace or any ancestor namespace.
-    pub fn get_var(&self, name: &str) -> Result<ObjectRef, RuntimeErr> {
+    pub fn get_var(&self, name: &str) -> RuntimeObjResult {
         let depth = self.get_var_depth(name, None)?;
         self.get_var_at_depth(depth, name)
     }
 
     /// Get var in parent namespace or any ancestor of the parent
     /// namespace.
-    pub fn get_outer_var(&self, name: &str) -> Result<ObjectRef, RuntimeErr> {
+    pub fn get_outer_var(&self, name: &str) -> RuntimeObjResult {
         let depth = self.get_outer_var_depth(name)?;
         self.get_var_at_depth(depth, name)
+    }
+
+    /// Get builtin object. This is used as a fallback when a name isn't
+    /// found in the current scope.
+    /// TODO: Cache builtins up front (like before, just not in the
+    ///       global namespace).
+    pub fn get_builtin(&self, name: &str) -> RuntimeObjResult {
+        let builtins = modules::BUILTINS.read().unwrap();
+        let builtins = builtins.down_to_mod().unwrap();
+        if let Some(obj) = builtins.ns().get_obj(name) {
+            Ok(obj)
+        } else {
+            let message = format!("Name not found: {name}");
+            Err(RuntimeErr::name_err(message))
+        }
     }
 
     pub fn iter_vars(&self) -> indexmap::map::Iter<'_, String, ObjectRef> {
