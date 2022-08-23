@@ -36,14 +36,12 @@ pub static FILE_TYPE: Lazy<new::obj_ref_t!(FileType)> = Lazy::new(|| {
             }
         }),
         // Instance Attributes
-        gen::meth!("text", type_ref, &[], |this, _, _| {
+        gen::prop!("text", type_ref, |this, _, _| {
             let this = this.read().unwrap();
             let this = this.down_to_file().unwrap();
             this.text()
         }),
-        gen::meth!("lines", type_ref, &[], |this, _, _| {
-            let mut this = this.write().unwrap();
-            let this = &mut this.down_to_file_mut().unwrap();
+        gen::prop!("lines", type_ref, |this, _, _| {
             let mut this = this.read().unwrap();
             let this = &mut this.down_to_file().unwrap();
             this.lines()

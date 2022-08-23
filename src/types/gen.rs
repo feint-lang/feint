@@ -159,6 +159,17 @@ macro_rules! meth {
     };
 }
 
+/// This similar to `meth!` but it creates a property instead of a
+/// method and has no `$params` arg.
+macro_rules! prop {
+    ( $name:literal, $this_type:expr, $func:expr ) => {
+        (
+            $name,
+            new::prop(new::builtin_func($name, Some($this_type.clone()), &[], $func)),
+        )
+    };
+}
+
 /// Get arg by index. If the index is out of bounds, return an error.
 ///
 /// Args:
@@ -204,6 +215,7 @@ macro_rules! use_arg_usize {
 }
 
 pub(crate) use meth;
+pub(crate) use prop;
 pub(crate) use use_arg;
 pub(crate) use use_arg_str;
 pub(crate) use use_arg_usize;

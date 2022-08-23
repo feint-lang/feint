@@ -1,11 +1,11 @@
 # Read file as text
 print("Read file as text:")
 file = File.new("Cargo.toml")
-print(file.text())
+print(file.text)
 
 print()
 
 # Read file as lines (and print the first line)
 print("Read file as lines:")
 file = File.new("Cargo.toml")
-print(file.lines())
+print(file.lines)

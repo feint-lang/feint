@@ -37,6 +37,7 @@ pub(crate) mod list;
 pub(crate) mod map;
 pub(crate) mod module;
 pub(crate) mod nil;
+pub(crate) mod prop;
 pub(crate) mod result;
 pub(crate) mod str;
 pub(crate) mod tuple;

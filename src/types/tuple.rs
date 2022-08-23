@@ -23,17 +23,18 @@ pub static TUPLE_TYPE: Lazy<new::obj_ref_t!(TupleType)> = Lazy::new(|| {
     let mut class = type_ref.write().unwrap();
 
     class.ns_mut().add_entries(&[
-        // Instance Methods
-        gen::meth!("length", type_ref, &[], |this, _, _| {
+        // Instance Attributes -----------------------------------------
+        gen::prop!("length", type_ref, |this, _, _| {
             let this = this.read().unwrap();
             let this = this.down_to_tuple().unwrap();
             Ok(new::int(this.len()))
         }),
-        gen::meth!("is_empty", type_ref, &[], |this, _, _| {
+        gen::prop!("is_empty", type_ref, |this, _, _| {
             let this = this.read().unwrap();
             let this = this.down_to_tuple().unwrap();
             Ok(new::bool(this.is_empty()))
         }),
+        // Instance Methods --------------------------------------------
         gen::meth!("map", type_ref, &["map_fn"], |this, args, vm| {
             let this = this.read().unwrap();
             let this = this.down_to_tuple().unwrap();

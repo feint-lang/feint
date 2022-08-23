@@ -24,17 +24,18 @@ pub static LIST_TYPE: Lazy<new::obj_ref_t!(ListType)> = Lazy::new(|| {
     let mut class = type_ref.write().unwrap();
 
     class.ns_mut().add_entries(&[
-        // Instance Methods
-        gen::meth!("length", type_ref, &[], |this, _, _| {
+        // Instance Attributes -----------------------------------------
+        gen::prop!("length", type_ref, |this, _, _| {
             let this = this.read().unwrap();
             let this = this.down_to_list().unwrap();
             Ok(new::int(this.len()))
         }),
-        gen::meth!("is_empty", type_ref, &[], |this, _, _| {
+        gen::prop!("is_empty", type_ref, |this, _, _| {
             let this = this.read().unwrap();
             let this = this.down_to_list().unwrap();
             Ok(new::bool(this.len() == 0))
         }),
+        // Instance Methods --------------------------------------------
         // Push item and return it.
         gen::meth!("push", type_ref, &["item"], |this, args, _| {
             let this = this.read().unwrap();

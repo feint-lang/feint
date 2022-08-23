@@ -27,6 +27,7 @@ use super::map::Map;
 use super::module::Module;
 use super::nil::Nil;
 use super::ns::Namespace;
+use super::prop::Prop;
 use super::str::Str;
 use super::tuple::Tuple;
 
@@ -178,6 +179,10 @@ pub fn module<S: Into<String>>(
     code: Code,
 ) -> obj_ref_t!(Module) {
     obj_ref!(Module::new(name.into(), ns, code))
+}
+
+pub fn prop(getter: ObjectRef) -> ObjectRef {
+    obj_ref!(Prop::new(getter))
 }
 
 pub fn str<S: Into<String>>(value: S) -> ObjectRef {

@@ -574,14 +574,17 @@ impl VM {
                     let message = format!("Not an attribute name or index: {b:?}");
                     return Err(RuntimeErr::type_err(message));
                 };
-                let bind = {
-                    let obj = obj_ref.read().unwrap();
-                    obj.is_builtin_func() || obj.is_func() || obj.is_closure()
-                };
-                if bind {
+                let obj = obj_ref.read().unwrap();
+                if obj.is_builtin_func() || obj.is_func() || obj.is_closure() {
                     // If `b` in `a.b` is a function, bind `b` to `a`.
                     new::bound_func(obj_ref.clone(), a_ref.clone())
+                } else if let Some(prop) = obj.down_to_prop() {
+                    // If `b` in `a.b` is a property, bind `b`'s getter
+                    // to `a` then call the bound getter.
+                    let func = new::bound_func(prop.getter(), a_ref.clone());
+                    return self.call(func, vec![]);
                 } else {
+                    drop(obj);
                     obj_ref
                 }
             }

@@ -10,6 +10,7 @@ use crate::modules;
 use crate::vm::{RuntimeBoolResult, RuntimeErr, RuntimeObjResult};
 
 use super::new;
+use super::ns::Namespace;
 use super::result::{GetAttrResult, SetAttrResult};
 
 use super::bool::{Bool, BoolType};
@@ -28,7 +29,7 @@ use super::list::{List, ListType};
 use super::map::{Map, MapType};
 use super::module::{Module, ModuleType};
 use super::nil::{Nil, NilType};
-use super::ns::Namespace;
+use super::prop::{Prop, PropType};
 use super::str::{Str, StrType};
 use super::tuple::{Tuple, TupleType};
 
@@ -256,6 +257,7 @@ pub trait ObjectTrait {
     make_type_checker!(is_map_type, MapType);
     make_type_checker!(is_mod_type, ModuleType);
     make_type_checker!(is_nil_type, NilType);
+    make_type_checker!(is_prop_type, PropType);
     make_type_checker!(is_str_type, StrType);
     make_type_checker!(is_tuple_type, TupleType);
 
@@ -274,6 +276,7 @@ pub trait ObjectTrait {
     make_type_checker!(is_map, Map);
     make_type_checker!(is_mod, Module);
     make_type_checker!(is_nil, Nil);
+    make_type_checker!(is_prop, Prop);
     make_type_checker!(is_str, Str);
     make_type_checker!(is_tuple, Tuple);
 
@@ -296,6 +299,7 @@ pub trait ObjectTrait {
     make_down_to!(down_to_map_type, MapType);
     make_down_to!(down_to_mod_type, ModuleType);
     make_down_to!(down_to_nil_type, NilType);
+    make_down_to!(down_to_prop_type, PropType);
     make_down_to!(down_to_str_type, StrType);
     make_down_to!(down_to_tuple_type, TupleType);
 
@@ -317,6 +321,7 @@ pub trait ObjectTrait {
     make_down_to!(down_to_mod, Module);
     make_down_to_mut!(down_to_mod_mut, Module);
     make_down_to!(down_to_nil, Nil);
+    make_down_to!(down_to_prop, Prop);
     make_down_to!(down_to_str, Str);
     make_down_to!(down_to_tuple, Tuple);
 
@@ -452,6 +457,7 @@ impl fmt::Display for dyn ObjectTrait {
             MapType,
             ModuleType,
             NilType,
+            PropType,
             StrType,
             TupleType
         );
@@ -474,6 +480,7 @@ impl fmt::Display for dyn ObjectTrait {
             Map,
             Module,
             Nil,
+            Prop,
             Str,
             Tuple
         );
@@ -502,6 +509,7 @@ impl fmt::Debug for dyn ObjectTrait {
             MapType,
             ModuleType,
             NilType,
+            PropType,
             StrType,
             TupleType
         );
@@ -524,6 +532,7 @@ impl fmt::Debug for dyn ObjectTrait {
             Map,
             Module,
             Nil,
+            Prop,
             Str,
             Tuple
         );
