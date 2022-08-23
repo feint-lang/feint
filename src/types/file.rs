@@ -5,7 +5,7 @@ use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 
-use once_cell::sync::Lazy;
+use once_cell::sync::{Lazy, OnceCell};
 
 use crate::vm::{RuntimeBoolResult, RuntimeErr, RuntimeObjResult};
 
@@ -35,14 +35,17 @@ pub static FILE_TYPE: Lazy<new::obj_ref_t!(FileType)> = Lazy::new(|| {
                 Err(RuntimeErr::arg_err(message))
             }
         }),
+        // Instance Attributes
         gen::meth!("text", type_ref, &[], |this, _, _| {
-            let mut this = this.write().unwrap();
-            let this = &mut this.down_to_file_mut().unwrap();
+            let this = this.read().unwrap();
+            let this = this.down_to_file().unwrap();
             this.text()
         }),
         gen::meth!("lines", type_ref, &[], |this, _, _| {
             let mut this = this.write().unwrap();
             let this = &mut this.down_to_file_mut().unwrap();
+            let mut this = this.read().unwrap();
+            let this = &mut this.down_to_file().unwrap();
             this.lines()
         }),
     ]);
@@ -56,8 +59,8 @@ pub struct File {
     ns: Namespace,
     file_name: String,
     path: PathBuf,
-    text: Option<ObjectRef>,
-    lines: Option<ObjectRef>,
+    text: OnceCell<ObjectRef>,
+    lines: OnceCell<ObjectRef>,
 }
 
 gen::standard_object_impls!(File);
@@ -71,38 +74,35 @@ impl File {
             ns: Namespace::with_entries(&[("name", name_obj)]),
             file_name,
             path,
-            text: None,
-            lines: None,
+            text: OnceCell::default(),
+            lines: OnceCell::default(),
         }
     }
 
-    fn text(&mut self) -> RuntimeObjResult {
-        if self.text.is_none() {
-            let text = fs::read_to_string(&self.file_name)
+    fn text(&self) -> RuntimeObjResult {
+        let text = self.text.get_or_try_init(|| {
+            fs::read_to_string(&self.file_name)
                 .map(new::str)
-                .map_err(|err| RuntimeErr::could_not_read_file(err.to_string()))?;
-            self.text = Some(text.clone());
-        }
-        Ok(self.text.as_ref().unwrap().clone())
+                .map_err(|err| RuntimeErr::could_not_read_file(err.to_string()))
+        })?;
+        Ok(text.clone())
     }
 
-    fn lines(&mut self) -> RuntimeObjResult {
-        if self.lines.is_none() {
+    fn lines(&self) -> RuntimeObjResult {
+        let lines = self.lines.get_or_try_init(|| {
             let file = fs::File::open(&self.file_name);
-            let lines = file
-                .map(|file| {
-                    let reader = BufReader::new(file);
-                    let lines = reader
-                        .lines()
-                        // TODO: Handle lines that can't be read
-                        .map(|line| new::str(line.unwrap()))
-                        .collect();
-                    new::tuple(lines)
-                })
-                .map_err(|err| RuntimeErr::could_not_read_file(err.to_string()))?;
-            self.lines = Some(lines.clone());
-        }
-        Ok(self.lines.as_ref().unwrap().clone())
+            file.map(|file| {
+                let reader = BufReader::new(file);
+                let lines = reader
+                    .lines()
+                    // TODO: Handle lines that can't be read
+                    .map(|line| new::str(line.unwrap()))
+                    .collect();
+                new::tuple(lines)
+            })
+            .map_err(|err| RuntimeErr::could_not_read_file(err.to_string()))
+        })?;
+        Ok(lines.clone())
     }
 }
 
