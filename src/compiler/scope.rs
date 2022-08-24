@@ -172,7 +172,6 @@ impl ScopeTree {
         if self.pointer == 0 {
             None
         } else {
-            log::trace!("FINDING VAR {name} from parent");
             self.find_var(name, Some(self.pointer - 1))
         }
     }

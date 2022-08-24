@@ -395,11 +395,11 @@ impl VM {
                     if capture_set.is_empty() {
                         self.push_const(code, *func_const_index)?;
                     } else {
+                        log::trace!("CREATING CLOSURE FOR {func_const_index}");
+
                         let func_ref = code.get_const(*func_const_index)?.clone();
                         let func = func_ref.read().unwrap();
                         let func = func.down_to_func().unwrap();
-
-                        log::trace!("CREATING CLOSURE FOR {}", func.name());
 
                         let mut captured = capture_set.to_hash_map();
 
@@ -947,6 +947,7 @@ impl VM {
     }
 
     fn push_const(&mut self, code: &Code, index: usize) -> RuntimeResult {
+        log::trace!("GET CONST: {index} : {code:?}");
         let obj = code.get_const(index)?.clone();
         self.push(ValueStackKind::Constant(obj, index));
         Ok(())
