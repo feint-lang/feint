@@ -6,71 +6,50 @@ use crate::modules;
 use crate::types::{new, Namespace, ObjectRef, ObjectTrait};
 use crate::vm::RuntimeObjResult;
 
-use super::constants::Constants;
 use super::result::{RuntimeErr, RuntimeResult};
 
 pub struct RuntimeContext {
-    global_constants: Constants,
+    global_constants: Vec<ObjectRef>,
     ns_stack: Vec<Namespace>,
-    // Number of namespaces on stack
-    size: usize,
-    // Index of namespace associated with current scope
-    current_depth: usize,
 }
 
 impl RuntimeContext {
     pub fn new() -> Self {
-        let mut ctx = Self {
-            global_constants: Constants::new(),
-            ns_stack: vec![],
-            size: 0,
-            current_depth: 0,
-        };
-        ctx.init();
-        ctx
-    }
-
-    fn init(&mut self) {
-        // Add singleton constants.
-        self.add_global_const(new::nil()); // 0
-        self.add_global_const(new::true_()); // 1
-        self.add_global_const(new::false_()); // 2
-
+        let mut global_constants = vec![new::nil(), new::true_(), new::false_()];
         for int in new::SHARED_INTS.iter() {
-            self.add_global_const(int.clone());
+            global_constants.push(int.clone());
         }
-
-        // Enter global scope.
-        self.enter_scope();
+        Self { global_constants, ns_stack: vec![Namespace::new()] }
     }
 
     #[inline]
     fn current_ns(&self) -> &Namespace {
-        &self.ns_stack[self.current_depth]
+        self.ns_stack.last().unwrap()
+    }
+
+    #[inline]
+    fn current_depth(&self) -> usize {
+        self.ns_stack.len() - 1
     }
 
     fn current_ns_mut(&mut self) -> &mut Namespace {
-        &mut self.ns_stack[self.current_depth]
+        self.ns_stack.last_mut().unwrap()
     }
 
     pub fn enter_scope(&mut self) {
-        self.current_depth = self.size;
         self.ns_stack.push(Namespace::new());
-        self.size += 1;
     }
 
     pub fn exit_scope(&mut self) {
-        if self.current_depth == 0 {
+        if self.current_depth() == 0 {
             panic!("Can't remove global namespace");
         }
         let mut ns = self.ns_stack.pop().expect("Expected namespace");
         ns.clear();
-        self.size -= 1;
-        self.current_depth -= 1;
     }
 
     pub fn exit_all_scopes(&mut self) {
-        while self.current_depth != 0 {
+        while self.ns_stack.len() > 1 {
             self.exit_scope();
         }
     }
@@ -82,11 +61,17 @@ impl RuntimeContext {
     // singleton nil, true, and false objects.
 
     pub fn add_global_const(&mut self, obj: ObjectRef) -> usize {
-        self.global_constants.add(obj)
+        let index = self.global_constants.len();
+        self.global_constants.push(obj);
+        index
     }
 
-    pub fn get_global_const(&self, index: usize) -> Result<&ObjectRef, RuntimeErr> {
-        self.global_constants.get(index)
+    pub fn get_global_const(&self, index: usize) -> RuntimeObjResult {
+        if let Some(obj) = self.global_constants.get(index) {
+            Ok(obj.clone())
+        } else {
+            Err(RuntimeErr::constant_not_found(index))
+        }
     }
 
     pub fn iter_constants(&self) -> slice::Iter<'_, ObjectRef> {
@@ -116,7 +101,7 @@ impl RuntimeContext {
     ) -> Result<usize, RuntimeErr> {
         let ns = self.current_ns_mut();
         if ns.set_obj(name, obj) {
-            Ok(self.current_depth)
+            Ok(self.ns_stack.len() - 1)
         } else {
             let message = format!("Name not defined in current namespace: {name}");
             Err(RuntimeErr::name_err(message))
@@ -157,7 +142,7 @@ impl RuntimeContext {
     ) -> Result<usize, RuntimeErr> {
         let ns_stack = &self.ns_stack;
         let mut var_depth =
-            if let Some(depth) = starting_depth { depth } else { self.current_depth };
+            if let Some(depth) = starting_depth { depth } else { self.current_depth() };
         loop {
             if ns_stack[var_depth].get_obj(name).is_some() {
                 break Ok(var_depth);
@@ -173,11 +158,11 @@ impl RuntimeContext {
     /// Get depth of namespace where outer var is defined (skips current
     /// namespace, starts search from parent namespace).
     pub fn get_outer_var_depth(&self, name: &str) -> Result<usize, RuntimeErr> {
-        if self.current_depth == 0 {
+        if self.current_depth() == 0 {
             let message = format!("Name not found: {name}");
             return Err(RuntimeErr::name_err(message));
         }
-        self.get_var_depth(name, Some(self.current_depth - 1))
+        self.get_var_depth(name, Some(self.current_depth() - 1))
     }
 
     /// Get var from current namespace.
@@ -230,6 +215,6 @@ impl RuntimeContext {
     }
 
     pub fn iter_vars(&self) -> indexmap::map::Iter<'_, String, ObjectRef> {
-        self.ns_stack[self.current_depth].iter()
+        self.current_ns().iter()
     }
 }
