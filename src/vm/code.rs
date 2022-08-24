@@ -7,12 +7,12 @@ use crate::util::Location;
 use super::inst::Inst;
 use super::result::RuntimeErr;
 
-type FreeVarEntry = Vec<(
+type FreeVarEntry = (
     usize,    // address
     String,   // name
     Location, // source start
     Location, // source end
-)>;
+);
 
 /// Code for a module or function.
 #[derive(Debug)]
@@ -20,7 +20,7 @@ pub struct Code {
     chunk: Vec<Inst>,
     constants: Vec<ObjectRef>,
     // Vars defined outside of this unit of code.
-    free_vars: FreeVarEntry,
+    free_vars: Vec<FreeVarEntry>,
 }
 
 impl Index<usize> for Code {
@@ -149,7 +149,7 @@ impl Code {
 
     // Vars ------------------------------------------------------------
 
-    pub fn free_vars(&self) -> &FreeVarEntry {
+    pub fn free_vars(&self) -> &Vec<FreeVarEntry> {
         &self.free_vars
     }
 
