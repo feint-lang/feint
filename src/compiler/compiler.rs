@@ -921,6 +921,12 @@ impl Visitor {
         log::trace!("VISIT ASS {lhs_expr:?} = {value_expr:?}");
         // TODO: Allow assignment to attributes
         if let Some(name) = lhs_expr.ident_name() {
+            if name == "$main" && !value_expr.is_func() {
+                return Err(CompErr::main_must_be_func(
+                    value_expr.start,
+                    value_expr.end,
+                ));
+            }
             self.visit_expr(value_expr, Some(name.clone()))?;
             let pointer = self.scope_tree.pointer();
             match self.scope_tree.find_var_in_scope(name.as_str(), pointer) {
