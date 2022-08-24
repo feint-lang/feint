@@ -17,9 +17,9 @@ pub type PopNObjResult = Result<Vec<ObjectRef>, RuntimeErr>;
 pub type PeekResult<'a> = Result<&'a ValueStackKind, RuntimeErr>;
 pub type PeekObjResult = Result<ObjectRef, RuntimeErr>;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub enum VMState {
-    Idle,
+    Idle(Option<ObjectRef>),
     Halted(u8),
 }
 

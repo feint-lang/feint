@@ -354,6 +354,11 @@ impl Expr {
             None
         }
     }
+
+    /// Check if expression is a function.
+    pub fn is_func(&self) -> bool {
+        matches!(self.kind, ExprKind::Func(_))
+    }
 }
 
 impl fmt::Debug for Expr {

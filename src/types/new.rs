@@ -173,7 +173,7 @@ pub fn map(entries: Vec<(String, ObjectRef)>) -> ObjectRef {
     obj_ref!(Map::new(entries))
 }
 
-pub fn module<S: Into<String>>(
+pub fn _module<S: Into<String>>(
     name: S,
     ns: Namespace,
     code: Code,

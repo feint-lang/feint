@@ -2,6 +2,7 @@
 //! then, implicitly, goes idle until it's passed some instructions to
 //! execute. After instructions are executed, it goes back into idle
 //! mode.
+use std::cmp;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
@@ -11,7 +12,9 @@ use ctrlc;
 use num_traits::ToPrimitive;
 
 use crate::modules;
-use crate::types::{new, Args, BuiltinFunc, Func, FuncTrait, ObjectRef, ThisOpt};
+use crate::types::{
+    new, Args, BuiltinFunc, Func, FuncTrait, Module, ObjectRef, ThisOpt,
+};
 use crate::util::{
     BinaryOperator, CompareOperator, InplaceOperator, Location, Stack,
     UnaryCompareOperator, UnaryOperator,
@@ -103,21 +106,36 @@ impl VM {
         }
     }
 
-    pub fn execute(&mut self, code: &Code) -> VMExeResult {
+    pub fn execute_module(&mut self, module: &mut Module, start: usize) -> VMExeResult {
+        self.execute_code(&module.code, start)
+    }
+
+    pub fn execute_func(&mut self, func: &Func, start: usize) -> VMExeResult {
+        self.execute_code(&func.code, start)
+    }
+
     /// Execute the given code object's instructions and return the VM's
     /// state. If a HALT instruction isn't encountered, the VM will go
     /// "idle"--it will maintain its internal state and await further
     /// instructions. When a HALT instruction is encountered, the VM's
     /// state will be cleared; it can be "restarted" by passing more
     /// instructions to execute.
+    pub fn execute_code(&mut self, code: &Code, start: usize) -> VMExeResult {
         use Inst::*;
+
+        let len_chunk = code.len_chunk();
+
+        match start.cmp(&len_chunk) {
+            cmp::Ordering::Equal => return Ok(VMState::Idle(None)),
+            cmp::Ordering::Greater => panic!("Code start index out of bounds"),
+            _ => (),
+        }
 
         let handle_sigint = self.handle_sigint;
         let sigint_flag = self.sigint_flag.clone();
         let mut sigint_counter = 0u32;
 
-        let num_inst = code.len_chunk();
-        let mut ip: usize = 0;
+        let mut ip = start;
         let mut jump_ip = None;
 
         loop {
@@ -462,13 +480,6 @@ impl VM {
                 }
             }
 
-            if let Some(new_ip) = jump_ip {
-                ip = new_ip;
-                jump_ip = None;
-            } else {
-                ip += 1;
-            }
-
             if handle_sigint {
                 sigint_counter += 1;
                 // TODO: Maybe use a different value and/or make it
@@ -476,14 +487,22 @@ impl VM {
                 if sigint_counter == 1024 {
                     if sigint_flag.load(Ordering::Relaxed) {
                         self.handle_sigint();
-                        break Ok(VMState::Idle);
+                        break Ok(VMState::Idle(None));
                     }
                     sigint_counter = 0;
                 }
             }
 
-            if ip == num_inst {
-                break Ok(VMState::Idle);
+            if let Some(new_ip) = jump_ip {
+                ip = new_ip;
+                jump_ip = None;
+            } else {
+                ip += 1;
+                if ip == len_chunk {
+                    break Ok(VMState::Idle(
+                        self.peek_obj().map_or_else(|_| None, Some),
+                    ));
+                }
             }
         }
     }
@@ -802,7 +821,7 @@ impl VM {
             let cell = new::cell_with_value(arg);
             self.ctx.declare_and_assign_var(name, cell)?;
         }
-        match self.execute(&func.code) {
+        match self.execute_func(func, 0) {
             Ok(_) => {
                 self.pop_call_frame()?;
                 Ok(())

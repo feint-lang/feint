@@ -4,7 +4,7 @@ use std::sync::{Arc, RwLock};
 use once_cell::sync::Lazy;
 
 use crate::types::{new, Module, Namespace, ObjectTrait};
-use crate::vm::{Code, RuntimeErr, RuntimeObjResult, RuntimeResult};
+use crate::vm::{RuntimeErr, RuntimeObjResult, RuntimeResult};
 
 use super::builtins::BUILTINS;
 
@@ -25,18 +25,18 @@ pub fn add_system_module_to_system() -> RuntimeResult {
     Ok(())
 }
 
-/// Add a module to system.modules.
-pub fn add_module(name: &str, code: Code) -> RuntimeObjResult {
+/// Add a module to `system.modules`.
+pub fn _add_module(name: &str, module: Module) -> RuntimeResult {
     let system = SYSTEM.read().unwrap();
     let modules = system.get_attr("modules")?;
     let modules = modules.write().unwrap();
     let modules = modules.down_to_map().expect("Expected system.modules to be a Map");
-    let module = new::module(name, Namespace::new(), code);
-    modules.add(name, module.clone());
-    Ok(module)
+    let module = new::obj_ref!(module);
+    modules.add(name, module);
+    Ok(())
 }
 
-/// Get a module from system.modules.
+/// Get a module from `system.modules`.
 pub fn get_module(name: &str) -> RuntimeObjResult {
     let system = SYSTEM.read().unwrap();
     let modules = system.get_attr("modules")?;

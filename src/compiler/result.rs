@@ -1,7 +1,7 @@
+use crate::types::Module;
 use crate::util::Location;
-use crate::vm::Code;
 
-pub type CompResult = Result<Code, CompErr>;
+pub type CompResult = Result<Module, CompErr>;
 
 #[derive(Clone, Debug)]
 pub struct CompErr {

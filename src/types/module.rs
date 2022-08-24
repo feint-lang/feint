@@ -38,6 +38,10 @@ impl Module {
         module
     }
 
+    pub fn with_name(name: &str) -> Self {
+        Self::new(name.to_owned(), Namespace::new(), Code::new())
+    }
+
     pub fn name(&self) -> &str {
         self.name.as_str()
     }
@@ -61,6 +65,10 @@ impl Module {
 
     pub fn code(&self) -> &Code {
         &self.code
+    }
+
+    pub fn code_mut(&mut self) -> &mut Code {
+        &mut self.code
     }
 
     pub fn set_code(&mut self, code: Code) {

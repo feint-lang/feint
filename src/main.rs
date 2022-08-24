@@ -108,11 +108,9 @@ fn main() -> ExitCode {
         log::trace!("RUN REPL");
         match save_repl_history {
             true => {
-                let history_path = match history_path {
-                    Some(path) => PathBuf::from(path),
-                    None => default_history_path(),
-                };
-                repl::run(Some(history_path.as_path()), dis, debug)
+                let history_path = history_path
+                    .map_or_else(default_history_path, |path| PathBuf::from(path));
+                repl::run(Some(history_path), dis, debug)
             }
             false => repl::run(None, dis, debug),
         }

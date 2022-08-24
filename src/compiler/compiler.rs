@@ -5,7 +5,7 @@ use num_traits::ToPrimitive;
 
 use crate::ast;
 use crate::modules::BUILTINS;
-use crate::types::{new, ObjectRef};
+use crate::types::{new, Module, Namespace, ObjectRef};
 use crate::util::{
     BinaryOperator, CompareOperator, InplaceOperator, Location, Stack,
     UnaryCompareOperator, UnaryOperator,
@@ -18,6 +18,8 @@ use super::scope::{Scope, ScopeKind, ScopeTree};
 // Compiler ------------------------------------------------------------
 
 pub struct Compiler {
+    // Check names at compile time.
+    check_names: bool,
     // The visitor stack is analogous to the VM call stack.
     visitor_stack: Stack<(Visitor, usize)>, // visitor, scope tree pointer
 }
@@ -34,62 +36,69 @@ struct CaptureInfo {
 }
 
 impl Compiler {
-    pub fn new() -> Self {
-        Self { visitor_stack: Stack::new() }
+    pub fn new(check_names: bool) -> Self {
+        Self { check_names, visitor_stack: Stack::new() }
     }
 
+    /// Compile AST module node as script. This will check if the module
+    /// has a `$main` function and, if it does, add instructions to call
+    /// it.
     pub fn compile_script(
         &mut self,
-        program: ast::Module,
+        name: &str,
+        module: ast::Module,
         argv: Vec<&str>,
     ) -> CompResult {
-        let mut visitor = Visitor::for_module("$main");
-
-        if program.statements.is_empty() {
-            visitor.push(Inst::Halt(0));
-            return Ok(visitor.code);
+        let mut code = self.compile_module_to_code(name, module)?;
+        if code.has_main() {
+            let argc = argv.len();
+            for arg in argv {
+                let index = code.add_const(new::str(arg));
+                code.push_inst(Inst::LoadConst(index));
+            }
+            code.push_inst(Inst::LoadVar("$main".to_string()));
+            code.push_inst(Inst::Call(argc));
+            code.push_inst(Inst::Pop);
+            code.push_inst(Inst::HaltTop);
+        } else {
+            code.push_inst(Inst::Pop);
+            code.push_inst(Inst::Halt(0));
         }
+        Ok(Module::new(name.to_owned(), Namespace::new(), code))
+    }
 
-        visitor.visit_module(program)?;
+    /// Compile AST module node to module object.
+    /// XXX: Anticipating a need for this.
+    pub fn _compile_module(&mut self, name: &str, module: ast::Module) -> CompResult {
+        let mut code = self.compile_module_to_code(name, module)?;
+        code.push_inst(Inst::Pop);
+        Ok(Module::new(name.to_owned(), Namespace::new(), code))
+    }
 
+    /// Compile AST module node to code object.
+    pub fn compile_module_to_code(
+        &mut self,
+        name: &str,
+        module: ast::Module,
+    ) -> Result<Code, CompErr> {
+        let mut visitor = Visitor::for_module(name, self.check_names);
+        visitor.visit_module(module)?;
         assert!(
             visitor.scope_tree.in_global_scope(),
-            "Expected to be in global scope after compiling script"
+            "Expected to be in global scope after compiling module"
         );
-
-        // Global Functions --------------------------------------------
-
-        let mut has_main = false;
+        // Compile global functions
         let func_nodes = visitor.func_nodes.to_vec();
         self.visitor_stack.push((visitor, 0));
         for (addr, scope_tree_pointer, name, node) in func_nodes {
-            if name == "$main" {
-                has_main = true;
-            }
             self.compile_func(addr, scope_tree_pointer, name, node)?;
         }
-        let mut visitor = self.visitor_stack.pop().unwrap().0;
-
-        // END Global Functions ----------------------------------------
-
-        if has_main {
-            let argc = argv.len();
-            for arg in argv {
-                visitor.add_const(new::str(arg));
-            }
-            visitor.push(Inst::LoadVar("$main".to_string()));
-            visitor.push(Inst::Call(argc));
-            visitor.push(Inst::HaltTop);
-        } else {
-            visitor.push(Inst::Pop);
-            visitor.push(Inst::Halt(0));
-        }
-
+        let visitor = self.visitor_stack.pop().unwrap().0;
         Ok(visitor.code)
     }
 
-    /// Compile a function and inject it into the *parent* visitor at
-    /// the specified address.
+    /// Compile AST function node and inject it into the *parent*
+    /// visitor at the specified address.
     fn compile_func(
         &mut self,
         // Address in parent visitor's code where function was defined.
@@ -104,7 +113,7 @@ impl Compiler {
         let stack = &mut self.visitor_stack;
         let params = node.params.clone();
 
-        let mut visitor = Visitor::for_func(func_name.as_str());
+        let mut visitor = Visitor::for_func(func_name.as_str(), self.check_names);
         visitor.visit_func(node)?;
 
         // Unresolved names are assumed to be builtins.
@@ -183,7 +192,7 @@ impl Compiler {
         }
 
         for (addr, name, start, end) in presumed_builtins.into_iter() {
-            if builtins.has_global(name.as_str()) {
+            if builtins.has_global(name.as_str()) || !self.check_names {
                 visitor.replace(addr, Inst::LoadVar(name.to_owned()));
             } else {
                 return Err(CompErr::name_not_found(name, start, end));
@@ -274,6 +283,8 @@ type VisitResult = Result<(), CompErr>;
 
 pub struct Visitor {
     initial_scope_kind: ScopeKind,
+    name: String,
+    check_names: bool,
     code: Code,
     scope_tree: ScopeTree,
     scope_depth: usize,
@@ -283,14 +294,14 @@ pub struct Visitor {
         String, // name
         ast::Func,
     )>,
-    name: String,
 }
 
 impl Visitor {
-    fn new(initial_scope_kind: ScopeKind, name: &str) -> Self {
+    fn new(initial_scope_kind: ScopeKind, name: &str, check_names: bool) -> Self {
         assert!(matches!(initial_scope_kind, ScopeKind::Module | ScopeKind::Func));
         Self {
             initial_scope_kind,
+            check_names,
             code: Code::new(),
             scope_tree: ScopeTree::new(initial_scope_kind),
             scope_depth: 0,
@@ -299,17 +310,21 @@ impl Visitor {
         }
     }
 
-    fn for_module(name: &str) -> Self {
-        Self::new(ScopeKind::Module, name)
+    fn for_module(name: &str, check_names: bool) -> Self {
+        Self::new(ScopeKind::Module, name, check_names)
     }
 
-    fn for_func(name: &str) -> Self {
-        Self::new(ScopeKind::Func, name)
+    fn for_func(name: &str, check_names: bool) -> Self {
+        Self::new(ScopeKind::Func, name, check_names)
     }
 
     // Entry Point Visitors --------------------------------------------
 
     fn visit_module(&mut self, node: ast::Module) -> VisitResult {
+        if node.statements.is_empty() {
+            self.push_nil();
+            return Ok(());
+        }
         self.visit_statements(node.statements)?;
         assert_eq!(self.scope_tree.pointer(), 0);
         self.fix_jumps()?;
@@ -607,7 +622,10 @@ impl Visitor {
                         // in an outer scope. If it isn't, that's an error.
                         let found =
                             self.scope_tree.find_var_in_parent(name.as_str()).is_some();
-                        if found || BUILTINS.read().unwrap().has_global(name.as_str()) {
+                        if found
+                            || BUILTINS.read().unwrap().has_global(name.as_str())
+                            || !self.check_names
+                        {
                             self.push(Inst::LoadOuterVar(name));
                         } else {
                             return Err(CompErr::name_not_found(name, start, end));
@@ -625,7 +643,9 @@ impl Visitor {
                 if self.initial_scope_kind == ScopeKind::Module {
                     // When compiling a module, all vars should resolve
                     // at this stage, so this is an error.
-                    if BUILTINS.read().unwrap().has_global(name.as_str()) {
+                    if BUILTINS.read().unwrap().has_global(name.as_str())
+                        || !self.check_names
+                    {
                         self.push(Inst::LoadVar(name));
                     } else {
                         return Err(CompErr::name_not_found(name, start, end));

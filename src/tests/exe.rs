@@ -1,10 +1,9 @@
 use crate::exe::Executor;
 use crate::result::{ExeErrKind, ExeResult};
-use crate::vm::{RuntimeContext, RuntimeErrKind, VM};
+use crate::vm::RuntimeErrKind;
 
 fn execute(source: &str) -> ExeResult {
-    let mut vm = VM::new(RuntimeContext::new(), 16);
-    let mut exe = Executor::default(&mut vm);
+    let mut exe = Executor::new(16, false, false, false);
     exe.execute_text(source)
 }
 

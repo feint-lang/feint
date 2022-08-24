@@ -2,46 +2,83 @@
 use std::io::BufRead;
 
 use crate::compiler::{CompErr, CompErrKind, Compiler};
-use crate::dis;
 use crate::modules;
 use crate::parser::{ParseErr, ParseErrKind, Parser};
 use crate::result::{ExeErr, ExeErrKind, ExeResult};
 use crate::scanner::{ScanErr, ScanErrKind, Scanner, Token, TokenWithLocation};
-use crate::types::{Module, ObjectRef};
+use crate::types::Module;
 use crate::util::{
     source_from_file, source_from_stdin, source_from_text, Location, Source,
 };
-use crate::vm::{Code, RuntimeErr, RuntimeErrKind, VMExeResult, VMState, VM};
+use crate::vm::{
+    CallDepth, RuntimeContext, RuntimeErr, RuntimeErrKind, VMExeResult, VMState, VM,
+};
+use crate::{ast, dis};
 
-pub struct Executor<'a> {
-    pub vm: &'a mut VM,
+pub struct Executor {
+    vm: VM,
     incremental: bool,
     dis: bool,
     debug: bool,
-    current_file_name: &'a str,
+    current_file_name: String,
 }
 
-impl<'a> Executor<'a> {
-    pub fn new(vm: &'a mut VM, incremental: bool, dis: bool, debug: bool) -> Self {
-        Self { vm, incremental, dis, debug, current_file_name: "<none>" }
-    }
-
-    pub fn default(vm: &'a mut VM) -> Self {
-        Self {
-            vm,
-            incremental: false,
-            dis: false,
-            debug: false,
-            current_file_name: "<default>",
+impl Executor {
+    pub fn new(
+        max_call_depth: CallDepth,
+        incremental: bool,
+        dis: bool,
+        debug: bool,
+    ) -> Self {
+        if let Err(err) = modules::add_system_module_to_system() {
+            panic!("Could not add system module to system.modules: {err}");
         }
+        let vm = VM::new(RuntimeContext::new(), max_call_depth);
+        Self { vm, incremental, dis, debug, current_file_name: "<none>".to_owned() }
     }
 
-    /// Execute source from file.
-    pub fn execute_file(&mut self, file_path: &'a str, argv: Vec<&str>) -> ExeResult {
+    pub fn halt(&mut self) {
+        self.vm.halt();
+    }
+
+    pub fn install_sigint_handler(&mut self) {
+        self.vm.install_sigint_handler();
+    }
+
+    /// Execute text entered in REPL. REPL execution is different from
+    /// the other types of execution where the text or source is
+    /// compiled all at once and executed as a script. In the REPL, code
+    /// is compiled incrementally as it's entered, which makes it
+    /// somewhat more complex to deal with.
+    pub fn execute_repl(&mut self, text: &str, module: &mut Module) -> ExeResult {
+        self.current_file_name = "<repl>".to_owned();
+        let source = &mut source_from_text(text);
+        let ast_module = self.parse_source(source)?;
+        let mut compiler = Compiler::new(false);
+
+        let code = compiler.compile_module_to_code(module.name(), ast_module).map_err(
+            |err| {
+                self.handle_comp_err(&err, source);
+                ExeErr::new(ExeErrKind::CompErr(err.kind))
+            },
+        )?;
+
+        // XXX: Rather than extending the module's code object, perhaps
+        //      it would be better to compile INTO the existing module.
+        //      This would required passing the module or its code obj
+        //      into the compiler.
+        let start = module.code().len_chunk();
+        module.code_mut().extend(code);
+
+        self.execute_module(module, start, self.debug, source)
+    }
+
+    /// Execute source from file as script.
+    pub fn execute_file(&mut self, file_path: &str, argv: Vec<&str>) -> ExeResult {
         match source_from_file(file_path) {
             Ok(mut source) => {
-                self.current_file_name = file_path;
-                self.execute_source(&mut source, argv)
+                self.current_file_name = file_path.to_owned();
+                self.execute_script_from_source(&mut source, argv)
             }
             Err(err) => {
                 let message = format!("{file_path}: {err}");
@@ -50,76 +87,51 @@ impl<'a> Executor<'a> {
         }
     }
 
-    /// Execute stdin.
+    /// Execute stdin as script.
     pub fn execute_stdin(&mut self) -> ExeResult {
-        self.current_file_name = "<stdin>";
+        self.current_file_name = "<stdin>".to_owned();
         let mut source = source_from_stdin();
-        self.execute_source(&mut source, vec![])
+        self.execute_script_from_source(&mut source, vec![])
     }
 
-    /// Execute text.
+    /// Execute text as script.
     pub fn execute_text(&mut self, text: &str) -> ExeResult {
-        self.current_file_name = "<text>";
+        self.current_file_name = "<text>".to_owned();
         let mut source = source_from_text(text);
-        self.execute_source(&mut source, vec![])
+        self.execute_script_from_source(&mut source, vec![])
     }
 
-    /// Execute source.
-    pub fn execute_source<T: BufRead>(
+    /// Execute source as script. The source will be compiled into a
+    /// module. If the module contains a global `$main` function, it
+    /// will be run automatically.
+    fn execute_script_from_source<T: BufRead>(
         &mut self,
         source: &mut Source<T>,
         argv: Vec<&str>,
     ) -> ExeResult {
-        let code = self.compile_source(source, argv)?;
+        let mut main_module = self.compile_script("$main", source, argv)?;
         if self.dis {
             let mut disassembler = dis::Disassembler::new();
-            disassembler.disassemble(&code);
+            disassembler.disassemble(&main_module.code);
             if self.debug {
                 println!();
                 self.display_stack();
             }
             Ok(VMState::Halted(0))
         } else {
-            if let Err(err) = modules::add_system_module_to_system() {
-                return Err(ExeErr::new(ExeErrKind::RuntimeErr(err.kind)));
-            }
-            match modules::add_module("$main", code) {
-                Ok(main_module) => {
-                    let mut main_module = main_module.write().unwrap();
-                    let main_module = main_module.down_to_mod_mut().unwrap();
-                    self.execute_module(main_module, self.debug, source)
-                }
-                Err(err) => Err(ExeErr::new(ExeErrKind::RuntimeErr(err.kind))),
-            }
+            self.execute_module(&mut main_module, 0, self.debug, source)
         }
     }
 
-    pub fn execute_repl(&mut self, text: &str, module: ObjectRef) -> ExeResult {
-        self.current_file_name = "<repl>";
-        let source = &mut source_from_text(text);
-        let code = self.compile_source(source, vec![])?;
-        let mut module = module.write().unwrap();
-        let module = module.down_to_mod_mut().unwrap();
-        module.set_code(code);
-        let result = self.execute_module(module, self.debug, source);
-
-        // Add globals to REPL module namespace.
-        // TODO: Find a better way to do this.
-        for (name, val) in self.vm.ctx.iter_vars() {
-            module.add_global(name, val.clone());
-        }
-
-        result
-    }
-
-    /// Execute a code (a list of instructions).
-    pub fn execute_module<T: BufRead>(
+    /// Execute a module.
+    fn execute_module<T: BufRead>(
         &mut self,
         module: &mut Module,
+        start: usize,
         debug: bool,
         source: &mut Source<T>,
     ) -> ExeResult {
-        let result = self.vm.execute(module.code());
+        let result = self.vm.execute_module(module, start);
         if debug {
             self.display_stack();
             self.display_vm_state(&result);
@@ -134,58 +146,43 @@ impl<'a> Executor<'a> {
         })
     }
 
-    /// Compile source into a `Code` object.
-    fn compile_source<T: BufRead>(
+    /// Compile AST module node into module object.
+    fn compile_script<T: BufRead>(
         &self,
+        name: &str,
         source: &mut Source<T>,
         argv: Vec<&str>,
-    ) -> Result<Code, ExeErr> {
-        let scanner = Scanner::new(source);
-        let mut parser = Parser::new(scanner);
-        let program = match parser.parse() {
-            Ok(program) => program,
-            Err(err) => {
-                return if let ParseErrKind::ScanErr(scan_err) = err.kind {
-                    if !self.ignore_scan_err(&scan_err) {
-                        self.print_err_line(
-                            source.line_no,
-                            source.get_current_line().unwrap_or("<none>"),
-                        );
-                        self.handle_scan_err(&scan_err);
-                    }
-                    Err(ExeErr::new(ExeErrKind::ScanErr(scan_err.kind)))
-                } else {
-                    if !self.ignore_parse_err(&err) {
-                        let loc = err.loc();
-                        self.print_err_line(
-                            loc.line,
-                            source.get_line(loc.line).unwrap_or("<none>"),
-                        );
-                        self.handle_parse_err(&err);
-                    }
-                    Err(ExeErr::new(ExeErrKind::ParseErr(err.kind)))
-                };
-            }
-        };
-        let mut compiler = Compiler::new();
-        let code = match compiler.compile_script(program, argv) {
-            Ok(code) => code,
-            Err(err) => {
-                if !self.ignore_comp_err(&err) {
-                    let (start, _end) = err.loc();
-                    self.print_err_line(
-                        start.line,
-                        source.get_line(start.line).unwrap_or("<none>"),
-                    );
-                    self.handle_comp_err(&err);
-                }
-                return Err(ExeErr::new(ExeErrKind::CompErr(err.kind)));
-            }
-        };
-        Ok(code)
+    ) -> Result<Module, ExeErr> {
+        let ast_module = self.parse_source(source)?;
+        let mut compiler = Compiler::new(true);
+        let module =
+            compiler.compile_script(name, ast_module, argv).map_err(|err| {
+                self.handle_comp_err(&err, source);
+                ExeErr::new(ExeErrKind::CompErr(err.kind))
+            })?;
+        Ok(module)
     }
 
-    fn display_stack(&self) {
+    /// Parse source text, file, etc into AST module node.
+    fn parse_source<T: BufRead>(
+        &self,
+        source: &mut Source<T>,
+    ) -> Result<ast::Module, ExeErr> {
+        let scanner = Scanner::new(source);
+        let mut parser = Parser::new(scanner);
+        let parse_result = parser.parse();
+        parse_result.map_err(|err| {
+            if let ParseErrKind::ScanErr(scan_err) = err.kind {
+                self.handle_scan_err(&scan_err, source);
+                ExeErr::new(ExeErrKind::ScanErr(scan_err.kind))
+            } else {
+                self.handle_parse_err(&err, source);
+                ExeErr::new(ExeErrKind::ParseErr(err.kind))
+            }
+        })
+    }
+
+    pub(crate) fn display_stack(&self) {
         eprintln!("{:=<79}", "STACK ");
         self.vm.display_stack();
     }
@@ -196,7 +193,7 @@ impl<'a> Executor<'a> {
     }
 
     fn print_err_line(&self, line_no: usize, line: &str) {
-        let file_name = self.current_file_name;
+        let file_name = self.current_file_name.as_str();
         let line = line.trim_end();
         eprintln!("\n  Error in {file_name} on line {line_no}:\n\n    |\n    |{line}");
     }
@@ -214,20 +211,23 @@ impl<'a> Executor<'a> {
         }
     }
 
-    fn ignore_scan_err(&self, err: &ScanErr) -> bool {
+    fn handle_scan_err<T: BufRead>(&self, err: &ScanErr, source: &Source<T>) {
         use ScanErrKind::*;
-        self.incremental
+        let ignore = self.incremental
             && matches!(
                 &err.kind,
                 ExpectedBlock
                     | ExpectedIndentedBlock(_)
                     | UnmatchedOpeningBracket(_)
                     | UnterminatedStr(_)
-            )
-    }
-
-    fn handle_scan_err(&self, err: &ScanErr) {
-        use ScanErrKind::*;
+            );
+        if ignore {
+            return;
+        }
+        self.print_err_line(
+            source.line_no,
+            source.get_current_line().unwrap_or("<none>"),
+        );
         let mut loc = err.location;
         let col = loc.col;
         let message = match &err.kind {
@@ -279,14 +279,13 @@ impl<'a> Executor<'a> {
         self.print_err_message(message, loc, loc);
     }
 
-    fn ignore_parse_err(&self, err: &ParseErr) -> bool {
+    fn handle_parse_err<T: BufRead>(&self, err: &ParseErr, source: &Source<T>) {
         use ParseErrKind::*;
-        self.incremental && matches!(&err.kind, ExpectedBlock(_))
-    }
-
-    fn handle_parse_err(&self, err: &ParseErr) {
-        use ParseErrKind::*;
+        if self.incremental && matches!(&err.kind, ExpectedBlock(_)) {
+            return;
+        }
         let loc = err.loc();
+        self.print_err_line(loc.line, source.get_line(loc.line).unwrap_or("<none>"));
         let message = match &err.kind {
             ScanErr(_) => {
                 unreachable!("Handle ScanErr before calling handle_parse_err")
@@ -334,9 +333,16 @@ impl<'a> Executor<'a> {
         self.print_err_message(message, loc, loc);
     }
 
-    fn handle_comp_err(&self, err: &CompErr) {
+    fn handle_comp_err<T: BufRead>(&self, err: &CompErr, source: &Source<T>) {
         use CompErrKind::*;
+        if self.incremental && matches!(&err.kind, LabelNotFoundInScope(..)) {
+            return;
+        }
         let (start, end) = err.loc();
+        self.print_err_line(
+            start.line,
+            source.get_line(start.line).unwrap_or("<none>"),
+        );
         let message = match &err.kind {
             NameNotFound(name, ..) =>format!("Name not found: {name}"),
             LabelNotFoundInScope(name, ..) => format!("label not found in scope: {name}"),
@@ -350,6 +356,9 @@ impl<'a> Executor<'a> {
             CannotAssignSpecialIdent(name, ..) => {
                 format!("cannot assign to special name: {name}")
             }
+            MainMustBeFunc(..) => {
+                "$main must be a function".to_owned()
+            }
             GlobalNotFound(name, ..) => {
                 format!("global var not found: {name}")
             }
@@ -359,11 +368,6 @@ impl<'a> Executor<'a> {
         };
         let message = format!("Compilation error: {message}");
         self.print_err_message(message, start, end);
-    }
-
-    fn ignore_comp_err(&self, err: &CompErr) -> bool {
-        use CompErrKind::*;
-        self.incremental && matches!(&err.kind, LabelNotFoundInScope(..))
     }
 
     fn handle_runtime_err(&self, err: &RuntimeErr) {

@@ -1,49 +1,39 @@
 //! # FeInt REPL
-use std::path::Path;
+use std::path::PathBuf;
 
 use rustyline::config::Configurer;
 use rustyline::error::ReadlineError;
 
+use crate::dis;
 use crate::exe::Executor;
-use crate::modules;
 use crate::parser::ParseErrKind;
 use crate::result::{ExeErr, ExeErrKind, ExitResult};
 use crate::scanner::ScanErrKind;
-use crate::types::{ObjectRef, ObjectTrait};
-use crate::vm::{Code, RuntimeContext, VMState, VM};
+use crate::types::{Module, ObjectRef, ObjectTrait};
+use crate::vm::VMState;
 
 /// Run FeInt REPL until user exits.
-pub fn run(history_path: Option<&Path>, dis: bool, debug: bool) -> ExitResult {
-    let mut vm = VM::new(RuntimeContext::new(), 256);
-    vm.install_sigint_handler();
-    let executor = Executor::new(&mut vm, true, dis, debug);
-    let module = if let Ok(module) = modules::add_module("$repl", Code::new()) {
-        module
-    } else {
-        panic!("Could not add $repl module");
-    };
-    let mut repl = Repl::new(history_path, executor, module);
+pub fn run(history_path: Option<PathBuf>, dis: bool, debug: bool) -> ExitResult {
+    let mut executor = Executor::new(256, true, dis, debug);
+    executor.install_sigint_handler();
+    let mut repl = Repl::new(history_path, executor);
     repl.run()
 }
 
-pub struct Repl<'a> {
+pub struct Repl {
     reader: rustyline::Editor<()>,
-    history_path: Option<&'a Path>,
-    executor: Executor<'a>,
-    module: ObjectRef,
+    history_path: Option<PathBuf>,
+    executor: Executor,
+    module: Module,
 }
 
-impl<'a> Repl<'a> {
-    pub fn new(
-        history_path: Option<&'a Path>,
-        executor: Executor<'a>,
-        module: ObjectRef,
-    ) -> Self {
+impl Repl {
+    pub fn new(history_path: Option<PathBuf>, executor: Executor) -> Self {
         let mut reader =
             rustyline::Editor::<()>::new().expect("Could initialize readline");
         reader.set_indent_size(4);
         reader.set_tab_stop(4);
-        Repl { reader, history_path, executor, module }
+        Repl { reader, history_path, executor, module: Module::with_name("$repl") }
     }
 
     fn run(&mut self) -> ExitResult {
@@ -51,19 +41,16 @@ impl<'a> Repl<'a> {
         println!("Type a line of code, then hit Enter to evaluate it");
         self.load_history();
         println!("Type .exit or .quit to exit");
-
-        loop {
+        let result = loop {
             match self.read_line("→ ", true) {
                 Ok(None) => {
                     // Blank or all-whitespace line.
                 }
                 Ok(Some(input)) => {
                     // Evaluate the input. If eval returns a result of
-                    // any kind (ok or err), exit the loop and shut down
-                    // the REPL.
-                    match self.eval(input.as_str(), false) {
+                    // any kind (ok or err), shut down the REPL.
+                    match self.eval(input.as_str(), true) {
                         Some(result) => {
-                            self.executor.vm.halt();
                             break result;
                         }
                         None => (),
@@ -72,21 +59,20 @@ impl<'a> Repl<'a> {
                 // User hit Ctrl-C
                 Err(ReadlineError::Interrupted) => {
                     println!("Use Ctrl-D or .exit to exit");
-                    self.executor.vm.halt();
                 }
                 // User hit Ctrl-D
                 Err(ReadlineError::Eof) => {
-                    self.executor.vm.halt();
                     break Ok(None);
                 }
                 // Unexpected error encountered while attempting to read
                 // a line.
                 Err(err) => {
-                    self.executor.vm.halt();
                     break Err((1, Some(format!("Could not read line: {}", err))));
                 }
             }
-        }
+        };
+        self.executor.halt();
+        result
     }
 
     /// Get a line of input from the user. If the line comprises only
@@ -107,10 +93,75 @@ impl<'a> Repl<'a> {
     /// Evaluate text. Returns None to indicate to the main loop to
     /// continue reading and evaluating input. Returns some result to
     /// indicate to the main loop to exit.
-    pub fn eval(&mut self, text: &str, no_continue: bool) -> Option<ExitResult> {
+    pub fn eval(&mut self, text: &str, continue_on_err: bool) -> Option<ExitResult> {
         self.add_history_entry(text);
 
-        let result = match text.trim() {
+        if matches!(text, ".exit" | ".quit") {
+            return Some(Ok(None));
+        } else if self.handle_command(text) {
+            return None;
+        }
+
+        let result = self.executor.execute_repl(text, &mut self.module);
+
+        if let Ok(vm_state) = result {
+            return match vm_state {
+                VMState::Idle(obj_ref) => {
+                    if let Some(obj_ref) = obj_ref {
+                        self.print(obj_ref);
+                    } else {
+                        eprintln!("No result on stack");
+                    }
+                    None
+                }
+                VMState::Halted(0) => None,
+                VMState::Halted(code) => {
+                    Some(Err((code, Some(format!("Halted abnormally: {}", code)))))
+                }
+            };
+        }
+
+        let err = result.unwrap_err();
+
+        // If there's an error executing the current input, try to add
+        // more lines *if* the error can potentially be recovered from
+        // by adding more input.
+
+        if !(continue_on_err && self.continue_on_err(err)) {
+            return None;
+        }
+
+        // Add input until 2 successive blank lines are entered.
+        let mut input = text.to_owned();
+        let mut blank_line_count = 0;
+        loop {
+            let read_line_result = self.read_line("+ ", false);
+            if let Ok(None) = read_line_result {
+                unreachable!();
+            } else if let Ok(Some(new_input)) = read_line_result {
+                if new_input.is_empty() {
+                    input.push('\n');
+                    if blank_line_count > 0 {
+                        break self.eval(input.as_str(), false);
+                    }
+                    blank_line_count += 1;
+                } else {
+                    input.push('\n');
+                    input.push_str(new_input.as_str());
+                    if blank_line_count > 0 {
+                        break self.eval(input.as_str(), false);
+                    }
+                    blank_line_count = 0;
+                }
+            } else {
+                let message = format!("{}", read_line_result.unwrap_err());
+                break Some(Err((2, Some(message))));
+            }
+        }
+    }
+
+    fn handle_command(&mut self, text: &str) -> bool {
+        match text.trim() {
             "?" | ".help" => {
                 eprintln!("{:=>72}", "");
                 eprintln!("FeInt Help");
@@ -121,98 +172,32 @@ impl<'a> Repl<'a> {
                 eprintln!(".emacs -> switch to emacs-style input (default)");
                 eprintln!(".vi    -> switch to vi-style input");
                 eprintln!("{:=>72}", "");
-                return None;
             }
-            "\t" => {
-                eprintln!("got tab");
-                return None;
-            }
-            ".exit" | ".quit" => return Some(Ok(None)),
             ".stack" => {
-                self.executor.vm.display_stack();
-                return None;
+                self.executor.display_stack();
+            }
+            ".dis" => {
+                let mut disassembler = dis::Disassembler::new();
+                disassembler.disassemble(&self.module.code);
             }
             ".globals" => {
-                let module = self.module.read().unwrap();
-                let module = module.down_to_mod().unwrap();
                 eprintln!("{:=>72}", "");
-                eprintln!("GLOBALS for module {:?} ", module.name());
+                eprintln!("GLOBALS for module {:?} ", self.module.name());
                 eprintln!("{:->72}", "");
-                for (name, val) in module.ns().iter() {
+                for (name, val) in self.module.ns().iter() {
                     println!("{name} = {:?}", &*val.read().unwrap());
                 }
                 eprintln!("{:=>72}", "");
-                return None;
             }
             ".emacs" => {
                 self.reader.set_edit_mode(rustyline::config::EditMode::Emacs);
-                return None;
             }
             ".vi" | ".vim" => {
                 self.reader.set_edit_mode(rustyline::config::EditMode::Vi);
-                return None;
             }
-            _ => {
-                let module_guard = self.module.read().unwrap();
-                let module = module_guard.down_to_mod().unwrap();
-                if let Some(obj_ref) = module.get_global(text) {
-                    self.print(obj_ref);
-                    return None;
-                } else {
-                    drop(module_guard); // prevent deadlock
-                    self.executor.execute_repl(text, self.module.clone())
-                }
-            }
-        };
-
-        if let Ok(vm_state) = result {
-            let module_guard = self.module.read().unwrap();
-            let module = module_guard.down_to_mod().unwrap();
-            let val = module.get_last_added_global();
-
-            self.print(val.clone());
-            drop(module_guard); // prevent deadlock
-
-            let mut module = self.module.write().unwrap();
-            let module = module.down_to_mod_mut().unwrap();
-            module.add_global("_", val);
-
-            return self.vm_state_to_exit_result(vm_state);
+            _ => return false,
         }
-
-        let err = result.unwrap_err();
-
-        if no_continue {
-            None
-        } else if self.continue_on_err(err) {
-            // Keep adding input until 2 successive blank lines are
-            // entered.
-            let mut input = text.to_owned();
-            let mut blank_line_count = 0;
-            loop {
-                match self.read_line("+ ", false) {
-                    Ok(None) => unreachable!(),
-                    Ok(Some(new_input)) if new_input.is_empty() => {
-                        input.push('\n');
-                        if blank_line_count > 0 {
-                            break self.eval(input.as_str(), true);
-                        }
-                        blank_line_count += 1;
-                    }
-                    Ok(Some(new_input)) => {
-                        input.push('\n');
-                        input.push_str(new_input.as_str());
-                        if blank_line_count > 0 {
-                            break self.eval(input.as_str(), true);
-                        }
-                        blank_line_count = 0;
-                    }
-                    Err(err) => break Some(Err((2, Some(format!("{}", err))))),
-                }
-            }
-        } else {
-            None
-        }
+        true
     }
 
     /// Print eval result if it's not nil.
@@ -220,16 +205,6 @@ impl<'a> Repl<'a> {
         let obj = obj_ref.read().unwrap();
         if !obj.is_nil() {
             println!("{:?}", &*obj);
-        }
-    }
-
-    fn vm_state_to_exit_result(&self, vm_state: VMState) -> Option<ExitResult> {
-        match vm_state {
-            VMState::Idle => None,
-            VMState::Halted(0) => None,
-            VMState::Halted(code) => {
-                Some(Err((code, Some(format!("Halted abnormally: {}", code)))))
-            }
         }
     }
 
@@ -253,10 +228,10 @@ impl<'a> Repl<'a> {
     }
 
     fn load_history(&mut self) {
-        match self.history_path {
+        match &self.history_path {
             Some(path) => {
                 println!("REPL history will be saved to {}", path.to_string_lossy());
-                match self.reader.load_history(path) {
+                match self.reader.load_history(path.as_path()) {
                     Ok(_) => (),
                     Err(err) => eprintln!("Could not load REPL history: {}", err),
                 }
@@ -266,10 +241,10 @@ impl<'a> Repl<'a> {
     }
 
     fn add_history_entry(&mut self, input: &str) {
-        match self.history_path {
+        match &self.history_path {
             Some(path) => {
                 self.reader.add_history_entry(input);
-                match self.reader.save_history(path) {
+                match self.reader.save_history(path.as_path()) {
                     Ok(_) => (),
                     Err(err) => eprintln!("Could not save REPL history: {}", err),
                 }

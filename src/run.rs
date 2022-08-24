@@ -1,7 +1,7 @@
 //! # FeInt code runner
 use crate::exe::Executor;
 use crate::result::{ExeErrKind, ExeResult, ExitResult};
-use crate::vm::{CallDepth, RuntimeContext, VMState, VM};
+use crate::vm::{CallDepth, VMState};
 
 /// Run source from file.
 pub fn run_file(
@@ -11,16 +11,14 @@ pub fn run_file(
     dis: bool,
     debug: bool,
 ) -> ExitResult {
-    let mut vm = VM::new(RuntimeContext::new(), max_call_depth);
-    let mut executor = Executor::new(&mut vm, false, dis, debug);
+    let mut executor = Executor::new(max_call_depth, false, dis, debug);
     let result = executor.execute_file(file_path, argv);
     exit(result)
 }
 
 /// Read and run source from stdin.
 pub fn run_stdin(max_call_depth: CallDepth, dis: bool, debug: bool) -> ExitResult {
-    let mut vm = VM::new(RuntimeContext::new(), max_call_depth);
-    let mut executor = Executor::new(&mut vm, false, dis, debug);
+    let mut executor = Executor::new(max_call_depth, false, dis, debug);
     let result = executor.execute_stdin();
     exit(result)
 }
@@ -32,8 +30,7 @@ pub fn run_text(
     dis: bool,
     debug: bool,
 ) -> ExitResult {
-    let mut vm = VM::new(RuntimeContext::new(), max_call_depth);
-    let mut executor = Executor::new(&mut vm, false, dis, debug);
+    let mut executor = Executor::new(max_call_depth, false, dis, debug);
     let result = executor.execute_text(text);
     exit(result)
 }
@@ -43,7 +40,7 @@ fn exit(result: ExeResult) -> ExitResult {
         Ok(vm_state) => match vm_state {
             VMState::Halted(0) => Ok(None),
             VMState::Halted(code) => Err((code, None)),
-            VMState::Idle => Err((255, Some("Never halted".to_owned()))),
+            VMState::Idle(_) => Err((255, Some("Never halted".to_owned()))),
         },
         // TODO: Return error code depending on error type?
         Err(err) => {

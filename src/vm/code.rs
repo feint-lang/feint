@@ -1,7 +1,7 @@
 use std::ops::Index;
 use std::slice::Iter;
 
-use crate::types::ObjectRef;
+use crate::types::{FuncTrait, ObjectRef};
 use crate::util::Location;
 
 use super::inst::Inst;
@@ -42,6 +42,28 @@ impl Code {
         let mut code = Code::new();
         code.chunk.extend(chunk);
         code
+    }
+
+    /// Extend this `Code` object with another `Code` object:
+    ///
+    /// - Extend instructions, adjusting constant indexes
+    /// - Extend constants
+    /// - Free vars are ignored for now since this is mainly intended
+    ///   for extending modules (where there are no free vars) and not
+    ///   functions
+    pub fn extend(&mut self, mut code: Self) {
+        let mut replacements = vec![];
+        let const_offset = self.constants.len();
+        for (addr, inst) in code.iter_chunk().enumerate() {
+            if let Inst::LoadConst(index) = inst {
+                replacements.push((addr, *index));
+            }
+        }
+        for (addr, index) in replacements {
+            code.replace_inst(addr, Inst::LoadConst(index + const_offset));
+        }
+        self.chunk.extend(code.chunk);
+        self.constants.extend(code.constants);
     }
 
     // Instructions ----------------------------------------------------
@@ -112,6 +134,17 @@ impl Code {
 
     pub fn iter_constants(&self) -> Iter<'_, ObjectRef> {
         self.constants.iter()
+    }
+
+    pub fn has_main(&self) -> bool {
+        self.constants.iter().any(|obj_ref| {
+            let obj = obj_ref.read().unwrap();
+            if let Some(func) = obj.down_to_func() {
+                func.name() == "$main"
+            } else {
+                false
+            }
+        })
     }
 
     // Vars ------------------------------------------------------------
