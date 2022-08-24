@@ -3,9 +3,6 @@ use std::process::ExitCode;
 
 use clap::{value_parser, Arg, ArgAction, Command};
 
-#[macro_use]
-extern crate log;
-
 use feint::repl;
 use feint::run;
 use feint::vm::{CallDepth, DEFAULT_MAX_CALL_DEPTH};
@@ -13,7 +10,6 @@ use feint::vm::{CallDepth, DEFAULT_MAX_CALL_DEPTH};
 /// Interpret a file if one is specified. Otherwise, run the REPL.
 fn main() -> ExitCode {
     env_logger::init();
-    trace!("BEGIN: feint (main)");
 
     let default_max_call_depth = DEFAULT_MAX_CALL_DEPTH.to_string();
 
@@ -87,25 +83,15 @@ fn main() -> ExitCode {
         None => vec![],
     };
 
-    log::trace!(
-        "CLI OPTIONS: \
-        max_call_depth={max_call_depth} \
-        dis={dis} \
-        debug={debug}"
-    );
-
     let result = if let Some(code) = code {
-        log::trace!("RUN TEXT");
         run::run_text(code, max_call_depth, argv, dis, debug)
     } else if let Some(file_name) = file_name {
-        log::trace!("RUN FILE: {file_name}");
         if file_name == "-" {
             run::run_stdin(max_call_depth, argv, dis, debug)
         } else {
             run::run_file(file_name, max_call_depth, argv, dis, debug)
         }
     } else {
-        log::trace!("RUN REPL");
         match save_repl_history {
             true => {
                 let history_path =
@@ -129,8 +115,6 @@ fn main() -> ExitCode {
         Err((code, None)) => code,
     };
 
-    trace!("END: feint (main)");
-    trace!("RETURN CODE: {return_code}");
     ExitCode::from(return_code)
 }
 
