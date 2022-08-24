@@ -53,20 +53,20 @@ mod list {
     #[test]
     fn test_push() {
         assert_result_is_ok(run_text(
-            "l = []\nl.push(1)\nl.push('a')\nprint(l.length() == 2)",
+            "l = []\nl.push(1)\nl.push('a')\nprint(l.length == 2)",
         ));
     }
 
     #[test]
     fn test_extend() {
         assert_result_is_ok(run_text(
-            "l = []\nl.extend([1, 'a', 2, ()])\nprint(l.length() == 4)",
+            "l = []\nl.extend([1, 'a', 2, ()])\nprint(l.length == 4)",
         ));
     }
 
     #[test]
     fn test_pop() {
-        assert_result_is_ok(run_text("l = [1]\nl.pop()\nprint(l.length() == 0)"));
+        assert_result_is_ok(run_text("l = [1]\nl.pop()\nprint(l.length == 0)"));
     }
 }
 

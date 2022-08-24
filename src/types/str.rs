@@ -23,7 +23,7 @@ pub static STR_TYPE: Lazy<new::obj_ref_t!(StrType)> = Lazy::new(|| {
 
     class.ns_mut().add_entries(&[
         // Instance Attributes -----------------------------------------
-        gen::prop!("length", type_ref, |this, args, _| {
+        gen::prop!("length", type_ref, |this, _, _| {
             let this = this.read().unwrap();
             let this = this.down_to_str().unwrap();
             Ok(new::int(this.value.len()))

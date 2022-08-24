@@ -33,8 +33,8 @@ print(f(), "(x in f() should be 3)")  # -> 3
 print(x, "(global x should be 1)")    # -> 1
 
 # Var args allowed in last position
-f = (...) -> print($args.length(), "var args")
+f = (...) -> print($args.length, "var args")
 f(1, 2, 3)  # -> 3
 
-f = (required, ...) -> print($args.length(), "var args")
+f = (required, ...) -> print($args.length, "var args")
 f(1, 2, 3)  # -> 2

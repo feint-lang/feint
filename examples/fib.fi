@@ -30,5 +30,5 @@ fib_match_slow = (n) ->
         : -> fib_match_slow(n - 1) + fib_match_slow(n - 2)
 
 $main = (...) ->
-    n = if $args.is_empty() -> 50 else -> Int.new($args.0)
+    n = if $args.is_empty -> 50 else -> Int.new($args.0)
     print(fib_match(n))

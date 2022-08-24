@@ -42,7 +42,7 @@ pub static FILE_TYPE: Lazy<new::obj_ref_t!(FileType)> = Lazy::new(|| {
             this.text()
         }),
         gen::prop!("lines", type_ref, |this, _, _| {
-            let mut this = this.read().unwrap();
+            let this = this.read().unwrap();
             let this = &mut this.down_to_file().unwrap();
             this.lines()
         }),
