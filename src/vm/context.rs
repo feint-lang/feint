@@ -42,14 +42,6 @@ impl RuntimeContext {
 
         // Enter global scope.
         self.enter_scope();
-
-        // Builtins ----------------------------------------------------
-
-        // Add builtins module to global scope.
-        let builtins = modules::BUILTINS.clone();
-        if let Err(err) = self.declare_and_assign_var("builtins", builtins) {
-            panic!("Could not define builtins module: {err}");
-        }
     }
 
     #[inline]
