@@ -84,23 +84,8 @@ impl Code {
         self.chunk.insert(index, inst);
     }
 
-    /// Insert instruction at `len - 1`, pushing the last instruction
-    /// to the end.
-    pub fn insert_inst_last(&mut self, inst: Inst) {
-        let len = self.len_chunk();
-        if len == 0 {
-            self.push_inst(inst);
-        } else {
-            self.chunk.insert(len - 1, inst);
-        }
-    }
-
     pub fn replace_inst(&mut self, index: usize, inst: Inst) {
         self.chunk[index] = inst;
-    }
-
-    pub fn get_inst(&mut self, index: usize) -> Option<&Inst> {
-        self.chunk.get(index)
     }
 
     /// Explicit return statements need to jump to the end of the
