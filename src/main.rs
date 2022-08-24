@@ -82,8 +82,8 @@ fn main() -> ExitCode {
     let dis = *matches.get_one::<bool>("dis").unwrap();
     let debug = *matches.get_one::<bool>("debug").unwrap();
 
-    let argv: Vec<&str> = match matches.values_of("argv") {
-        Some(values) => values.collect(),
+    let argv: Vec<String> = match matches.values_of("argv") {
+        Some(values) => values.map(|a| a.to_owned()).collect(),
         None => vec![],
     };
 
@@ -96,13 +96,13 @@ fn main() -> ExitCode {
 
     let result = if let Some(code) = code {
         log::trace!("RUN TEXT");
-        run::run_text(code, max_call_depth, dis, debug)
+        run::run_text(code, max_call_depth, argv, dis, debug)
     } else if let Some(file_name) = file_name {
         log::trace!("RUN FILE: {file_name}");
         if file_name == "-" {
-            run::run_stdin(max_call_depth, dis, debug)
+            run::run_stdin(max_call_depth, argv, dis, debug)
         } else {
-            run::run_file(file_name, argv, max_call_depth, dis, debug)
+            run::run_file(file_name, max_call_depth, argv, dis, debug)
         }
     } else {
         log::trace!("RUN REPL");
@@ -110,9 +110,9 @@ fn main() -> ExitCode {
             true => {
                 let history_path =
                     history_path.map_or_else(default_history_path, PathBuf::from);
-                repl::run(Some(history_path), dis, debug)
+                repl::run(Some(history_path), argv, dis, debug)
             }
-            false => repl::run(None, dis, debug),
+            false => repl::run(None, argv, dis, debug),
         }
     };
 

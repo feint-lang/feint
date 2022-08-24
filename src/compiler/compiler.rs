@@ -45,7 +45,7 @@ impl Compiler {
         &mut self,
         name: &str,
         module: ast::Module,
-        argv: Vec<&str>,
+        argv: &Vec<String>,
     ) -> CompResult {
         let mut code = self.compile_module_to_code(name, module)?;
         if code.has_main() {

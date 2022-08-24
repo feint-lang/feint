@@ -6,19 +6,24 @@ use crate::vm::{CallDepth, VMState};
 /// Run source from file.
 pub fn run_file(
     file_path: &str,
-    argv: Vec<&str>,
     max_call_depth: CallDepth,
+    argv: Vec<String>,
     dis: bool,
     debug: bool,
 ) -> ExitResult {
-    let mut executor = Executor::new(max_call_depth, false, dis, debug);
-    let result = executor.execute_file(file_path, argv);
+    let mut executor = Executor::new(max_call_depth, argv, false, dis, debug);
+    let result = executor.execute_file(file_path);
     exit(result)
 }
 
 /// Read and run source from stdin.
-pub fn run_stdin(max_call_depth: CallDepth, dis: bool, debug: bool) -> ExitResult {
-    let mut executor = Executor::new(max_call_depth, false, dis, debug);
+pub fn run_stdin(
+    max_call_depth: CallDepth,
+    argv: Vec<String>,
+    dis: bool,
+    debug: bool,
+) -> ExitResult {
+    let mut executor = Executor::new(max_call_depth, argv, false, dis, debug);
     let result = executor.execute_stdin();
     exit(result)
 }
@@ -27,10 +32,11 @@ pub fn run_stdin(max_call_depth: CallDepth, dis: bool, debug: bool) -> ExitResul
 pub fn run_text(
     text: &str,
     max_call_depth: CallDepth,
+    argv: Vec<String>,
     dis: bool,
     debug: bool,
 ) -> ExitResult {
-    let mut executor = Executor::new(max_call_depth, false, dis, debug);
+    let mut executor = Executor::new(max_call_depth, argv, false, dis, debug);
     let result = executor.execute_text(text);
     exit(result)
 }

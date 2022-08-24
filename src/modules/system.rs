@@ -11,18 +11,22 @@ use super::builtins::BUILTINS;
 pub static SYSTEM: Lazy<new::obj_ref_t!(Module)> = Lazy::new(|| {
     let modules = new::map(vec![("builtins".to_owned(), BUILTINS.clone())]);
 
-    new::builtin_module("system", Namespace::with_entries(&[("modules", modules)]))
+    new::builtin_module(
+        "system",
+        Namespace::with_entries(&[("argv", new::empty_tuple()), ("modules", modules)]),
+    )
 });
 
-/// Add system module to system.modules. This has to be done after
-/// `SYSTEM` is created at some point during startup.
-pub fn add_system_module_to_system() -> RuntimeResult {
-    let system = SYSTEM.read().unwrap();
-    let modules = system.get_attr("modules")?;
+/// Add system module to `system.modules`, set `argv`, etc. This has to
+/// be done after `SYSTEM` is created at some point during startup.
+pub fn init_system_module(argv: &[String]) {
+    let mut system = SYSTEM.write().unwrap();
+    let ns = system.ns_mut();
+    ns.set_obj("argv", new::tuple(argv.iter().map(new::str).collect()));
+    let modules = ns.get_obj("modules").expect("Expected system.modules to be present");
     let modules = modules.write().unwrap();
     let modules = modules.down_to_map().expect("Expected system.modules to be a Map");
     modules.add("system".to_owned(), SYSTEM.clone());
-    Ok(())
 }
 
 /// Add a module to `system.modules`.

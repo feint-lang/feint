@@ -2,7 +2,7 @@ use crate::result::ExitResult;
 use crate::run;
 
 fn run_text(source: &str) -> ExitResult {
-    run::run_text(source, 16, false, false)
+    run::run_text(source, 16, vec![], false, false)
 }
 
 fn assert_result_is_ok(result: ExitResult) {

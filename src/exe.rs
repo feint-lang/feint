@@ -18,6 +18,7 @@ use crate::{ast, dis};
 
 pub struct Executor {
     vm: VM,
+    argv: Vec<String>,
     incremental: bool,
     dis: bool,
     debug: bool,
@@ -27,15 +28,15 @@ pub struct Executor {
 impl Executor {
     pub fn new(
         max_call_depth: CallDepth,
+        argv: Vec<String>,
         incremental: bool,
         dis: bool,
         debug: bool,
     ) -> Self {
-        if let Err(err) = modules::add_system_module_to_system() {
-            panic!("Could not add system module to system.modules: {err}");
-        }
         let vm = VM::new(RuntimeContext::new(), max_call_depth);
-        Self { vm, incremental, dis, debug, current_file_name: "<none>".to_owned() }
+        let current_file_name = "<none>".to_owned();
+        modules::init_system_module(&argv);
+        Self { vm, argv, incremental, dis, debug, current_file_name }
     }
 
     pub fn halt(&mut self) {
@@ -85,11 +86,11 @@ impl Executor {
     }
 
     /// Execute source from file as script.
-    pub fn execute_file(&mut self, file_path: &str, argv: Vec<&str>) -> ExeResult {
+    pub fn execute_file(&mut self, file_path: &str) -> ExeResult {
         match source_from_file(file_path) {
             Ok(mut source) => {
                 self.current_file_name = file_path.to_owned();
-                self.execute_script_from_source(&mut source, argv)
+                self.execute_script_from_source(&mut source)
             }
             Err(err) => {
                 let message = format!("{file_path}: {err}");
@@ -102,14 +103,14 @@ impl Executor {
     pub fn execute_stdin(&mut self) -> ExeResult {
         self.current_file_name = "<stdin>".to_owned();
         let mut source = source_from_stdin();
-        self.execute_script_from_source(&mut source, vec![])
+        self.execute_script_from_source(&mut source)
     }
 
     /// Execute text as script.
     pub fn execute_text(&mut self, text: &str) -> ExeResult {
         self.current_file_name = "<text>".to_owned();
         let mut source = source_from_text(text);
-        self.execute_script_from_source(&mut source, vec![])
+        self.execute_script_from_source(&mut source)
     }
 
     /// Execute source as script. The source will be compiled into a
@@ -118,9 +119,8 @@ impl Executor {
     fn execute_script_from_source<T: BufRead>(
         &mut self,
         source: &mut Source<T>,
-        argv: Vec<&str>,
     ) -> ExeResult {
-        let mut main_module = self.compile_script("$main", source, argv)?;
+        let mut main_module = self.compile_script("$main", source)?;
         if self.dis {
             let mut disassembler = dis::Disassembler::new();
             disassembler.disassemble(main_module.code());
@@ -162,12 +162,11 @@ impl Executor {
         &self,
         name: &str,
         source: &mut Source<T>,
-        argv: Vec<&str>,
     ) -> Result<Module, ExeErr> {
         let ast_module = self.parse_source(source)?;
         let mut compiler = Compiler::new(true);
         let module =
-            compiler.compile_script(name, ast_module, argv).map_err(|err| {
+            compiler.compile_script(name, ast_module, &self.argv).map_err(|err| {
                 self.handle_comp_err(&err, source);
                 ExeErr::new(ExeErrKind::CompErr(err.kind))
             })?;

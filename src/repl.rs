@@ -13,8 +13,13 @@ use crate::types::{Module, ObjectRef, ObjectTrait};
 use crate::vm::VMState;
 
 /// Run FeInt REPL until user exits.
-pub fn run(history_path: Option<PathBuf>, dis: bool, debug: bool) -> ExitResult {
-    let mut executor = Executor::new(256, true, dis, debug);
+pub fn run(
+    history_path: Option<PathBuf>,
+    argv: Vec<String>,
+    dis: bool,
+    debug: bool,
+) -> ExitResult {
+    let mut executor = Executor::new(256, argv, true, dis, debug);
     executor.install_sigint_handler();
     let mut repl = Repl::new(history_path, executor);
     repl.run()
