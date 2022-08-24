@@ -1,5 +1,6 @@
 use std::fmt;
 
+use crate::types::new;
 use crate::vm::{Code, Inst};
 
 pub struct Disassembler {
@@ -55,10 +56,10 @@ impl Disassembler {
             NoOp => self.align("NOOP", "ø"),
             Pop => self.align("POP", ""),
             LoadGlobalConst(index) => {
-                let index = *index;
                 let op_code = "LOAD_GLOBAL_CONST";
-                if (3..=259).contains(&index) {
-                    self.align(op_code, format!("{index} ({})", index - 3))
+                let index = *index;
+                if let Some(int) = new::shared_int_for_global_const_index(index) {
+                    self.align(op_code, format!("{index} ({})", int.read().unwrap()))
                 } else {
                     self.align(op_code, format!("{index} ([unknown])"))
                 }
@@ -66,6 +67,7 @@ impl Disassembler {
             LoadNil => self.align("LOAD_NIL", "nil"),
             LoadTrue => self.align("LOAD_TRUE", "true"),
             LoadFalse => self.align("LOAD_FALSE", "false"),
+            LoadEmptyTuple => self.align("LOAD_EMPTY_TUPLE", "()"),
             ScopeStart => self.align("SCOPE_START", ""),
             ScopeEnd => self.align("SCOPE_END", ""),
             StatementStart(start, _) => {

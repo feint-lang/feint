@@ -164,6 +164,9 @@ impl VM {
                 LoadFalse => {
                     self.push_global_const(2)?;
                 }
+                LoadEmptyTuple => {
+                    self.push_global_const(3)?;
+                }
                 // Scopes
                 ScopeStart => {
                     self.enter_scope();

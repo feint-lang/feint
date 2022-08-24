@@ -15,9 +15,10 @@ pub enum Inst {
     LoadGlobalConst(usize),
 
     // Special global constants with a known index.
-    LoadNil,   // 0
-    LoadTrue,  // 1
-    LoadFalse, // 2
+    LoadNil,        // 0
+    LoadTrue,       // 1
+    LoadFalse,      // 2
+    LoadEmptyTuple, // 3
 
     ScopeStart,
     ScopeEnd,

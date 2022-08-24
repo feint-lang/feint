@@ -15,7 +15,8 @@ pub struct RuntimeContext {
 
 impl RuntimeContext {
     pub fn new() -> Self {
-        let mut global_constants = vec![new::nil(), new::true_(), new::false_()];
+        let mut global_constants =
+            vec![new::nil(), new::true_(), new::false_(), new::empty_tuple()];
         for int in new::SHARED_INTS.iter() {
             global_constants.push(int.clone());
         }

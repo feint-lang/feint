@@ -1,8 +1,6 @@
 use std::fmt;
 use std::fmt::Formatter;
 
-use num_traits::ToPrimitive;
-
 use crate::ast;
 use crate::modules::BUILTINS;
 use crate::types::{new, Module, Namespace, ObjectRef};
@@ -508,9 +506,13 @@ impl Visitor {
     }
 
     fn visit_tuple(&mut self, items: Vec<ast::Expr>) -> VisitResult {
-        let num_items = items.len();
-        self.visit_exprs(items)?;
-        self.push(Inst::MakeTuple(num_items));
+        if items.is_empty() {
+            self.push_empty_tuple();
+        } else {
+            let num_items = items.len();
+            self.visit_exprs(items)?;
+            self.push(Inst::MakeTuple(num_items));
+        }
         Ok(())
     }
 
@@ -539,8 +541,7 @@ impl Visitor {
             Kind::Bool(false) => self.push_false(),
             Kind::Ellipsis => self.push_nil(),
             Kind::Int(value) => {
-                if new::in_shared_int_range(&value) {
-                    let index = value.to_usize().unwrap() + 3;
+                if let Some(index) = new::shared_int_global_const_index(&value) {
                     self.push(Inst::LoadGlobalConst(index))
                 } else {
                     self.add_const(new::int(value));
@@ -968,6 +969,10 @@ impl Visitor {
 
     fn push_false(&mut self) {
         self.push(Inst::LoadFalse)
+    }
+
+    fn push_empty_tuple(&mut self) {
+        self.push(Inst::LoadEmptyTuple)
     }
 
     // Code unit constants ---------------------------------------------

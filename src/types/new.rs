@@ -34,20 +34,41 @@ use super::tuple::Tuple;
 use super::result::Params;
 
 static NIL: Lazy<obj_ref_t!(Nil)> = Lazy::new(|| obj_ref!(Nil::new()));
-
 static TRUE: Lazy<obj_ref_t!(Bool)> = Lazy::new(|| obj_ref!(Bool::new(true)));
-
 static FALSE: Lazy<obj_ref_t!(Bool)> = Lazy::new(|| obj_ref!(Bool::new(false)));
 
-pub static GLOBAL_INT_MAX: Lazy<BigInt> = Lazy::new(|| BigInt::from(256));
+static EMPTY_TUPLE: Lazy<obj_ref_t!(Tuple)> =
+    Lazy::new(|| obj_ref!(Tuple::new(vec![])));
 
+static SHARED_INT_INDEX: usize = 4;
+static SHARED_INT_MAX: usize = 256;
+static SHARED_INT_MAX_BIGINT: Lazy<BigInt> = Lazy::new(|| BigInt::from(SHARED_INT_MAX));
 pub static SHARED_INTS: Lazy<Vec<obj_ref_t!(Int)>> = Lazy::new(|| {
-    let end = GLOBAL_INT_MAX.to_u32().unwrap();
-    (0..=end).map(|i| obj_ref!(Int::new(BigInt::from(i)))).collect()
+    (0..=SHARED_INT_MAX).map(|i| obj_ref!(Int::new(BigInt::from(i)))).collect()
 });
 
-pub fn in_shared_int_range(value: &BigInt) -> bool {
-    value.is_zero() || (value.is_positive() && value <= Lazy::force(&GLOBAL_INT_MAX))
+/// Get the corresponding global constant index for an int, if the int
+/// is in the shared int range [0, 256].
+pub fn shared_int_global_const_index(int: &BigInt) -> Option<usize> {
+    if int.is_zero() {
+        Some(SHARED_INT_INDEX)
+    } else if int.is_positive() && int <= Lazy::force(&SHARED_INT_MAX_BIGINT) {
+        Some(int.to_usize().unwrap() + SHARED_INT_INDEX)
+    } else {
+        None
+    }
+}
+
+/// Get the corresponding shared int object for the specified global
+/// constant index, if the index is in the shared int range.
+pub fn shared_int_for_global_const_index(index: usize) -> Option<ObjectRef> {
+    let i = SHARED_INT_INDEX;
+    let j = i + SHARED_INT_MAX;
+    if (i..=j).contains(&index) {
+        Some(SHARED_INTS[index - SHARED_INT_INDEX].clone())
+    } else {
+        None
+    }
 }
 
 // Builtin type constructors -------------------------------------------
@@ -145,7 +166,7 @@ pub fn func(name: String, params: Params, code: Code) -> ObjectRef {
 
 pub fn int<I: Into<BigInt>>(value: I) -> ObjectRef {
     let value = value.into();
-    if value.is_positive() && &value <= Lazy::force(&GLOBAL_INT_MAX) {
+    if value.is_positive() && &value <= Lazy::force(&SHARED_INT_MAX_BIGINT) {
         let index = value.to_usize().unwrap();
         SHARED_INTS[index].clone()
     } else {
@@ -190,7 +211,15 @@ pub fn str<S: Into<String>>(value: S) -> ObjectRef {
 }
 
 pub fn tuple(items: Vec<ObjectRef>) -> ObjectRef {
-    obj_ref!(Tuple::new(items))
+    if items.is_empty() {
+        EMPTY_TUPLE.clone()
+    } else {
+        obj_ref!(Tuple::new(items))
+    }
+}
+
+pub fn empty_tuple() -> ObjectRef {
+    EMPTY_TUPLE.clone()
 }
 
 // Custom type constructor ---------------------------------------------
