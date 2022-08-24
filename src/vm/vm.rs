@@ -103,13 +103,13 @@ impl VM {
         }
     }
 
-    /// Execute the specified instructions and return the VM's state. If
-    /// a HALT instruction isn't encountered, the VM will go "idle"; it
-    /// will maintain its internal state and await further instructions.
-    /// When a HALT instruction is encountered, the VM's state will be
-    /// cleared; it can be "restarted" by passing more instructions to
-    /// execute.
     pub fn execute(&mut self, code: &Code) -> VMExeResult {
+    /// Execute the given code object's instructions and return the VM's
+    /// state. If a HALT instruction isn't encountered, the VM will go
+    /// "idle"--it will maintain its internal state and await further
+    /// instructions. When a HALT instruction is encountered, the VM's
+    /// state will be cleared; it can be "restarted" by passing more
+    /// instructions to execute.
         use Inst::*;
 
         let handle_sigint = self.handle_sigint;
@@ -489,7 +489,7 @@ impl VM {
     }
 
     pub fn halt(&mut self) {
-        // TODO: Not sure what this should do or if it's even needed
+        self.reset();
     }
 
     /// Get location of current statement (start and end).
