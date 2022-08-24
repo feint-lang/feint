@@ -11,7 +11,6 @@ pub(crate) use result::{
 };
 
 mod code;
-mod constants;
 mod context;
 mod inst;
 mod result;

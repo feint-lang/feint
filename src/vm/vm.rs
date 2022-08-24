@@ -107,7 +107,7 @@ impl VM {
     }
 
     pub fn execute_module(&mut self, module: &mut Module, start: usize) -> VMExeResult {
-        self.execute_code(&module.code, start)
+        self.execute_code(module.code(), start)
     }
 
     pub fn execute_func(&mut self, func: &Func, start: usize) -> VMExeResult {
@@ -941,7 +941,7 @@ impl VM {
     }
 
     fn push_global_const(&mut self, index: usize) -> RuntimeResult {
-        let obj = self.ctx.get_global_const(index)?.clone();
+        let obj = self.ctx.get_global_const(index)?;
         self.push(ValueStackKind::GlobalConstant(obj, index));
         Ok(())
     }

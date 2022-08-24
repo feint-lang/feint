@@ -178,7 +178,7 @@ impl Repl {
             }
             ".dis" => {
                 let mut disassembler = dis::Disassembler::new();
-                disassembler.disassemble(&self.module.code);
+                disassembler.disassemble(self.module.code());
             }
             ".globals" => {
                 eprintln!("{:=>72}", "");

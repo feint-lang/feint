@@ -112,7 +112,7 @@ impl Executor {
         let mut main_module = self.compile_script("$main", source, argv)?;
         if self.dis {
             let mut disassembler = dis::Disassembler::new();
-            disassembler.disassemble(&main_module.code);
+            disassembler.disassemble(main_module.code());
             if self.debug {
                 println!();
                 self.display_stack();
