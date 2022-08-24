@@ -109,6 +109,7 @@ impl Repl {
                 VMState::Idle(obj_ref) => {
                     if let Some(obj_ref) = obj_ref {
                         self.print(obj_ref);
+                        self.executor.assign_top("_");
                     } else {
                         eprintln!("No result on stack");
                     }
@@ -139,14 +140,13 @@ impl Repl {
             if let Ok(None) = read_line_result {
                 unreachable!();
             } else if let Ok(Some(new_input)) = read_line_result {
+                input.push('\n');
                 if new_input.is_empty() {
-                    input.push('\n');
                     if blank_line_count > 0 {
                         break self.eval(input.as_str(), false);
                     }
                     blank_line_count += 1;
                 } else {
-                    input.push('\n');
                     input.push_str(new_input.as_str());
                     if blank_line_count > 0 {
                         break self.eval(input.as_str(), false);

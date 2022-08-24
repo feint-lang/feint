@@ -310,7 +310,9 @@ impl VM {
                     self.call(callable, args)?;
                 }
                 Return => {
-                    // self.exit_scope();
+                    // RETURN doesn't do anything in and of itself. It's
+                    // a marker for the end of a function and a jump
+                    // target for explicit returns.
                 }
                 // Object construction
                 MakeString(n) => {

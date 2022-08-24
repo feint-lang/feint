@@ -11,7 +11,8 @@ use crate::util::{
     source_from_file, source_from_stdin, source_from_text, Location, Source,
 };
 use crate::vm::{
-    CallDepth, RuntimeContext, RuntimeErr, RuntimeErrKind, VMExeResult, VMState, VM,
+    CallDepth, Code, Inst, RuntimeContext, RuntimeErr, RuntimeErrKind, VMExeResult,
+    VMState, VM,
 };
 use crate::{ast, dis};
 
@@ -43,6 +44,16 @@ impl Executor {
 
     pub fn install_sigint_handler(&mut self) {
         self.vm.install_sigint_handler();
+    }
+
+    pub fn assign_top(&mut self, name: &str) {
+        let code = Code::with_chunk(vec![
+            Inst::DeclareVar(name.to_owned()),
+            Inst::AssignVar(name.to_owned()),
+        ]);
+        if let Err(err) = self.vm.execute_code(&code, 0) {
+            eprintln!("Could not assign TOS to {name}: {err}");
+        }
     }
 
     /// Execute text entered in REPL. REPL execution is different from
