@@ -573,70 +573,52 @@ impl Visitor {
         end: Location,
     ) -> VisitResult {
         let name = node.name();
+
         // NOTE: When a function is being compiled, find_var will
         //       traverse up as far as the top level scope of the
         //       function. It will NOT proceed up into a function's
         //       enclosing scope, whether that's an outer function or
         //       a module.
-        match self.scope_tree.find_var(name.as_str(), None) {
-            Some(v) => {
-                if v.assigned {
-                    if v.pointer < self.scope_tree.pointer() {
+
+        if let Some(var) = self.scope_tree.find_var(name.as_str(), None) {
+            if var.assigned {
+                self.push(Inst::LoadVar(name));
+            } else {
+                // This happens with assignments of the form `x = x`
+                // where `x` isn't already defined in the current scope.
+                // In this case the RHS `x` must be defined in an outer
+                // scope.
+                if self.scope_tree.find_var_in_parent(name.as_str()).is_some() {
+                    self.push(Inst::LoadOuterVar(name));
+                } else if self.initial_scope_kind == ScopeKind::Module {
+                    if self.has_builtin(name.as_str()) || !self.check_names {
                         self.push(Inst::LoadOuterVar(name));
-                    } else {
-                        self.push(Inst::LoadVar(name));
-                    }
-                } else {
-                    // The var exists but has not been assigned--where
-                    // the RHS side name shadows a name from an outer
-                    // scope. E.g.:
-                    //
-                    //     x = "global"
-                    //     block -> x = x
-                    //     f = () -> x = x
-                    //
-                    if self.initial_scope_kind == ScopeKind::Module {
-                        // When compiling a module, the RHS must be defined
-                        // in an outer scope. If it isn't, that's an error.
-                        let found =
-                            self.scope_tree.find_var_in_parent(name.as_str()).is_some();
-                        if found
-                            || BUILTINS.read().unwrap().has_global(name.as_str())
-                            || !self.check_names
-                        {
-                            self.push(Inst::LoadOuterVar(name));
-                        } else {
-                            return Err(CompErr::name_not_found(name, start, end));
-                        }
-                    } else if self.initial_scope_kind == ScopeKind::Func {
-                        // When compiling a function, the RHS is considered
-                        // a free var and will be resolved later.
-                        self.code.add_free_var(name.as_str(), start, end);
-                    }
-                }
-            }
-            // Var wasn't found in current scope or its ancestors.
-            None => {
-                if self.initial_scope_kind == ScopeKind::Module {
-                    // When compiling a module, all vars should resolve
-                    // at this stage, so this is an error.
-                    if BUILTINS.read().unwrap().has_global(name.as_str())
-                        || !self.check_names
-                    {
-                        self.push(Inst::LoadVar(name));
                     } else {
                         return Err(CompErr::name_not_found(name, start, end));
                     }
                 } else if self.initial_scope_kind == ScopeKind::Func {
-                    // When compiling a function, vars may be defined in
-                    // an enclosing scope. These free vars will be
-                    // resolved later.
                     self.code.add_free_var(name.as_str(), start, end);
                 } else {
                     panic!("Unexpected scope type: {:?}", self.initial_scope_kind);
                 }
             }
+        } else if self.initial_scope_kind == ScopeKind::Module {
+            // When compiling a module, all vars should resolve at this
+            // point, so if the name doesn't resolve to a builtin,
+            // that's an error.
+            if self.has_builtin(name.as_str()) || !self.check_names {
+                self.push(Inst::LoadVar(name));
+            } else {
+                return Err(CompErr::name_not_found(name, start, end));
+            }
+        } else if self.initial_scope_kind == ScopeKind::Func {
+            // When compiling a function, vars may be defined in an
+            // enclosing scope. These free vars will be resolved later.
+            self.code.add_free_var(name.as_str(), start, end);
+        } else {
+            panic!("Unexpected scope type: {:?}", self.initial_scope_kind);
         }
+
         Ok(())
     }
 
@@ -899,16 +881,8 @@ impl Visitor {
                 ));
             }
             self.visit_expr(value_expr, Some(name.clone()))?;
-            let pointer = self.scope_tree.pointer();
-            match self.scope_tree.find_var_in_scope(name.as_str(), pointer) {
-                Some(_) => {
-                    self.scope_tree.mark_assigned(pointer, name.as_str());
-                    self.push(Inst::AssignVar(name))
-                }
-                None => {
-                    panic!("Expected var to exist: {name}");
-                }
-            }
+            self.scope_tree.mark_assigned(self.scope_tree.pointer(), name.as_str());
+            self.push(Inst::AssignVar(name));
             Ok(())
         } else {
             Err(CompErr::expected_ident(lhs_expr.start, lhs_expr.end))
@@ -955,6 +929,10 @@ impl Visitor {
 
     fn replace(&mut self, addr: usize, inst: Inst) {
         self.code.replace_inst(addr, inst);
+    }
+
+    fn has_builtin(&self, name: &str) -> bool {
+        BUILTINS.read().unwrap().has_global(name)
     }
 
     // Global constants ------------------------------------------------
