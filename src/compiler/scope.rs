@@ -120,7 +120,7 @@ impl ScopeTree {
     pub fn add_var<S: Into<String>>(&mut self, addr: usize, name: S, assigned: bool) {
         let name = name.into();
         let pointer = self.pointer;
-        if self.find_var_in_scope(name.as_str(), pointer).is_none() {
+        if !self.get(pointer).vars.iter().any(|v| v.name == name) {
             self.current_mut().vars.push(Var { addr, pointer, name, assigned });
         }
     }
@@ -141,12 +141,6 @@ impl ScopeTree {
         }
     }
 
-    /// Find var in specified scope. This will *panic* if the specified
-    /// scope doesn't exist.
-    pub fn find_var_in_scope(&self, name: &str, pointer: usize) -> Option<Var> {
-        self.get(pointer).vars.iter().find(|v| v.name == name).cloned()
-    }
-
     /// Find var in current scope or any of its ancestor scopes.
     pub fn find_var(&self, name: &str, pointer: Option<usize>) -> Option<Var> {
         let mut scope = if let Some(pointer) = pointer {
@@ -155,9 +149,8 @@ impl ScopeTree {
             self.current()
         };
         loop {
-            let var = self.find_var_in_scope(name, scope.index);
-            if var.is_some() {
-                return var;
+            if let Some(var) = scope.vars.iter().find(|v| v.name == name) {
+                return Some(var.clone());
             }
             if let Some(parent_index) = scope.parent {
                 scope = self.get(parent_index)
@@ -168,6 +161,7 @@ impl ScopeTree {
         None
     }
 
+    /// Find var in parent scope or any of its ancestor scopes.
     pub fn find_var_in_parent(&self, name: &str) -> Option<Var> {
         if self.pointer == 0 {
             None
