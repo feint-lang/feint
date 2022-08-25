@@ -590,19 +590,19 @@ impl Visitor {
                 // scope.
                 if self.scope_tree.find_var_in_parent(name.as_str()).is_some() {
                     self.push(Inst::LoadOuterVar(name));
-                } else if self.initial_scope_kind == ScopeKind::Module {
+                } else if self.is_module() {
                     if self.has_builtin(name.as_str()) || !self.check_names {
                         self.push(Inst::LoadOuterVar(name));
                     } else {
                         return Err(CompErr::name_not_found(name, start, end));
                     }
-                } else if self.initial_scope_kind == ScopeKind::Func {
+                } else if self.is_func() {
                     self.code.add_free_var(name.as_str(), start, end);
                 } else {
                     panic!("Unexpected scope type: {:?}", self.initial_scope_kind);
                 }
             }
-        } else if self.initial_scope_kind == ScopeKind::Module {
+        } else if self.is_module() {
             // When compiling a module, all vars should resolve at this
             // point, so if the name doesn't resolve to a builtin,
             // that's an error.
@@ -611,7 +611,7 @@ impl Visitor {
             } else {
                 return Err(CompErr::name_not_found(name, start, end));
             }
-        } else if self.initial_scope_kind == ScopeKind::Func {
+        } else if self.is_func() {
             // When compiling a function, vars may be defined in an
             // enclosing scope. These free vars will be resolved later.
             self.code.add_free_var(name.as_str(), start, end);
@@ -848,7 +848,7 @@ impl Visitor {
             }
             name
         } else if let Some(name) = ident_expr.is_special_ident() {
-            if name == "$main" && self.scope_tree.in_global_scope() {
+            if name == "$main" && self.in_global_scope() {
                 name
             } else {
                 return Err(CompErr::cannot_assign_special_ident(
@@ -918,6 +918,18 @@ impl Visitor {
     }
 
     // Utilities -------------------------------------------------------
+
+    fn is_module(&self) -> bool {
+        self.initial_scope_kind == ScopeKind::Module
+    }
+
+    fn is_func(&self) -> bool {
+        self.initial_scope_kind == ScopeKind::Func
+    }
+
+    fn in_global_scope(&self) -> bool {
+        self.scope_tree.in_global_scope()
+    }
 
     fn len(&self) -> usize {
         self.code.len_chunk()
@@ -1023,8 +1035,7 @@ impl Visitor {
 
 impl fmt::Display for Visitor {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let suffix =
-            if self.initial_scope_kind == ScopeKind::Module { "" } else { "()" };
+        let suffix = if self.is_module() { "" } else { "()" };
         write!(f, "{}{suffix} with {} instructions", self.name, self.code.len_chunk())
     }
 }
