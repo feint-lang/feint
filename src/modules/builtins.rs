@@ -4,14 +4,13 @@ use std::sync::{Arc, RwLock};
 use once_cell::sync::Lazy;
 
 use crate::types::{new, Module, Namespace, ObjectRef, ObjectTrait};
-use crate::vm::RuntimeErr;
 
 use crate::types::bool::BOOL_TYPE;
 use crate::types::bound_func::BOUND_FUNC_TYPE;
 use crate::types::builtin_func::BUILTIN_FUNC_TYPE;
 use crate::types::class::TYPE_TYPE;
 use crate::types::closure::CLOSURE_TYPE;
-use crate::types::error::ERROR_TYPE;
+use crate::types::error::{ErrorKind, ERROR_TYPE};
 use crate::types::file::FILE_TYPE;
 use crate::types::float::FLOAT_TYPE;
 use crate::types::func::FUNC_TYPE;
@@ -73,6 +72,10 @@ pub static BUILTINS: Lazy<new::obj_ref_t!(Module)> = Lazy::new(|| {
             // Args:
             //     condition: Bool
             //     message?: Any
+            //
+            // Returns:
+            //     true: if the assertion succeeded
+            //     Error: if the assertion failed
             "assert",
             new::builtin_func("assert", None, &["assertion", ""], |_, args, _| {
                 let arg = args.get(0).unwrap();
@@ -95,7 +98,7 @@ pub static BUILTINS: Lazy<new::obj_ref_t!(Module)> = Lazy::new(|| {
                             msg_arg.to_string()
                         }
                     };
-                    Err(RuntimeErr::assertion_failed(msg))
+                    Ok(new::error(ErrorKind::Assertion, msg))
                 }
             }),
         ),

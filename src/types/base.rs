@@ -20,7 +20,7 @@ use super::cell::{Cell, CellType};
 use super::class::{Type, TypeType};
 use super::closure::{Closure, ClosureType};
 use super::custom::{CustomObj, CustomType};
-use super::error::{Error, ErrorKind, ErrorType};
+use super::error::{Error, ErrorType};
 use super::file::{File, FileType};
 use super::float::{Float, FloatType};
 use super::func::{Func, FuncType};
@@ -199,9 +199,6 @@ pub trait ObjectTrait {
             names.dedup();
             let items = names.iter().map(new::str).collect();
             return Ok(new::tuple(items));
-        }
-        if name == "is_err" {
-            return Ok(new::bool(self.is_error()));
         }
         if name == "err" {
             return if self.is_error() { Ok(this.clone()) } else { Ok(new::nil()) };
