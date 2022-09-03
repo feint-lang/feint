@@ -68,12 +68,11 @@ impl Executor {
         let ast_module = self.parse_source(source)?;
         let mut compiler = Compiler::new(false);
 
-        let code = compiler.compile_module_to_code(module.name(), ast_module).map_err(
-            |err| {
-                self.handle_comp_err(&err, source);
-                ExeErr::new(ExeErrKind::CompErr(err.kind))
-            },
-        )?;
+        let comp_result = compiler.compile_module_to_code(module.name(), ast_module);
+        let code = comp_result.map_err(|err| {
+            self.handle_comp_err(&err, source);
+            ExeErr::new(ExeErrKind::CompErr(err.kind))
+        })?;
 
         // XXX: Rather than extending the module's code object, perhaps
         //      it would be better to compile INTO the existing module.

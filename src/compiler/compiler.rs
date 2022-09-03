@@ -90,7 +90,10 @@ impl Compiler {
         for (addr, scope_tree_pointer, name, node) in func_nodes {
             self.compile_func(addr, scope_tree_pointer, name, node)?;
         }
-        let visitor = self.visitor_stack.pop().unwrap().0;
+        let mut visitor = self.visitor_stack.pop().unwrap().0;
+        // XXX: The NOOP ensures there's always jump target at the end
+        //      of a module.
+        visitor.push(Inst::NoOp);
         Ok(visitor.code)
     }
 
