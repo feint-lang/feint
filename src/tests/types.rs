@@ -43,7 +43,7 @@ mod list {
     fn test_push_exists() {
         let obj_ref = new::list(vec![]);
         let list = obj_ref.read().unwrap();
-        let push = list.get_attr("push");
+        let push = list.get_attr("push", obj_ref.clone());
         assert!(push.is_ok());
     }
 }
@@ -69,18 +69,19 @@ mod custom {
         ns.add_obj("value", new::nil());
         let t1_obj3 = new::custom_instance(t1.clone(), ns);
 
-        assert!(t1.clone().read().unwrap().get_attr("$id").is_ok());
-        assert!(t1.clone().read().unwrap().get_attr("$type").is_ok());
-        assert!(t1_obj1.read().unwrap().get_attr("$id").is_ok());
-        assert!(t1_obj1.read().unwrap().get_attr("$type").is_ok());
+        assert!(t1.clone().read().unwrap().get_attr("$id", t1.clone()).is_ok());
+        assert!(t1.clone().read().unwrap().get_attr("$type", t1.clone()).is_ok());
+        assert!(t1_obj1.read().unwrap().get_attr("$id", t1_obj1.clone()).is_ok());
+        assert!(t1_obj1.read().unwrap().get_attr("$type", t1_obj1.clone()).is_ok());
 
-        let was_set = t1_obj3.write().unwrap().set_attr("value", new::int(1));
+        let was_set =
+            t1_obj3.write().unwrap().set_attr("value", new::int(1), t1_obj3.clone());
         assert!(was_set.is_ok(), "Could not set `value` on t1_obj3");
-        assert!(t1_obj3.read().unwrap().get_attr("value").is_ok());
+        assert!(t1_obj3.read().unwrap().get_attr("value", t1_obj3.clone()).is_ok());
         assert!(t1_obj3
             .read()
             .unwrap()
-            .get_attr("value")
+            .get_attr("value", t1_obj3.clone())
             .unwrap()
             .read()
             .unwrap()

@@ -165,7 +165,18 @@ pub trait ObjectTrait {
 
     // Attributes (accessed by name) -----------------------------------
 
-    fn get_attr(&self, name: &str) -> GetAttrResult {
+    /// Get attribute.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The name of the attribute.
+    /// * `this` - The object reference wrapping `self`. The main use
+    ///    for this currently is to allow the object reference to be
+    ///    returned as the result without having to clone the inner
+    ///    object.
+    ///    TODO: There's probably a more elegant way to do this, but it
+    ///          might require a bit of re-architecting.
+    fn get_attr(&self, name: &str, this: ObjectRef) -> GetAttrResult {
         if name == "$type" {
             return Ok(self.type_obj().clone());
         }
@@ -193,11 +204,7 @@ pub trait ObjectTrait {
             return Ok(new::bool(self.is_error()));
         }
         if name == "err" {
-            return if let Some(error) = self.down_to_error() {
-                Ok(new::obj_ref!(error.clone()))
-            } else {
-                Ok(new::nil())
-            };
+            return if self.is_error() { Ok(this.clone()) } else { Ok(new::nil()) };
         }
         if let Some(obj) = self.ns().get_obj(name) {
             return Ok(obj);
@@ -208,7 +215,20 @@ pub trait ObjectTrait {
         Err(self.attr_does_not_exist(name))
     }
 
-    fn set_attr(&mut self, name: &str, _value: ObjectRef) -> SetAttrResult {
+    /// Set attribute.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The name of the attribute
+    /// * `value` - The new value for the attribute
+    /// * `this` - The object reference wrapping `self` (see note on
+    ///   `get_attr()`.
+    fn set_attr(
+        &mut self,
+        name: &str,
+        _value: ObjectRef,
+        _this: ObjectRef,
+    ) -> SetAttrResult {
         Err(RuntimeErr::attr_cannot_be_set(
             self.class().read().unwrap().full_name(),
             name,

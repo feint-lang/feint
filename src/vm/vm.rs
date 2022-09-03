@@ -591,7 +591,7 @@ impl VM {
             Sub => a.sub(b)?,
             Dot => {
                 let obj_ref = if let Some(name) = b.get_str_val() {
-                    a.get_attr(name)?
+                    a.get_attr(name, a_ref.clone())?
                 } else if let Some(index) = b.get_usize_val() {
                     a.get_item(index)?
                 } else {

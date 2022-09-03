@@ -29,7 +29,7 @@ pub static ERROR_TYPE: Lazy<new::obj_ref_t!(ErrorType)> = Lazy::new(|| {
 
 // Error Object --------------------------------------------------------
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub enum ErrorKind {
     Assertion,
 }
@@ -45,12 +45,6 @@ gen::standard_object_impls!(Error);
 impl Error {
     pub fn new(kind: ErrorKind, message: String) -> Self {
         Self { ns: Namespace::new(), kind, message }
-    }
-}
-
-impl Clone for Error {
-    fn clone(&self) -> Self {
-        Self::new(self.kind.clone(), self.message.clone())
     }
 }
 

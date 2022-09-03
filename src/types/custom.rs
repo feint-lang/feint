@@ -100,7 +100,12 @@ impl ObjectTrait for CustomObj {
         &mut self.ns
     }
 
-    fn set_attr(&mut self, name: &str, value: ObjectRef) -> SetAttrResult {
+    fn set_attr(
+        &mut self,
+        name: &str,
+        value: ObjectRef,
+        _this: ObjectRef,
+    ) -> SetAttrResult {
         self.ns.set_obj(name, value);
         Ok(())
     }

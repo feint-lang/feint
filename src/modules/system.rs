@@ -32,7 +32,7 @@ pub fn init_system_module(argv: &[String]) {
 /// Add a module to `system.modules`.
 pub fn _add_module(name: &str, module: Module) -> RuntimeResult {
     let system = SYSTEM.read().unwrap();
-    let modules = system.get_attr("modules")?;
+    let modules = system.get_attr("modules", SYSTEM.clone())?;
     let modules = modules.write().unwrap();
     let modules = modules.down_to_map().expect("Expected system.modules to be a Map");
     let module = new::obj_ref!(module);
@@ -43,7 +43,7 @@ pub fn _add_module(name: &str, module: Module) -> RuntimeResult {
 /// Get a module from `system.modules`.
 pub fn get_module(name: &str) -> RuntimeObjResult {
     let system = SYSTEM.read().unwrap();
-    let modules = system.get_attr("modules")?;
+    let modules = system.get_attr("modules", SYSTEM.clone())?;
     let modules = modules.read().unwrap();
     let modules = modules.down_to_map().expect("Expected system.modules to be a Map");
     if let Some(module) = modules.get(name) {
