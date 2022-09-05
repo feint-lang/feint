@@ -5,7 +5,7 @@ It's a learning project and a work in progress and is not meant for
 production use.
 
 Here's what a simple function definition looks like (more examples
-below):
+below and in the `examples` directory):
 
 ```
 raise = (x, p) -> x ^ p
@@ -306,6 +306,9 @@ NOTE: The implementation hasn't been well-tested and complex closures
       might not work as expected.
 
 ## Custom Types
+
+TODO: Custom types are still in the idea phase and haven't been 
+implemented.
 
 - Upper camel case names only
 - Still working out some details
