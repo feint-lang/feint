@@ -1,7 +1,19 @@
 # FeInt
 
 FeInt is a stack-based, bytecode-style interpreter written in Rust.
-It's a learning project and is not meant for production use.
+It's a learning project and a work in progress and is not meant for
+production use.
+
+Here's what a simple function definition looks like (more examples
+below):
+
+```
+raise = (x, p) -> x ^ p
+```
+
+FeInt is "bytecode-style" in the sense that instructions are defined as
+Rust enum variants and not actual byte code. This makes defining and
+handling instructions much simpler than in, say, C.
 
 ## Author
 
@@ -10,6 +22,28 @@ Wyatt Baldwin <code@wyattbaldwin.com>
 ## License
 
 MIT. See the LICENSE file.
+
+## Inspiration & Resources
+
+- [Crafting Interpreters](https://craftinginterpreters.com)
+- Python, JavaScript, Rust, and a handful of other languages
+
+## Building & Running
+
+FeInt is a standard Cargo project, so it can built with `cargo build`
+and tested with `cargo test`.
+
+TODO: Write a lot more tests.
+
+The REPL can be run with `cargo run` and scripts can be run with
+`cargo run <file>`.
+
+NOTE: A script is just a module that may contain a `$main` function.
+`$main` is a special name that can only be bound to a function in the
+global scope of a module. When a script is run, `$main` will be called
+automatically with args passed on the command line (AKA `argv`).
+
+`$main` is equivalent to `if __name__ == "__main__": ...` in Python.
 
 ## Ideas
 
@@ -43,6 +77,7 @@ TODO
 - Tuple
 - List
 - Map
+- Error
 - BuiltinFunc (e.g., `print()`)
 - Func
 - Module
@@ -126,8 +161,8 @@ else -> false
 x = if true -> true else -> false
 
 # The else block is optional; nil is returned by default
-if true -> true    # result is true
-if false -> false  # result is nil
+if true -> true          # result is true
+if false -> "1 + 1 = 5"  # result is nil
 ```
 
 ## Match
@@ -156,14 +191,14 @@ loop ->
 # Loop from 0 up to, but not including, 10
 # Expression value is 9 (last value of i)
 #
-# TODO:
+# TODO: Implement Range & Iterator
 loop i <- 0..10 ->
     i
 
 # Loop from 1 to 10, including 10
 # Expression value is 10 (last value of i)
 #
-# TODO:
+# TODO: Implement Range & Iterator
 loop i <- 1...10 ->
     i
 
@@ -227,6 +262,17 @@ my_func = (x) ->
 my_func = (func) -> func()
 my_func(() -> nil)
 # -> nil
+```
+
+Functions can be defined with a var args parameter in the last position,
+which can be accessed in the body of the function as `$args`. `$args`
+is always a tuple and will be empty if there are no var args.
+
+```
+# $main is special; $args is argv
+$main = (...) -> print($args)
+
+f = (x, y, ...) -> print(x, y, $args)
 ```
 
 ### Closures

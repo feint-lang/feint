@@ -3,17 +3,17 @@
 //! The error type represents _recoverable_ runtime errors that can be
 //! checked in user code using this pattern:
 //!
-//!     result = do_something()
-//!     if result.err ->
-//!         # Handle `result` as an `Error`
-//!         print(result)
+//! result = assert(false)
+//! if result.err ->
+//!     # Handle `result` as an `Error`
+//!     print(result)
 //!
 //! _All_ objects respond to `err`, which returns either an `Error`
 //! object or `nil`. `Error` objects evaluate as `false` in a boolean
 //! context:
 //!
-//!     if !assert(false) ->
-//!         print("false is not true")
+//! if !assert(false) ->
+//!     print("false is not true")
 use std::any::Any;
 use std::fmt;
 use std::sync::{Arc, RwLock};
