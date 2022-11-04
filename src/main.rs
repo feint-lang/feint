@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use clap::{value_parser, Arg, ArgAction, Command};
+use clap::{parser::ValueSource, value_parser, Arg, ArgAction, Command};
 
 use feint::repl;
 use feint::run;
@@ -11,11 +11,8 @@ use feint::vm::{CallDepth, DEFAULT_MAX_CALL_DEPTH};
 fn main() -> ExitCode {
     env_logger::init();
 
-    let default_max_call_depth = DEFAULT_MAX_CALL_DEPTH.to_string();
-
     let app = Command::new("FeInt")
         .version("0.0.0")
-        .trailing_var_arg(true)
         .arg(
             Arg::new("FILE_NAME")
                 .index(1)
@@ -29,14 +26,14 @@ fn main() -> ExitCode {
                 .long("code")
                 .required(false)
                 .conflicts_with("FILE_NAME")
-                .takes_value(true)
+                .num_args(1)
                 .help("Code to run"),
         )
         .arg(
             Arg::new("history_path")
                 .long("history-path")
                 .required(false)
-                .takes_value(true)
+                .num_args(1)
                 .help("Disable REPL history?"),
         )
         .arg(
@@ -49,7 +46,7 @@ fn main() -> ExitCode {
             Arg::new("max_call_depth")
                 .short('m')
                 .long("max-call-depth")
-                .default_value(default_max_call_depth.as_str())
+                .default_value("0")
                 .value_parser(value_parser!(CallDepth))
                 .help("Maximum call/recursion depth"),
         )
@@ -67,7 +64,7 @@ fn main() -> ExitCode {
                 .action(ArgAction::SetTrue)
                 .help("Enable debug mode?"),
         )
-        .arg(Arg::new("argv").index(2).multiple(true));
+        .arg(Arg::new("argv").index(2).trailing_var_arg(true).num_args(0..));
 
     let matches = app.get_matches();
     let file_name = matches.get_one::<String>("FILE_NAME");
@@ -77,10 +74,15 @@ fn main() -> ExitCode {
     let max_call_depth = *matches.get_one("max_call_depth").unwrap();
     let dis = *matches.get_one::<bool>("dis").unwrap();
     let debug = *matches.get_one::<bool>("debug").unwrap();
+    let argv = matches
+        .get_many::<String>("argv")
+        .unwrap_or_default()
+        .map(|v| v.to_string())
+        .collect();
 
-    let argv: Vec<String> = match matches.values_of("argv") {
-        Some(values) => values.map(|a| a.to_owned()).collect(),
-        None => vec![],
+    let max_call_depth = match matches.value_source("max_call_depth") {
+        Some(ValueSource::DefaultValue) => DEFAULT_MAX_CALL_DEPTH,
+        _ => max_call_depth,
     };
 
     let result = if let Some(code) = code {
