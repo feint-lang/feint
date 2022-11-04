@@ -7,7 +7,7 @@ pub enum FormatStrToken {
     Expr(Vec<TokenWithLocation>),
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum FormatStrErr {
     EmptyExpr(usize),
     UnmatchedOpeningBracket(usize),

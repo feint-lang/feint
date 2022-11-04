@@ -54,11 +54,8 @@ impl Repl {
                 Ok(Some(input)) => {
                     // Evaluate the input. If eval returns a result of
                     // any kind (ok or err), shut down the REPL.
-                    match self.eval(input.as_str(), true) {
-                        Some(result) => {
-                            break result;
-                        }
-                        None => (),
+                    if let Some(result) = self.eval(input.as_str(), true) {
+                        break result;
                     }
                 }
                 // User hit Ctrl-C

@@ -6,7 +6,7 @@ use std::fmt;
 use crate::scanner::Token;
 
 /// Unary operators.
-#[derive(Clone, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 pub enum UnaryOperator {
     Plus,
     Negate,
@@ -40,7 +40,7 @@ impl fmt::Debug for UnaryOperator {
 }
 
 /// Unary comparison operators.
-#[derive(Clone, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 pub enum UnaryCompareOperator {
     Not,
     AsBool,
@@ -74,7 +74,7 @@ impl fmt::Debug for UnaryCompareOperator {
 }
 
 /// Binary operators.
-#[derive(Clone, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 pub enum BinaryOperator {
     Pow,
     Mul,
@@ -126,7 +126,7 @@ impl fmt::Debug for BinaryOperator {
 }
 
 /// Binary comparison operators (operators that return bool).
-#[derive(Clone, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 pub enum CompareOperator {
     Is,
     IsNot,
@@ -184,7 +184,7 @@ impl fmt::Debug for CompareOperator {
 }
 
 /// Inplace binary operators (e.g. +=)
-#[derive(Clone, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 pub enum InplaceOperator {
     Mul,
     Div,

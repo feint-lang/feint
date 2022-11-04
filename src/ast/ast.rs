@@ -535,12 +535,12 @@ impl fmt::Debug for LiteralKind {
 }
 
 /// Identifiers - names for variables, functions, and types
-#[derive(Clone, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 pub struct Ident {
     pub kind: IdentKind,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 pub enum IdentKind {
     Ident(String),
     SpecialIdent(String),

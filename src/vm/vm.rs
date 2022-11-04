@@ -655,10 +655,10 @@ impl VM {
         let b = b_ref.read().unwrap();
         let b = &*b;
         let result = match op {
-            InplaceOperator::Mul => a.mul(&*b)?,
-            InplaceOperator::Div => a.div(&*b)?,
-            InplaceOperator::Add => a.add(&*b)?,
-            InplaceOperator::Sub => a.sub(&*b)?,
+            InplaceOperator::Mul => a.mul(b)?,
+            InplaceOperator::Div => a.div(b)?,
+            InplaceOperator::Add => a.add(b)?,
+            InplaceOperator::Sub => a.sub(b)?,
         };
         if let ValueStackKind::Var(_, depth, name) = a_kind {
             self.ctx.assign_var_at_depth(depth, name.as_str(), result.clone())?;

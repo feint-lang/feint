@@ -182,7 +182,7 @@ impl<T: BufRead> Iterator for Source<T> {
 }
 
 /// Represents a line and column in the source.
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct Location {
     pub line: usize,
     pub col: usize,
