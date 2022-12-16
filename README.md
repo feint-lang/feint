@@ -244,15 +244,9 @@ my_func = (x) ->
 - Value of last evaluated expression is returned
 
 ```
-# Named function
+# Named functions
 <name> = ([params]) ->
     <block>
-
-<name> = ([params]) -> <expression>
-
-# Anonymous function assigned to a var
-<name> = ([params]) ->
-    <body>
 
 <name> = ([params]) -> <expression>
 
