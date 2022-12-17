@@ -1,2 +1,0 @@
-print (any) ->
-    "Delegate to system printer somehow (???)"
