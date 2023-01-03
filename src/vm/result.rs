@@ -45,6 +45,10 @@ impl RuntimeErr {
         Self { kind }
     }
 
+    pub fn exit(code: u8) -> Self {
+        Self::new(RuntimeErrKind::Exit(code))
+    }
+
     pub fn assertion_failed(message: String) -> Self {
         Self::new(RuntimeErrKind::AssertionFailed(message))
     }
@@ -134,6 +138,7 @@ impl fmt::Display for RuntimeErr {
 
 #[derive(Clone, Debug)]
 pub enum RuntimeErrKind {
+    Exit(u8),
     AssertionFailed(String),
     EmptyStack,
     NotEnoughValuesOnStack(usize),

@@ -146,14 +146,22 @@ impl Executor {
             self.display_stack();
             self.display_vm_state(&result);
         }
-        result.map_err(|err| {
-            let start = self.vm.loc().0;
-            let line =
-                source.get_line(start.line).unwrap_or("<source line not available>");
-            self.print_err_line(start.line, line);
-            self.handle_runtime_err(&err);
-            ExeErr::new(ExeErrKind::RuntimeErr(err.kind))
-        })
+        match result {
+            Ok(state) => Ok(state),
+            Err(err) => {
+                if let RuntimeErrKind::Exit(code) = err.kind {
+                    Ok(VMState::Halted(code))
+                } else {
+                    let start = self.vm.loc().0;
+                    let line = source
+                        .get_line(start.line)
+                        .unwrap_or("<source line not available>");
+                    self.print_err_line(start.line, line);
+                    self.handle_runtime_err(&err);
+                    Err(ExeErr::new(ExeErrKind::RuntimeErr(err.kind)))
+                }
+            }
+        }
     }
 
     /// Compile AST module node into module object.
