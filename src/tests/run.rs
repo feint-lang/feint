@@ -74,6 +74,25 @@ mod str {
     use super::*;
 
     #[test]
+    fn test_new() {
+        assert_result_is_ok(run_text("Str.new(\"string\")"));
+        assert_result_is_ok(run_text("Str.new(nil) == \"nil\""));
+        assert_result_is_ok(run_text("Str.new(true) == \"true\""));
+        assert_result_is_ok(run_text("Str.new(false) == \"false\""));
+        assert_result_is_ok(run_text("Str.new(1) == \"1\""));
+        assert_result_is_ok(run_text("Str.new(1.0) == \"1.0\""));
+        assert_result_is_ok(run_text("Str.new(()) == \"()\""));
+        assert_result_is_ok(run_text("Str.new([]) == \"[]\""));
+        assert_result_is_ok(run_text("Str.new({}) == \"{}\""));
+        assert_result_is_ok(run_text(
+            "Str.new(print).starts_with(\"function print/0+ @\")",
+        ));
+        assert_result_is_ok(run_text(
+            "Str.new(() -> nil).starts_with(\"function <anonymous>/0 @\")",
+        ));
+    }
+
+    #[test]
     fn test_starts_with() {
         assert_result_is_ok(run_text("'abc'.starts_with('a')"));
     }

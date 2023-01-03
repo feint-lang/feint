@@ -22,6 +22,11 @@ pub static STR_TYPE: Lazy<new::obj_ref_t!(StrType)> = Lazy::new(|| {
     let mut class = type_ref.write().unwrap();
 
     class.ns_mut().add_entries(&[
+        // Class Methods -----------------------------------------------
+        gen::meth!("new", type_ref, &["value"], |_, args, _| {
+            let arg = gen::use_arg!(args, 0);
+            Ok(if arg.is_str() { args[0].clone() } else { new::str(arg.to_string()) })
+        }),
         // Instance Attributes -----------------------------------------
         gen::prop!("length", type_ref, |this, _, _| {
             let this = this.read().unwrap();
@@ -35,6 +40,16 @@ pub static STR_TYPE: Lazy<new::obj_ref_t!(StrType)> = Lazy::new(|| {
             let arg = gen::use_arg!(args, 0);
             let prefix = gen::use_arg_str!(arg);
             Ok(new::bool(this.value.starts_with(prefix)))
+        }),
+        gen::meth!("replace", type_ref, &["old", "new"], |this, args, _| {
+            let this = this.read().unwrap();
+            let this = this.down_to_str().unwrap();
+            let arg1 = gen::use_arg!(args, 0);
+            let arg2 = gen::use_arg!(args, 1);
+            let old = gen::use_arg_str!(arg1);
+            let new = gen::use_arg_str!(arg2);
+            let result = this.value.replace(old, new);
+            Ok(new::str(result))
         }),
     ]);
 

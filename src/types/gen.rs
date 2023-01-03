@@ -159,7 +159,7 @@ macro_rules! meth {
     };
 }
 
-/// This similar to `meth!` but it creates a property instead of a
+/// This is similar to `meth!` but it creates a property instead of a
 /// method and has no `$params` arg.
 macro_rules! prop {
     ( $name:literal, $this_type:expr, $func:expr ) => {
