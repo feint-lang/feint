@@ -3,7 +3,7 @@ use std::sync::{Arc, RwLock};
 
 use once_cell::sync::Lazy;
 
-use crate::types::{new, Module, Namespace, ObjectRef, ObjectTrait};
+use crate::types::{new, Module, Namespace, ObjectRef};
 
 use crate::types::bool::BOOL_TYPE;
 use crate::types::bound_func::BOUND_FUNC_TYPE;
@@ -21,6 +21,9 @@ use crate::types::module::MODULE_TYPE;
 use crate::types::nil::NIL_TYPE;
 use crate::types::str::STR_TYPE;
 use crate::types::tuple::TUPLE_TYPE;
+
+use crate::util::check_args;
+use crate::vm::RuntimeErr;
 
 pub static BUILTINS: Lazy<new::obj_ref_t!(Module)> = Lazy::new(|| {
     let entries: Vec<(&str, ObjectRef)> = vec![
@@ -72,34 +75,44 @@ pub static BUILTINS: Lazy<new::obj_ref_t!(Module)> = Lazy::new(|| {
             // Args:
             //     condition: Bool
             //     message?: Any
+            //     throw?: Bool = false
             //
             // Returns:
             //     true: if the assertion succeeded
-            //     Error: if the assertion failed
+            //     Error: if the assertion failed and throw unset
+            //     RuntimeError: if the assertion failed and throw set
             "assert",
             new::builtin_func("assert", None, &["assertion", ""], |_, args, _| {
+                let (_, n_var_args, var_args) =
+                    check_args("assert()", 1, Some(3), true, &args)?;
+
                 let arg = args.get(0).unwrap();
                 let arg = arg.read().unwrap();
                 let success = arg.bool_val()?;
+
                 if success {
-                    Ok(new::true_())
-                } else {
-                    let var_args = args.get(1).unwrap();
-                    let var_args = var_args.read().unwrap();
-                    let var_args = var_args.down_to_tuple().unwrap();
-                    let msg = if var_args.is_empty() {
-                        "".to_string()
-                    } else {
-                        let msg_arg = var_args.get_item(0)?;
-                        let msg_arg = msg_arg.read().unwrap();
-                        if let Some(msg) = msg_arg.get_str_val() {
-                            msg.to_string()
-                        } else {
-                            msg_arg.to_string()
-                        }
-                    };
-                    Ok(new::error(ErrorKind::Assertion, msg))
+                    return Ok(new::true_());
                 }
+
+                let var_args = var_args.read().unwrap();
+
+                let msg = if n_var_args == 0 {
+                    "".to_string()
+                } else {
+                    let msg_arg = var_args.get_item(0)?;
+                    let msg_arg = msg_arg.read().unwrap();
+                    msg_arg.to_string()
+                };
+
+                if n_var_args == 2 {
+                    let throw_arg = var_args.get_item(1)?;
+                    let throw_arg = throw_arg.read().unwrap();
+                    if throw_arg.bool_val()? {
+                        return Err(RuntimeErr::assertion_failed(msg));
+                    }
+                }
+
+                Ok(new::error(ErrorKind::Assertion, msg))
             }),
         ),
         (
