@@ -414,7 +414,8 @@ impl Executor {
                 format!("Index out of bounds on {type_name}: {index}")
             }
             NotCallable(type_name) => format!("Object is not callable: {type_name}"),
-            kind => format!("Unhandled runtime error: {:?}", kind),
+            ArgErr(msg) => format!("Bad argument: {msg}"),
+            kind => format!("Unhandled runtime error: {}", kind),
         };
         self.print_err_message(message, start, end);
     }

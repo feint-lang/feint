@@ -1,3 +1,4 @@
+pub(crate) use call::check_args;
 pub(crate) use operators::{
     BinaryOperator, CompareOperator, InplaceOperator, UnaryCompareOperator,
     UnaryOperator,
@@ -7,6 +8,7 @@ pub(crate) use source::{
 };
 pub(crate) use stack::Stack;
 
+mod call;
 mod operators;
 mod source;
 mod stack;
