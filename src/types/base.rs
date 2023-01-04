@@ -210,6 +210,11 @@ pub trait ObjectTrait {
                 new::str(this.read().unwrap().to_string())
             });
         }
+        if let Some(map) = self.down_to_map() {
+            if let Some(obj) = map.get(name) {
+                return Ok(obj.clone());
+            }
+        }
         if let Some(obj) = self.ns().get_obj(name) {
             return Ok(obj);
         }
