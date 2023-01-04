@@ -364,7 +364,7 @@ impl Visitor {
             let inst = &self.code[addr];
             if let Inst::ReturnPlaceholder(inst_addr, depth) = inst {
                 let rel_addr = return_addr - inst_addr;
-                self.replace(*inst_addr, Inst::Jump(rel_addr, true, depth - 1));
+                self.replace(*inst_addr, Inst::Jump(rel_addr, true, *depth));
             }
         }
 
