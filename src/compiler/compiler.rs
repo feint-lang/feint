@@ -250,10 +250,6 @@ impl Compiler {
         let parent_visitor = &mut self.visitor_stack.peek_mut().unwrap().0;
         let const_index = parent_visitor.code.add_const(func);
 
-        let mut captured_names: Vec<String> =
-            captured.into_iter().map(|info| info.name).collect();
-        captured_names.sort();
-        captured_names.dedup();
         parent_visitor.replace(func_addr + 1, Inst::MakeFunc(const_index));
 
         Ok(())
