@@ -15,15 +15,16 @@ use crate::vm::RuntimeErr;
 ///
 /// A tuple with the following items:
 ///
+/// - this
 /// - total number of args
 /// - number of var args
 /// - vargs
 pub(crate) fn check_args(
     name: &str,
+    args: &Args,
+    has_var_args: bool,
     min: usize,
     max: Option<usize>,
-    has_var_args: bool,
-    args: &Args,
 ) -> Result<(usize, usize, ObjectRef), RuntimeErr> {
     let mut n_args = args.len();
 

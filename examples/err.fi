@@ -1,0 +1,82 @@
+#err = Err.new(ErrType.assertion, nil)
+#assert(err.err, $"Expected err, not {err.$type}", true)
+#assert(err.type == ErrType.arg, $"err.type is {err.type}, not nested", true)
+#
+#arg_err = Err.new(ErrType.arg, "bad arg: a")
+#assert(!!arg_err, "expected err", true)
+#assert(!nil.err, "did not expect err", true)
+#assert(!1.err, "did not expect err", true)
+#
+## Error objects have an err attribute too, which just points at itself
+## (is this useful?).
+#assert(arg_err === arg_err.err, "", true)
+#assert(arg_err.err, $"expected err {arg_err.err}", true)
+
+check_result = (result, expected) ->
+    print("Checking result:", result)
+
+    statuses = []
+    errs = []
+
+    # One way to handle a potential error is like this:
+    if result.ok ->
+        statuses.push("ok")
+    else ->
+        statuses.push("err")
+        match result.err.type ->
+            ErrType.assertion ->
+                errs.push("assertion")
+            : ->
+                errs.push($"{result.err.type}")
+
+    # Another way:
+    if result.err ->
+        statuses.push("err")
+        match result.err.type ->
+            ErrType.assertion ->
+                errs.push("assertion")
+            : ->
+                errs.push($"{result.err.type}")
+    else ->
+        statuses.push("ok")
+
+#    # And yet another way:
+    match result.err.type ->
+        ErrType.ok ->
+            statuses.push("ok")
+        ErrType.assertion ->
+            statuses.push("err")
+            errs.push("assertion")
+        : ->
+            statuses.push("err")
+            errs.push($"{result.err.type}")
+
+    r = (result.ok, !!result.err, statuses, errs)
+
+    print($"result = {result}, ok = {r.0}, err = {r.1}, statuses = {r.2}, errs = {r.3}\n")
+    assert(r == expected, $"\n    expected: {expected}\n      actual: {r}", true)
+
+check_result(
+    1,
+    (true, false, ["ok", "ok", "ok"], []),
+)
+
+check_result(
+    assert(false),
+    (false, true, ["err", "err", "err"], ["assertion", "assertion", "assertion"]),
+)
+
+handle_result = (result) ->
+    if result.err ->
+        jump err
+
+    print("handling ok case for", result)
+
+    ok:
+    return "ok"
+
+    err:
+    return "err"
+
+assert(handle_result(1) === "ok")
+assert(handle_result(assert(false)) === "err")

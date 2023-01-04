@@ -20,8 +20,8 @@ use super::cell::{Cell, CellType};
 use super::class::{Type, TypeType};
 use super::closure::{Closure, ClosureType};
 use super::custom::{CustomObj, CustomType};
-use super::error::{Error, ErrorType};
-use super::error_type::{ErrorTypeObj, ErrorTypeType};
+use super::err::{ErrObj, ErrType};
+use super::err_type::{ErrTypeObj, ErrTypeType};
 use super::file::{File, FileType};
 use super::float::{Float, FloatType};
 use super::func::{Func, FuncType};
@@ -178,16 +178,21 @@ pub trait ObjectTrait {
     ///    TODO: There's probably a more elegant way to do this, but it
     ///          might require a bit of re-architecting.
     fn get_attr(&self, name: &str, this: ObjectRef) -> GetAttrResult {
+        // Special attributes that *cannot* be overridden --------------
+
         if name == "$type" {
             return Ok(self.type_obj().clone());
         }
+
         if name == "$module" {
             let module = self.class().read().unwrap().module().clone();
             return Ok(module);
         }
+
         if name == "$id" {
             return Ok(self.id_obj());
         }
+
         if name == "$names" {
             let class = self.class();
             let class = class.read().unwrap();
@@ -201,9 +206,43 @@ pub trait ObjectTrait {
             let items = names.iter().map(new::str).collect();
             return Ok(new::tuple(items));
         }
-        if name == "err" {
-            return Ok(if self.is_error() { this.clone() } else { new::not_error() });
+
+        // Instance attributes -----------------------------------------
+
+        if let Some(obj) = self.ns().get_obj(name) {
+            return Ok(obj);
         }
+
+        if let Some(obj) = self.type_obj().read().unwrap().ns().get_obj(name) {
+            return Ok(obj);
+        }
+
+        // Public attributes that *can* be overridden ------------------
+
+        // OK status associated with this object.
+        //
+        // If this object *is* an error, the object itself is returned.
+        // In this case, the boolean status is delegated to the error
+        // object.
+        //
+        // If this object *is not* an error, true is returned.
+        if name == "ok" {
+            return Ok(if self.is_err() {
+                new::bool(!self.bool_val()?)
+            } else {
+                new::true_()
+            });
+        }
+
+        // Error object associated with this object.
+        //
+        // If this object *is* an error, the object itself is returned.
+        // If this object *is not* an error, the singleton OK object is
+        // returned.
+        if name == "err" {
+            return Ok(if self.is_err() { this } else { new::ok() });
+        }
+
         if name == "to_str" {
             return Ok(if self.is_str() {
                 this.clone()
@@ -211,17 +250,7 @@ pub trait ObjectTrait {
                 new::str(this.read().unwrap().to_string())
             });
         }
-        if let Some(map) = self.down_to_map() {
-            if let Some(obj) = map.get(name) {
-                return Ok(obj.clone());
-            }
-        }
-        if let Some(obj) = self.ns().get_obj(name) {
-            return Ok(obj);
-        }
-        if let Some(obj) = self.type_obj().read().unwrap().ns().get_obj(name) {
-            return Ok(obj);
-        }
+
         Err(self.attr_does_not_exist(name))
     }
 
@@ -278,7 +307,8 @@ pub trait ObjectTrait {
     make_type_checker!(is_builtin_func_type, BuiltinFuncType);
     make_type_checker!(is_cell_type, CellType);
     make_type_checker!(is_closure_type, ClosureType);
-    make_type_checker!(is_error_type, ErrorType);
+    make_type_checker!(is_err_type, ErrType);
+    make_type_checker!(is_err_type_type, ErrTypeType);
     make_type_checker!(is_file_type, FileType);
     make_type_checker!(is_float_type, FloatType);
     make_type_checker!(is_func_type, FuncType);
@@ -297,7 +327,8 @@ pub trait ObjectTrait {
     make_type_checker!(is_builtin_func, BuiltinFunc);
     make_type_checker!(is_cell, Cell);
     make_type_checker!(is_closure, Closure);
-    make_type_checker!(is_error, Error);
+    make_type_checker!(is_err, ErrObj);
+    make_type_checker!(is_err_type_obj, ErrTypeObj);
     make_type_checker!(is_file, File);
     make_type_checker!(is_float, Float);
     make_type_checker!(is_func, Func);
@@ -320,7 +351,8 @@ pub trait ObjectTrait {
     make_down_to!(down_to_builtin_func_type, BuiltinFuncType);
     make_down_to!(down_to_cell_type, CellType);
     make_down_to!(down_to_closure_type, ClosureType);
-    make_down_to!(down_to_error_type, ErrorType);
+    make_down_to!(down_to_err_type, ErrType);
+    make_down_to!(down_to_err_type_type, ErrTypeType);
     make_down_to!(down_to_file_type, FileType);
     make_down_to!(down_to_float_type, FloatType);
     make_down_to!(down_to_func_type, FuncType);
@@ -340,7 +372,8 @@ pub trait ObjectTrait {
     make_down_to!(down_to_cell, Cell);
     make_down_to_mut!(down_to_cell_mut, Cell);
     make_down_to!(down_to_closure, Closure);
-    make_down_to!(down_to_error, Error);
+    make_down_to!(down_to_err, ErrObj);
+    make_down_to!(down_to_err_type_obj, ErrTypeObj);
     make_down_to!(down_to_file, File);
     make_down_to_mut!(down_to_file_mut, File);
     make_down_to!(down_to_float, Float);
@@ -478,8 +511,8 @@ impl fmt::Display for dyn ObjectTrait {
             CellType,
             ClosureType,
             CustomType,
-            ErrorType,
-            ErrorTypeType,
+            ErrType,
+            ErrTypeType,
             FileType,
             FloatType,
             FuncType,
@@ -502,8 +535,8 @@ impl fmt::Display for dyn ObjectTrait {
             Cell,
             Closure,
             CustomObj,
-            Error,
-            ErrorTypeObj,
+            ErrObj,
+            ErrTypeObj,
             File,
             Float,
             Func,
@@ -532,8 +565,8 @@ impl fmt::Debug for dyn ObjectTrait {
             CellType,
             ClosureType,
             CustomType,
-            ErrorType,
-            ErrorTypeType,
+            ErrType,
+            ErrTypeType,
             FileType,
             FloatType,
             FuncType,
@@ -556,8 +589,8 @@ impl fmt::Debug for dyn ObjectTrait {
             Cell,
             Closure,
             CustomObj,
-            Error,
-            ErrorTypeObj,
+            ErrObj,
+            ErrTypeObj,
             File,
             Float,
             Func,

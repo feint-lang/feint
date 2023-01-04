@@ -28,6 +28,25 @@ mod basics {
     }
 }
 
+mod err {
+    use super::*;
+
+    #[test]
+    fn test_new() {
+        assert_result_is_ok(run_text(
+            "Err.new(ErrType.assertion, \"assertion failed :(\")",
+        ));
+    }
+
+    #[test]
+    fn test_every_obj_has_err_attr() {
+        assert_result_is_ok(run_text("nil.err"));
+        assert_result_is_ok(run_text("true.err"));
+        assert_result_is_ok(run_text("false.err"));
+        assert_result_is_ok(run_text("1.err"));
+    }
+}
+
 mod float {
     use super::*;
 

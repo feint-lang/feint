@@ -10,8 +10,8 @@ use crate::types::bound_func::BOUND_FUNC_TYPE;
 use crate::types::builtin_func::BUILTIN_FUNC_TYPE;
 use crate::types::class::TYPE_TYPE;
 use crate::types::closure::CLOSURE_TYPE;
-use crate::types::error::ERROR_TYPE;
-use crate::types::error_type::ERROR_TYPE_TYPE;
+use crate::types::err::ERR_TYPE;
+use crate::types::err_type::ERR_TYPE_TYPE;
 use crate::types::file::FILE_TYPE;
 use crate::types::float::FLOAT_TYPE;
 use crate::types::func::FUNC_TYPE;
@@ -33,8 +33,8 @@ pub static BUILTINS: Lazy<new::obj_ref_t!(Module)> = Lazy::new(|| {
         ("BoundFunc", BOUND_FUNC_TYPE.clone()),
         ("BuiltinFunc", BUILTIN_FUNC_TYPE.clone()),
         ("Closure", CLOSURE_TYPE.clone()),
-        ("Error", ERROR_TYPE.clone()),
-        ("ErrorType", ERROR_TYPE_TYPE.clone()),
+        ("Err", ERR_TYPE.clone()),
+        ("ErrType", ERR_TYPE_TYPE.clone()),
         ("File", FILE_TYPE.clone()),
         ("Func", FUNC_TYPE.clone()),
         ("Float", FLOAT_TYPE.clone()),
@@ -81,12 +81,12 @@ pub static BUILTINS: Lazy<new::obj_ref_t!(Module)> = Lazy::new(|| {
             //
             // Returns:
             //     true: if the assertion succeeded
-            //     Error: if the assertion failed and throw unset
-            //     RuntimeError: if the assertion failed and throw set
+            //     Err: if the assertion failed and throw unset
+            //     RuntimeErr: if the assertion failed and throw set
             "assert",
             new::builtin_func("assert", None, &["assertion", ""], |_, args, _| {
                 let (_, n_var_args, var_args) =
-                    check_args("assert()", 1, Some(3), true, &args)?;
+                    check_args("assert()", &args, true, 1, Some(3))?;
 
                 let arg = args.get(0).unwrap();
                 let arg = arg.read().unwrap();
@@ -114,7 +114,7 @@ pub static BUILTINS: Lazy<new::obj_ref_t!(Module)> = Lazy::new(|| {
                     }
                 }
 
-                Ok(new::assertion_error(msg))
+                Ok(new::assertion_err(msg))
             }),
         ),
         (

@@ -299,10 +299,59 @@ assert(r2 == ("x2", "y2", "z"))
 NOTE: The implementation hasn't been well-tested and complex closures
       might not work as expected.
 
+## Error Handling
+
+NOTE: Error handling is a major work in progress. There are many
+      recoverable errors that are current handled as unrecoverable and
+      will cause the interpreter to halt and exit even though they
+      shouldn't. This is because there was no real error handling in the
+      initial versions.
+
+Unrecoverable runtime errors will cause the interpreter to halt and
+exit. These are (or should be--see not above) internal errors for which
+no recovery is possible.
+
+Recoverable errors can be "caught" and handled. Currently, they can also
+be ignored completely, which isn't optimal.
+
+*Every* object has an `err` attribute, and the result of any expression
+may be an error.
+
+The big idea behind this is that all return values can be treated sort
+of like `Result<Any, Err>`.
+
+```
+assert(!1.err, "1 is not an error")
+
+# Pretend this is some interesting operation that can fail and return an
+# error.
+result = assert(false)
+
+# Check result - method 1
+if result.ok ->
+    "ok"
+else ->
+    ErrType.assertion -> "handle assertion error"
+    : -> $"handle other error: {result.err.type}"
+
+# Check result - method 2
+if result.err ->
+    ErrType.assertion -> "handle assertion error"
+    : -> $"handle {result.err.type} error"
+else ->
+    "ok"
+
+# Check result - method 3
+match result.err.type ->
+    ErrType.ok -> "ok"
+    ErrType.assertion -> "handle assertion error"
+    : -> $"handle other error: {result.err.type}"
+```
+
 ## Custom Types
 
 TODO: Custom types are still in the idea phase and haven't been 
-implemented.
+      implemented.
 
 - Upper camel case names only
 - Still working out some details

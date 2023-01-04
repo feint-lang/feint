@@ -395,7 +395,7 @@ impl Executor {
                 if message.is_empty() {
                     "Assertion failed".to_string()
                 } else {
-                    format!("Assertion failed with message: {message}")
+                    format!("Assertion failed: {message}")
                 }
             }
             RecursionDepthExceeded(max_call_depth) => {

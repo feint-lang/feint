@@ -9,6 +9,7 @@ use num_traits::{FromPrimitive, Num, Signed, ToPrimitive, Zero};
 use indexmap::IndexMap;
 use once_cell::sync::Lazy;
 
+use super::result::Params;
 use crate::vm::Code;
 
 use super::base::ObjectRef;
@@ -18,7 +19,8 @@ use super::builtin_func::{BuiltinFn, BuiltinFunc};
 use super::cell::Cell;
 use super::closure::Closure;
 use super::custom::{CustomObj, CustomType};
-use super::error::Error;
+use super::err::ErrObj;
+use super::err_type::ErrKind;
 use super::file::File;
 use super::float::Float;
 use super::func::Func;
@@ -32,11 +34,12 @@ use super::prop::Prop;
 use super::str::Str;
 use super::tuple::Tuple;
 
-use super::result::Params;
-
 static NIL: Lazy<obj_ref_t!(Nil)> = Lazy::new(|| obj_ref!(Nil::new()));
 static TRUE: Lazy<obj_ref_t!(Bool)> = Lazy::new(|| obj_ref!(Bool::new(true)));
 static FALSE: Lazy<obj_ref_t!(Bool)> = Lazy::new(|| obj_ref!(Bool::new(false)));
+
+static OK_ERR: Lazy<obj_ref_t!(ErrObj)> =
+    Lazy::new(|| obj_ref!(ErrObj::new(ErrKind::Ok, "".to_string())));
 
 static EMPTY_TUPLE: Lazy<obj_ref_t!(Tuple)> =
     Lazy::new(|| obj_ref!(Tuple::new(vec![])));
@@ -144,13 +147,33 @@ pub fn closure(func: ObjectRef, captured: IndexMap<String, ObjectRef>) -> Object
     obj_ref!(Closure::new(func, captured))
 }
 
-pub fn assertion_error<S: Into<String>>(message: S) -> ObjectRef {
-    obj_ref!(Error::new_assertion_error(message.into()))
+// Errors --------------------------------------------------------------
+
+pub fn err<S: Into<String>>(kind: ErrKind, msg: S) -> ObjectRef {
+    obj_ref!(ErrObj::new(kind, msg.into()))
 }
 
-pub fn not_error() -> ObjectRef {
-    obj_ref!(Error::new_not_error())
+pub fn arg_err<S: Into<String>>(msg: S) -> ObjectRef {
+    err(ErrKind::Arg, msg)
 }
+
+pub fn assertion_err<S: Into<String>>(msg: S) -> ObjectRef {
+    err(ErrKind::Assertion, msg)
+}
+
+pub fn _attr_not_found_err<S: Into<String>>(msg: S) -> ObjectRef {
+    err(ErrKind::AttrNotFound, msg)
+}
+
+pub fn _name_not_found_err<S: Into<String>>(msg: S) -> ObjectRef {
+    err(ErrKind::NameNotFound, msg)
+}
+
+pub fn ok() -> ObjectRef {
+    OK_ERR.clone()
+}
+
+// END Errors ----------------------------------------------------------
 
 pub fn file<S: Into<String>>(file_name: S) -> ObjectRef {
     obj_ref!(File::new(file_name.into()))
