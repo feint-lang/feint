@@ -10,7 +10,8 @@ use crate::types::bound_func::BOUND_FUNC_TYPE;
 use crate::types::builtin_func::BUILTIN_FUNC_TYPE;
 use crate::types::class::TYPE_TYPE;
 use crate::types::closure::CLOSURE_TYPE;
-use crate::types::error::{ErrorKind, ERROR_TYPE};
+use crate::types::error::ERROR_TYPE;
+use crate::types::error_type::ERROR_TYPE_TYPE;
 use crate::types::file::FILE_TYPE;
 use crate::types::float::FLOAT_TYPE;
 use crate::types::func::FUNC_TYPE;
@@ -33,6 +34,7 @@ pub static BUILTINS: Lazy<new::obj_ref_t!(Module)> = Lazy::new(|| {
         ("BuiltinFunc", BUILTIN_FUNC_TYPE.clone()),
         ("Closure", CLOSURE_TYPE.clone()),
         ("Error", ERROR_TYPE.clone()),
+        ("ErrorType", ERROR_TYPE_TYPE.clone()),
         ("File", FILE_TYPE.clone()),
         ("Func", FUNC_TYPE.clone()),
         ("Float", FLOAT_TYPE.clone()),
@@ -112,7 +114,7 @@ pub static BUILTINS: Lazy<new::obj_ref_t!(Module)> = Lazy::new(|| {
                     }
                 }
 
-                Ok(new::error(ErrorKind::Assertion, msg))
+                Ok(new::assertion_error(msg))
             }),
         ),
         (

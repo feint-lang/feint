@@ -21,6 +21,7 @@ use super::class::{Type, TypeType};
 use super::closure::{Closure, ClosureType};
 use super::custom::{CustomObj, CustomType};
 use super::error::{Error, ErrorType};
+use super::error_type::{ErrorTypeObj, ErrorTypeType};
 use super::file::{File, FileType};
 use super::float::{Float, FloatType};
 use super::func::{Func, FuncType};
@@ -478,6 +479,7 @@ impl fmt::Display for dyn ObjectTrait {
             ClosureType,
             CustomType,
             ErrorType,
+            ErrorTypeType,
             FileType,
             FloatType,
             FuncType,
@@ -501,6 +503,7 @@ impl fmt::Display for dyn ObjectTrait {
             Closure,
             CustomObj,
             Error,
+            ErrorTypeObj,
             File,
             Float,
             Func,
@@ -530,6 +533,7 @@ impl fmt::Debug for dyn ObjectTrait {
             ClosureType,
             CustomType,
             ErrorType,
+            ErrorTypeType,
             FileType,
             FloatType,
             FuncType,
@@ -553,6 +557,7 @@ impl fmt::Debug for dyn ObjectTrait {
             Closure,
             CustomObj,
             Error,
+            ErrorTypeObj,
             File,
             Float,
             Func,
