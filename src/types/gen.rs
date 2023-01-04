@@ -198,7 +198,7 @@ macro_rules! use_arg_str {
             val
         } else {
             let msg = format!("Expected string; got {}", $arg.class().read().unwrap());
-            return Err(RuntimeErr::type_err(msg));
+            return Err(RuntimeErr::arg_err(msg));
         }
     }};
 }
@@ -209,7 +209,7 @@ macro_rules! use_arg_usize {
             val
         } else {
             let msg = format!("Expected index; got {}", $arg.class().read().unwrap());
-            return Err(RuntimeErr::type_err(msg));
+            return Err(RuntimeErr::arg_err(msg));
         }
     }};
 }
