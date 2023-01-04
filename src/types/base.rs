@@ -201,7 +201,14 @@ pub trait ObjectTrait {
             return Ok(new::tuple(items));
         }
         if name == "err" {
-            return if self.is_error() { Ok(this.clone()) } else { Ok(new::nil()) };
+            return Ok(if self.is_error() { this.clone() } else { new::not_error() });
+        }
+        if name == "to_str" {
+            return Ok(if self.is_str() {
+                this.clone()
+            } else {
+                new::str(this.read().unwrap().to_string())
+            });
         }
         if let Some(obj) = self.ns().get_obj(name) {
             return Ok(obj);

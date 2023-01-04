@@ -20,6 +20,12 @@ mod basics {
     fn test_add() {
         assert_result_is_ok(run_text("1 + 2"));
     }
+
+    #[test]
+    fn test_to_str() {
+        assert_result_is_ok(run_text("1.to_str == \"1\""));
+        assert_result_is_ok(run_text("[].to_str == \"[]\""));
+    }
 }
 
 mod float {
