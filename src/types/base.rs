@@ -11,7 +11,6 @@ use crate::vm::{RuntimeBoolResult, RuntimeErr, RuntimeObjResult};
 
 use super::new;
 use super::ns::Namespace;
-use super::result::{GetAttrResult, SetAttrResult};
 
 use super::bool::{Bool, BoolType};
 use super::bound_func::{BoundFunc, BoundFuncType};
@@ -148,6 +147,9 @@ pub trait ObjectTrait {
     fn ns(&self) -> &Namespace;
     fn ns_mut(&mut self) -> &mut Namespace;
 
+    /// Cast object to type, if possible.
+    fn as_type(&self) -> Option<&dyn TypeTrait>;
+
     fn id(&self) -> usize {
         let p = self as *const Self;
         p as *const () as usize
@@ -177,20 +179,20 @@ pub trait ObjectTrait {
     ///    object.
     ///    TODO: There's probably a more elegant way to do this, but it
     ///          might require a bit of re-architecting.
-    fn get_attr(&self, name: &str, this: ObjectRef) -> GetAttrResult {
+    fn get_attr(&self, name: &str, this: ObjectRef) -> ObjectRef {
         // Special attributes that *cannot* be overridden --------------
 
         if name == "$type" {
-            return Ok(self.type_obj().clone());
+            return self.type_obj().clone();
         }
 
         if name == "$module" {
             let module = self.class().read().unwrap().module().clone();
-            return Ok(module);
+            return module;
         }
 
         if name == "$id" {
-            return Ok(self.id_obj());
+            return self.id_obj();
         }
 
         if name == "$names" {
@@ -204,7 +206,7 @@ pub trait ObjectTrait {
             names.sort();
             names.dedup();
             let items = names.iter().map(new::str).collect();
-            return Ok(new::tuple(items));
+            return new::tuple(items);
         }
 
         // Instance attributes -----------------------------------------
@@ -212,11 +214,11 @@ pub trait ObjectTrait {
         // Check instance then instance type.
 
         if let Some(obj) = self.ns().get_obj(name) {
-            return Ok(obj);
+            return obj;
         }
 
         if let Some(obj) = self.type_obj().read().unwrap().ns().get_obj(name) {
-            return Ok(obj);
+            return obj;
         }
 
         // Public attributes that *can* be overridden ------------------
@@ -233,11 +235,11 @@ pub trait ObjectTrait {
         //      `ErrType.ok` returns the OK err type rather than a bool.
         if name == "ok" {
             let this = this.read().unwrap();
-            return Ok(if let Some(err) = this.down_to_err() {
+            return if let Some(err) = this.down_to_err() {
                 new::bool(!err.retrieve_bool_val())
             } else {
                 new::true_()
-            });
+            };
         }
 
         // Error object associated with this object.
@@ -248,23 +250,26 @@ pub trait ObjectTrait {
         // If this object *is not* an error, the singleton OK object
         // that responds to bool is returned.
         if name == "err" {
-            let this = this.read().unwrap();
-            return Ok(if let Some(err) = this.down_to_err() {
-                new::err_with_responds_to_bool(err.kind.clone(), err.message.as_str())
+            return if let Some(err) = this.read().unwrap().down_to_err() {
+                new::err_with_responds_to_bool(
+                    err.kind.clone(),
+                    err.message.as_str(),
+                    this.clone(),
+                )
             } else {
-                new::ok_with_responds_to_bool()
-            });
+                new::ok_err()
+            };
         }
 
         if name == "to_str" {
-            return Ok(if self.is_str() {
+            return if self.is_str() {
                 this.clone()
             } else {
                 new::str(this.read().unwrap().to_string())
-            });
+            };
         }
 
-        Err(self.attr_does_not_exist(name))
+        self.attr_not_found(name, this)
     }
 
     /// Set attribute.
@@ -279,37 +284,35 @@ pub trait ObjectTrait {
         &mut self,
         name: &str,
         _value: ObjectRef,
-        _this: ObjectRef,
-    ) -> SetAttrResult {
-        Err(RuntimeErr::attr_cannot_be_set(
-            self.class().read().unwrap().full_name(),
-            name,
-        ))
+        this: ObjectRef,
+    ) -> ObjectRef {
+        // TODO: The default should be a "does not support" attr access
+        self.attr_not_found(name, this)
     }
 
-    fn attr_does_not_exist(&self, name: &str) -> RuntimeErr {
-        RuntimeErr::attr_does_not_exist(self.class().read().unwrap().full_name(), name)
+    fn attr_not_found(&self, name: &str, obj: ObjectRef) -> ObjectRef {
+        new::attr_not_found_err(name, obj)
     }
 
     // Items (accessed by index) ---------------------------------------
 
-    fn get_item(&self, index: usize) -> GetAttrResult {
-        Err(self.item_does_not_exist(index))
+    fn get_item(&self, index: usize, this: ObjectRef) -> ObjectRef {
+        // TODO: The default should be a "does not support" indexing err
+        new::index_out_of_bounds_err(index, this)
     }
 
-    fn set_item(&mut self, index: usize, _value: ObjectRef) -> GetAttrResult {
-        Err(RuntimeErr::item_cannot_be_set(
-            self.class().read().unwrap().full_name(),
-            index,
-        ))
+    fn set_item(
+        &mut self,
+        index: usize,
+        this: ObjectRef,
+        _value: ObjectRef,
+    ) -> ObjectRef {
+        // TODO: The default should be a "does not support" indexing err
+        new::index_out_of_bounds_err(index, this)
     }
 
-    fn item_does_not_exist(&self, index: usize) -> RuntimeErr {
-        RuntimeErr::item_does_not_exist(self.class().read().unwrap().full_name(), index)
-    }
-
-    fn index_out_of_bounds(&self, index: usize) -> RuntimeErr {
-        RuntimeErr::index_out_of_bounds(self.class().read().unwrap().full_name(), index)
+    fn index_out_of_bounds(&self, index: usize, this: ObjectRef) -> ObjectRef {
+        new::index_out_of_bounds_err(index, this)
     }
 
     // Type checkers ---------------------------------------------------

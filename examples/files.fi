@@ -1,11 +1,25 @@
 # Read file as text
 print("Read file as text:")
 file = File.new("Cargo.toml")
-print(file.text)
+if file.ok -> print(file.text) else -> print(file.err)
 
 print()
 
 # Read file as lines (and print the first line)
 print("Read file as lines:")
 file = File.new("Cargo.toml")
-print(file.lines)
+if file.ok -> print(file.lines)
+else -> print(file)
+
+print()
+
+# Try to open a file that doesn't exist
+print("Open a file that doesn't exist:")
+file_name = "this-file-probably-does-not-exist"
+file = File.new(file_name)
+assert(!file.ok, $"did not expect file to exist: {file_name}", true)
+assert(file.err, $"did not expect file to exist: {file_name}", true)
+if file.ok ->
+    print($"file exists: {file_name}")
+else ->
+    print($"file does not exist: {file_name}")

@@ -97,22 +97,6 @@ impl RuntimeErr {
         Self::new(RuntimeErrKind::TypeErr(message.into()))
     }
 
-    pub fn attr_does_not_exist<S: Into<String>>(type_name: S, name: S) -> Self {
-        Self::new(RuntimeErrKind::AttrDoesNotExist(type_name.into(), name.into()))
-    }
-
-    pub fn attr_cannot_be_set<S: Into<String>>(type_name: S, name: S) -> Self {
-        Self::new(RuntimeErrKind::AttrCannotBeSet(type_name.into(), name.into()))
-    }
-
-    pub fn item_does_not_exist<S: Into<String>>(type_name: S, index: usize) -> Self {
-        Self::new(RuntimeErrKind::ItemDoesNotExist(type_name.into(), index))
-    }
-
-    pub fn item_cannot_be_set<S: Into<String>>(type_name: S, index: usize) -> Self {
-        Self::new(RuntimeErrKind::ItemCannotBeSet(type_name.into(), index))
-    }
-
     pub fn index_out_of_bounds<S: Into<String>>(type_name: S, index: usize) -> Self {
         Self::new(RuntimeErrKind::IndexOutOfBounds(type_name.into(), index))
     }
@@ -123,10 +107,6 @@ impl RuntimeErr {
 
     pub fn arg_err<S: Into<String>>(message: S) -> Self {
         Self::new(RuntimeErrKind::ArgErr(message.into()))
-    }
-
-    pub fn could_not_read_file<S: Into<String>>(message: S) -> Self {
-        Self::new(RuntimeErrKind::CouldNotReadFile(message.into()))
     }
 }
 
@@ -155,15 +135,9 @@ pub enum RuntimeErrKind {
     TypeErr(String),
     NameErr(String),
     StringFormatErr(String),
-    AttrDoesNotExist(String, String),
-    AttrCannotBeSet(String, String),
-    ItemDoesNotExist(String, usize),
-    ItemCannotBeSet(String, usize),
     IndexOutOfBounds(String, usize),
     NotCallable(String),
-
     ArgErr(String),
-    CouldNotReadFile(String),
 }
 
 impl fmt::Display for RuntimeErrKind {

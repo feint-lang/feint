@@ -38,11 +38,9 @@ static NIL: Lazy<obj_ref_t!(Nil)> = Lazy::new(|| obj_ref!(Nil::new()));
 static TRUE: Lazy<obj_ref_t!(Bool)> = Lazy::new(|| obj_ref!(Bool::new(true)));
 static FALSE: Lazy<obj_ref_t!(Bool)> = Lazy::new(|| obj_ref!(Bool::new(false)));
 
-static _OK_ERR: Lazy<obj_ref_t!(ErrObj)> =
-    Lazy::new(|| obj_ref!(ErrObj::new(ErrKind::Ok, "".to_string())));
-
-static OK_ERR_RESPONDS_TO_BOOL: Lazy<obj_ref_t!(ErrObj)> =
-    Lazy::new(|| obj_ref!(ErrObj::with_responds_to_bool(ErrKind::Ok, "".to_string())));
+static OK_ERR: Lazy<obj_ref_t!(ErrObj)> = Lazy::new(|| {
+    obj_ref!(ErrObj::with_responds_to_bool(ErrKind::Ok, "".to_string(), new::nil()))
+});
 
 static EMPTY_TUPLE: Lazy<obj_ref_t!(Tuple)> =
     Lazy::new(|| obj_ref!(Tuple::new(vec![])));
@@ -94,6 +92,7 @@ macro_rules! obj_ref {
     };
 }
 
+use crate::types::new;
 pub(crate) use obj_ref;
 
 #[inline]
@@ -152,36 +151,48 @@ pub fn closure(func: ObjectRef, captured: IndexMap<String, ObjectRef>) -> Object
 
 // Errors --------------------------------------------------------------
 
-pub fn err<S: Into<String>>(kind: ErrKind, msg: S) -> ObjectRef {
-    obj_ref!(ErrObj::new(kind, msg.into()))
+pub fn err<S: Into<String>>(kind: ErrKind, msg: S, obj: ObjectRef) -> ObjectRef {
+    obj_ref!(ErrObj::new(kind, msg.into(), obj))
 }
 
-pub fn err_with_responds_to_bool<S: Into<String>>(kind: ErrKind, msg: S) -> ObjectRef {
-    obj_ref!(ErrObj::with_responds_to_bool(kind, msg.into()))
+pub fn err_with_responds_to_bool<S: Into<String>>(
+    kind: ErrKind,
+    msg: S,
+    obj: ObjectRef,
+) -> ObjectRef {
+    obj_ref!(ErrObj::with_responds_to_bool(kind, msg.into(), obj))
 }
 
-pub fn arg_err<S: Into<String>>(msg: S) -> ObjectRef {
-    err(ErrKind::Arg, msg)
+pub fn arg_err<S: Into<String>>(msg: S, obj: ObjectRef) -> ObjectRef {
+    err(ErrKind::Arg, msg, obj)
 }
 
-pub fn assertion_err<S: Into<String>>(msg: S) -> ObjectRef {
-    err(ErrKind::Assertion, msg)
+pub fn assertion_err<S: Into<String>>(msg: S, obj: ObjectRef) -> ObjectRef {
+    err(ErrKind::Assertion, msg, obj)
 }
 
-pub fn _attr_not_found_err<S: Into<String>>(msg: S) -> ObjectRef {
-    err(ErrKind::AttrNotFound, msg)
+pub fn attr_err<S: Into<String>>(msg: S, obj: ObjectRef) -> ObjectRef {
+    err(ErrKind::Attr, msg, obj)
 }
 
-pub fn _name_not_found_err<S: Into<String>>(msg: S) -> ObjectRef {
-    err(ErrKind::NameNotFound, msg)
+pub fn attr_not_found_err<S: Into<String>>(msg: S, obj: ObjectRef) -> ObjectRef {
+    err(ErrKind::AttrNotFound, msg, obj)
 }
 
-pub fn _ok() -> ObjectRef {
-    _OK_ERR.clone()
+pub fn file_not_found_err<S: Into<String>>(msg: S, obj: ObjectRef) -> ObjectRef {
+    err(ErrKind::FileNotFound, msg, obj)
 }
 
-pub fn ok_with_responds_to_bool() -> ObjectRef {
-    OK_ERR_RESPONDS_TO_BOOL.clone()
+pub fn file_unreadable_err<S: Into<String>>(msg: S, obj: ObjectRef) -> ObjectRef {
+    err(ErrKind::FileUnreadable, msg, obj)
+}
+
+pub fn index_out_of_bounds_err(index: usize, obj: ObjectRef) -> ObjectRef {
+    err(ErrKind::IndexOutOfBounds, index.to_string(), obj)
+}
+
+pub fn ok_err() -> ObjectRef {
+    OK_ERR.clone()
 }
 
 // END Errors ----------------------------------------------------------

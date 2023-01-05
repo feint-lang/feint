@@ -1,4 +1,63 @@
-use crate::types::{new, Namespace, ObjectTrait};
+use crate::types::{new, Namespace, ObjectRef};
+
+fn check_ok<S: Into<String>>(obj: ObjectRef, msg: S) {
+    assert!(!obj.read().unwrap().is_err(), "{}", msg.into())
+}
+
+fn check_is(a: ObjectRef, b: ObjectRef) {
+    assert!(a.read().unwrap().is(&*b.read().unwrap()))
+}
+
+fn check_is_not(a: ObjectRef, b: ObjectRef) {
+    assert!(!a.read().unwrap().is(&*b.read().unwrap()))
+}
+
+fn check_type_is(a: ObjectRef, b: ObjectRef) {
+    let a = a.read().unwrap();
+    let b = b.read().unwrap();
+    assert!(a.class().read().unwrap().is(&*b.class().read().unwrap()))
+}
+
+fn check_eq(a: ObjectRef, b: ObjectRef) {
+    assert!(a.read().unwrap().is_equal(&*b.read().unwrap()));
+}
+
+fn check_ne(a: ObjectRef, b: ObjectRef) {
+    assert!(!a.read().unwrap().is_equal(&*b.read().unwrap()));
+}
+
+fn _check_id_eq(a: ObjectRef, b: ObjectRef) {
+    let a_id = a.read().unwrap().id();
+    let b_id = b.read().unwrap().id();
+    assert_eq!(a_id, b_id)
+}
+
+fn check_id_ne(a: ObjectRef, b: ObjectRef) {
+    let a_id = a.read().unwrap().id();
+    let b_id = b.read().unwrap().id();
+    assert_ne!(a_id, b_id)
+}
+
+fn check_attr(obj: ObjectRef, name: &str) {
+    check_ok(
+        obj.clone().read().unwrap().get_attr(name, obj.clone()),
+        format!("Attribute {name} is not OK"),
+    )
+}
+
+fn check_attr_eq(obj: ObjectRef, name: &str, to: ObjectRef) {
+    assert!(
+        obj.clone()
+            .read()
+            .unwrap()
+            .get_attr(name, obj.clone())
+            .read()
+            .unwrap()
+            .is_equal(&*to.read().unwrap()),
+        "attribute {name} not equal to {to}",
+        to = to.read().unwrap()
+    );
+}
 
 mod float {
     use super::*;
@@ -9,30 +68,26 @@ mod float {
         let float2 = new::float(0.0);
         let float3 = new::float(1.0);
 
-        let float1 = float1.read().unwrap();
-        let float2 = float2.read().unwrap();
-        let float3 = float3.read().unwrap();
+        check_type_is(float1.clone(), float2.clone());
+        check_type_is(float2.clone(), float3.clone());
 
-        assert!(float1.class().read().unwrap().is(&*float2.class().read().unwrap()));
-        assert!(float2.class().read().unwrap().is(&*float3.class().read().unwrap()));
+        check_is(float1.clone(), float1.clone());
+        check_is_not(float1.clone(), float2.clone());
+        check_is_not(float1.clone(), float3.clone());
 
-        assert!(float1.is(&*float1));
-        assert!(!float1.is(&*float2));
-        assert!(!float1.is(&*float3));
+        check_eq(float1.clone(), float2.clone());
+        check_ne(float1.clone(), float3.clone());
 
-        assert!(float1.is_equal(&*float2));
-        assert!(!float1.is_equal(&*float3));
-
-        assert_ne!(float1.id(), float2.id());
-        assert_ne!(float2.id(), float3.id());
+        check_id_ne(float1.clone(), float2.clone());
+        check_id_ne(float2.clone(), float3.clone());
     }
 
     #[test]
     fn test_compare_to_int() {
         let float = new::float(1.0);
         let int = new::int(1);
-        assert!(float.read().unwrap().is_equal(&*int.read().unwrap()));
-        assert!(int.read().unwrap().is_equal(&*float.read().unwrap()));
+        check_eq(float.clone(), int.clone());
+        check_eq(int.clone(), float.clone());
     }
 }
 
@@ -44,7 +99,8 @@ mod list {
         let obj_ref = new::list(vec![]);
         let list = obj_ref.read().unwrap();
         let push = list.get_attr("push", obj_ref.clone());
-        assert!(push.is_ok());
+        check_ok(push.clone(), "list.push() is not OK");
+        assert!(push.read().unwrap().is_builtin_func());
     }
 }
 
@@ -69,23 +125,16 @@ mod custom {
         ns.add_obj("value", new::nil());
         let t1_obj3 = new::custom_instance(t1.clone(), ns);
 
-        assert!(t1.clone().read().unwrap().get_attr("$id", t1.clone()).is_ok());
-        assert!(t1.clone().read().unwrap().get_attr("$type", t1.clone()).is_ok());
-        assert!(t1_obj1.read().unwrap().get_attr("$id", t1_obj1.clone()).is_ok());
-        assert!(t1_obj1.read().unwrap().get_attr("$type", t1_obj1.clone()).is_ok());
+        check_attr(t1.clone(), "$id");
+        check_attr(t1.clone(), "$type");
+        check_attr(t1_obj1.clone(), "$id");
+        check_attr(t1_obj1.clone(), "$type");
 
-        let was_set =
+        let result =
             t1_obj3.write().unwrap().set_attr("value", new::int(1), t1_obj3.clone());
-        assert!(was_set.is_ok(), "Could not set `value` on t1_obj3");
-        assert!(t1_obj3.read().unwrap().get_attr("value", t1_obj3.clone()).is_ok());
-        assert!(t1_obj3
-            .read()
-            .unwrap()
-            .get_attr("value", t1_obj3.clone())
-            .unwrap()
-            .read()
-            .unwrap()
-            .is_equal(&*new::int(1).read().unwrap()));
+        check_ok(result, "Could not set `value` on t1_obj3");
+        check_attr(t1_obj3.clone(), "value");
+        check_attr_eq(t1_obj3.clone(), "value", new::int(1));
 
         let mod2 = new::builtin_module("test2", Namespace::new());
 
@@ -93,18 +142,18 @@ mod custom {
         let t2_obj1 = new::custom_instance(t2, Namespace::new());
 
         // An object should be equal to itself.
-        assert!(t1_obj1.read().unwrap().is_equal(&*t1_obj1.read().unwrap()));
+        check_eq(t1_obj1.clone(), t1_obj1.clone());
 
         // An object should be equal to an object of the SAME type with
         // the same attributes.
-        assert!(t1_obj1.read().unwrap().is_equal(&*t1_obj2.read().unwrap()));
+        check_eq(t1_obj1.clone(), t1_obj2.clone());
 
         // An object should NOT be equal to an object of the SAME type with
         // the DIFFERENT attributes.
-        assert!(!t1_obj1.read().unwrap().is_equal(&*t1_obj3.read().unwrap()));
+        check_ne(t1_obj1.clone(), t1_obj3.clone());
 
         // An object should NOT be equal to an object of a DIFFERENT type,
         // regardless of attributes.
-        assert!(!t1_obj1.read().unwrap().is_equal(&*t2_obj1.read().unwrap()));
+        check_ne(t1_obj1.clone(), t2_obj1.clone());
     }
 }

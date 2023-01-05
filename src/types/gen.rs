@@ -72,6 +72,10 @@ macro_rules! type_and_impls {
             fn ns_mut(&mut self) -> &mut Namespace {
                 &mut self.ns
             }
+
+            fn as_type(&self) -> Option<&dyn TypeTrait> {
+                Some(self)
+            }
         }
     };
 }
@@ -115,6 +119,10 @@ macro_rules! object_trait_header {
 
         fn ns_mut(&mut self) -> &mut Namespace {
             &mut self.ns
+        }
+
+        fn as_type(&self) -> Option<&dyn TypeTrait> {
+            None
         }
     };
 }
@@ -197,6 +205,7 @@ macro_rules! use_arg_str {
         if let Some(val) = $arg.get_str_val() {
             val
         } else {
+            // NOTE: This should never happen from user code.
             let msg = format!("Expected string; got {}", $arg.class().read().unwrap());
             return Err(RuntimeErr::arg_err(msg));
         }
@@ -208,6 +217,7 @@ macro_rules! use_arg_usize {
         if let Some(val) = $arg.get_usize_val() {
             val
         } else {
+            // NOTE: This should never happen from user code.
             let msg = format!("Expected index; got {}", $arg.class().read().unwrap());
             return Err(RuntimeErr::arg_err(msg));
         }

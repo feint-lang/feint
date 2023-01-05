@@ -7,7 +7,7 @@ use std::sync::{Arc, RwLock};
 
 use once_cell::sync::{Lazy, OnceCell};
 
-use crate::vm::{RuntimeBoolResult, RuntimeErr, RuntimeObjResult};
+use crate::vm::{RuntimeBoolResult, RuntimeErr};
 
 use super::gen;
 use super::new;
@@ -29,22 +29,27 @@ pub static FILE_TYPE: Lazy<new::obj_ref_t!(FileType)> = Lazy::new(|| {
         gen::meth!("new", type_ref, &["file_name"], |_, args, _| {
             let arg = gen::use_arg!(args, 0);
             if let Some(file_name) = arg.get_str_val() {
-                Ok(new::file(file_name))
+                let path = Path::new(file_name);
+                Ok(if path.is_file() {
+                    new::file(file_name)
+                } else {
+                    new::file_not_found_err(file_name, new::nil())
+                })
             } else {
                 let message = format!("File.new(file_name) expected string; got {arg}");
-                Err(RuntimeErr::arg_err(message))
+                Ok(new::arg_err(message, new::nil()))
             }
         }),
         // Instance Attributes
         gen::prop!("text", type_ref, |this, _, _| {
             let this = this.read().unwrap();
             let this = this.down_to_file().unwrap();
-            this.text()
+            Ok(this.text())
         }),
         gen::prop!("lines", type_ref, |this, _, _| {
             let this = this.read().unwrap();
             let this = &mut this.down_to_file().unwrap();
-            this.lines()
+            Ok(this.lines())
         }),
     ]);
 
@@ -77,17 +82,20 @@ impl File {
         }
     }
 
-    fn text(&self) -> RuntimeObjResult {
-        let text = self.text.get_or_try_init(|| {
+    fn text(&self) -> ObjectRef {
+        let result = self.text.get_or_try_init(|| {
             fs::read_to_string(&self.file_name)
                 .map(new::str)
-                .map_err(|err| RuntimeErr::could_not_read_file(err.to_string()))
-        })?;
-        Ok(text.clone())
+                .map_err(|err| new::file_unreadable_err(err.to_string(), new::nil()))
+        });
+        match result {
+            Ok(text) => text.clone(),
+            Err(err) => err,
+        }
     }
 
-    fn lines(&self) -> RuntimeObjResult {
-        let lines = self.lines.get_or_try_init(|| {
+    fn lines(&self) -> ObjectRef {
+        let result = self.lines.get_or_try_init(|| {
             let file = fs::File::open(&self.file_name);
             file.map(|file| {
                 let reader = BufReader::new(file);
@@ -98,9 +106,12 @@ impl File {
                     .collect();
                 new::tuple(lines)
             })
-            .map_err(|err| RuntimeErr::could_not_read_file(err.to_string()))
-        })?;
-        Ok(lines.clone())
+            .map_err(|err| new::file_unreadable_err(err.to_string(), new::nil()))
+        });
+        match result {
+            Ok(lines) => lines.clone(),
+            Err(err) => err,
+        }
     }
 }
 

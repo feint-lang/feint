@@ -4,7 +4,6 @@ use std::sync::{Arc, RwLock};
 
 use super::gen;
 use super::new;
-use super::result::SetAttrResult;
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
 use super::class::TYPE_TYPE;
@@ -100,14 +99,18 @@ impl ObjectTrait for CustomObj {
         &mut self.ns
     }
 
+    fn as_type(&self) -> Option<&dyn TypeTrait> {
+        None
+    }
+
     fn set_attr(
         &mut self,
         name: &str,
         value: ObjectRef,
         _this: ObjectRef,
-    ) -> SetAttrResult {
+    ) -> ObjectRef {
         self.ns.set_obj(name, value);
-        Ok(())
+        new::nil()
     }
 
     fn is_equal(&self, rhs: &dyn ObjectTrait) -> bool {

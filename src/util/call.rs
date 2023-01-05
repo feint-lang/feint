@@ -1,5 +1,4 @@
 use crate::types::{new, Args, ObjectRef};
-use crate::vm::RuntimeErr;
 
 /// Check args and return info.
 ///
@@ -13,19 +12,34 @@ use crate::vm::RuntimeErr;
 ///
 /// # Returns
 ///
-/// A tuple with the following items:
+/// If the check is successful, a tuple with the following items:
 ///
-/// - this
 /// - total number of args
 /// - number of var args
 /// - vargs
+///
+/// If the check is *not* successful, an error object.
+///
+/// NOTE: This returns a `Result` so that it's easy to tell when the
+///       check succeeds or fails. This result should always be checked,
+///       and if it's an `Err`, it should be unwrapped and returned:
+///
+/// ```rust, ignore
+/// let result = check_args("name", &[], false, 1, None);
+///
+/// if let Err(err) = result {
+///     return Ok(err);
+/// }
+///
+/// let (n_args, n_var_args, var_args) = result.unwrap();
+/// ```
 pub(crate) fn check_args(
     name: &str,
     args: &Args,
     has_var_args: bool,
     min: usize,
     max: Option<usize>,
-) -> Result<(usize, usize, ObjectRef), RuntimeErr> {
+) -> Result<(usize, usize, ObjectRef), ObjectRef> {
     let mut n_args = args.len();
 
     let (n_var_args, var_args) = if has_var_args {
@@ -51,7 +65,7 @@ pub(crate) fn check_args(
         } else {
             format!("{name} expected {min} to {max} args; got {n_args}")
         };
-        return Err(RuntimeErr::arg_err(msg));
+        return Err(new::arg_err(msg, new::nil()));
     }
 
     Ok((n_args, n_var_args, var_args))

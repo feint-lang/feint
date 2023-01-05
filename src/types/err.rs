@@ -42,7 +42,12 @@ pub static ERR_TYPE: Lazy<new::obj_ref_t!(ErrType)> = Lazy::new(|| {
         // Class Methods -----------------------------------------------
         gen::meth!("new", type_ref, &["type", "msg"], |_, args, _| {
             let name = "Err.new()";
-            check_args(name, &args, false, 2, Some(2))?;
+
+            let result = check_args(name, &args, false, 2, Some(2));
+            if let Err(err) = result {
+                return Ok(err);
+            }
+
             let type_arg = gen::use_arg!(args, 0);
             let msg_arg = gen::use_arg!(args, 1);
 
@@ -59,24 +64,19 @@ pub static ERR_TYPE: Lazy<new::obj_ref_t!(ErrType)> = Lazy::new(|| {
                 // TODO: Figure out a solution for this, perhaps an err
                 //       type that is *not* user-constructible or a
                 //       nested err type?
-                return Ok(new::arg_err(arg_err_msg));
+                return Ok(new::arg_err(arg_err_msg, new::nil()));
             };
 
-            let kind = if let Some(kind) = err_type.kind() {
-                kind
-            } else {
-                let arg_err_msg = format!("Unknown ErrType: {type_arg}");
-                return Ok(new::arg_err(arg_err_msg));
-            };
+            let kind = err_type.kind().clone();
 
             let msg = if let Some(msg) = msg_arg.get_str_val() {
                 msg
             } else {
                 let arg_err_msg = format!("{name} expected message to be a Str");
-                return Ok(new::arg_err(arg_err_msg));
+                return Ok(new::arg_err(arg_err_msg, new::nil()));
             };
 
-            Ok(new::err(kind, msg))
+            Ok(new::err(kind, msg, new::nil()))
         }),
         // Instance Attributes -----------------------------------------
         gen::prop!("type", type_ref, |this, _, _| {
@@ -97,6 +97,7 @@ pub struct ErrObj {
     ns: Namespace,
     pub kind: ErrKind,
     pub message: String,
+    pub obj: ObjectRef,
     bool_val: bool,
     responds_to_bool: bool,
 }
@@ -104,13 +105,24 @@ pub struct ErrObj {
 gen::standard_object_impls!(ErrObj);
 
 impl ErrObj {
-    pub fn new(kind: ErrKind, message: String) -> Self {
+    pub fn new(kind: ErrKind, message: String, obj: ObjectRef) -> Self {
         let bool_val = kind != ErrKind::Ok;
-        Self { ns: Namespace::new(), kind, message, bool_val, responds_to_bool: false }
+        Self {
+            ns: Namespace::new(),
+            kind,
+            message,
+            obj,
+            bool_val,
+            responds_to_bool: false,
+        }
     }
 
-    pub fn with_responds_to_bool(kind: ErrKind, message: String) -> Self {
-        let mut instance = Self::new(kind, message);
+    pub fn with_responds_to_bool(
+        kind: ErrKind,
+        message: String,
+        obj: ObjectRef,
+    ) -> Self {
+        let mut instance = Self::new(kind, message, obj);
         instance.responds_to_bool = true;
         instance
     }
@@ -152,12 +164,12 @@ impl ObjectTrait for ErrObj {
 
 impl fmt::Display for ErrObj {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.kind == ErrKind::Ok {
-            write!(f, "{}", self.kind)
-        } else if self.message.is_empty() {
-            write!(f, "ERROR: {}", self.kind)
+        let kind = &self.kind;
+        let msg = &self.message;
+        if self.message.is_empty() {
+            write!(f, "{} [{}]", kind, kind.name())
         } else {
-            write!(f, "ERROR: {}: {}", self.kind, self.message)
+            write!(f, "{} [{}]:\n\n    message: {}", kind, kind.name(), msg)
         }
     }
 }

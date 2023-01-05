@@ -85,8 +85,11 @@ pub static BUILTINS: Lazy<new::obj_ref_t!(Module)> = Lazy::new(|| {
             //     RuntimeErr: if the assertion failed and throw set
             "assert",
             new::builtin_func("assert", None, &["assertion", ""], |_, args, _| {
-                let (_, n_var_args, var_args) =
-                    check_args("assert()", &args, true, 1, Some(3))?;
+                let result = check_args("assert()", &args, true, 1, Some(3));
+                if let Err(err) = result {
+                    return Ok(err);
+                }
+                let (_, n_var_args, var_args_obj) = result.unwrap();
 
                 let arg = args.get(0).unwrap();
                 let arg = arg.read().unwrap();
@@ -96,25 +99,25 @@ pub static BUILTINS: Lazy<new::obj_ref_t!(Module)> = Lazy::new(|| {
                     return Ok(new::true_());
                 }
 
-                let var_args = var_args.read().unwrap();
+                let var_args = var_args_obj.read().unwrap();
 
                 let msg = if n_var_args == 0 {
                     "".to_string()
                 } else {
-                    let msg_arg = var_args.get_item(0)?;
+                    let msg_arg = var_args.get_item(0, var_args_obj.clone());
                     let msg_arg = msg_arg.read().unwrap();
                     msg_arg.to_string()
                 };
 
                 if n_var_args == 2 {
-                    let throw_arg = var_args.get_item(1)?;
+                    let throw_arg = var_args.get_item(1, var_args_obj.clone());
                     let throw_arg = throw_arg.read().unwrap();
                     if throw_arg.bool_val()? {
                         return Err(RuntimeErr::assertion_failed(msg));
                     }
                 }
 
-                Ok(new::assertion_err(msg))
+                Ok(new::assertion_err(msg, new::nil()))
             }),
         ),
         (

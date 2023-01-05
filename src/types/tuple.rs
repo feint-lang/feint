@@ -8,7 +8,6 @@ use once_cell::sync::Lazy;
 use super::gen;
 
 use super::new;
-use super::result::GetAttrResult;
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
 use super::class::TYPE_TYPE;
@@ -82,14 +81,11 @@ impl Tuple {
 impl ObjectTrait for Tuple {
     gen::object_trait_header!(TUPLE_TYPE);
 
-    fn get_item(&self, index: usize) -> GetAttrResult {
-        if index >= self.items.len() {
-            return Err(self.index_out_of_bounds(index));
-        }
+    fn get_item(&self, index: usize, this: ObjectRef) -> ObjectRef {
         if let Some(item) = self.items.get(index) {
-            Ok(item.clone())
+            item.clone()
         } else {
-            Err(self.item_does_not_exist(index))
+            self.index_out_of_bounds(index, this)
         }
     }
 

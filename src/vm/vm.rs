@@ -429,7 +429,7 @@ impl VM {
                 }
                 // Modules
                 LoadModule(name) => {
-                    let module = modules::get_module(name.as_str())?;
+                    let module = modules::get_module(name.as_str());
                     self.ctx.declare_and_assign_var(name, module.clone())?;
                     self.push_temp(module.clone());
                 }
@@ -591,12 +591,17 @@ impl VM {
             Sub => a.sub(b)?,
             Dot => {
                 let obj_ref = if let Some(name) = b.get_str_val() {
-                    a.get_attr(name, a_ref.clone())?
+                    a.get_attr(name, a_ref.clone())
                 } else if let Some(index) = b.get_usize_val() {
-                    a.get_item(index)?
+                    a.get_item(index, a_ref.clone())
                 } else {
-                    let message = format!("Not an attribute name or index: {b:?}");
-                    return Err(RuntimeErr::type_err(message));
+                    // XXX: This can happen for a construct like `1.()`,
+                    //      but that should probably be a syntax error
+                    //      that's caught early.
+                    new::attr_err(
+                        format!("Not an attribute name or index: {b:?}"),
+                        a_ref.clone(),
+                    )
                 };
                 let obj = obj_ref.read().unwrap();
                 if obj.is_builtin_func() || obj.is_func() || obj.is_closure() {
