@@ -41,8 +41,8 @@ static FALSE: Lazy<obj_ref_t!(Bool)> = Lazy::new(|| obj_ref!(Bool::new(false)));
 static _OK_ERR: Lazy<obj_ref_t!(ErrObj)> =
     Lazy::new(|| obj_ref!(ErrObj::new(ErrKind::Ok, "".to_string())));
 
-static OK_ERR_WITH_INVERTED_BOOL_VAL: Lazy<obj_ref_t!(ErrObj)> =
-    Lazy::new(|| obj_ref!(ErrObj::with_inverted_bool_val(ErrKind::Ok, "".to_string())));
+static OK_ERR_RESPONDS_TO_BOOL: Lazy<obj_ref_t!(ErrObj)> =
+    Lazy::new(|| obj_ref!(ErrObj::with_responds_to_bool(ErrKind::Ok, "".to_string())));
 
 static EMPTY_TUPLE: Lazy<obj_ref_t!(Tuple)> =
     Lazy::new(|| obj_ref!(Tuple::new(vec![])));
@@ -156,8 +156,8 @@ pub fn err<S: Into<String>>(kind: ErrKind, msg: S) -> ObjectRef {
     obj_ref!(ErrObj::new(kind, msg.into()))
 }
 
-pub fn err_with_inverted_bool_val<S: Into<String>>(kind: ErrKind, msg: S) -> ObjectRef {
-    obj_ref!(ErrObj::with_inverted_bool_val(kind, msg.into()))
+pub fn err_with_responds_to_bool<S: Into<String>>(kind: ErrKind, msg: S) -> ObjectRef {
+    obj_ref!(ErrObj::with_responds_to_bool(kind, msg.into()))
 }
 
 pub fn arg_err<S: Into<String>>(msg: S) -> ObjectRef {
@@ -180,8 +180,8 @@ pub fn _ok() -> ObjectRef {
     _OK_ERR.clone()
 }
 
-pub fn ok_with_inverted_bool_val() -> ObjectRef {
-    OK_ERR_WITH_INVERTED_BOOL_VAL.clone()
+pub fn ok_with_responds_to_bool() -> ObjectRef {
+    OK_ERR_RESPONDS_TO_BOOL.clone()
 }
 
 // END Errors ----------------------------------------------------------

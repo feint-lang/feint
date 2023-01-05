@@ -208,6 +208,8 @@ pub trait ObjectTrait {
         }
 
         // Instance attributes -----------------------------------------
+        //
+        // Check instance then instance type.
 
         if let Some(obj) = self.ns().get_obj(name) {
             return Ok(obj);
@@ -226,9 +228,13 @@ pub trait ObjectTrait {
         // returned.
         //
         // If this object *is not* an error, `true` is returned.
+        //
+        // NOT: This needs to be after instance attribute lookup so that
+        //      `ErrType.ok` returns the OK err type rather than a bool.
         if name == "ok" {
-            return Ok(if self.is_err() {
-                new::bool(self.bool_val()?)
+            let this = this.read().unwrap();
+            return Ok(if let Some(err) = this.down_to_err() {
+                new::bool(!err.retrieve_bool_val())
             } else {
                 new::true_()
             });
@@ -236,17 +242,17 @@ pub trait ObjectTrait {
 
         // Error object associated with this object.
         //
-        // If this object *is* an error, the object itself is returned
-        // but with its bool val inverted.
+        // If this object *is* an error, a copy of the error that
+        // responds to bool is returned.
         //
-        // If this object *is not* an error, the singleton OK object is
-        // returned.
+        // If this object *is not* an error, the singleton OK object
+        // that responds to bool is returned.
         if name == "err" {
             let this = this.read().unwrap();
             return Ok(if let Some(err) = this.down_to_err() {
-                new::err_with_inverted_bool_val(err.kind.clone(), err.message.as_str())
+                new::err_with_responds_to_bool(err.kind.clone(), err.message.as_str())
             } else {
-                new::ok_with_inverted_bool_val()
+                new::ok_with_responds_to_bool()
             });
         }
 

@@ -65,7 +65,7 @@ pub static ERR_TYPE: Lazy<new::obj_ref_t!(ErrType)> = Lazy::new(|| {
             let kind = if let Some(kind) = err_type.kind() {
                 kind
             } else {
-                let arg_err_msg = format!("{name} got unexpected err type: {type_arg}");
+                let arg_err_msg = format!("Unknown ErrType: {type_arg}");
                 return Ok(new::arg_err(arg_err_msg));
             };
 
@@ -95,37 +95,44 @@ pub static ERR_TYPE: Lazy<new::obj_ref_t!(ErrType)> = Lazy::new(|| {
 //       Rust's `Err`.
 pub struct ErrObj {
     ns: Namespace,
-    inverted_bool_val: bool,
     pub kind: ErrKind,
     pub message: String,
+    bool_val: bool,
+    responds_to_bool: bool,
 }
 
 gen::standard_object_impls!(ErrObj);
 
 impl ErrObj {
     pub fn new(kind: ErrKind, message: String) -> Self {
-        Self { ns: Namespace::new(), kind, message, inverted_bool_val: false }
+        let bool_val = kind != ErrKind::Ok;
+        Self { ns: Namespace::new(), kind, message, bool_val, responds_to_bool: false }
     }
 
-    pub fn with_inverted_bool_val(kind: ErrKind, message: String) -> Self {
-        Self { ns: Namespace::new(), kind, message, inverted_bool_val: true }
+    pub fn with_responds_to_bool(kind: ErrKind, message: String) -> Self {
+        let mut instance = Self::new(kind, message);
+        instance.responds_to_bool = true;
+        instance
+    }
+
+    pub fn retrieve_bool_val(&self) -> bool {
+        self.bool_val
     }
 }
 
 impl ObjectTrait for ErrObj {
     gen::object_trait_header!(ERR_TYPE);
 
-    /// `Err` object's evaluate to `false` in boolean context *except*
-    /// for the special OK value, which evaluates to `true`.
-    ///
-    /// When `self.invert_err_arg` is set, the boolean semantics are
-    /// inverted.
     fn bool_val(&self) -> RuntimeBoolResult {
-        let mut val = self.kind == ErrKind::Ok;
-        if self.inverted_bool_val {
-            val = !val
+        if self.responds_to_bool {
+            Ok(self.bool_val)
+        } else {
+            Err(RuntimeErr::type_err(concat!(
+                "An Err object cannot be evaluated directly as a ",
+                "Bool. You must access it via the `.err` attribute of ",
+                "the result object.",
+            )))
         }
-        Ok(val)
     }
 
     fn and(&self, rhs: &dyn ObjectTrait) -> RuntimeBoolResult {
