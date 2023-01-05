@@ -327,6 +327,12 @@ assert(!1.err, "1 is not an error")
 # error.
 result = assert(false)
 
+# The boolean value of an error is `false` when used directly
+assert(!result)
+
+# The boolean value of an error is `true` when accessed via `.err`
+assert(!!result.err)
+
 # Check result - method 1
 if result.ok ->
     "ok"

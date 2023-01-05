@@ -17,9 +17,9 @@ use std::any::Any;
 use std::fmt;
 use std::sync::{Arc, RwLock};
 
-use crate::util::check_args;
 use once_cell::sync::Lazy;
 
+use crate::util::check_args;
 use crate::vm::{RuntimeBoolResult, RuntimeErr};
 
 use super::gen;
@@ -95,27 +95,37 @@ pub static ERR_TYPE: Lazy<new::obj_ref_t!(ErrType)> = Lazy::new(|| {
 //       Rust's `Err`.
 pub struct ErrObj {
     ns: Namespace,
-    kind: ErrKind,
-    message: String,
+    inverted_bool_val: bool,
+    pub kind: ErrKind,
+    pub message: String,
 }
 
 gen::standard_object_impls!(ErrObj);
 
 impl ErrObj {
     pub fn new(kind: ErrKind, message: String) -> Self {
-        Self { ns: Namespace::new(), kind, message }
+        Self { ns: Namespace::new(), kind, message, inverted_bool_val: false }
+    }
+
+    pub fn with_inverted_bool_val(kind: ErrKind, message: String) -> Self {
+        Self { ns: Namespace::new(), kind, message, inverted_bool_val: true }
     }
 }
 
 impl ObjectTrait for ErrObj {
     gen::object_trait_header!(ERR_TYPE);
 
-    /// Err object's evaluate to `false` in boolean context *except* for
-    /// the special OK value, which evaluates to `true`.
+    /// `Err` object's evaluate to `false` in boolean context *except*
+    /// for the special OK value, which evaluates to `true`.
     ///
-    /// In other words, this returns whether the obj *is* an error.
+    /// When `self.invert_err_arg` is set, the boolean semantics are
+    /// inverted.
     fn bool_val(&self) -> RuntimeBoolResult {
-        Ok(self.kind != ErrKind::Ok)
+        let mut val = self.kind == ErrKind::Ok;
+        if self.inverted_bool_val {
+            val = !val
+        }
+        Ok(val)
     }
 
     fn and(&self, rhs: &dyn ObjectTrait) -> RuntimeBoolResult {

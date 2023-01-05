@@ -14,7 +14,7 @@ use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
 use super::class::TYPE_TYPE;
 use super::ns::Namespace;
 
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum ErrKind {
     Arg,
     Assertion,

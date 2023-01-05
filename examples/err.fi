@@ -1,16 +1,19 @@
-#err = Err.new(ErrType.assertion, nil)
-#assert(err.err, $"Expected err, not {err.$type}", true)
-#assert(err.type == ErrType.arg, $"err.type is {err.type}, not nested", true)
-#
-#arg_err = Err.new(ErrType.arg, "bad arg: a")
-#assert(!!arg_err, "expected err", true)
-#assert(!nil.err, "did not expect err", true)
-#assert(!1.err, "did not expect err", true)
-#
-## Error objects have an err attribute too, which just points at itself
-## (is this useful?).
-#assert(arg_err === arg_err.err, "", true)
-#assert(arg_err.err, $"expected err {arg_err.err}", true)
+err = Err.new(ErrType.assertion, nil)
+assert(!err, "Expected assertion err to evaluate as false", true)
+assert(!!err.err, "Expected err.err to evaluate as true", true)
+assert(err.err.type == ErrType.arg, $"Expected assertion err, not {err.$type}", true)
+assert(err.type == ErrType.arg, $"err.type is {err.type}", true)
+
+arg_err = Err.new(ErrType.arg, "bad arg: a")
+assert(!arg_err, "Expected arg err to evaluate as false", true)
+assert(!!err.err, "Expected arg_err.err to evaluate as true", true)
+assert(arg_err.err.type == ErrType.arg, $"Expected arg err, not {err.$type}", true)
+assert(!nil.err, "did not expect err", true)
+assert(!1.err, "did not expect err", true)
+
+# Error objects have an err attribute too, which just points at itself
+# (is this useful?).
+assert(arg_err.err, $"expected err {arg_err.err}", true)
 
 check_result = (result, expected) ->
     print("Checking result:", result)
@@ -40,7 +43,7 @@ check_result = (result, expected) ->
     else ->
         statuses.push("ok")
 
-#    # And yet another way:
+    # And yet another way:
     match result.err.type ->
         ErrType.ok ->
             statuses.push("ok")
