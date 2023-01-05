@@ -30,26 +30,43 @@ pub static STR_TYPE: Lazy<new::obj_ref_t!(StrType)> = Lazy::new(|| {
         // Instance Attributes -----------------------------------------
         gen::prop!("length", type_ref, |this, _, _| {
             let this = this.read().unwrap();
-            let this = this.down_to_str().unwrap();
-            Ok(new::int(this.value.len()))
+            let value = this.get_str_val().unwrap();
+            Ok(new::int(value.len()))
         }),
         // Instance Methods --------------------------------------------
         gen::meth!("starts_with", type_ref, &["prefix"], |this, args, _| {
             let this = this.read().unwrap();
-            let this = this.down_to_str().unwrap();
+            let value = this.get_str_val().unwrap();
             let arg = gen::use_arg!(args, 0);
             let prefix = gen::use_arg_str!(arg);
-            Ok(new::bool(this.value.starts_with(prefix)))
+            Ok(new::bool(value.starts_with(prefix)))
+        }),
+        gen::meth!("ends_with", type_ref, &["prefix"], |this, args, _| {
+            let this = this.read().unwrap();
+            let value = this.get_str_val().unwrap();
+            let arg = gen::use_arg!(args, 0);
+            let prefix = gen::use_arg_str!(arg);
+            Ok(new::bool(value.ends_with(prefix)))
         }),
         gen::meth!("replace", type_ref, &["old", "new"], |this, args, _| {
             let this = this.read().unwrap();
-            let this = this.down_to_str().unwrap();
+            let value = this.get_str_val().unwrap();
             let arg1 = gen::use_arg!(args, 0);
             let arg2 = gen::use_arg!(args, 1);
             let old = gen::use_arg_str!(arg1);
             let new = gen::use_arg_str!(arg2);
-            let result = this.value.replace(old, new);
+            let result = value.replace(old, new);
             Ok(new::str(result))
+        }),
+        gen::meth!("upper", type_ref, &[], |this, _, _| {
+            let this = this.read().unwrap();
+            let value = this.get_str_val().unwrap();
+            Ok(new::str(value.to_uppercase()))
+        }),
+        gen::meth!("lower", type_ref, &[], |this, _, _| {
+            let this = this.read().unwrap();
+            let value = this.get_str_val().unwrap();
+            Ok(new::str(value.to_lowercase()))
         }),
     ]);
 
