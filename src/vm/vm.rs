@@ -744,7 +744,7 @@ impl VM {
 
     /// Look up call chain for `this`.
     fn find_this(&self) -> ObjectRef {
-        for frame in self.call_stack.iter().rev() {
+        for frame in self.call_stack.iter() {
             if let Some(this) = &frame.this_opt {
                 return this.clone();
             }
@@ -757,10 +757,10 @@ impl VM {
     pub fn call(&mut self, callable_ref: ObjectRef, args: Args) -> RuntimeResult {
         let callable = callable_ref.read().unwrap();
         if let Some(func) = callable.down_to_builtin_func() {
-            log::trace!("CALL builtin func");
+            log::trace!("CALL builtin func {}", func.name());
             self.call_builtin_func(func, None, args)
         } else if let Some(func) = callable.down_to_func() {
-            log::trace!("CALL func");
+            log::trace!("CALL func {}", func.name());
             self.call_func(func, None, args, None)
         } else if callable.is_closure() {
             log::trace!("CALL closure");
@@ -770,7 +770,11 @@ impl VM {
             let func_obj = func_ref.read().unwrap();
             let this_opt = Some(bound_func.this.clone());
             if let Some(func) = func_obj.down_to_builtin_func() {
-                log::trace!("CALL bound builtin func");
+                log::trace!(
+                    "CALL bound builtin func {} with this: {}",
+                    func.name(),
+                    bound_func.this.read().unwrap()
+                );
                 if let Some(expected_type) = func.this_type() {
                     let expected_type = &*expected_type.read().unwrap();
                     let this = bound_func.this.read().unwrap();
@@ -785,10 +789,17 @@ impl VM {
                 }
                 self.call_builtin_func(func, this_opt, args)
             } else if let Some(func) = func_obj.down_to_func() {
-                log::trace!("CALL bound func");
+                log::trace!(
+                    "CALL bound func {} with this: {}",
+                    func.name(),
+                    bound_func.this.read().unwrap()
+                );
                 self.call_func(func, this_opt, args, None)
             } else if callable.is_closure() {
-                log::trace!("CALL bound closure");
+                log::trace!(
+                    "CALL bound closure with this: {}",
+                    bound_func.this.read().unwrap()
+                );
                 self.call_closure(func_ref.clone(), this_opt, args)
             } else {
                 Err(func_obj.not_callable())
@@ -965,7 +976,6 @@ impl VM {
     }
 
     fn push_const(&mut self, code: &Code, index: usize) -> RuntimeResult {
-        log::trace!("GET CONST: {index} : {code:?}");
         let obj = code.get_const(index)?.clone();
         self.push(ValueStackKind::Constant(obj, index));
         Ok(())
