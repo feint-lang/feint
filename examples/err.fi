@@ -27,7 +27,7 @@ check_result = (result, expected) ->
         match result.err.type ->
             ErrType.assertion ->
                 errs.push("assertion")
-            : ->
+            * ->
                 errs.push($"{result.err.type}")
 
     # Another way:
@@ -36,7 +36,7 @@ check_result = (result, expected) ->
         match result.err.type ->
             ErrType.assertion ->
                 errs.push("assertion")
-            : ->
+            * ->
                 errs.push($"{result.err.type}")
     else ->
         statuses.push("ok")
@@ -48,7 +48,7 @@ check_result = (result, expected) ->
         ErrType.assertion ->
             statuses.push("err")
             errs.push("assertion")
-        : ->
+        * ->
             statuses.push("err")
             errs.push($"{result.err.type}")
 

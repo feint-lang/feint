@@ -421,7 +421,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
             ExpectedExpr, ExpectedToken, InlineMatchNotAllowed, MatchDefaultMustBeLast,
         };
         use Token::{
-            Colon, EndOfStatement, EqualEqual, InlineScopeStart, ScopeEnd, ScopeStart,
+            EndOfStatement, EqualEqual, InlineScopeStart, ScopeEnd, ScopeStart, Star,
         };
         let lhs = self.expr(0).map_err(|_| self.err(ExpectedExpr(self.loc())))?;
         let mut branches = vec![];
@@ -432,7 +432,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
                 if !self.has_tokens()? || self.peek_token_is(&ScopeEnd)? {
                     break;
                 }
-                if self.next_token_is(&Colon)? {
+                if self.next_token_is(&Star)? {
                     let block = self.block(start)?;
                     end = block.end;
                     default = Some(block);

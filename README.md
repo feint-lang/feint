@@ -167,17 +167,33 @@ if false -> "1 + 1 = 5"  # result is nil
 
 ## Match
 
+`match` can be used to simplify `if`/`else if`/`else` blocks where the
+same object is always checked. For example, this:
+
+```
+x = "abc"
+if x == "a" -> 1
+else if x == "ab" -> 2
+else if x == "abc" -> 3
+else -> 4
+```
+
+can be written more succinctly as:
+
 ```
 x = "abc"
 result = match x ->
     "a"   -> 1
     "ab"  -> 2
     "abc" -> 3
-    :     -> 4
+    *     -> 4
 print(result)  # -> 3
 ```
 
-The default branch is denoted by a single `:`. If there's no default
+When a branch matches, its value is returned immediately--there's no
+fallthrough.
+
+The default branch is denoted by a single `*`. If there's no default
 branch and no match is found, the `match` block will return `nil`.
 
 ## Loops
@@ -332,12 +348,12 @@ if result.ok ->
     "ok"
 else ->
     ErrType.assertion -> "handle assertion error"
-    : -> $"handle other error: {result.err.type}"
+    * -> $"handle other error: {result.err.type}"
 
 # Check result - method 2
 if result.err ->
     ErrType.assertion -> "handle assertion error"
-    : -> $"handle {result.err.type} error"
+    * -> $"handle {result.err.type} error"
 else ->
     "ok"
 
@@ -345,7 +361,7 @@ else ->
 match result.err.type ->
     ErrType.ok -> "ok"
     ErrType.assertion -> "handle assertion error"
-    : -> $"handle other error: {result.err.type}"
+    * -> $"handle other error: {result.err.type}"
 ```
 
 ## Custom Types

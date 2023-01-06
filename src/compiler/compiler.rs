@@ -650,7 +650,10 @@ impl Visitor {
         branches: Vec<(ast::Expr, ast::StatementBlock)>,
         default: Option<ast::StatementBlock>,
     ) -> VisitResult {
-        assert!(!branches.is_empty(), "At least one branch required for conditional");
+        assert!(
+            branches.len() > 0 || default.is_some(),
+            "At least one branch required for conditional"
+        );
 
         // Addresses of branch jump-out instructions (added after each
         // branch's block). The target address for these isn't known

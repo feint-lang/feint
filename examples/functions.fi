@@ -12,7 +12,7 @@ print(self_referential(3))  # -> [0, 1, 2, 3]
 f = (n) ->
     match n ->
         0 -> [0]
-        : -> f(n - 1).extend([n])
+        * -> f(n - 1).extend([n])
 
 print(f(3))  # -> [0, 1, 2, 3]
 
