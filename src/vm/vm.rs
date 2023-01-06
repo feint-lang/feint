@@ -180,6 +180,11 @@ impl VM {
                 LoadConst(index) => {
                     self.push_const(code, *index)?;
                 }
+                // Modules
+                LoadModule(name) => {
+                    let module = modules::get_module(name.as_str());
+                    self.push_temp(module);
+                }
                 // Vars
                 DeclareVar(name) => {
                     if self.ctx.get_var_in_current_ns(name).is_err() {
@@ -426,12 +431,6 @@ impl VM {
 
                         self.push_temp(closure);
                     }
-                }
-                // Modules
-                LoadModule(name) => {
-                    let module = modules::get_module(name.as_str());
-                    self.ctx.declare_and_assign_var(name, module.clone())?;
-                    self.push_temp(module.clone());
                 }
                 // Placeholders
                 Placeholder(addr, inst, message) => {

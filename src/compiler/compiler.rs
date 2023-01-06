@@ -448,7 +448,9 @@ impl Visitor {
 
     fn visit_import(&mut self, name: String) -> VisitResult {
         self.scope_tree.add_var(self.len(), name.as_str(), true);
-        self.push(Inst::LoadModule(name));
+        self.push(Inst::DeclareVar(name.clone()));
+        self.push(Inst::LoadModule(name.clone()));
+        self.push(Inst::AssignVar(name));
         Ok(())
     }
 
