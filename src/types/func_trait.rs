@@ -4,7 +4,7 @@ use super::result::Params;
 
 // Function Trait ------------------------------------------------------
 
-pub(crate) trait FuncTrait {
+pub trait FuncTrait {
     fn name(&self) -> &str;
     fn params(&self) -> &Params;
 
@@ -35,6 +35,10 @@ pub(crate) trait FuncTrait {
             }
         }
         None
+    }
+
+    fn has_var_args(&self) -> bool {
+        self.var_args_index().is_some()
     }
 
     fn format_string(&self, id: Option<usize>) -> String {

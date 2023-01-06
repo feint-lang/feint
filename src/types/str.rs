@@ -3,6 +3,7 @@ use std::fmt;
 use std::sync::{Arc, RwLock};
 
 use once_cell::sync::Lazy;
+use tera::{Context, Tera};
 
 use crate::vm::{RuntimeBoolResult, RuntimeErr, RuntimeObjResult};
 
@@ -41,22 +42,12 @@ pub static STR_TYPE: Lazy<new::obj_ref_t!(StrType)> = Lazy::new(|| {
             let prefix = gen::use_arg_str!(arg);
             Ok(new::bool(value.starts_with(prefix)))
         }),
-        gen::meth!("ends_with", type_ref, &["prefix"], |this, args, _| {
+        gen::meth!("ends_with", type_ref, &["suffix"], |this, args, _| {
             let this = this.read().unwrap();
             let value = this.get_str_val().unwrap();
             let arg = gen::use_arg!(args, 0);
-            let prefix = gen::use_arg_str!(arg);
-            Ok(new::bool(value.ends_with(prefix)))
-        }),
-        gen::meth!("replace", type_ref, &["old", "new"], |this, args, _| {
-            let this = this.read().unwrap();
-            let value = this.get_str_val().unwrap();
-            let arg1 = gen::use_arg!(args, 0);
-            let arg2 = gen::use_arg!(args, 1);
-            let old = gen::use_arg_str!(arg1);
-            let new = gen::use_arg_str!(arg2);
-            let result = value.replace(old, new);
-            Ok(new::str(result))
+            let suffix = gen::use_arg_str!(arg);
+            Ok(new::bool(value.ends_with(suffix)))
         }),
         gen::meth!("upper", type_ref, &[], |this, _, _| {
             let this = this.read().unwrap();
@@ -67,6 +58,43 @@ pub static STR_TYPE: Lazy<new::obj_ref_t!(StrType)> = Lazy::new(|| {
             let this = this.read().unwrap();
             let value = this.get_str_val().unwrap();
             Ok(new::str(value.to_lowercase()))
+        }),
+        gen::meth!("render", type_ref, &["context"], |this_obj, args, _| {
+            let this = this_obj.read().unwrap();
+            let value = this.get_str_val().unwrap();
+            let arg = gen::use_arg!(args, 0);
+            let context = gen::use_arg_map!(arg);
+            let context = context.to_hash_map();
+            let mut tera = Tera::default();
+            let mut tera_context = Context::new();
+            context.iter().for_each(|(k, v)| {
+                let v = v.read().unwrap();
+                let v = v.get_str_val().unwrap();
+                tera_context.insert(k, v);
+            });
+            tera.add_raw_template("str.render.template", value).unwrap();
+            let result = tera.render("str.render.template", &tera_context);
+            Ok(match result {
+                Ok(output) => new::str(output),
+                Err(err) => new::string_err(err.to_string(), this_obj.clone()),
+            })
+        }),
+        gen::meth!("repeat", type_ref, &["count"], |this, args, _| {
+            let this = this.read().unwrap();
+            let value = this.get_str_val().unwrap();
+            let arg1 = gen::use_arg!(args, 0);
+            let count = gen::use_arg_usize!(arg1);
+            Ok(new::str(value.repeat(count)))
+        }),
+        gen::meth!("replace", type_ref, &["old", "new"], |this, args, _| {
+            let this = this.read().unwrap();
+            let value = this.get_str_val().unwrap();
+            let arg1 = gen::use_arg!(args, 0);
+            let arg2 = gen::use_arg!(args, 1);
+            let old = gen::use_arg_str!(arg1);
+            let new = gen::use_arg_str!(arg2);
+            let result = value.replace(old, new);
+            Ok(new::str(result))
         }),
     ]);
 

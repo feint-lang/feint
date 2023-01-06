@@ -191,6 +191,10 @@ pub fn index_out_of_bounds_err(index: usize, obj: ObjectRef) -> ObjectRef {
     err(ErrKind::IndexOutOfBounds, index.to_string(), obj)
 }
 
+pub fn string_err<S: Into<String>>(msg: S, obj: ObjectRef) -> ObjectRef {
+    err(ErrKind::String, msg, obj)
+}
+
 pub fn ok_err() -> ObjectRef {
     OK_ERR.clone()
 }

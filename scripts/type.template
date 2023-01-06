@@ -1,0 +1,53 @@
+use std::any::Any;
+use std::fmt;
+use std::sync::{Arc, RwLock};
+
+use once_cell::sync::Lazy;
+
+use crate::vm::RuntimeBoolResult;
+
+use super::gen;
+use super::new;
+
+use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
+use super::class::TYPE_TYPE;
+use super::ns::Namespace;
+
+// {{ type_name }} Type {{ type_rule }}
+
+gen::type_and_impls!({{ type_name }}, {{ obj_name }});
+
+pub static {singleton_type_name}: Lazy<new::obj_ref_t!({{ type_name }})> =
+    Lazy::new(|| new::obj_ref!({{ type_name }}::new()));
+
+// {{ obj_name }} Object {{ obj_rule }}
+
+pub struct {{ obj_name }} {
+    ns: Namespace,
+}
+
+gen::standard_object_impls!({{ obj_name }});
+
+impl {{ obj_name }} {
+    pub fn new() -> Self {
+        Self { ns: Namespace::new() }
+    }
+}
+
+impl ObjectTrait for {{ obj_name }} {
+    gen::object_trait_header!({singleton_type_name});
+}
+
+// Display -------------------------------------------------------------
+
+impl fmt::Display for {{ obj_name }} {
+    fn fmt(&self, f: &mut fmt::Formatter<\'_>) -> fmt::Result {
+        write!(f, "nil")
+    }
+}
+
+impl fmt::Debug for {{ obj_name }} {
+    fn fmt(&self, f: &mut fmt::Formatter<\'_>) -> fmt::Result {
+        write!(f, "{self}")
+    }
+}

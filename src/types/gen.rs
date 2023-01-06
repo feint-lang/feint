@@ -195,11 +195,21 @@ macro_rules! use_arg {
     }};
 }
 
-/// Get the value of the arg if it's a Str or return a type error.
-///
-/// Args:
-///
-/// $arg: ObjectRef
+// The use_arg_<type> macros convert the supplied arg to a value of the
+// given type if possible or return an Err if not.
+
+macro_rules! use_arg_map {
+    ( $arg:ident ) => {{
+        if let Some(map) = $arg.get_map_val() {
+            map
+        } else {
+            // note: this should never happen from user code.
+            let msg = format!("Expected map; got {}", $arg.class().read().unwrap());
+            return Err(RuntimeErr::arg_err(msg));
+        }
+    }};
+}
+
 macro_rules! use_arg_str {
     ( $arg:ident ) => {{
         if let Some(val) = $arg.get_str_val() {
@@ -227,5 +237,6 @@ macro_rules! use_arg_usize {
 pub(crate) use meth;
 pub(crate) use prop;
 pub(crate) use use_arg;
+pub(crate) use use_arg_map;
 pub(crate) use use_arg_str;
 pub(crate) use use_arg_usize;

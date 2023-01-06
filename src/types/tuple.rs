@@ -5,13 +5,15 @@ use std::sync::{Arc, RwLock};
 
 use once_cell::sync::Lazy;
 
-use super::gen;
+use crate::vm::RuntimeErr;
 
+use super::gen;
 use super::new;
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
 use super::class::TYPE_TYPE;
 use super::ns::Namespace;
+use super::seq;
 
 // Tuple Type ----------------------------------------------------------
 
@@ -31,20 +33,34 @@ pub static TUPLE_TYPE: Lazy<new::obj_ref_t!(TupleType)> = Lazy::new(|| {
         gen::prop!("is_empty", type_ref, |this, _, _| {
             let this = this.read().unwrap();
             let this = this.down_to_tuple().unwrap();
-            Ok(new::bool(this.is_empty()))
+            Ok(new::bool(this.len() == 0))
         }),
-        // Instance Methods --------------------------------------------
-        gen::meth!("map", type_ref, &["map_fn"], |this, args, vm| {
+        gen::prop!("sum", type_ref, |this, _, _| {
             let this = this.read().unwrap();
             let this = this.down_to_tuple().unwrap();
-            let items = &this.items;
-            let map_fn = &args[0];
-            let mut results = vec![];
-            for (i, item) in items.iter().enumerate() {
-                vm.call(map_fn.clone(), vec![item.clone(), new::int(i)])?;
-                results.push(vm.pop_obj()?);
-            }
-            Ok(new::tuple(results))
+            seq::sum(&this.items)
+        }),
+        // Instance Methods --------------------------------------------
+        gen::meth!("get", type_ref, &["index"], |this, args, _| {
+            let this = this.read().unwrap();
+            let this = this.down_to_tuple().unwrap();
+            let arg = gen::use_arg!(args, 0);
+            let index = gen::use_arg_usize!(arg);
+            let result = match this.get(index) {
+                Some(obj) => obj,
+                None => new::nil(),
+            };
+            Ok(result)
+        }),
+        gen::meth!("map", type_ref, &["map_fn"], |this_obj, args, vm| {
+            let this = this_obj.read().unwrap();
+            let this = this.down_to_tuple().unwrap();
+            seq::map(&this_obj, &this.items, &args, vm)
+        }),
+        gen::meth!("join", type_ref, &["sep"], |this, args, _| {
+            let this = this.read().unwrap();
+            let this = this.down_to_tuple().unwrap();
+            seq::join(&this.items, &args)
         }),
     ]);
 
@@ -73,8 +89,12 @@ impl Tuple {
         self.items.len()
     }
 
-    pub fn is_empty(&self) -> bool {
-        self.items.is_empty()
+    pub fn get(&self, index: usize) -> Option<ObjectRef> {
+        if let Some(item) = self.items.get(index) {
+            Some(item.clone())
+        } else {
+            None
+        }
     }
 }
 

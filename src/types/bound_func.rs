@@ -9,7 +9,9 @@ use super::new;
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
 use super::class::TYPE_TYPE;
+use super::func_trait::FuncTrait;
 use super::ns::Namespace;
+use super::result::Params;
 
 // Bound Function Type -------------------------------------------------
 
@@ -24,13 +26,40 @@ pub struct BoundFunc {
     ns: Namespace,
     pub func: ObjectRef,
     pub this: ObjectRef,
+    name: String,
+    params: Params,
 }
 
 gen::standard_object_impls!(BoundFunc);
 
 impl BoundFunc {
     pub fn new(func: ObjectRef, this: ObjectRef) -> Self {
-        Self { ns: Namespace::new(), func, this }
+        let f = func.read().unwrap();
+        let (name, params) = if let Some(f) = f.down_to_builtin_func() {
+            (f.name().to_string(), f.params().clone())
+        } else if let Some(f) = f.down_to_func() {
+            (f.name().to_string(), f.params().clone())
+        } else if let Some(f) = f.down_to_closure() {
+            (f.name().to_string(), f.params().clone())
+        } else {
+            panic!("Unexpected bound func type: {f}")
+        };
+        drop(f);
+        Self { ns: Namespace::new(), func, this, name, params }
+    }
+
+    pub fn func(&self) -> ObjectRef {
+        self.func.clone()
+    }
+}
+
+impl FuncTrait for BoundFunc {
+    fn name(&self) -> &str {
+        self.name.as_str()
+    }
+
+    fn params(&self) -> &Params {
+        &self.params
     }
 }
 

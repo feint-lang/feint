@@ -7,6 +7,7 @@ use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 
 use crate::modules;
+use crate::types::FuncTrait;
 use crate::vm::{RuntimeBoolResult, RuntimeErr, RuntimeObjResult};
 
 use super::new;
@@ -357,6 +358,10 @@ pub trait ObjectTrait {
     make_type_checker!(is_str, Str);
     make_type_checker!(is_tuple, Tuple);
 
+    fn is_seq(&self) -> bool {
+        self.is_list() || self.is_tuple()
+    }
+
     // Downcasters -----------------------------------------------------
     //
     // These downcast object refs to their concrete types.
@@ -404,6 +409,21 @@ pub trait ObjectTrait {
     make_down_to!(down_to_str, Str);
     make_down_to!(down_to_tuple, Tuple);
 
+    fn as_func(&self) -> Option<&dyn FuncTrait> {
+        let f: &dyn FuncTrait = if let Some(f) = self.down_to_builtin_func() {
+            f
+        } else if let Some(f) = self.down_to_func() {
+            f
+        } else if let Some(f) = self.down_to_closure() {
+            f
+        } else if let Some(f) = self.down_to_bound_func() {
+            f
+        } else {
+            return None;
+        };
+        Some(f)
+    }
+
     // Value extractors ------------------------------------------------
     //
     // These extract the inner value from an object.
@@ -413,6 +433,14 @@ pub trait ObjectTrait {
     make_value_extractor!(get_float_val, Float, &f64);
     make_value_extractor!(get_int_val, Int, &BigInt);
     make_value_extractor!(get_str_val, Str, &str);
+
+    fn get_map_val(&self) -> Option<&Map> {
+        if let Some(map) = self.down_to_map() {
+            Some(map)
+        } else {
+            None
+        }
+    }
 
     fn get_usize_val(&self) -> Option<usize> {
         if let Some(int) = self.get_int_val() {

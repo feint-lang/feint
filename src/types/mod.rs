@@ -40,6 +40,7 @@ pub(crate) mod module;
 pub(crate) mod nil;
 pub(crate) mod prop;
 pub(crate) mod result;
+pub(crate) mod seq;
 pub(crate) mod str;
 pub(crate) mod tuple;
 pub(crate) mod util;

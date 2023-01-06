@@ -590,7 +590,24 @@ impl VM {
             Sub => a.sub(b)?,
             Dot => {
                 let obj_ref = if let Some(name) = b.get_str_val() {
-                    a.get_attr(name, a_ref.clone())
+                    let mut result = a.get_attr(name, a_ref.clone());
+
+                    // If name isn't an attr and LHS is a sequence, look
+                    // up `name` and use its value as an index, if
+                    // possible. If this fails--if `name` isn't defined
+                    // or isn't an index--the original attr err will be
+                    // returned.
+                    if result.read().unwrap().is_err() && (a.is_seq()) {
+                        let i = self.ctx.get_var(name);
+                        if let Ok(i) = i {
+                            let i = i.read().unwrap();
+                            if let Some(i) = i.get_usize_val() {
+                                result = a.get_item(i, a_ref.clone());
+                            }
+                        }
+                    }
+
+                    result
                 } else if let Some(index) = b.get_usize_val() {
                     a.get_item(index, a_ref.clone())
                 } else {
@@ -602,6 +619,7 @@ impl VM {
                         a_ref.clone(),
                     )
                 };
+
                 let obj = obj_ref.read().unwrap();
                 if obj.is_builtin_func() || obj.is_func() || obj.is_closure() {
                     // If `b` in `a.b` is a function, bind `b` to `a`.

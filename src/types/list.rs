@@ -13,6 +13,7 @@ use super::new;
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
 use super::class::TYPE_TYPE;
 use super::ns::Namespace;
+use super::seq;
 
 // List Type -----------------------------------------------------------
 
@@ -33,6 +34,12 @@ pub static LIST_TYPE: Lazy<new::obj_ref_t!(ListType)> = Lazy::new(|| {
             let this = this.read().unwrap();
             let this = this.down_to_list().unwrap();
             Ok(new::bool(this.len() == 0))
+        }),
+        gen::prop!("sum", type_ref, |this, _, _| {
+            let this = this.read().unwrap();
+            let this = this.down_to_list().unwrap();
+            let items = &this.items.read().unwrap();
+            seq::sum(items)
         }),
         // Instance Methods --------------------------------------------
         // Push item and return it.
@@ -71,17 +78,17 @@ pub static LIST_TYPE: Lazy<new::obj_ref_t!(ListType)> = Lazy::new(|| {
             };
             Ok(result)
         }),
-        gen::meth!("map", type_ref, &["map_fn"], |this, args, vm| {
+        gen::meth!("map", type_ref, &["map_fn"], |this_obj, args, vm| {
+            let this = this_obj.read().unwrap();
+            let this = this.down_to_list().unwrap();
+            let items = &this.items.read().unwrap();
+            seq::map(&this_obj, items, &args, vm)
+        }),
+        gen::meth!("join", type_ref, &["sep"], |this, args, _| {
             let this = this.read().unwrap();
             let this = this.down_to_list().unwrap();
-            let items = this.items.read().unwrap();
-            let map_fn = &args[0];
-            let mut results = vec![];
-            for (i, item) in items.iter().enumerate() {
-                vm.call(map_fn.clone(), vec![item.clone(), new::int(i)])?;
-                results.push(vm.pop_obj()?);
-            }
-            Ok(new::tuple(results))
+            let items = &this.items.read().unwrap();
+            seq::join(items, &args)
         }),
     ]);
 

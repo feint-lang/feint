@@ -3,7 +3,7 @@ use std::sync::{Arc, RwLock};
 
 use once_cell::sync::Lazy;
 
-use crate::types::{new, Module, Namespace, ObjectRef};
+use crate::types::{new, Args, Module, Namespace, ObjectRef};
 
 use crate::types::bool::BOOL_TYPE;
 use crate::types::bound_func::BOUND_FUNC_TYPE;
@@ -24,7 +24,7 @@ use crate::types::str::STR_TYPE;
 use crate::types::tuple::TUPLE_TYPE;
 
 use crate::util::check_args;
-use crate::vm::RuntimeErr;
+use crate::vm::{RuntimeErr, RuntimeObjResult};
 
 pub static BUILTINS: Lazy<new::obj_ref_t!(Module)> = Lazy::new(|| {
     let entries: Vec<(&str, ObjectRef)> = vec![
@@ -51,24 +51,16 @@ pub static BUILTINS: Lazy<new::obj_ref_t!(Module)> = Lazy::new(|| {
             // Args:
             //    objects?: ObjectRef[]
             "print",
-            new::builtin_func("print", None, &[""], |_, args, _| {
-                let items = args.get(0).unwrap();
-                let obj_ref = items.read().unwrap();
-                let tuple = obj_ref.down_to_tuple().unwrap();
-                let count = tuple.len();
-                if count > 0 {
-                    let last = count - 1;
-                    let mut sep = " ";
-                    for (i, arg) in tuple.iter().enumerate() {
-                        let arg = arg.read().unwrap();
-                        if i == last {
-                            sep = "";
-                        }
-                        print!("{arg}{sep}");
-                    }
-                }
-                println!();
-                Ok(new::nil())
+            new::builtin_func("print", None, &[""], |_, args, _| print(&args, false)),
+        ),
+        (
+            // Print representation of zero or more objects to stderr.
+            //
+            // Args:
+            //    objects?: ObjectRef[]
+            "print_err",
+            new::builtin_func("print_err", None, &[""], |_, args, _| {
+                print(&args, true)
             }),
         ),
         (
@@ -150,3 +142,31 @@ pub static BUILTINS: Lazy<new::obj_ref_t!(Module)> = Lazy::new(|| {
 
     new::builtin_module("builtins", Namespace::with_entries(&entries))
 });
+
+fn print(args: &Args, err: bool) -> RuntimeObjResult {
+    let items = args.get(0).unwrap();
+    let obj_ref = items.read().unwrap();
+    let tuple = obj_ref.down_to_tuple().unwrap();
+    let count = tuple.len();
+    if count > 0 {
+        let last = count - 1;
+        let mut sep = " ";
+        for (i, arg) in tuple.iter().enumerate() {
+            let arg = arg.read().unwrap();
+            if i == last {
+                sep = "";
+            }
+            if err {
+                eprint!("{arg}{sep}");
+            } else {
+                print!("{arg}{sep}");
+            }
+        }
+    }
+    if err {
+        eprintln!()
+    } else {
+        println!()
+    }
+    return Ok(new::nil());
+}
