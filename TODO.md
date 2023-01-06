@@ -1,5 +1,19 @@
 # TODO
 
+- [ ] Fix ident parsing - parse to whitespace and then check for
+      validity. Currently, an invalid ident will cause a cryptic
+      "expected EOS" error.
+- [ ] Handle/allow `UPPERCASE_IDENT`s.
+- [ ] Consider allowing `Map` entries to be accessed using dot notation.
+      This would allow `Map`s to be used as lightweight "instances",
+      similar to JS.
+- [ ] Add docstrings
+    - [ ] Functions
+    - [ ] Other objects?
+- [-] Implement error handling (partially implemented)
+- [-] Replace unrecoverable errors with recoverable errors where
+      appropriate
+
 - [x] Implement basic types (`Float`, `Int`, `Str`, etc)
 - [x] Implement format strings (AKA $ strings)
 - [x] Implement `Tuple`
@@ -43,11 +57,10 @@
   - [ ] `import from <name>: <names>`
 - [ ] Implement custom classes
 - [ ] Figure out a nice way to do multi-line lambdas
-- [ ] Implement error handling (exceptions or something)
-- [ ] Improve error handling/reporting
+- [-] Improve error handling/reporting (of unrecoverable errors)
   - [ ] Make source location available in AST (started)
   - [ ] Fix locations in format strings
   - [ ] Make source locations available in VM
 - [ ] Add a lot more tests
-- [ ] Profile
+- [-] Profile
 - [ ] Benchmark
