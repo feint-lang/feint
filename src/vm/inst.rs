@@ -3,12 +3,13 @@ use crate::util::{
     UnaryOperator,
 };
 
-#[derive(Debug, PartialEq)]
+/// NOTE: When adding or removing instructions, the PartialEq impl
+///       below must also be updated.
+#[derive(Debug)]
 pub enum Inst {
-    DisplayStack(String),
-
     NoOp,
 
+    // Pop TOS and discard it.
     Pop,
 
     // Global constants are shared globally by all code units.
@@ -93,6 +94,14 @@ pub enum Inst {
 
     LoadModule(String),
 
+    Halt(u8),
+    HaltTop,
+
+    // Placeholders ----------------------------------------------------
+    //
+    // Placeholders are inserted during compilation and later updated.
+    // All placeholders must be replaced or a runtime error will be
+    // thrown.
     Placeholder(usize, Box<Inst>, String), // address, instruction, error message
     FreeVarPlaceholder(usize, String),     // address, var name
     BreakPlaceholder(usize, usize),        // jump address, scope depth
@@ -102,6 +111,53 @@ pub enum Inst {
     //       replaced with a jump to a RETURN target.
     ReturnPlaceholder(usize, usize), // jump address, scope depth
 
-    Halt(u8),
-    HaltTop,
+    // Disassembler ----------------------------------------------------
+    DisplayStack(String),
+}
+
+impl PartialEq for Inst {
+    fn eq(&self, other: &Self) -> bool {
+        use Inst::*;
+
+        match (self, other) {
+            (NoOp, NoOp) => true,
+            (Pop, Pop) => true,
+            (LoadGlobalConst(a), LoadGlobalConst(b)) => a == b,
+            (LoadNil, LoadNil) => true,
+            (LoadTrue, LoadTrue) => true,
+            (LoadFalse, LoadFalse) => true,
+            (LoadEmptyTuple, LoadEmptyTuple) => true,
+            (ScopeStart, ScopeStart) => true,
+            (ScopeEnd, ScopeEnd) => true,
+            (StatementStart(..), StatementStart(..)) => true,
+            (LoadConst(a), LoadConst(b)) => a == b,
+            (DeclareVar(a), DeclareVar(b)) => a == b,
+            (AssignVar(a), AssignVar(b)) => a == b,
+            (LoadVar(a), LoadVar(b)) => a == b,
+            (LoadOuterVar(a), LoadOuterVar(b)) => a == b,
+            (AssignCell(a), AssignCell(b)) => a == b,
+            (LoadCell(a), LoadCell(b)) => a == b,
+            (LoadCaptured(a), LoadCaptured(b)) => a == b,
+            (Jump(a, b, c), Jump(d, e, f)) => (a, b, c) == (d, e, f),
+            (JumpPushNil(a, b, c), JumpPushNil(d, e, f)) => (a, b, c) == (d, e, f),
+            (JumpIfNot(a, b, c), JumpIfNot(d, e, f)) => (a, b, c) == (d, e, f),
+            (UnaryOp(a), UnaryOp(b)) => a == b,
+            (UnaryCompareOp(a), UnaryCompareOp(b)) => a == b,
+            (BinaryOp(a), BinaryOp(b)) => a == b,
+            (CompareOp(a), CompareOp(b)) => a == b,
+            (InplaceOp(a), InplaceOp(b)) => a == b,
+            (Call(a), Call(b)) => a == b,
+            (Return, Return) => true,
+            (MakeString(a), MakeString(b)) => a == b,
+            (MakeTuple(a), MakeTuple(b)) => a == b,
+            (MakeList(a), MakeList(b)) => a == b,
+            (MakeMap(a), MakeMap(b)) => a == b,
+            (CaptureSet(a), CaptureSet(b)) => a == b,
+            (MakeFunc(a), MakeFunc(b)) => a == b,
+            (LoadModule(a), LoadModule(b)) => a == b,
+            (Halt(a), Halt(b)) => a == b,
+            (HaltTop, HaltTop) => true,
+            _ => false,
+        }
+    }
 }

@@ -31,6 +31,28 @@ impl Index<usize> for Code {
     }
 }
 
+impl PartialEq for Code {
+    fn eq(&self, other: &Self) -> bool {
+        if self.chunk != other.chunk {
+            return false;
+        }
+        if self.constants.len() != other.constants.len() {
+            return false;
+        }
+        if self.free_vars != other.free_vars {
+            return false;
+        }
+        for (c, d) in self.constants.iter().zip(other.constants.iter()) {
+            let c = c.read().unwrap();
+            let d = d.read().unwrap();
+            if !c.is_equal(&*d) {
+                return false;
+            }
+        }
+        true
+    }
+}
+
 impl Code {
     pub fn new() -> Self {
         Self { chunk: vec![], constants: vec![], free_vars: vec![] }

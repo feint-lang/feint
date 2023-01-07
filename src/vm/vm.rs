@@ -140,11 +140,6 @@ impl VM {
 
         loop {
             match &code[ip] {
-                DisplayStack(message) => {
-                    eprintln!("\nSTACK: {message}\n");
-                    self.display_stack();
-                    eprintln!();
-                }
                 NoOp => {
                     // do nothing
                 }
@@ -432,6 +427,23 @@ impl VM {
                         self.push_temp(closure);
                     }
                 }
+                // VM control
+                Halt(return_code) => {
+                    self.halt();
+                    break Ok(VMState::Halted(*return_code));
+                }
+                HaltTop => {
+                    let obj = self.pop_obj()?;
+                    let obj = obj.read().unwrap();
+                    let return_code = match obj.get_int_val() {
+                        Some(int) => {
+                            self.halt();
+                            int.to_u8().unwrap_or(255)
+                        }
+                        None => 0,
+                    };
+                    break Ok(VMState::Halted(return_code));
+                }
                 // Placeholders
                 Placeholder(addr, inst, message) => {
                     self.halt();
@@ -460,22 +472,11 @@ impl VM {
                     eprintln!("Return placeholder at {addr} was not updated");
                     break Ok(VMState::Halted(255));
                 }
-                // VM control
-                Halt(return_code) => {
-                    self.halt();
-                    break Ok(VMState::Halted(*return_code));
-                }
-                HaltTop => {
-                    let obj = self.pop_obj()?;
-                    let obj = obj.read().unwrap();
-                    let return_code = match obj.get_int_val() {
-                        Some(int) => {
-                            self.halt();
-                            int.to_u8().unwrap_or(255)
-                        }
-                        None => 0,
-                    };
-                    break Ok(VMState::Halted(return_code));
+                // Disassembler
+                DisplayStack(message) => {
+                    eprintln!("\nSTACK: {message}\n");
+                    self.display_stack();
+                    eprintln!();
                 }
             }
 

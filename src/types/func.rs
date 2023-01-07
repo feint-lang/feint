@@ -71,6 +71,16 @@ impl FuncTrait for Func {
 
 impl ObjectTrait for Func {
     gen::object_trait_header!(FUNC_TYPE);
+
+    fn is_equal(&self, rhs: &dyn ObjectTrait) -> bool {
+        if self.is(rhs) {
+            true
+        } else if let Some(f) = rhs.down_to_func() {
+            f.params == self.params && f.code == self.code
+        } else {
+            false
+        }
+    }
 }
 
 // Display -------------------------------------------------------------
