@@ -783,7 +783,7 @@ impl VM {
             log::trace!("CALL closure");
             self.call_closure(callable_ref.clone(), None, args)
         } else if let Some(bound_func) = callable.down_to_bound_func() {
-            let func_ref = bound_func.func.clone();
+            let func_ref = bound_func.func();
             let func_obj = func_ref.read().unwrap();
             let this_opt = Some(bound_func.this.clone());
             if let Some(func) = func_obj.down_to_builtin_func() {

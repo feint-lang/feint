@@ -247,7 +247,7 @@ impl Executor {
         );
         let mut loc = err.location;
         let col = loc.col;
-        let message = match &err.kind {
+        let mut message = match &err.kind {
             UnexpectedChar(c) => {
                 format!("Syntax error: Unexpected character at column {}: '{}'", col, c)
             }
@@ -296,6 +296,9 @@ impl Executor {
                 format!("Unhandled scan error at {loc}: {kind:?}")
             }
         };
+        if self.debug {
+            message = format!("SCAN ERROR: {message}");
+        }
         self.print_err_message(message, loc, loc);
     }
 
@@ -306,7 +309,7 @@ impl Executor {
         }
         let loc = err.loc();
         self.print_err_line(loc.line, source.get_line(loc.line).unwrap_or("<none>"));
-        let message = match &err.kind {
+        let mut message = match &err.kind {
             ScanErr(_) => {
                 unreachable!("Handle ScanErr before calling handle_parse_err")
             }
@@ -350,6 +353,9 @@ impl Executor {
             SyntaxErr(loc) => format!("Syntax error at {loc}"),
             kind => format!("Unhandled parse error: {:?}", kind),
         };
+        if self.debug {
+            message = format!("PARSE ERROR: {message}");
+        }
         self.print_err_message(message, loc, loc);
     }
 
@@ -386,14 +392,14 @@ impl Executor {
                 "var args must be last in parameter list".to_owned()
             }
         };
-        let message = format!("Compilation error: {message}");
+        let message = format!("COMPILATION ERROR: {message}");
         self.print_err_message(message, start, end);
     }
 
     fn handle_runtime_err(&self, err: &RuntimeErr) {
         use RuntimeErrKind::*;
         let (start, end) = self.vm.loc();
-        let message = match &err.kind {
+        let mut message = match &err.kind {
             AssertionFailed(message) => {
                 if message.is_empty() {
                     "Assertion failed".to_string()
@@ -412,6 +418,9 @@ impl Executor {
             NotCallable(type_name) => format!("Object is not callable: {type_name}"),
             kind => format!("Unhandled runtime error: {}", kind),
         };
+        if self.debug {
+            message = format!("RUNTIME ERROR: {message}");
+        }
         self.print_err_message(message, start, end);
     }
 }

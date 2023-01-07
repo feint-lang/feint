@@ -24,7 +24,7 @@ pub static BOUND_FUNC_TYPE: Lazy<new::obj_ref_t!(BoundFuncType)> =
 
 pub struct BoundFunc {
     ns: Namespace,
-    pub func: ObjectRef,
+    func: ObjectRef,
     pub this: ObjectRef,
     name: String,
     params: Params,

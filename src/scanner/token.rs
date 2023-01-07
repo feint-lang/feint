@@ -235,6 +235,13 @@ impl TokenWithLocation {
 
 impl fmt::Display for TokenWithLocation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}: {} -> {}", self.as_str(), self.start, self.end)
+        write!(
+            f,
+            "{:?}({}) @ {} -> {})",
+            self.token,
+            self.as_str(),
+            self.start,
+            self.end
+        )
     }
 }

@@ -651,7 +651,7 @@ impl Visitor {
         default: Option<ast::StatementBlock>,
     ) -> VisitResult {
         assert!(
-            branches.len() > 0 || default.is_some(),
+            !branches.is_empty() || default.is_some(),
             "At least one branch required for conditional"
         );
 
