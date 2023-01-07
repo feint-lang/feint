@@ -73,10 +73,10 @@ handle_result = (result) ->
 
     print("handling ok case for", result)
 
-    ok:
+    :ok:
     return "ok"
 
-    err:
+    :err:
     return "err"
 
 assert(handle_result(1) === "ok")

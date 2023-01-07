@@ -268,6 +268,9 @@ impl Executor {
             WhitespaceAfterIndent | UnexpectedWhitespace => {
                 "Syntax error: Unexpected whitespace".to_string()
             }
+            InvalidLabel(msg) => {
+                format!("Syntax error: Invalid label: {msg}")
+            }
             FormatStrErr(err) => {
                 use crate::format::FormatStrErr::*;
                 match err {

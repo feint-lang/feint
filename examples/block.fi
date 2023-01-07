@@ -3,11 +3,11 @@ print("start ==========================================================")
 
 jump y
 
-y: block ->
+:y: block ->
     print("    in block y")
     jump x
 
-x: print("found")
+:x: print("found")
 print(true && false)
 print(true || false)
 print(1 / 2)
@@ -20,7 +20,7 @@ block ->
         print("        no")
         jump z
         print("        no")
-    z: print("    z")
+    :z: print("    z")
 
 a = "a1"
 b = "b1"
@@ -55,18 +55,18 @@ print("this should be skipped")
 block ->
     print("    this should be skipped too")
     jump a
-    a: block ->
+    :a: block ->
         print("        skipped")
 
-a: print("label: a")
+:a: print("label: a")
 
 block ->
     jump b
     print("    skipped")
-    b: print("    leave block")
+    :b: print("    leave block")
 
 print("before label: b")
-b:
+:b:
 print("after label: b")
 
 block ->
@@ -77,9 +77,9 @@ block ->
     y = "Y"
     print("    skipped y")
 
-out:
+:out:
 print("jumped out")
 
-yyy: # do-nothing label
+:yyy: # do-nothing label
 
 print("end ============================================================")

@@ -84,7 +84,7 @@ loops()
 jump_out = () ->
     loop ->
         jump exit
-    exit: print("exit")
+    :exit: print("exit")
 
 jump_out()
 

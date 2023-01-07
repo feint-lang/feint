@@ -22,6 +22,10 @@ impl ScanErr {
     pub fn new(kind: ScanErrKind, location: Location) -> Self {
         Self { kind, location }
     }
+
+    pub fn new_invalid_label<S: Into<String>>(msg: S, loc: Location) -> Self {
+        Self::new(ScanErrKind::InvalidLabel(msg.into()), loc)
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -40,6 +44,8 @@ pub enum ScanErrKind {
     ParseFloatErr(ParseFloatError),
     FormatStrErr(FormatStrErr),
     TooMuchWhitespace,
+
+    InvalidLabel(String),
 
     InvalidIdent(String),
     InvalidConstIdent(String),

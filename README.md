@@ -103,6 +103,20 @@ block ->
 print(a) # outer a
 ```
 
+## Type Hints
+
+Type hints can be applied to any _identifier_.
+
+NOTE: Currently, type hints are completely ignored and are only useful
+      as documentation.
+
+```
+a: Int = 1
+
+f: Str = (s: Str, count: Int) ->
+    s.repeat(count)
+```
+
 ## Format Strings
 
 Similar to f-strings in Python. Sometimes called $-strings since they
@@ -239,6 +253,10 @@ loop cond = cond ->
 
 - Forward jumps support the jump-to-exit pattern
 - Backward jumps are disallowed (so no looping via goto)
+- Labels can only be placed at the beginning of a line or directly
+  after a scope start marker
+- Labels are fenced by colons e.g. `:my_label:` (this differentiates
+  labels from identifiers with type hints)
 - Labels can't be redefined in a scope
 - Can't jump out of functions
 
@@ -249,7 +267,7 @@ my_func = (x) ->
 
     # do stuff and fall through to exit
 
-    exit:
+    :exit:
     # clean up and return
 ```
 

@@ -101,7 +101,16 @@ impl<'a, T: BufRead> Scanner<'a, T> {
                 self.consume_comment();
                 return Ok(());
             }
-            Some((':', _, _)) => Colon,
+            Some((':', _, _)) => {
+                // If a colon appears at the start of a line, that
+                // indicates a label.
+                let last_token = self.last_token();
+                if let EndOfStatement | ScopeStart | InlineScopeStart = last_token {
+                    self.handle_label(start)?
+                } else {
+                    Colon
+                }
+            }
             Some((',', _, _)) => {
                 self.maybe_exit_inline_scope(start, false);
                 Comma
@@ -205,8 +214,38 @@ impl<'a, T: BufRead> Scanner<'a, T> {
         };
 
         let end = self.source.loc();
+        let is_ident = token.is_ident();
+
         self.add_token_to_queue(token, start, end);
         self.consume_whitespace();
+
+        // XXX: This is a hacky way to skip type hints. For now, they're
+        //      completely ignored. Initially, this just allows type
+        //      hints to be used for documentation.
+        //
+        // XXX: This implementation allows type hints inside tuples,
+        //      which is wonky but probably (?) harmless. E.g.
+        //      `(a: Int, b: Str)`.
+        //
+        // XXX: Another interesting thing about type hints is that they
+        //      are only applied to *identifiers*. This is due to the
+        //      way all objects are given names strictly via assignment
+        //      syntax. This is nice, because it keeps things simple.
+        if is_ident && self.next_char_is(':') {
+            let in_brackets = matches!(self.bracket_stack.peek(), Some(('[' | '{', _)));
+            if !in_brackets {
+                let test = |&c: &char| {
+                    c.is_ascii_alphabetic()
+                        || c.is_ascii_digit()
+                        || c.is_whitespace()
+                        || c == '_'
+                        || c == '<'
+                        || c == '>'
+                        || c == '|'
+                };
+                while self.next_char_if(test).is_some() {}
+            }
+        }
 
         // The following ensures that if a token is followed by only
         // trailing whitespace and/or a comment that the EndOfStatement
@@ -286,6 +325,33 @@ impl<'a, T: BufRead> Scanner<'a, T> {
         }
     }
 
+    /// `start` is the location of the leading colon.
+    fn handle_label(&mut self, start: Location) -> AddTokenResult {
+        use ErrKind::InvalidLabel;
+        use Token::Label;
+        let id_start = Location::new(start.line, start.col + 1);
+        if let Some(c) = self.source.next() {
+            if c == '\n' {
+                return Err(ScanErr::new_invalid_label("missing identifier", id_start));
+            } else if !c.is_ascii_lowercase() {
+                return Err(ScanErr::new_invalid_label(c, id_start));
+            }
+            let ident = self.read_ident(c);
+            let result = self.check_ident(ident.as_str(), IdentKind::Ident, id_start);
+            if result.is_err() {
+                return Err(ScanErr::new_invalid_label(ident, id_start));
+            }
+            if !self.next_char_is(':') {
+                let loc = self.source.loc();
+                let loc = Location::new(loc.line, loc.col + 1);
+                return Err(ScanErr::new_invalid_label("missing colon", loc));
+            }
+            Ok(Label(ident))
+        } else {
+            Err(ScanErr::new(InvalidLabel("missing identifier".to_owned()), id_start))
+        }
+    }
+
     /// Handle identifiers (NOTE: ident, not INdent!).
     fn handle_ident(
         &mut self,
@@ -294,7 +360,6 @@ impl<'a, T: BufRead> Scanner<'a, T> {
         start: Location,
     ) -> AddTokenResult {
         use IdentKind::*;
-        use Token::{EndOfStatement, InlineScopeStart, Label, ScopeStart};
 
         // Special case for underscore placeholder vars.
         if first_char == '_' {
@@ -323,15 +388,6 @@ impl<'a, T: BufRead> Scanner<'a, T> {
 
         let ident_token = match kind {
             Ident => {
-                // Label
-                let last = self.last_token();
-                if let EndOfStatement | ScopeStart | InlineScopeStart = last {
-                    if let Some(':') = self.source.peek() {
-                        self.source.next();
-                        return Ok(Label(ident));
-                    }
-                }
-
                 // Keyword
                 if let Some(token) = KEYWORDS.get(ident.as_str()) {
                     if token == &Token::If {

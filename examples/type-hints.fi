@@ -1,0 +1,6 @@
+x: Int = 1
+
+repeat: Str = (string: Str, count: Int) -> string.repeat(count)
+
+s = repeat("x", 4)
+assert(s == "xxxx")
