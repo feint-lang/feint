@@ -114,10 +114,7 @@ impl ObjectTrait for CustomObj {
     }
 
     fn is_equal(&self, rhs: &dyn ObjectTrait) -> bool {
-        if self.is(rhs) {
-            return true;
-        }
-        self.ns.is_equal(rhs.ns())
+        self.is(rhs) || rhs.is_always() || self.ns.is_equal(rhs.ns())
     }
 }
 

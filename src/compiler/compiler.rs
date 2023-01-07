@@ -540,6 +540,7 @@ impl Visitor {
             Kind::Nil => self.push_nil(),
             Kind::Bool(true) => self.push_true(),
             Kind::Bool(false) => self.push_false(),
+            Kind::Always => self.push_always(),
             Kind::Ellipsis => self.push_nil(),
             Kind::Int(value) => {
                 if let Some(index) = new::shared_int_global_const_index(&value) {
@@ -963,6 +964,10 @@ impl Visitor {
 
     fn push_false(&mut self) {
         self.push(Inst::LoadFalse)
+    }
+
+    fn push_always(&mut self) {
+        self.push(Inst::LoadAlways)
     }
 
     fn push_empty_tuple(&mut self) {

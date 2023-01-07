@@ -5,6 +5,7 @@ use once_cell::sync::Lazy;
 
 use crate::types::{new, Args, Module, Namespace, ObjectRef};
 
+use crate::types::always::ALWAYS_TYPE;
 use crate::types::bool::BOOL_TYPE;
 use crate::types::bound_func::BOUND_FUNC_TYPE;
 use crate::types::builtin_func::BUILTIN_FUNC_TYPE;
@@ -29,6 +30,7 @@ use crate::vm::{RuntimeErr, RuntimeObjResult};
 pub static BUILTINS: Lazy<new::obj_ref_t!(Module)> = Lazy::new(|| {
     let entries: Vec<(&str, ObjectRef)> = vec![
         ("Type", TYPE_TYPE.clone()),
+        ("Always", ALWAYS_TYPE.clone()),
         ("Bool", BOOL_TYPE.clone()),
         ("BoundFunc", BOUND_FUNC_TYPE.clone()),
         ("BuiltinFunc", BUILTIN_FUNC_TYPE.clone()),

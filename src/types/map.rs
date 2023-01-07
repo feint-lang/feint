@@ -66,10 +66,10 @@ impl ObjectTrait for Map {
     gen::object_trait_header!(MAP_TYPE);
 
     fn is_equal(&self, rhs: &dyn ObjectTrait) -> bool {
+        if self.is(rhs) || rhs.is_always() {
+            return true;
+        }
         if let Some(rhs) = rhs.down_to_map() {
-            if self.is(rhs) {
-                return true;
-            }
             if self.len() != rhs.len() {
                 return false;
             }

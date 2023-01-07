@@ -170,6 +170,10 @@ impl Expr {
         Self::new_literal(Literal::new_bool(false), start, end)
     }
 
+    pub fn new_always(start: Location, end: Location) -> Self {
+        Self::new_literal(Literal::new_always(), start, end)
+    }
+
     pub fn new_ellipsis(start: Location, end: Location) -> Self {
         Self::new_literal(Literal::new_ellipsis(), start, end)
     }
@@ -478,6 +482,7 @@ pub struct Literal {
 pub enum LiteralKind {
     Nil,
     Bool(bool),
+    Always,
     Ellipsis,
     Float(f64),
     Int(BigInt),
@@ -495,6 +500,10 @@ impl Literal {
 
     pub fn new_bool(value: bool) -> Self {
         Self::new(LiteralKind::Bool(value))
+    }
+
+    pub fn new_always() -> Self {
+        Self::new(LiteralKind::Always)
     }
 
     pub fn new_ellipsis() -> Self {
@@ -525,6 +534,7 @@ impl fmt::Debug for LiteralKind {
         let string = match self {
             Self::Nil => "nil".to_string(),
             Self::Bool(value) => value.to_string(),
+            Self::Always => "@".to_string(),
             Self::Ellipsis => "...".to_string(),
             Self::Int(value) => value.to_string(),
             Self::Float(value) => value.to_string(),

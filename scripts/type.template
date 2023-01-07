@@ -17,7 +17,7 @@ use super::ns::Namespace;
 
 gen::type_and_impls!({{ type_name }}, {{ obj_name }});
 
-pub static {singleton_type_name}: Lazy<new::obj_ref_t!({{ type_name }})> =
+pub static {{ singleton_type_name }}: Lazy<new::obj_ref_t!({{ type_name }})> =
     Lazy::new(|| new::obj_ref!({{ type_name }}::new()));
 
 // {{ obj_name }} Object {{ obj_rule }}
@@ -35,19 +35,19 @@ impl {{ obj_name }} {
 }
 
 impl ObjectTrait for {{ obj_name }} {
-    gen::object_trait_header!({singleton_type_name});
+    gen::object_trait_header!({{ singleton_type_name }});
 }
 
 // Display -------------------------------------------------------------
 
 impl fmt::Display for {{ obj_name }} {
-    fn fmt(&self, f: &mut fmt::Formatter<\'_>) -> fmt::Result {
-        write!(f, "nil")
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{{ repr }}")
     }
 }
 
 impl fmt::Debug for {{ obj_name }} {
-    fn fmt(&self, f: &mut fmt::Formatter<\'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{self}")
     }
 }

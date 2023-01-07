@@ -210,6 +210,24 @@ fallthrough.
 The default branch is denoted by a single `*`. If there's no default
 branch and no match is found, the `match` block will return `nil`.
 
+## Pattern Matching
+
+Pattern matching can be done using the builtin `Always` singleton `@`.
+`@` always evaluates as `true` can be compared for equality with
+_anything_ and the comparison will _always_ be `true`.
+
+```
+r = match (1, 2) ->
+    (1, @) -> true
+    * -> false
+print(r)  # -> true
+
+r = match (1, 2) ->
+    (@, 2) -> true
+    * -> false
+print(r)  # -> true
+```
+
 ## Loops
 
 ```
@@ -307,9 +325,9 @@ f = (x, y, ...) => print(x, y, $args)
 
 Closures work pretty much like Python or JavaScript. One difference is
 that names defined *after* a function won't be captured. Allowing this
-seems a little bit wonky in the first place and it also adds a bit of
-complexity for no apparent benefit (or, at least, I'm not sure what the
-benefit of this capability is off the top of my head.)
+seems a bit wonky in the first place and also adds a bit of complexity
+for no apparent benefit (or, at least, I'm not sure what the benefit of
+this capability is off the top of my head.)
 
 Here's an extremely artificial example:
 

@@ -110,10 +110,10 @@ impl ObjectTrait for Tuple {
     }
 
     fn is_equal(&self, rhs: &dyn ObjectTrait) -> bool {
+        if self.is(rhs) || rhs.is_always() {
+            return true;
+        }
         if let Some(rhs) = rhs.down_to_tuple() {
-            if self.is(rhs) {
-                return true;
-            }
             if self.len() != rhs.len() {
                 return false;
             }

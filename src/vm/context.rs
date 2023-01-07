@@ -11,16 +11,37 @@ use super::result::{RuntimeErr, RuntimeResult};
 pub struct RuntimeContext {
     global_constants: Vec<ObjectRef>,
     ns_stack: Vec<Namespace>,
+    pub nil_index: usize,
+    pub true_index: usize,
+    pub false_index: usize,
+    pub always_index: usize,
+    pub empty_tuple_index: usize,
 }
 
 impl RuntimeContext {
     pub fn new() -> Self {
-        let mut global_constants =
-            vec![new::nil(), new::true_(), new::false_(), new::empty_tuple()];
+        // XXX: When a new global constant is added before the shared
+        //      ints, `SHARED_INT_INDEX` needs to updated in the `new`
+        //      module.
+        let mut global_constants = vec![
+            new::nil(),
+            new::true_(),
+            new::false_(),
+            new::always(),
+            new::empty_tuple(),
+        ];
         for int in new::SHARED_INTS.iter() {
             global_constants.push(int.clone());
         }
-        Self { global_constants, ns_stack: vec![Namespace::new()] }
+        Self {
+            global_constants,
+            ns_stack: vec![Namespace::new()],
+            nil_index: 0,
+            true_index: 1,
+            false_index: 2,
+            always_index: 3,
+            empty_tuple_index: 4,
+        }
     }
 
     #[inline]

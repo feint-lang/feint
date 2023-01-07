@@ -39,7 +39,7 @@ parse_args: List<Str> = (
     else ->
         args = []
         i = 0
-        loop i < max_args ->
+        loop i < argv.length ->
             args.push(argv.i)
             i += 1
         args
@@ -53,33 +53,50 @@ make_rule: Str = (...) =>
 
 
 $main = (...) =>
-    args = parse_args("make-type", $args, 1, 1)
+    p = print
+    e = print_err
+
+    args = parse_args("make-type", $args, 1, 2)
 
     if args.err ->
         exit(args.err)
 
     name = args.0
+    repr = args.get(1)
+
+    if name.err || repr.err ->
+        if name.err -> e(name.err)
+        if repr.err -> e(repr.err)
+        exit()
 
     singleton_type_name = $"{name.upper()}_TYPE"
     type_name = $"{name}Type"
     obj_name = name
 
     rule = "-".repeat(80)
-    print_err(rule)
-    print_err($"Creating new type:\n")
-    print_err($"singleton type name = {singleton_type_name}")
-    print_err($"type name =  {type_name}")
-    print_err($"object name = {obj_name}")
-    print_err(rule, "\n\n")
+    e(rule)
+    e($"Creating new type:\n")
+    e($"singleton type name = {singleton_type_name}")
+    e($"type name =  {type_name}")
+    e($"object name = {obj_name}")
+    e("\nAfter creation tasks:\n")
+    e($"- Add `pub(crate) mod {name.lower()};` to types/mod.rs")
+    e($"- Add constructor to types/new.rs")
+    e($"- Add entry to `BUILTINS` in modules/builtins.rs")
+    e($"- Add type-related methods in types/base.rs")
+    e($"- Add Display and Debug impls in types/base.rs")
+    e($"- Customize implementation")
+    e($"- Handle in scanner/parser/compiler/VM")
+    e(rule, "\n\n")
 
     template_file = File.new("./scripts/type.template")
     if template_file.err ->
-        print_err(template_file.err)
+        e(template_file.err)
         exit()
 
     template = template_file.text
     if template.err ->
-        print_err(template.err)
+        e(template.err)
         exit()
 
     output = template.render({
@@ -88,10 +105,11 @@ $main = (...) =>
         "type_rule": make_rule(type_name, "type"),
         "obj_name": name,
         "obj_rule": make_rule(obj_name, "object"),
+        "repr": repr,
     })
 
     if output.err ->
-        print_err(output.err)
+        e(output.err)
         exit()
 
-    print(output)
+    p(output)

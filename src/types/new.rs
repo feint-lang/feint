@@ -12,6 +12,7 @@ use once_cell::sync::Lazy;
 use super::result::Params;
 use crate::vm::Code;
 
+use super::always::Always;
 use super::base::ObjectRef;
 use super::bool::Bool;
 use super::bound_func::BoundFunc;
@@ -37,15 +38,16 @@ use super::tuple::Tuple;
 static NIL: Lazy<obj_ref_t!(Nil)> = Lazy::new(|| obj_ref!(Nil::new()));
 static TRUE: Lazy<obj_ref_t!(Bool)> = Lazy::new(|| obj_ref!(Bool::new(true)));
 static FALSE: Lazy<obj_ref_t!(Bool)> = Lazy::new(|| obj_ref!(Bool::new(false)));
+static ALWAYS: Lazy<obj_ref_t!(Always)> = Lazy::new(|| obj_ref!(Always::new()));
 
 static OK_ERR: Lazy<obj_ref_t!(ErrObj)> = Lazy::new(|| {
-    obj_ref!(ErrObj::with_responds_to_bool(ErrKind::Ok, "".to_string(), new::nil()))
+    obj_ref!(ErrObj::with_responds_to_bool(ErrKind::Ok, "".to_string(), nil()))
 });
 
 static EMPTY_TUPLE: Lazy<obj_ref_t!(Tuple)> =
     Lazy::new(|| obj_ref!(Tuple::new(vec![])));
 
-static SHARED_INT_INDEX: usize = 4;
+static SHARED_INT_INDEX: usize = 5;
 static SHARED_INT_MAX: usize = 256;
 static SHARED_INT_MAX_BIGINT: Lazy<BigInt> = Lazy::new(|| BigInt::from(SHARED_INT_MAX));
 pub static SHARED_INTS: Lazy<Vec<obj_ref_t!(Int)>> = Lazy::new(|| {
@@ -92,7 +94,6 @@ macro_rules! obj_ref {
     };
 }
 
-use crate::types::new;
 pub(crate) use obj_ref;
 
 #[inline]
@@ -117,6 +118,11 @@ pub fn true_() -> ObjectRef {
 #[inline]
 pub fn false_() -> ObjectRef {
     FALSE.clone()
+}
+
+#[inline]
+pub fn always() -> ObjectRef {
+    ALWAYS.clone()
 }
 
 pub fn bound_func(func: ObjectRef, this: ObjectRef) -> ObjectRef {

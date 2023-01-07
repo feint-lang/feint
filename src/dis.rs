@@ -67,6 +67,7 @@ impl Disassembler {
             LoadNil => self.align("LOAD_NIL", "nil"),
             LoadTrue => self.align("LOAD_TRUE", "true"),
             LoadFalse => self.align("LOAD_FALSE", "false"),
+            LoadAlways => self.align("LOAD_ALWAYS", "@"),
             LoadEmptyTuple => self.align("LOAD_EMPTY_TUPLE", "()"),
             ScopeStart => self.align("SCOPE_START", ""),
             ScopeEnd => self.align("SCOPE_END", ""),

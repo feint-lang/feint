@@ -19,7 +19,8 @@ pub enum Inst {
     LoadNil,        // 0
     LoadTrue,       // 1
     LoadFalse,      // 2
-    LoadEmptyTuple, // 3
+    LoadAlways,     // 3
+    LoadEmptyTuple, // 4
 
     ScopeStart,
     ScopeEnd,
@@ -126,6 +127,7 @@ impl PartialEq for Inst {
             (LoadNil, LoadNil) => true,
             (LoadTrue, LoadTrue) => true,
             (LoadFalse, LoadFalse) => true,
+            (LoadAlways, LoadAlways) => true,
             (LoadEmptyTuple, LoadEmptyTuple) => true,
             (ScopeStart, ScopeStart) => true,
             (ScopeEnd, ScopeEnd) => true,

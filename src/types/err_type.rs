@@ -117,8 +117,10 @@ impl ObjectTrait for ErrTypeObj {
     gen::object_trait_header!(ERR_TYPE_TYPE);
 
     fn is_equal(&self, rhs: &dyn ObjectTrait) -> bool {
-        if let Some(rhs) = rhs.down_to_err_type_obj() {
-            self.is(rhs) || self.kind == rhs.kind
+        if self.is(rhs) || rhs.is_always() {
+            true
+        } else if let Some(rhs) = rhs.down_to_err_type_obj() {
+            self.kind == rhs.kind
         } else {
             false
         }

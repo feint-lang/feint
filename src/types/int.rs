@@ -110,8 +110,10 @@ impl ObjectTrait for Int {
     }
 
     fn is_equal(&self, rhs: &dyn ObjectTrait) -> bool {
-        if let Some(rhs) = rhs.down_to_int() {
-            self.is(rhs) || self.value() == rhs.value()
+        if self.is(rhs) || rhs.is_always() {
+            true
+        } else if let Some(rhs) = rhs.down_to_int() {
+            self.value() == rhs.value()
         } else if let Some(rhs) = rhs.down_to_float() {
             eq_int_float(self, rhs)
         } else {

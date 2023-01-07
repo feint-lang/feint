@@ -13,6 +13,7 @@ use crate::vm::{RuntimeBoolResult, RuntimeErr, RuntimeObjResult};
 use super::new;
 use super::ns::Namespace;
 
+use super::always::{Always, AlwaysType};
 use super::bool::{Bool, BoolType};
 use super::bound_func::{BoundFunc, BoundFuncType};
 use super::builtin_func::{BuiltinFunc, BuiltinFuncType};
@@ -319,6 +320,7 @@ pub trait ObjectTrait {
     // Type checkers ---------------------------------------------------
 
     make_type_checker!(is_type_type, TypeType);
+    make_type_checker!(is_always_type, AlwaysType);
     make_type_checker!(is_bool_type, BoolType);
     make_type_checker!(is_bound_func_type, BoundFuncType);
     make_type_checker!(is_builtin_func_type, BuiltinFuncType);
@@ -339,6 +341,7 @@ pub trait ObjectTrait {
     make_type_checker!(is_tuple_type, TupleType);
 
     make_type_checker!(is_type, Type);
+    make_type_checker!(is_always, Always);
     make_type_checker!(is_bool, Bool);
     make_type_checker!(is_bound_func, BoundFunc);
     make_type_checker!(is_builtin_func, BuiltinFunc);
@@ -367,6 +370,7 @@ pub trait ObjectTrait {
     // These downcast object refs to their concrete types.
 
     make_down_to!(down_to_type_type, TypeType);
+    make_down_to!(down_to_always_type, AlwaysType);
     make_down_to!(down_to_bool_type, BoolType);
     make_down_to!(down_to_bound_func_type, BoundFuncType);
     make_down_to!(down_to_builtin_func_type, BuiltinFuncType);
@@ -387,6 +391,7 @@ pub trait ObjectTrait {
     make_down_to!(down_to_tuple_type, TupleType);
 
     make_down_to!(down_to_type, Type);
+    make_down_to!(down_to_always, Always);
     make_down_to!(down_to_bool, Bool);
     make_down_to!(down_to_bound_func, BoundFunc);
     make_down_to!(down_to_builtin_func, BuiltinFunc);
@@ -470,7 +475,7 @@ pub trait ObjectTrait {
     }
 
     fn is_equal(&self, rhs: &dyn ObjectTrait) -> bool {
-        self.is(rhs)
+        self.is(rhs) || rhs.is_always()
     }
 
     fn not_equal(&self, rhs: &dyn ObjectTrait) -> bool {
@@ -549,6 +554,7 @@ impl fmt::Display for dyn ObjectTrait {
             f,
             self,
             TypeType,
+            AlwaysType,
             BoolType,
             BoundFuncType,
             BuiltinFuncType,
@@ -573,6 +579,7 @@ impl fmt::Display for dyn ObjectTrait {
             f,
             self,
             Type,
+            Always,
             Bool,
             BoundFunc,
             BuiltinFunc,
@@ -603,6 +610,7 @@ impl fmt::Debug for dyn ObjectTrait {
             f,
             self,
             TypeType,
+            AlwaysType,
             BoolType,
             BoundFuncType,
             BuiltinFuncType,
@@ -627,6 +635,7 @@ impl fmt::Debug for dyn ObjectTrait {
             f,
             self,
             Type,
+            Always,
             Bool,
             BoundFunc,
             BuiltinFunc,

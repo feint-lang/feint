@@ -51,8 +51,10 @@ impl ObjectTrait for Bool {
     // Binary operations -----------------------------------------------
 
     fn is_equal(&self, rhs: &dyn ObjectTrait) -> bool {
-        if let Some(rhs) = rhs.down_to_bool() {
-            self.is(rhs) || self.value() == rhs.value()
+        if self.is(rhs) || rhs.is_always() {
+            true
+        } else if let Some(rhs) = rhs.down_to_bool() {
+            self.value() == rhs.value()
         } else {
             false
         }

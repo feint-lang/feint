@@ -22,6 +22,7 @@ pub enum Token {
     LoopFeed, // <-
 
     // Fundamental types -----------------------------------------------
+    At,                             // @ (used to represent the singleton Always)
     Int(BigInt),                    // 1, 1_000, 0b1, 0o1, ox1 (digits, radix)
     Float(f64),                     // 1.0, 1.0E+10
     Str(String),                    // "words words words"
@@ -115,6 +116,7 @@ impl Token {
             Self::RBrace => "}",
 
             // Miscellaneous ---------------------------------------------------
+            Self::At => "@",
             Self::Colon => ":",
             Self::DotDot => "..",
             Self::Ellipsis => "...",

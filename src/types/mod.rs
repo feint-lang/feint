@@ -20,6 +20,7 @@ mod func_trait;
 pub(crate) mod ns;
 
 // Builtin Types
+pub(crate) mod always;
 pub(crate) mod bool;
 pub(crate) mod bound_func;
 pub(crate) mod builtin_func;

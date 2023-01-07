@@ -215,6 +215,7 @@ impl<'a, T: BufRead> Scanner<'a, T> {
             Some((c @ '$', Some('a'..='z'), _)) => {
                 self.handle_ident(c, IdentKind::Special, start)?
             }
+            Some(('@', _, _)) => At,
             Some(('\n', _, _)) => return self.handle_newline(start),
             Some((c, _, _)) if c.is_whitespace() => {
                 return Err(ScanErr::new(UnexpectedWhitespace, start));

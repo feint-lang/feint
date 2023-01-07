@@ -14,3 +14,17 @@ r = match (() => nil) ->
     (() => nil) -> "func"
     * -> "other"
 assert(r == "func", r, true)
+
+r = match [1, 2] ->
+    @ -> true
+    * -> false
+assert(r, r, true)
+
+r = match [1, 2] ->
+    [1, @] -> true
+    * -> false
+assert(r, r, true)
+
+r = match [1, 2] ->
+    [@, 2] -> true
+    * -> false

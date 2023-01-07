@@ -123,6 +123,13 @@ impl VM {
     pub fn execute_code(&mut self, code: &Code, start: usize) -> VMExeResult {
         use Inst::*;
 
+        let handle_sigint = self.handle_sigint;
+        let sigint_flag = self.sigint_flag.clone();
+        let mut sigint_counter = 0u32;
+
+        let mut ip = start;
+        let mut jump_ip = None;
+
         let len_chunk = code.len_chunk();
 
         match start.cmp(&len_chunk) {
@@ -130,13 +137,6 @@ impl VM {
             cmp::Ordering::Greater => panic!("Code start index out of bounds"),
             _ => (),
         }
-
-        let handle_sigint = self.handle_sigint;
-        let sigint_flag = self.sigint_flag.clone();
-        let mut sigint_counter = 0u32;
-
-        let mut ip = start;
-        let mut jump_ip = None;
 
         loop {
             match &code[ip] {
@@ -146,21 +146,25 @@ impl VM {
                 Pop => {
                     self.pop()?;
                 }
-                // Constants
+                // Global constants
                 LoadGlobalConst(index) => {
                     self.push_global_const(*index)?;
                 }
+                // Well-known global constants
                 LoadNil => {
-                    self.push_global_const(0)?;
+                    self.push_global_const(self.ctx.nil_index)?;
                 }
                 LoadTrue => {
-                    self.push_global_const(1)?;
+                    self.push_global_const(self.ctx.true_index)?;
                 }
                 LoadFalse => {
-                    self.push_global_const(2)?;
+                    self.push_global_const(self.ctx.false_index)?;
+                }
+                LoadAlways => {
+                    self.push_global_const(self.ctx.always_index)?;
                 }
                 LoadEmptyTuple => {
-                    self.push_global_const(3)?;
+                    self.push_global_const(self.ctx.empty_tuple_index)?;
                 }
                 // Scopes
                 ScopeStart => {

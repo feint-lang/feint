@@ -189,6 +189,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
             Nil => ast::Expr::new_nil(start, end),
             True => ast::Expr::new_true(start, end),
             False => ast::Expr::new_false(start, end),
+            At => ast::Expr::new_always(start, end),
             Ellipsis => ast::Expr::new_ellipsis(start, end),
             Int(value) => ast::Expr::new_int(value, start, end),
             Float(value) => ast::Expr::new_float(value, start, end),

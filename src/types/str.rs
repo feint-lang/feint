@@ -130,7 +130,9 @@ impl ObjectTrait for Str {
     gen::object_trait_header!(STR_TYPE);
 
     fn is_equal(&self, rhs: &dyn ObjectTrait) -> bool {
-        if let Some(rhs) = rhs.down_to_str() {
+        if self.is(rhs) || rhs.is_always() {
+            true
+        } else if let Some(rhs) = rhs.down_to_str() {
             self.is(rhs) || self.value() == rhs.value()
         } else {
             false
