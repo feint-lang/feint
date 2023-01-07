@@ -201,7 +201,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
             If => self.conditional(start)?,
             Match => self.match_conditional(start)?,
             Loop => self.loop_(start)?,
-            Ident(name) => {
+            Ident(name) | ConstIdent(name) => {
                 ast::Expr::new_ident(ast::Ident::new_ident(name), start, end)
             }
             SpecialIdent(name) => {

@@ -40,4 +40,11 @@ pub enum ScanErrKind {
     ParseFloatErr(ParseFloatError),
     FormatStrErr(FormatStrErr),
     TooMuchWhitespace,
+
+    InvalidIdent(String),
+    InvalidConstIdent(String),
+    InvalidTypeIdent(String),
+    InvalidConstOrTypeIdent(String),
+    InvalidTypeFuncIdent(String),
+    InvalidSpecialIdent(String),
 }

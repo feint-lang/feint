@@ -90,10 +90,11 @@ pub enum Token {
     As,      // import <module> as <name>
 
     // Identifiers -----------------------------------------------------
-    Ident(String),         // name
-    TypeIdent(String),     // Name
-    TypeFuncIdent(String), // @name (called via type)
-    SpecialIdent(String),  // $name (e.g., $bool, $str)
+    Ident(String),         // ident_name
+    ConstIdent(String),    // CONST_NAME
+    TypeIdent(String),     // TypeName
+    TypeFuncIdent(String), // @type_func_name (called via type)
+    SpecialIdent(String),  // $special_name (e.g., $bool, $str)
 
     EndOfStatement,
     EndOfInput,
@@ -186,6 +187,7 @@ impl Token {
 
             // Identifiers ---------------------------------------------
             Self::Ident(s)
+            | Self::ConstIdent(s)
             | Self::TypeIdent(s)
             | Self::TypeFuncIdent(s)
             | Self::SpecialIdent(s) => s.as_str(),
@@ -193,6 +195,17 @@ impl Token {
             Self::EndOfStatement => "end of statement",
             Self::EndOfInput => "EOI",
         }
+    }
+
+    pub fn is_ident(&self) -> bool {
+        matches!(
+            self,
+            Token::Ident(_)
+                | Token::ConstIdent(_)
+                | Token::TypeIdent(_)
+                | Token::TypeFuncIdent(_)
+                | Token::SpecialIdent(_)
+        )
     }
 }
 

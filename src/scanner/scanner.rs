@@ -3,6 +3,8 @@ use std::io::BufRead;
 
 use num_bigint::BigInt;
 use num_traits::Num;
+use once_cell::sync::Lazy;
+use regex::Regex;
 
 use crate::format::scan_format_string;
 use crate::scanner::result::AddTokenResult;
@@ -178,11 +180,22 @@ impl<'a, T: BufRead> Scanner<'a, T> {
             Some(('%', _, _)) => Percent,
             Some(('^', _, _)) => Caret,
             Some((c @ '0'..='9', _, _)) => self.handle_number(c, start)?,
-            Some(('_', _, _)) => self.handle_ident('_', start)?,
-            Some((c @ 'a'..='z', _, _)) => self.handle_ident(c, start)?,
-            Some((c @ 'A'..='Z', _, _)) => TypeIdent(self.read_type_ident(c)),
-            Some((c @ '@', Some('a'..='z'), _)) => TypeFuncIdent(self.read_ident(c)),
-            Some((c @ '$', Some('a'..='z'), _)) => SpecialIdent(self.read_ident(c)),
+            Some(('_', _, _)) => self.handle_ident('_', IdentKind::Ident, start)?,
+            Some((c @ 'a'..='z', _, _)) => {
+                self.handle_ident(c, IdentKind::Ident, start)?
+            }
+            Some((c @ 'A'..='Z', _, _)) => {
+                // NOTE: If the ident can't be parsed as a const name,
+                //       an attempt will be made to parse it as a type
+                //       name instead.
+                self.handle_ident(c, IdentKind::Const, start)?
+            }
+            Some((c @ '@', Some('a'..='z'), _)) => {
+                self.handle_ident(c, IdentKind::TypeFunc, start)?
+            }
+            Some((c @ '$', Some('a'..='z'), _)) => {
+                self.handle_ident(c, IdentKind::Special, start)?
+            }
             Some(('\n', _, _)) => return self.handle_newline(start),
             Some((c, _, _)) if c.is_whitespace() => {
                 return Err(ScanErr::new(UnexpectedWhitespace, start));
@@ -273,10 +286,16 @@ impl<'a, T: BufRead> Scanner<'a, T> {
         }
     }
 
-    fn handle_ident(&mut self, first_char: char, start: Location) -> AddTokenResult {
-        use Token::{
-            Else, EndOfStatement, Ident, If, InlineScopeStart, Label, ScopeStart,
-        };
+    /// Handle identifiers (NOTE: ident, not INdent!).
+    fn handle_ident(
+        &mut self,
+        first_char: char,
+        kind: IdentKind,
+        start: Location,
+    ) -> AddTokenResult {
+        use IdentKind::*;
+        use Token::{EndOfStatement, InlineScopeStart, Label, ScopeStart};
+
         // Special case for underscore placeholder vars.
         if first_char == '_' {
             let count = self.consume_contiguous('_') + 1;
@@ -284,30 +303,61 @@ impl<'a, T: BufRead> Scanner<'a, T> {
             for _ in 0..count {
                 ident.push('_');
             }
-            return Ok(Ident(ident));
+            return Ok(Token::Ident(ident));
         }
+
         let ident = self.read_ident(first_char);
-        // Label
-        if let EndOfStatement | ScopeStart | InlineScopeStart = self.last_token() {
-            if let Some(':') = self.source.peek() {
-                self.source.next();
-                return Ok(Label(ident));
-            }
-        }
-        // Keyword
-        if let Some(token) = KEYWORDS.get(ident.as_str()) {
-            if token == &If {
-                self.if_stack.push(start);
-            } else if token == &Else {
-                if self.maybe_exit_inline_scope(start, true) {
-                    self.add_token_to_queue(EndOfStatement, start, start);
+
+        let kind = match self.check_ident(ident.as_str(), kind, start) {
+            Ok(kind) => kind,
+            Err(err) => {
+                // NOTE: If the ident can't be parsed as a const name,
+                //       attempt to parse it as a type name instead.
+                if let ErrKind::InvalidConstIdent(_) = err.kind {
+                    self.check_ident(ident.as_str(), Type, start)?
+                } else {
+                    return Err(err);
                 }
-                self.if_stack.pop();
             }
-            return Ok(token.clone());
-        }
-        // Ident
-        Ok(Ident(ident))
+        };
+
+        let ident_token = match kind {
+            Ident => {
+                // Label
+                let last = self.last_token();
+                if let EndOfStatement | ScopeStart | InlineScopeStart = last {
+                    if let Some(':') = self.source.peek() {
+                        self.source.next();
+                        return Ok(Label(ident));
+                    }
+                }
+
+                // Keyword
+                if let Some(token) = KEYWORDS.get(ident.as_str()) {
+                    if token == &Token::If {
+                        self.if_stack.push(start);
+                    } else if token == &Token::Else {
+                        if self.maybe_exit_inline_scope(start, true) {
+                            self.add_token_to_queue(
+                                Token::EndOfStatement,
+                                start,
+                                start,
+                            );
+                        }
+                        self.if_stack.pop();
+                    }
+                    return Ok(token.clone());
+                }
+
+                // Ident
+                Token::Ident(ident)
+            }
+            Const => Token::ConstIdent(ident),
+            Type => Token::TypeIdent(ident),
+            TypeFunc => Token::TypeFuncIdent(ident),
+            Special => Token::SpecialIdent(ident),
+        };
+        Ok(ident_token)
     }
 
     fn handle_scope_start(&mut self, start: Location) -> AddTokensResult {
@@ -789,37 +839,81 @@ impl<'a, T: BufRead> Scanner<'a, T> {
         }
     }
 
-    /// Read variable/function identifier.
-    ///
-    /// Identifiers:
-    ///
-    /// - start with a lower case ASCII letter (a-z)
-    /// - contain lower case ASCII letters, numbers, and underscores
+    /// Read identifier.
     fn read_ident(&mut self, first_char: char) -> String {
         let mut string = first_char.to_string();
-        loop {
-            match self.next_char_if(|&c| {
-                c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_'
-            }) {
-                Some((c, _, _)) => string.push(c),
-                None => break string,
-            }
+
+        let test =
+            |&c: &char| c.is_ascii_alphabetic() || c.is_ascii_digit() || c == '_';
+
+        while let Some((c, _, _)) = self.next_char_if(test) {
+            string.push(c)
         }
+
+        string
     }
 
-    /// Read type identifier.
-    ///
-    /// Type identifiers:
-    ///
-    /// - start with an upper case ASCII letter (A-Z)
-    /// - contain ASCII letters and numbers
-    fn read_type_ident(&mut self, first_char: char) -> String {
-        let mut string = first_char.to_string();
-        loop {
-            match self.next_char_if(|&c| c.is_ascii_alphabetic() || c.is_ascii_digit())
-            {
-                Some((c, _, _)) => string.push(c),
-                None => break string,
+    fn check_ident(
+        &self,
+        ident: &str,
+        kind: IdentKind,
+        start: Location,
+    ) -> Result<IdentKind, ScanErr> {
+        use IdentKind::*;
+
+        match kind {
+            Ident => {
+                if IDENT_REGEX.is_match(ident) {
+                    Ok(kind)
+                } else {
+                    Err(ScanErr::new(ErrKind::InvalidIdent(ident.to_owned()), start))
+                }
+            }
+            Const => {
+                if CONST_IDENT_REGEX.is_match(ident) {
+                    Ok(kind)
+                } else {
+                    Err(ScanErr::new(
+                        ErrKind::InvalidConstIdent(ident.to_owned()),
+                        start,
+                    ))
+                }
+            }
+            Type => {
+                if TYPE_IDENT_REGEX.is_match(ident) {
+                    Ok(kind)
+                } else {
+                    Err(ScanErr::new(
+                        ErrKind::InvalidTypeIdent(ident.to_owned()),
+                        start,
+                    ))
+                }
+            }
+            TypeFunc => {
+                if ident.starts_with('@')
+                    && ident.len() > 1
+                    && IDENT_REGEX.is_match(&ident[1..])
+                {
+                    Ok(kind)
+                } else {
+                    Err(ScanErr::new(
+                        ErrKind::InvalidTypeFuncIdent(ident.to_owned()),
+                        start,
+                    ))
+                }
+            }
+            Special => {
+                if ident.starts_with('$')
+                    && ident.len() > 1
+                    && IDENT_REGEX.is_match(&ident[1..])
+                {
+                    Ok(kind)
+                } else {
+                    Err(ScanErr::new(
+                        ErrKind::InvalidSpecialIdent(ident.to_owned()),
+                        start,
+                    ))
+                }
             }
         }
     }
@@ -836,3 +930,22 @@ impl<'a, T: BufRead> Iterator for Scanner<'a, T> {
         }
     }
 }
+
+// Ident ---------------------------------------------------------------
+
+enum IdentKind {
+    Ident,
+    Const,
+    Type,
+    TypeFunc,
+    Special,
+}
+
+static IDENT_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^([a-z]|[a-z][a-z0-9_]*[a-z0-9])$").unwrap());
+
+static CONST_IDENT_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^([A-Z]|[A-Z][A-Z0-9_]*[A-Za-z0-9])$").unwrap());
+
+static TYPE_IDENT_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^([A-Z]|[A-Z][A-Za-z0-9]*[A-Za-z0-9])$").unwrap());

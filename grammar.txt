@@ -212,9 +212,10 @@ NAME:
 
 # Identifiers
 IDENT           : "[a-z]|[a-z][a-z0-9_]*[a-z0-9]"
-SPECIAL_IDENT   : "$" IDENT
+CONST_IDENT     : "[A-Z]|[A-Z][A-Z0-9_]*[A-Za-z0-9]"
 TYPE_IDENT      : "[A-Z]|[A-Z][A-Za-z0-9]*[A-Za-z0-9]"
 TYPE_FUNC_IDENT : "@" IDENT
+SPECIAL_IDENT   : "$" IDENT
 
 # Imports
 IMPORT_PATH :
