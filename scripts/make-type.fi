@@ -1,15 +1,66 @@
+#!./target/release/feint
 import system
 
 # Exit with message
 exit = (...) ->
-    if $args.length > 0 -> print_err($args.join(" "))
+    if $args.length > 0 ->
+        print_err($args.join(" "))
     system.exit(1)
 
-$main = (...) ->
-    if $args.length != 1 ->
-        exit("make-type requires a single argument: the name of the new type")
 
-    name = $args.0
+parse_args: List<Str> = (
+    program_name: Str,
+    argv: List<Str>,
+    min_args: Int,
+    max_args: Int | nil,
+) ->
+    "Parse args, such as `argv` from the command line.
+
+    Args:
+        program_name: The executable program name
+        argv: The args that were passed on the command line
+        min_args: The required minimum number of args
+        max_args: The required maximum number of args
+
+    "
+    n_args = argv.length
+
+    # NOTE: This version causes an error because the parenthesized
+    #       expression followed by -> looks like a function.
+    # if n_args < min_args || (max_args !== nil && n_args > max_args) ->
+
+    if n_args < min_args || n_args > max_args ->
+        min_args_s = if min_args == 1 -> "" else -> "s"
+        max_args_s = if max_args == 1 -> "" else -> "s"
+        msg = if min_args == max_args ->
+            $"requires exactly {min_args} arg{min_args_s}"
+        else ->
+            $"requires at least {min_args} arg{min_args_s} and no more
+              than {max_args} args{max_args_s}"
+        Err.new(ErrType.arg, $"{program_name} {msg}")
+    else ->
+        args = []
+        i = 0
+        loop i < max_args ->
+            args.push(argv.i)
+            i += 1
+        args
+
+
+make_rule: Str = (...) ->
+    "Make a horizontal rule that."
+    count = 72 - 3 - ($args.length)
+    count -= $args.map((str: Str) -> str.length).sum
+    "-".repeat(count)
+
+
+$main = (...) ->
+    args = parse_args("make-type", $args, 1, 1)
+
+    if args.err ->
+        exit(args.err)
+
+    name = args.0
 
     singleton_type_name = $"{name.upper()}_TYPE"
     type_name = $"{name}Type"
@@ -18,9 +69,9 @@ $main = (...) ->
     rule = "-".repeat(80)
     print_err(rule)
     print_err($"Creating new type:\n")
-    print_err($"  - singleton type name = {singleton_type_name}")
-    print_err($"  - type name =  {type_name}")
-    print_err($"  - object name = {obj_name}")
+    print_err($"singleton type name = {singleton_type_name}")
+    print_err($"type name =  {type_name}")
+    print_err($"object name = {obj_name}")
     print_err(rule, "\n\n")
 
     template_file = File.new("./scripts/type.template")
@@ -33,17 +84,12 @@ $main = (...) ->
         print_err(template.err)
         exit()
 
-    rule = (...) ->
-        count = 72 - 3 - ($args.length)
-        count -= $args.map((arg) -> arg.length).sum
-        "-".repeat(count)
-
     output = template.render({
         "singleton_type_name": singleton_type_name,
         "type_name": type_name,
-        "type_rule": rule(type_name, "type"),
+        "type_rule": make_rule(type_name, "type"),
         "obj_name": name,
-        "obj_rule": rule(obj_name, "object"),
+        "obj_rule": make_rule(obj_name, "object"),
     })
 
     if output.err ->

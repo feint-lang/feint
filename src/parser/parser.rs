@@ -176,6 +176,10 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
         let expr = match token.token {
             LParen => {
                 let expr = self.parenthesized(start, false)?;
+                // XXX: This determination of whether the parenthesized
+                //      expr should be treated as func args is too
+                //      simplistic. It can, for example, cause errors
+                //      when using a parenthesized expr with `if`.
                 if self.peek_token_is_scope_start()? {
                     self.func(expr, start)?
                 } else {
