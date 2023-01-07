@@ -9,7 +9,7 @@ fn execute(source: &str) -> ExeResult {
 
 #[test]
 fn test_too_much_recursion() {
-    let result = execute("f = () -> f()\nf()");
+    let result = execute("f = () => f()\nf()");
     assert!(result.is_err());
     let err = result.unwrap_err();
     assert!(matches!(

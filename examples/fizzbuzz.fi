@@ -1,4 +1,4 @@
-fizz_buzz = (end) ->
+fizz_buzz = (end) =>
     "FizzBuzz
 
     Spec:
@@ -23,7 +23,7 @@ fizz_buzz = (end) ->
     nil
 
 
-$main = (...) ->
+$main = (...) =>
     end = if $args.is_empty -> 100 else -> Int.new($args.0)
     print($"Running FizzBuzz on numbers from 1 to {end}:")
     fizz_buzz(end)

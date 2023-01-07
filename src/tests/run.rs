@@ -113,7 +113,7 @@ mod str {
             "Str.new(print).starts_with(\"function print/0+ @\")",
         ));
         assert_result_is_ok(run_text(
-            "Str.new(() -> nil).starts_with(\"function <anonymous>/0 @\")",
+            "Str.new(() => nil).starts_with(\"function <anonymous>/0 @\")",
         ));
     }
 
@@ -133,6 +133,6 @@ mod tuple {
 
     #[test]
     fn test_map() {
-        assert_result_is_ok(run_text("t = (1, 2)\nt.map((item, i) -> (item, i))"));
+        assert_result_is_ok(run_text("t = (1, 2)\nt.map((item, i) => (item, i))"));
     }
 }

@@ -52,10 +52,10 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
     /// Parse token stream a produce a module, which is a sequence of
     /// statements.
     pub fn parse(&mut self) -> ParseResult {
-        log::trace!("BEGIN: module");
+        log::trace!("BEGIN MODULE");
         let statements = self.statements()?;
         let module = ast::Module::new(statements);
-        log::trace!("END: module");
+        log::trace!("END MODULE");
         Ok(module)
     }
 
@@ -80,7 +80,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
     /// loops).
     fn statement(&mut self) -> StatementResult {
         let level = self.statement_level;
-        log::trace!("BEGIN {level}: statement");
+        log::trace!("BEGIN STATEMENT level {level}");
         self.statement_level += 1;
         use Token::{Break, Continue, EndOfStatement, Import, Jump, Label, Return};
         let token = self.expect_next_token()?;
@@ -95,13 +95,15 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
             _ => {
                 self.lookahead_queue.push_front(token);
                 let expr = self.expr(0)?;
+                log::trace!("STATEMENT EXPR = {expr:?}");
+                log::trace!("NEXT TOKEN = {:?}", self.peek_token()?);
                 let end = expr.end;
                 ast::Statement::new_expr(expr, start, end)
             }
         };
         self.expect_token(&EndOfStatement)?;
         self.statement_level -= 1;
-        log::trace!("END {level}: statement = {statement:?}");
+        log::trace!("END STATEMENT level {level}: = {statement:?}");
         Ok(statement)
     }
 
@@ -167,7 +169,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
     /// expressions, unary & binary expressions, blocks, functions, etc.
     fn expr(&mut self, prec: u8) -> ExprResult {
         let level = self.expr_level;
-        log::trace!("BEGIN {level}: expr");
+        log::trace!("BEGIN EXPR level {level}");
         self.expr_level += 1;
         use Token::*;
         let token = self.expect_next_token()?;
@@ -176,11 +178,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
         let expr = match token.token {
             LParen => {
                 let expr = self.parenthesized(start, false)?;
-                // XXX: This determination of whether the parenthesized
-                //      expr should be treated as func args is too
-                //      simplistic. It can, for example, cause errors
-                //      when using a parenthesized expr with `if`.
-                if self.peek_token_is_scope_start()? {
+                if self.peek_token_is_func_scope_start()? {
                     self.func(expr, start)?
                 } else {
                     expr
@@ -197,7 +195,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
             Str(string) => ast::Expr::new_string(string, start, end),
             FormatStr(tokens) => self.format_string(tokens, start, end)?,
             Block => {
-                let block = self.block(start)?;
+                let block = self.block(ScopeKind::Block, start)?;
                 let start = block.start;
                 let end = block.end;
                 ast::Expr::new_block(block, start, end)
@@ -221,7 +219,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
         // expression will be returned as is.
         let expr = self.maybe_binary_expr(prec, expr)?;
         self.expr_level -= 1;
-        log::trace!("END {level}: expr = {expr:?}");
+        log::trace!("END EXPR level {level} = {expr:?}");
         Ok(expr)
     }
 
@@ -233,7 +231,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
     ///    parenthesized expression is a function parameter list.
     fn parenthesized(&mut self, start: Location, force_tuple: bool) -> ExprResult {
         let level = self.expr_level;
-        log::trace!("BEGIN {level}: parenthesized expr");
+        log::trace!("BEGIN PARENTHESIZED EXPR level {level}");
         use Token::{Comma, RParen};
         if self.next_token_is(&RParen)? {
             log::trace!("PARENTHESIZED: is empty tuple");
@@ -242,7 +240,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
         log::trace!("PARENTHESIZED: get first item");
         let first_item = self.expr(0)?;
         let expr = if self.peek_token_is(&Comma)? {
-            log::trace!("PARENTHESIZED: is tuple");
+            log::trace!("PARENTHESIZED EXPR is tuple");
             let mut items = vec![first_item];
             loop {
                 if self.next_token_is(&RParen)? {
@@ -257,7 +255,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
             }
             ast::Expr::new_tuple(items, start, self.loc())
         } else {
-            log::trace!("PARENTHESIZED: is single item (not tuple)");
+            log::trace!("PARENTHESIZED EXPR is single item (not tuple)");
             self.expect_token(&RParen)?;
             if force_tuple {
                 ast::Expr::new_tuple(vec![first_item], start, self.loc())
@@ -265,7 +263,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
                 first_item
             }
         };
-        log::trace!("END {level}: parenthesized expr");
+        log::trace!("END PARENTHESIZED EXPR level {level}");
         Ok(expr)
     }
 
@@ -371,23 +369,41 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
     }
 
     /// Handle `block ->`, `if <expr> ->`, etc.
-    fn block(&mut self, start: Location) -> BlockResult {
+    fn block(&mut self, kind: ScopeKind, start: Location) -> BlockResult {
         use ParseErrKind::{ExpectedBlock, ExpectedToken};
-        use Token::{InlineScopeEnd, InlineScopeStart, ScopeEnd, ScopeStart};
-        let statements = if self.next_token_is(&ScopeStart)? {
-            let statements = self.statements()?;
-            if statements.is_empty() {
-                return Err(self.err(ExpectedBlock(self.next_loc())));
-            }
-            self.expect_token(&ScopeEnd)?;
-            statements
-        } else if self.next_token_is(&InlineScopeStart)? {
-            let statement = self.statement()?;
-            self.expect_token(&InlineScopeEnd)?;
-            vec![statement]
-        } else {
-            return Err(self.err(ExpectedToken(self.next_loc(), ScopeStart)));
+        use ScopeKind::*;
+        use Token::{
+            FuncInlineScopeStart, FuncScopeStart, InlineScopeEnd, InlineScopeStart,
+            ScopeEnd, ScopeStart,
         };
+
+        let expected_token = match kind {
+            Block => ScopeStart,
+            Func => FuncScopeStart,
+        };
+
+        let statements = match (kind, self.next_token_token()?) {
+            (Block, Some(ScopeStart)) | (Func, Some(FuncScopeStart)) => {
+                log::trace!("SUITE BLOCK");
+                let statements = self.statements()?;
+                if statements.is_empty() {
+                    return Err(self.err(ExpectedBlock(self.next_loc())));
+                }
+                self.expect_token(&ScopeEnd)?;
+                statements
+            }
+            (Block, Some(InlineScopeStart)) | (Func, Some(FuncInlineScopeStart)) => {
+                log::trace!("INLINE BLOCK");
+                let statement = self.statement()?;
+                self.expect_token(&InlineScopeEnd)?;
+                vec![statement]
+            }
+            _ => {
+                let err = ExpectedToken(self.next_loc(), expected_token);
+                return Err(self.err(err));
+            }
+        };
+
         let end = statements[statements.len() - 1].end;
         Ok(ast::StatementBlock::new(statements, start, end))
     }
@@ -398,18 +414,18 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
         let mut branches = vec![];
         let mut end;
         let cond = self.expr(0)?;
-        let block = self.block(cond.end)?;
+        let block = self.block(ScopeKind::Block, cond.end)?;
         end = block.end;
         branches.push((cond, block));
         while let true = self.next_tokens_are(vec![&EndOfStatement, &Else, &If])? {
             let cond = self.expr(0)?;
-            let block = self.block(cond.end)?;
+            let block = self.block(ScopeKind::Block, cond.end)?;
             end = block.end;
             branches.push((cond, block))
         }
         let default = match self.next_tokens_are(vec![&EndOfStatement, &Else])? {
             true => {
-                let block = self.block(self.loc())?;
+                let block = self.block(ScopeKind::Block, self.loc())?;
                 end = block.end;
                 Some(block)
             }
@@ -422,12 +438,13 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
     /// supported because they would be too confusing.
     fn match_conditional(&mut self, start: Location) -> ExprResult {
         use ParseErrKind::{
-            ExpectedExpr, ExpectedToken, InlineMatchNotAllowed, MatchDefaultMustBeLast,
+            ExpectedToken, InlineMatchNotAllowed, MatchDefaultMustBeLast,
         };
         use Token::{
             EndOfStatement, EqualEqual, InlineScopeStart, ScopeEnd, ScopeStart, Star,
         };
-        let lhs = self.expr(0).map_err(|_| self.err(ExpectedExpr(self.loc())))?;
+        let lhs = self.expr(0)?;
+        // let lhs = self.expr(0).map_err(|e| self.err({ ExpectedExpr(self.loc()) }))?;
         let mut branches = vec![];
         let mut default = None;
         let mut end = start;
@@ -437,7 +454,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
                     break;
                 }
                 if self.next_token_is(&Star)? {
-                    let block = self.block(start)?;
+                    let block = self.block(ScopeKind::Block, start)?;
                     end = block.end;
                     default = Some(block);
                     self.expect_token(&EndOfStatement)?;
@@ -455,7 +472,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
                         start,
                         rhs_end,
                     );
-                    let block = self.block(start)?;
+                    let block = self.block(ScopeKind::Block, start)?;
                     end = block.end;
                     branches.push((cond, block));
                     self.expect_token(&EndOfStatement)?;
@@ -478,7 +495,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
             true => ast::Expr::new_true(self.next_loc(), self.next_loc()),
             false => self.expr(0)?,
         };
-        let block = self.block(start)?;
+        let block = self.block(ScopeKind::Block, start)?;
         let end = block.end;
         self.loop_level -= 1;
         Ok(ast::Expr::new_loop(cond, block, start, end))
@@ -487,6 +504,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
     /// Handle function definition.
     fn func(&mut self, params_expr: ast::Expr, start: Location) -> ExprResult {
         self.func_level += 1;
+        log::trace!("FUNC level {}", self.func_level);
         let param_exprs = match params_expr.kind {
             // Function has multiple parameters.
             ast::ExprKind::Tuple(items) => items,
@@ -514,7 +532,8 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
                 }
             }
         }
-        let block = self.block(start)?;
+        log::trace!("GET FUNC BLOCK");
+        let block = self.block(ScopeKind::Func, start)?;
         let def_end = block.end;
         self.func_level -= 1;
         // NOTE: The name for a func will be set later if the function
@@ -558,7 +577,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
     /// RHS expression and return a binary expression. If not, just
     /// return the original expr.
     fn maybe_binary_expr(&mut self, prec: u8, mut lhs: ast::Expr) -> ExprResult {
-        log::trace!("BEGIN: maybe binary expr {lhs:?}");
+        log::trace!("BEGIN maybe binary expr {lhs:?}");
         use ParseErrKind::ExpectedOperand;
         let start = lhs.start;
         loop {
@@ -607,7 +626,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
                     }
                 }
             } else {
-                log::trace!("END: not binary expr");
+                log::trace!("END maybe binary expr: NOT binary expr");
                 break Ok(lhs);
             }
         }
@@ -647,6 +666,14 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
                 .map_err(|err| self.scan_err(err));
         }
         Ok(None)
+    }
+
+    fn next_token_token(&mut self) -> Result<Option<Token>, ParseErr> {
+        if let Some(token_with_location) = self.next_token()? {
+            Ok(Some(token_with_location.token))
+        } else {
+            Ok(None)
+        }
     }
 
     /// Get the next token. If there isn't a next token, panic! This is
@@ -771,6 +798,15 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
         }
     }
 
+    fn peek_token_is_func_scope_start(&mut self) -> BoolResult {
+        use Token::{FuncInlineScopeStart, FuncScopeStart};
+        if let Some(TokenWithLocation { token, .. }) = self.peek_token()? {
+            Ok(token == &FuncScopeStart || token == &FuncInlineScopeStart)
+        } else {
+            Ok(false)
+        }
+    }
+
     /// Get the next expression if available, otherwise return a nil
     /// expression.
     fn next_expr_or_nil(&mut self, start: Location) -> ExprResult {
@@ -802,4 +838,11 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
             Location::new(0, 0)
         }
     }
+}
+
+// Scope ---------------------------------------------------------------
+
+enum ScopeKind {
+    Block,
+    Func,
 }

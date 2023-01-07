@@ -21,6 +21,6 @@ print("Int from reference to Int.new:", new(101))
 
 # Map over tuple
 print("Tuple (1, 2) mapped to print:", (1, 2).map(print))
-print("Tuple (1, 2) mapped to `item * 2`:", (1, 2).map((item, i) -> item * 2))
+print("Tuple (1, 2) mapped to `item * 2`:", (1, 2).map((item, i) => item * 2))
 
 print()

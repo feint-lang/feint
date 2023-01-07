@@ -2,22 +2,22 @@
 Type = () =>
     "A type definition with a docstring"
 
-    @new = (x) ->
+    @new = (x) =>
         this.x = x
 
-    func = (x) ->
+    func = (x) =>
         this.x + x
 
     # The $ prefix indicates a computed field (like @property in Python)
     # TODO: Select a different prefix since $ is used for other stuff
-    $computed = () ->
+    $computed = () =>
         result
         # alternatively, do some complex stuff and cache the result
         # this.computed = result
 
-    $computed.set = (value) ->
+    $computed.set = (value) =>
         this.computed = value
 
     # TODO: Use special names like $add or a different symbolic syntax
-    + = (x) ->
+    + = (x) =>
         this.x + x

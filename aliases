@@ -17,7 +17,7 @@ alias lint-all='cargo clippy --'
 
 # run
 alias r="cargo run --"
-alias c="cargo run -- -c"
+alias c="cargo run -- --code"
 alias d="cargo run -- --dis --debug"
 
 # trace
@@ -25,18 +25,20 @@ alias d="cargo run -- --dis --debug"
 alias l="RUST_LOG=feint=trace cargo run --"
 
 # run release binary
-alias f="./target/release/feint"
-alias bf="cargo build --release && ./target/release/feint"
+set release_binary ./target/release/feint
+alias rr="cargo build --release && $release_binary --"
+alias cr="cargo build --release && $release_binary -- --code"
+alias dr="cargo build --release && $release_binary -- --dis --debug"
 
 # profile
 alias p="cargo flamegraph --root --"
 
 # run each example and show its exit code
 function e
-    cargo build
+    cargo build --release
     for f in examples/*.fi
         echo -n "> $f";
-        ./target/debug/feint "$f" 1>/dev/null
+        $release_binary $f 1>/dev/null
         echo -- " -> $status"
     end
 end

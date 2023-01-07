@@ -8,7 +8,7 @@ Here's what a simple function definition looks like (more examples
 below and in the `examples` directory):
 
 ```
-raise = (x, p) -> x ^ p
+raise = (x, p) => x ^ p
 ```
 
 FeInt is "bytecode-style" in the sense that instructions are defined as
@@ -113,7 +113,7 @@ NOTE: Currently, type hints are completely ignored and are only useful
 ```
 a: Int = 1
 
-f: Str = (s: Str, count: Int) ->
+f: Str = (s: Str, count: Int) =>
     s.repeat(count)
 ```
 
@@ -261,7 +261,7 @@ loop cond = cond ->
 - Can't jump out of functions
 
 ```
-my_func = (x) ->
+my_func = (x) =>
     if x ->
         jump exit
 
@@ -274,21 +274,21 @@ my_func = (x) ->
 ## Functions
 
 - Lower snake case names only
-- Declared/assigned like other vars with `f = () -> ...` syntax
+- Declared/assigned like other vars with `f = () => ...` syntax
 - Value of last evaluated expression is returned
 
 ```
 # Named functions
-<name> = ([params]) ->
+<name> = ([params]) =>
     <block>
 
-<name> = ([params]) -> <expression>
+<name> = ([params]) => <expression>
 
 # Immediate invocation of anonymous function
-(([params]) -> <expression>)([arguments])
+(([params]) => <expression>)([arguments])
 
-my_func = (func) -> func()
-my_func(() -> nil)
+my_func = (func) => func()
+my_func(() => nil)
 # -> nil
 ```
 
@@ -298,9 +298,9 @@ is always a tuple and will be empty if there are no var args.
 
 ```
 # $main is special; $args is argv
-$main = (...) -> print($args)
+$main = (...) => print($args)
 
-f = (x, y, ...) -> print(x, y, $args)
+f = (x, y, ...) => print(x, y, $args)
 ```
 
 ### Closures
@@ -314,10 +314,10 @@ benefit of this capability is off the top of my head.)
 Here's an extremely artificial example:
 
 ```
-f = (x) ->
-    g = (y) ->
+f = (x) =>
+    g = (y) =>
         z = "z"
-        h = () ->
+        h = () =>
             (x, y, z)
             
 f1 = f("x1")("y1")
@@ -396,22 +396,22 @@ TODO: Custom types are still in the idea phase and haven't been
 MyType = () =>
 
     # @ indicates class method
-    @new = (value) ->
+    @new = (value) =>
         this.value = value
 
     # add operation
-    + = (other) ->
+    + = (other) =>
         MyType(this.value + other.value)
 
     # !! must return the bool value of the object
-    !! = () ->
+    !! = () =>
         this.value > 10
 
     # $string must return the string representation of the object
     #
     # NOTE: The $ prefix indicates a special method, similar to
     #       dunder methods in Python (e.g., `__str__`)
-    $string = () ->
+    $string = () =>
         $"{this.value}"
 
 obj1 = MyType.new(1)

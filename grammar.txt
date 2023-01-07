@@ -173,10 +173,10 @@ cond :
     | inline_block
 
 func :
-    | "(" [params] ")" "->" suite
+    | "(" [params] ")" "=>" suite
 
 inline_func :
-    | "(" [params] ")" "->" expr
+    | "(" [params] ")" "=>" expr
 
 params :
     | IDENT ("," IDENT)* [","]

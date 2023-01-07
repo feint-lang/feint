@@ -1,8 +1,8 @@
 # This example works because `captured` is found in the immediately
 # enclosing scope (i.e., in `make_closure`).
 print("Single-level closure works")
-make_closure = (captured) ->
-    closure = () -> captured
+make_closure = (captured) =>
+    closure = () => captured
 
 closure_1 = make_closure("x")
 closure_2 = make_closure("y")
@@ -12,8 +12,8 @@ assert(closure_2() == "y", $"closure 2: {closure_2()} != 'y'")
 
 # Vars that appear *after* the definition of a function won't be
 # captured. So the following will throw a name error on `z`:
-f = (x) ->
-    g = (y) ->
+f = (x) =>
+    g = (y) =>
         (x, y, z)
     z = 3
     g
@@ -25,10 +25,10 @@ f = (x) ->
 # to `h()`.
 print("Multi-level closure needs work")
 
-f = (x) ->
-    g = (y) ->
+f = (x) =>
+    g = (y) =>
         z = "z"
-        h = () ->
+        h = () =>
             (x, y, z)
 
 r1 = f("x1")("y1")()

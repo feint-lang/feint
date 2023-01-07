@@ -1,4 +1,4 @@
-self_referential = (n) ->
+self_referential = (n) =>
     if n == 0 ->
         [0]
     else ->
@@ -9,14 +9,14 @@ self_referential = (n) ->
 print(self_referential(3))  # -> [0, 1, 2, 3]
 
 # Same as above but using match
-f = (n) ->
+f = (n) =>
     match n ->
         0 -> [0]
         * -> f(n - 1).extend([n])
 
 print(f(3))  # -> [0, 1, 2, 3]
 
-returns = (n) ->
+returns = (n) =>
     if n > 1 ->
         return "explicit return"
     "implicit return"
@@ -26,15 +26,15 @@ print(returns(1))  # -> "implicit"
 
 # In the assigment `x = x`, the RHS x refers to the global x
 x = 1
-f = () ->
+f = () =>
     x = x
     x += 2
 print(f(), "(x in f() should be 3)")  # -> 3
 print(x, "(global x should be 1)")    # -> 1
 
 # Var args allowed in last position
-f = (...) -> print($args.length, "var args")
+f = (...) => print($args.length, "var args")
 f(1, 2, 3)  # -> 3
 
-f = (required, ...) -> print($args.length, "var args")
+f = (required, ...) => print($args.length, "var args")
 f(1, 2, 3)  # -> 2

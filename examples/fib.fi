@@ -2,7 +2,7 @@
 #       cache entry.
 cache = [0, 0, 1]
 
-fib_if = (n) ->
+fib_if = (n) =>
     if n == 0 ->
         0
     else if n == 1 ->
@@ -12,7 +12,7 @@ fib_if = (n) ->
         if c === nil -> cache.push(fib_if(n - 2) + fib_if(n - 1))
         else -> c
 
-fib_match = (n) ->
+fib_match = (n) =>
     match n ->
         0 -> 0
         1 -> 1
@@ -23,12 +23,12 @@ fib_match = (n) ->
                 *   -> c
 
 # Keep for benchmarking
-fib_match_slow = (n) ->
+fib_match_slow = (n) =>
     match n ->
         0 -> 0
         1 -> 1
         * -> fib_match_slow(n - 1) + fib_match_slow(n - 2)
 
-$main = (...) ->
+$main = (...) =>
     n = if $args.is_empty -> 50 else -> Int.new($args.0)
     print(fib_match(n))

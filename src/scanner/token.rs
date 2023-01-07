@@ -62,10 +62,13 @@ pub enum Token {
     MinusEqual, // -=
 
     // Scope ---------------------------------------------------
-    ScopeStart,       // -> (start of scope: function, block, etc)
+    ScopeStart,       // -> (start of scope: block, etc)
     ScopeEnd,         // end of scope (implicit, no symbol)
-    InlineScopeStart, // -> (start of inline scope: function, block, etc)
+    InlineScopeStart, // -> (start of inline scope: block, etc)
     InlineScopeEnd,   // end of inline scope (implicit, no symbol)
+
+    FuncScopeStart,       // => (start of func scope)
+    FuncInlineScopeStart, // => (start of func inline scope)
 
     // Keywords ------------------------------------------------
     Nil,           // nil
@@ -162,6 +165,9 @@ impl Token {
             Self::ScopeEnd => "<scope end>",
             Self::InlineScopeStart => "-> (inline)",
             Self::InlineScopeEnd => "<inline scope end>",
+
+            Self::FuncScopeStart => "=>",
+            Self::FuncInlineScopeStart => "=> (inline)",
 
             // Keywords ------------------------------------------------
             Self::Nil => "nil",

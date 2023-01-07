@@ -165,12 +165,12 @@ fn scan_string_unclosed() {
 #[test]
 fn scan_indents() {
     let source = "\
-f (x) ->  # 1
+f (x) =>  # 1
     x     # 2
     1     # 3
           # 4
           # 5
-g (y) ->  # 6
+g (y) =>  # 6
     y     # 7\
 ";
     let tokens = scan_optimistic(source);
@@ -181,7 +181,7 @@ g (y) ->  # 6
     check_token(tokens.next(), Token::LParen, 1, 3, 1, 3);
     check_token(tokens.next(), Token::Ident("x".to_string()), 1, 4, 1, 4);
     check_token(tokens.next(), Token::RParen, 1, 5, 1, 5);
-    check_token(tokens.next(), Token::ScopeStart, 1, 7, 1, 8);
+    check_token(tokens.next(), Token::FuncScopeStart, 1, 7, 1, 8);
     check_token(tokens.next(), Token::Ident("x".to_string()), 2, 5, 2, 5);
     check_token(tokens.next(), Token::EndOfStatement, 2, 6, 2, 6);
     check_token(tokens.next(), Token::Int(BigInt::from(1)), 3, 5, 3, 5);
@@ -194,7 +194,7 @@ g (y) ->  # 6
     check_token(tokens.next(), Token::LParen, 6, 3, 6, 3);
     check_token(tokens.next(), Token::Ident("y".to_string()), 6, 4, 6, 4);
     check_token(tokens.next(), Token::RParen, 6, 5, 6, 5);
-    check_token(tokens.next(), Token::ScopeStart, 6, 7, 6, 8);
+    check_token(tokens.next(), Token::FuncScopeStart, 6, 7, 6, 8);
     check_token(tokens.next(), Token::Ident("y".to_string()), 7, 5, 7, 5);
     check_token(tokens.next(), Token::EndOfStatement, 7, 6, 7, 6);
     check_token(tokens.next(), Token::ScopeEnd, 8, 1, 8, 1);
@@ -395,7 +395,7 @@ fn scan_inline_block_3() {
 }
 
 #[test]
-fn scan_inline_block_4() {
+fn scan_inline_block_4_without_parens() {
     use Token::*;
     let tokens = scan_to_tokens("block -> block -> true");
     assert_eq!(
@@ -416,7 +416,7 @@ fn scan_inline_block_4() {
 }
 
 #[test]
-fn scan_inline_block_5() {
+fn scan_inline_block_5_with_parens() {
     use Token::*;
     let tokens = scan_to_tokens("(block -> block -> true)");
     assert_eq!(

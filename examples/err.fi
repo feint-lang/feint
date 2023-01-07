@@ -13,7 +13,7 @@ assert(!1.err, "did not expect err", true)
 # (is this useful?).
 assert(arg_err.err, $"expected err {arg_err.err}", true)
 
-check_result = (result, expected) ->
+check_result = (result, expected) =>
     print("Checking result:", result)
 
     statuses = []
@@ -67,7 +67,7 @@ check_result(
     (false, true, ["err", "err", "err"], ["assertion", "assertion", "assertion"]),
 )
 
-handle_result = (result) ->
+handle_result = (result) =>
     if result.err ->
         jump err
 

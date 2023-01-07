@@ -104,8 +104,15 @@ impl<'a, T: BufRead> Scanner<'a, T> {
             Some((':', _, _)) => {
                 // If a colon appears at the start of a line, that
                 // indicates a label.
-                let last_token = self.last_token();
-                if let EndOfStatement | ScopeStart | InlineScopeStart = last_token {
+                let line_start = matches!(
+                    self.last_token(),
+                    EndOfStatement
+                        | ScopeStart
+                        | InlineScopeStart
+                        | FuncScopeStart
+                        | FuncInlineScopeStart
+                );
+                if line_start {
                     self.handle_label(start)?
                 } else {
                     Colon
@@ -148,6 +155,12 @@ impl<'a, T: BufRead> Scanner<'a, T> {
                 self.consume_char_and_return_token(GreaterThanOrEqual)
             }
             Some(('>', _, _)) => GreaterThan,
+            Some(('-', Some('>'), _)) => {
+                return self.handle_scope_start(ScopeKind::Block, start);
+            }
+            Some(('=', Some('>'), _)) => {
+                return self.handle_scope_start(ScopeKind::Func, start);
+            }
             Some(('=', Some('='), Some('='))) => {
                 self.consume_two_chars_and_return_token(EqualEqualEqual)
             }
@@ -172,9 +185,6 @@ impl<'a, T: BufRead> Scanner<'a, T> {
                 Plus
             }
             Some(('-', Some('='), _)) => self.consume_char_and_return_token(MinusEqual),
-            Some(('-', Some('>'), _)) => {
-                return self.handle_scope_start(start);
-            }
             Some(('-', _, _)) => Minus,
             Some(('!', Some('='), Some('='))) => {
                 self.consume_two_chars_and_return_token(NotEqualEqual)
@@ -416,7 +426,12 @@ impl<'a, T: BufRead> Scanner<'a, T> {
         Ok(ident_token)
     }
 
-    fn handle_scope_start(&mut self, start: Location) -> AddTokensResult {
+    fn handle_scope_start(
+        &mut self,
+        kind: ScopeKind,
+        start: Location,
+    ) -> AddTokensResult {
+        use ScopeKind::*;
         let end = Location::new(start.line, start.col + 1);
         self.source.next(); // consume >
         self.consume_whitespace();
@@ -428,12 +443,20 @@ impl<'a, T: BufRead> Scanner<'a, T> {
             return Err(ScanErr::new(ErrKind::ExpectedBlock, self.source.loc()));
         } else if self.next_char_is('\n') {
             // Block
-            self.add_token_to_queue(Token::ScopeStart, start, end);
+            let token = match kind {
+                Block => Token::ScopeStart,
+                Func => Token::FuncScopeStart,
+            };
+            self.add_token_to_queue(token, start, end);
             self.expect_indent()?;
         } else {
             // Inline block
             let end = Location::new(start.line, start.col + 1);
-            self.add_token_to_queue(Token::InlineScopeStart, start, end);
+            let token = match kind {
+                Block => Token::InlineScopeStart,
+                Func => Token::FuncInlineScopeStart,
+            };
+            self.add_token_to_queue(token, start, end);
             self.inline_scope_stack.push(start);
         }
         Ok(())
@@ -569,8 +592,8 @@ impl<'a, T: BufRead> Scanner<'a, T> {
     }
 
     /// The scope for an inline block ends when one of the following
-    /// tokens is encountered: comma, closing bracket, newline, end of
-    /// input.
+    /// tokens is encountered: comma, closing bracket, scope start,
+    /// newline, end of input.
     ///
     /// If exiting because an `else` was encountered, exit back to the
     /// matching `if`. If inside a bracket group, exit only as far back
@@ -898,14 +921,11 @@ impl<'a, T: BufRead> Scanner<'a, T> {
     /// Read identifier.
     fn read_ident(&mut self, first_char: char) -> String {
         let mut string = first_char.to_string();
-
         let test =
             |&c: &char| c.is_ascii_alphabetic() || c.is_ascii_digit() || c == '_';
-
         while let Some((c, _, _)) = self.next_char_if(test) {
             string.push(c)
         }
-
         string
     }
 
@@ -985,6 +1005,13 @@ impl<'a, T: BufRead> Iterator for Scanner<'a, T> {
             err => Some(err),
         }
     }
+}
+
+// Scope ---------------------------------------------------------------
+
+enum ScopeKind {
+    Block,
+    Func,
 }
 
 // Ident ---------------------------------------------------------------

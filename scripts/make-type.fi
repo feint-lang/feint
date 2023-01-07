@@ -2,7 +2,7 @@
 import system
 
 # Exit with message
-exit = (...) ->
+exit = (...) =>
     if $args.length > 0 ->
         print_err($args.join(" "))
     system.exit(1)
@@ -13,7 +13,7 @@ parse_args: List<Str> = (
     argv: List<Str>,
     min_args: Int,
     max_args: Int | nil,
-) ->
+) =>
     "Parse args, such as `argv` from the command line.
 
     Args:
@@ -27,9 +27,7 @@ parse_args: List<Str> = (
 
     # NOTE: This version causes an error because the parenthesized
     #       expression followed by -> looks like a function.
-    # if n_args < min_args || (max_args !== nil && n_args > max_args) ->
-
-    if n_args < min_args || n_args > max_args ->
+    if n_args < min_args || (max_args !== nil && n_args > max_args) ->
         min_args_s = if min_args == 1 -> "" else -> "s"
         max_args_s = if max_args == 1 -> "" else -> "s"
         msg = if min_args == max_args ->
@@ -47,14 +45,14 @@ parse_args: List<Str> = (
         args
 
 
-make_rule: Str = (...) ->
+make_rule: Str = (...) =>
     "Make a horizontal rule that."
     count = 72 - 3 - ($args.length)
-    count -= $args.map((str: Str) -> str.length).sum
+    count -= $args.map((str: Str) => str.length).sum
     "-".repeat(count)
 
 
-$main = (...) ->
+$main = (...) =>
     args = parse_args("make-type", $args, 1, 1)
 
     if args.err ->

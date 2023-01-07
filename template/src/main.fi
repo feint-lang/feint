@@ -8,15 +8,15 @@ import from package: Type
 
 # $main is a special name. If it's defined, it will automatically be
 # called whenever a module is run as a script.
-$main = (argv) ->
+$main = (...) =>
     loop arg <- argv
         t = Type.new(arg)
         print(t)
 
-f = (x) ->
+f = (x) =>
     x * x
 
-g = (h) ->
+g = (h) =>
     h()
 
-g((x) -> x)
+g((x) => x)

@@ -40,7 +40,7 @@ x == y
 
 # TODO:
 # Print `n` three times
-# 3.times_do((n) -> print(n))
+# 3.times_do((n) => print(n))
 
 # Anonymous block (new scope)
 block_return_val = block ->
@@ -50,25 +50,25 @@ print(block_return_val)
 
 # TODO:
 # Type = () =>
-#     @new = () ->
+#     @new = () =>
 #         print("Create new instance Type")
 #
-#     !! = () ->
+#     !! = () =>
 #         true && false
 
-hello = () ->
+hello = () =>
     "Python-style docstring for hello function"
     print("hello")
     print("\"hello\"")
 
 hello()
 
-func_with_return_type = () ->
+func_with_return_type = () =>
     "abc"
 
 print(func_with_return_type())
 
-loops = () ->
+loops = () =>
     i = 0
     loop ->
         print(i)
@@ -81,7 +81,7 @@ loops = () ->
 
 loops()
 
-jump_out = () ->
+jump_out = () =>
     loop ->
         jump exit
     :exit: print("exit")
@@ -89,7 +89,7 @@ jump_out = () ->
 jump_out()
 
 # TODO:
-# loop_over_range = () ->
+# loop_over_range = () =>
 #     # Prints 0, 1, 2, 3, 4
 #     loop i <- 0..5 ->
 #         print(i)
