@@ -134,9 +134,6 @@ impl Disassembler {
                     format!("{formatted_inst} @ {addr} ({message})"),
                 )
             }
-            ScopeStartPlaceholder(addr) => {
-                self.align("PLACEHOLDER", format!("SCOPE_START @ {addr}"))
-            }
             FreeVarPlaceholder(addr, name) => {
                 self.align("PLACEHOLDER", format!("VAR {name} @ {addr}"))
             }

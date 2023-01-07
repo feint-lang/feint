@@ -440,11 +440,6 @@ impl VM {
                     );
                     break Ok(VMState::Halted(255));
                 }
-                ScopeStartPlaceholder(addr) => {
-                    self.halt();
-                    eprintln!("ScopeStart placeholder at {addr} was not updated");
-                    break Ok(VMState::Halted(255));
-                }
                 FreeVarPlaceholder(addr, name) => {
                     self.halt();
                     eprintln!("Var placeholder at {addr} was not updated: {name}");

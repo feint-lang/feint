@@ -94,7 +94,6 @@ pub enum Inst {
     LoadModule(String),
 
     Placeholder(usize, Box<Inst>, String), // address, instruction, error message
-    ScopeStartPlaceholder(usize),          // address, number of locals
     FreeVarPlaceholder(usize, String),     // address, var name
     BreakPlaceholder(usize, usize),        // jump address, scope depth
     ContinuePlaceholder(usize, usize),     // jump address, scope depth
