@@ -1,0 +1,16 @@
+x = 1
+r = match x ->
+    1 -> "1"
+    * -> "other"
+assert(r == "1", r, true)
+
+x = () => nil
+r = match x ->
+    x -> "x"
+    * -> "other"
+assert(r == "x", r, true)
+
+r = match (() => nil) ->
+    (() => nil) -> "func"
+    * -> "other"
+assert(r == "func", r, true)
