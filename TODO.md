@@ -1,9 +1,10 @@
 # TODO
 
-- [ ] Fix ident parsing - parse to whitespace and then check for
+- [-] Fix ident parsing - parse to whitespace and then check for
       validity. Currently, an invalid ident will cause a cryptic
       "expected EOS" error.
-- [ ] Handle/allow `UPPERCASE_IDENT`s.
+- [-] Handle/allow `UPPERCASE_IDENT`s.
+- [+] Add `Always` singleton to enable pattern matching.
 - [ ] Consider allowing `Map` entries to be accessed using dot notation.
       This would allow `Map`s to be used as lightweight "instances",
       similar to JS.
