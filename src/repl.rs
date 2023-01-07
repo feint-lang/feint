@@ -38,7 +38,12 @@ impl Repl {
             rustyline::Editor::<()>::new().expect("Could initialize readline");
         reader.set_indent_size(4);
         reader.set_tab_stop(4);
-        Repl { reader, history_path, executor, module: Module::with_name("$repl") }
+        Repl {
+            reader,
+            history_path,
+            executor,
+            module: Module::with_name("$repl", "$repl"),
+        }
     }
 
     fn run(&mut self) -> ExitResult {

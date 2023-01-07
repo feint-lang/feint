@@ -139,8 +139,8 @@ pub fn builtin_func(
     obj_ref!(BuiltinFunc::new(name.to_owned(), this_type, params, func))
 }
 
-pub fn builtin_module(name: &str, ns: Namespace) -> obj_ref_t!(Module) {
-    obj_ref!(Module::new(name.into(), ns, Code::new()))
+pub fn builtin_module(name: &str, ns: Namespace, doc: &str) -> obj_ref_t!(Module) {
+    obj_ref!(Module::new(name.into(), ns, Code::new(), doc))
 }
 
 pub fn cell() -> ObjectRef {
@@ -262,8 +262,9 @@ pub fn _module<S: Into<String>>(
     name: S,
     ns: Namespace,
     code: Code,
+    doc: &str,
 ) -> obj_ref_t!(Module) {
-    obj_ref!(Module::new(name.into(), ns, code))
+    obj_ref!(Module::new(name.into(), ns, code, doc))
 }
 
 pub fn prop(getter: ObjectRef) -> ObjectRef {

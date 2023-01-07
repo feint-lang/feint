@@ -142,7 +142,7 @@ pub static BUILTINS: Lazy<new::obj_ref_t!(Module)> = Lazy::new(|| {
         ),
     ];
 
-    new::builtin_module("builtins", Namespace::with_entries(&entries))
+    new::builtin_module("builtins", Namespace::with_entries(&entries), "Builtins")
 });
 
 fn print(args: &Args, err: bool) -> RuntimeObjResult {

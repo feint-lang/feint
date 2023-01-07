@@ -61,7 +61,7 @@ impl Compiler {
             code.push_inst(Inst::Pop);
             code.push_inst(Inst::Halt(0));
         }
-        Ok(Module::new(name.to_owned(), Namespace::new(), code))
+        Ok(Module::new(name.to_owned(), Namespace::new(), code, "$main"))
     }
 
     /// Compile AST module node to module object.
@@ -69,7 +69,7 @@ impl Compiler {
     pub fn _compile_module(&mut self, name: &str, module: ast::Module) -> CompResult {
         let mut code = self.compile_module_to_code(name, module)?;
         code.push_inst(Inst::Pop);
-        Ok(Module::new(name.to_owned(), Namespace::new(), code))
+        Ok(Module::new(name.to_owned(), Namespace::new(), code, name))
     }
 
     /// Compile AST module node to code object.
