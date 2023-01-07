@@ -24,7 +24,7 @@ pub static SYSTEM: Lazy<new::obj_ref_t!(Module)> = Lazy::new(|| {
             new::builtin_func("exit", None, &[""], |_, args, _| {
                 let name = "system.exit()";
 
-                let result = check_args(name, &args, true, 1, Some(1));
+                let result = check_args(name, &args, true, 0, Some(1));
                 if let Err(err) = result {
                     return Ok(err);
                 }
