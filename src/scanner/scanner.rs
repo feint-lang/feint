@@ -38,7 +38,7 @@ pub struct Scanner<'a, T: BufRead> {
     bracket_stack: Stack<(char, Location)>,
     /// Stack to keep track of inline blocks (e.g., `block -> true`
     /// where there's no newline after the `->`).
-    inline_scope_stack: Stack<Location>,
+    inline_scope_stack: Stack<(ScopeKind, Location)>,
     /// Keep track of where `if`s are encountered. This is used with
     /// exit from certain inline blocks.
     /// TODO: Not sure this is the best way to handle this. Currently,
@@ -457,7 +457,7 @@ impl<'a, T: BufRead> Scanner<'a, T> {
                 Func => Token::FuncInlineScopeStart,
             };
             self.add_token_to_queue(token, start, end);
-            self.inline_scope_stack.push(start);
+            self.inline_scope_stack.push((kind, start));
         }
         Ok(())
     }
@@ -592,8 +592,8 @@ impl<'a, T: BufRead> Scanner<'a, T> {
     }
 
     /// The scope for an inline block ends when one of the following
-    /// tokens is encountered: comma, closing bracket, scope start,
-    /// newline, end of input.
+    /// tokens is encountered: comma, closing bracket, newline, end of
+    /// input.
     ///
     /// If exiting because an `else` was encountered, exit back to the
     /// matching `if`. If inside a bracket group, exit only as far back
@@ -609,7 +609,7 @@ impl<'a, T: BufRead> Scanner<'a, T> {
             None => (0, 0),
         };
         let mut count = 0;
-        while let Some(scope_start) = self.inline_scope_stack.peek() {
+        while let Some((_, scope_start)) = self.inline_scope_stack.peek() {
             let scope_loc = (scope_start.line, scope_start.col);
             if scope_loc > bracket_loc {
                 if is_else && scope_loc < if_loc {
