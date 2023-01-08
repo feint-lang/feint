@@ -10,11 +10,18 @@ use crate::util::check_args;
 use crate::vm::{RuntimeErr, RuntimeResult};
 
 use super::builtins::BUILTINS;
+use super::proc::PROC;
 
 pub static SYSTEM: Lazy<new::obj_ref_t!(Module)> = Lazy::new(|| {
     let entries: Vec<(&str, ObjectRef)> = vec![
         ("argv", new::empty_tuple()),
-        ("modules", new::map(vec![("builtins".to_owned(), BUILTINS.clone())])),
+        (
+            "modules",
+            new::map(vec![
+                ("builtins".to_owned(), BUILTINS.clone()),
+                ("proc".to_owned(), PROC.clone()),
+            ]),
+        ),
         (
             // Exit program with return code.
             //
