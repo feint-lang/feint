@@ -28,7 +28,7 @@ pub struct Func {
     ns: Namespace,
     name: String,
     params: Params,
-    pub code: Code,
+    code: Code,
 }
 
 gen::standard_object_impls!(Func);
@@ -56,6 +56,10 @@ impl Func {
             }
         }
         names
+    }
+
+    pub fn code(&self) -> &Code {
+        &self.code
     }
 }
 

@@ -1,13 +1,16 @@
 //! System Module
+use std::path::Path;
 use std::sync::{Arc, RwLock};
 
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 use once_cell::sync::Lazy;
 
+use crate::config::CONFIG;
+use crate::exe::Executor;
 use crate::types::{new, Module, Namespace, ObjectRef, ObjectTrait};
 use crate::util::check_args;
-use crate::vm::{RuntimeErr, RuntimeResult};
+use crate::vm::RuntimeErr;
 
 use super::builtins::BUILTINS;
 use super::proc::PROC;
@@ -79,25 +82,52 @@ pub fn init_system_module(argv: &[String]) {
 }
 
 /// Add a module to `system.modules`.
-pub fn _add_module(name: &str, module: Module) -> RuntimeResult {
+pub fn add_module(name: &str, module: Module) -> ObjectRef {
     let system = SYSTEM.read().unwrap();
     let modules = system.get_attr("modules", SYSTEM.clone());
     let modules = modules.write().expect("Expected system module to be an object");
     let modules = modules.down_to_map().expect("Expected system.modules to be a Map");
     let module = new::obj_ref!(module);
-    modules.add(name, module);
-    Ok(())
+    modules.add(name, module.clone());
+    module
 }
 
 /// Get a module from `system.modules`.
-pub fn get_module(name: &str) -> ObjectRef {
+pub fn get_module(name: &str) -> Result<(ObjectRef, bool), RuntimeErr> {
     let system = SYSTEM.read().unwrap();
-    let modules = system.get_attr("modules", SYSTEM.clone());
-    let modules = modules.read().expect("Expected system module to be an object");
-    let modules = modules.down_to_map().expect("Expected system.modules to be a Map");
+    let modules_ref = system.get_attr("modules", SYSTEM.clone());
+    let modules_guard =
+        modules_ref.read().expect("Expected system module to be an object");
+    let modules =
+        modules_guard.down_to_map().expect("Expected system.modules to be a Map");
     if let Some(module) = modules.get(name) {
-        module.clone()
+        Ok((module.clone(), false))
     } else {
-        new::attr_not_found_err(name, SYSTEM.clone())
+        // XXX: Prevent deadlock when calling add_module.
+        drop(modules_guard);
+
+        let config = CONFIG.read().unwrap();
+        let search_path = config.get_str("builtin_module_search_path")?;
+
+        let file_name = format!("{search_path}/{name}.fi");
+        let path = Path::new(file_name.as_str());
+
+        drop(config);
+
+        let module = if path.is_file() {
+            let mut executor = Executor::for_add_module();
+            let result = executor.load_module(name, path);
+            match result {
+                Ok(module) => add_module(name, module),
+                Err(err) => {
+                    let msg = format!("{name}:\n\n{err}");
+                    new::module_could_not_be_loaded(msg, SYSTEM.clone())
+                }
+            }
+        } else {
+            new::module_not_found_err(name, SYSTEM.clone())
+        };
+
+        Ok((module, true))
     }
 }

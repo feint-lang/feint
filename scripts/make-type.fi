@@ -1,48 +1,18 @@
 #!./target/release/feint
+import args
 import system
+
+
+if args.err || system.err ->
+    print_err($"Import error")
+    system.exit(1)
+
 
 # Exit with message
 exit = (...) =>
     if $args.length > 0 ->
         print_err($args.join(" "))
     system.exit(1)
-
-
-parse_args: List<Str> = (
-    program_name: Str,
-    argv: List<Str>,
-    min_args: Int,
-    max_args: Int | nil,
-) =>
-    "Parse args, such as `argv` from the command line.
-
-    Args:
-        program_name: The executable program name
-        argv: The args that were passed on the command line
-        min_args: The required minimum number of args
-        max_args: The required maximum number of args
-
-    "
-    n_args = argv.length
-
-    # NOTE: This version causes an error because the parenthesized
-    #       expression followed by -> looks like a function.
-    if n_args < min_args || (max_args !== nil && n_args > max_args) ->
-        min_args_s = if min_args == 1 -> "" else -> "s"
-        max_args_s = if max_args == 1 -> "" else -> "s"
-        msg = if min_args == max_args ->
-            $"requires exactly {min_args} arg{min_args_s}"
-        else ->
-            $"requires at least {min_args} arg{min_args_s} and no more
-              than {max_args} args{max_args_s}"
-        Err.new(ErrType.arg, $"{program_name} {msg}")
-    else ->
-        args = []
-        i = 0
-        loop i < argv.length ->
-            args.push(argv.i)
-            i += 1
-        args
 
 
 make_rule: Str = (...) =>
@@ -56,7 +26,7 @@ $main = (...) =>
     p = print
     e = print_err
 
-    args = parse_args("make-type", $args, 1, 2)
+    args = args.parse("make-type", $args, 1, 2)
 
     if args.err ->
         exit(args.err)
@@ -72,6 +42,7 @@ $main = (...) =>
     singleton_type_name = $"{name.upper()}_TYPE"
     type_name = $"{name}Type"
     obj_name = name
+    repr = if repr -> repr else -> obj_name.lower()
 
     rule = "-".repeat(80)
     e(rule)
@@ -79,6 +50,7 @@ $main = (...) =>
     e($"singleton type name = {singleton_type_name}")
     e($"type name =  {type_name}")
     e($"object name = {obj_name}")
+    e($"display repr = {repr}")
     e("\nAfter creation tasks:\n")
     e($"- Add `pub(crate) mod {name.lower()};` to types/mod.rs")
     e($"- Add constructor to types/new.rs")

@@ -3,6 +3,7 @@ use std::io::BufRead;
 use std::path::Path;
 
 use crate::compiler::{CompErr, CompErrKind, Compiler};
+use crate::config::CONFIG;
 use crate::modules;
 use crate::parser::{ParseErr, ParseErrKind, Parser};
 use crate::result::{ExeErr, ExeErrKind, ExeResult};
@@ -13,7 +14,7 @@ use crate::util::{
 };
 use crate::vm::{
     CallDepth, Code, Inst, RuntimeContext, RuntimeErr, RuntimeErrKind, VMExeResult,
-    VMState, VM,
+    VMState, DEFAULT_MAX_CALL_DEPTH, VM,
 };
 use crate::{ast, dis};
 
@@ -38,6 +39,28 @@ impl Executor {
         let current_file_name = "<none>".to_owned();
         modules::init_system_module(&argv);
         Self { vm, argv, incremental, dis, debug, current_file_name }
+    }
+
+    pub fn for_add_module() -> Self {
+        let config = CONFIG.read().unwrap();
+        let max_call_depth = match config.get_usize("max_call_depth") {
+            Ok(depth) => depth,
+            Err(err) => {
+                log::warn!("{err}");
+                DEFAULT_MAX_CALL_DEPTH
+            }
+        };
+        drop(config);
+        let vm = VM::new(RuntimeContext::new(), max_call_depth);
+        let current_file_name = "<none>".to_owned();
+        Self {
+            vm,
+            argv: vec![],
+            incremental: false,
+            dis: false,
+            debug: false,
+            current_file_name,
+        }
     }
 
     pub fn halt(&mut self) {
@@ -136,7 +159,7 @@ impl Executor {
     }
 
     /// Execute a module.
-    fn execute_module<T: BufRead>(
+    pub fn execute_module<T: BufRead>(
         &mut self,
         module: &mut Module,
         start: usize,
@@ -149,7 +172,12 @@ impl Executor {
             self.display_vm_state(&result);
         }
         match result {
-            Ok(state) => Ok(state),
+            Ok(state) => {
+                for (name, obj) in self.vm.ctx.globals().iter() {
+                    module.add_global(name, obj.clone());
+                }
+                Ok(state)
+            }
             Err(err) => {
                 if let RuntimeErrKind::Exit(code) = err.kind {
                     Ok(VMState::Halted(code))
@@ -179,6 +207,47 @@ impl Executor {
                 self.handle_comp_err(&err, source);
                 ExeErr::new(ExeErrKind::CompErr(err.kind))
             })?;
+        Ok(module)
+    }
+
+    pub fn load_module(
+        &mut self,
+        name: &str,
+        file_path: &Path,
+    ) -> Result<Module, ExeErr> {
+        match source_from_file(file_path) {
+            Ok(mut source) => {
+                self.current_file_name =
+                    file_path.to_str().unwrap_or("<unknown>").to_owned();
+                match self.compile_module(name, &mut source) {
+                    Ok(mut module) => {
+                        match self.execute_module(&mut module, 0, false, &mut source) {
+                            Ok(_) => Ok(module),
+                            Err(err) => Err(err),
+                        }
+                    }
+                    Err(err) => Err(err),
+                }
+            }
+            Err(err) => {
+                let message = format!("{}: {err}", file_path.display());
+                Err(ExeErr::new(ExeErrKind::CouldNotReadSourceFile(message)))
+            }
+        }
+    }
+
+    /// Compile AST module node into module object.
+    fn compile_module<T: BufRead>(
+        &self,
+        name: &str,
+        source: &mut Source<T>,
+    ) -> Result<Module, ExeErr> {
+        let ast_module = self.parse_source(source)?;
+        let mut compiler = Compiler::new(true);
+        let module = compiler.compile_module(name, ast_module).map_err(|err| {
+            self.handle_comp_err(&err, source);
+            ExeErr::new(ExeErrKind::CompErr(err.kind))
+        })?;
         Ok(module)
     }
 

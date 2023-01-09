@@ -2,6 +2,8 @@ use crate::compiler::CompErrKind;
 use crate::parser::ParseErrKind;
 use crate::scanner::ScanErrKind;
 use crate::vm::{RuntimeErrKind, VMState};
+use core::fmt;
+use std::fmt::Formatter;
 
 /// Result type used by top level runners.
 ///
@@ -36,4 +38,26 @@ pub enum ExeErrKind {
     ParseErr(ParseErrKind),
     CompErr(CompErrKind),
     RuntimeErr(RuntimeErrKind),
+}
+
+impl fmt::Display for ExeErr {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.kind)
+    }
+}
+
+impl fmt::Display for ExeErrKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        use ExeErrKind::*;
+        let msg = match self {
+            CouldNotReadSourceFile(file_name) => {
+                format!("Could not read source file: {file_name}")
+            }
+            ScanErr(kind) => format!("Scan error: {kind:?}"),
+            ParseErr(kind) => format!("Parse error: {kind:?}"),
+            CompErr(kind) => format!("Compilation error: {kind:?}"),
+            RuntimeErr(kind) => format!("Runtime error: {kind:?}"),
+        };
+        write!(f, "{msg}")
+    }
 }

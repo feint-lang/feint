@@ -65,11 +65,11 @@ impl Compiler {
     }
 
     /// Compile AST module node to module object.
-    /// XXX: Anticipating a need for this.
-    pub fn _compile_module(&mut self, name: &str, module: ast::Module) -> CompResult {
+    pub fn compile_module(&mut self, name: &str, module: ast::Module) -> CompResult {
         let mut code = self.compile_module_to_code(name, module)?;
+        let ns = Namespace::new();
         code.push_inst(Inst::Pop);
-        Ok(Module::new(name.to_owned(), Namespace::new(), code, name))
+        Ok(Module::new(name.to_owned(), ns, code, name))
     }
 
     /// Compile AST module node to code object.
@@ -544,7 +544,7 @@ impl Visitor {
             Kind::Ellipsis => self.push_nil(),
             Kind::Int(value) => {
                 if let Some(index) = new::shared_int_global_const_index(&value) {
-                    self.push(Inst::LoadGlobalConst(index))
+                    self.push_global_const(index)
                 } else {
                     self.add_const(new::int(value));
                 }
@@ -631,7 +631,7 @@ impl Visitor {
     ) -> VisitResult {
         self.visit_expr(obj_expr, None)?;
         if let Some(name) = name_expr.ident_name() {
-            self.visit_literal(ast::Literal::new_string(name))?;
+            self.visit_literal(ast::Literal::new_string(name.as_str()))?;
         } else {
             self.visit_expr(name_expr, None)?;
         }
@@ -974,10 +974,14 @@ impl Visitor {
         self.push(Inst::LoadEmptyTuple)
     }
 
+    fn push_global_const(&mut self, index: usize) {
+        self.push(Inst::LoadGlobalConst(index))
+    }
+
     // Code unit constants ---------------------------------------------
 
-    fn add_const(&mut self, val: ObjectRef) -> usize {
-        let index = self.code.add_const(val);
+    fn add_const(&mut self, obj: ObjectRef) -> usize {
+        let index = self.code.add_const(obj);
         self.push(Inst::LoadConst(index));
         index
     }

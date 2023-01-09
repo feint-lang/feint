@@ -1,0 +1,37 @@
+parse: List<Str> = (
+    program_name: Str,
+    argv: List<Str>,
+    min_args: Int,
+    max_args: Int | nil,
+) =>
+    "Parse args, such as `argv` from the command line.
+
+    Args:
+        program_name: The executable program name
+        argv: The args that were passed on the command line
+        min_args: The required minimum number of args
+        max_args: The required maximum number of args
+
+    "
+    n_args = argv.length
+
+    # NOTE: This version causes an error because the parenthesized
+    #       expression followed by -> looks like a function.
+    if n_args < min_args || (max_args !== nil && n_args > max_args) ->
+        min_args_s = if min_args == 1 -> "" else -> "s"
+        max_args_s = if max_args == 1 -> "" else -> "s"
+        msg = if min_args == max_args ->
+            $"requires exactly {min_args} arg{min_args_s}"
+        else ->
+            msg = (
+                $"requires at least {min_args} arg{min_args_s} and ",
+                $"no more than {max_args} arg{max_args_s}"
+            ).join(" ")
+        Err.new(ErrType.arg, $"{program_name} {msg}")
+    else ->
+        args = []
+        i = 0
+        loop i < argv.length ->
+            args.push(argv.i)
+            i += 1
+        args

@@ -58,6 +58,10 @@ impl RuntimeContext {
         self.ns_stack.last_mut().unwrap()
     }
 
+    pub fn globals(&self) -> &Namespace {
+        &self.ns_stack[0]
+    }
+
     pub fn enter_scope(&mut self) {
         self.ns_stack.push(Namespace::new());
     }

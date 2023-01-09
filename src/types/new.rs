@@ -197,6 +197,17 @@ pub fn index_out_of_bounds_err(index: usize, obj: ObjectRef) -> ObjectRef {
     err(ErrKind::IndexOutOfBounds, index.to_string(), obj)
 }
 
+pub fn module_not_found_err<S: Into<String>>(msg: S, obj: ObjectRef) -> ObjectRef {
+    err(ErrKind::ModuleNotFound, msg, obj)
+}
+
+pub fn module_could_not_be_loaded<S: Into<String>>(
+    msg: S,
+    obj: ObjectRef,
+) -> ObjectRef {
+    err(ErrKind::ModuleCouldNotBeLoaded, msg, obj)
+}
+
 pub fn string_err<S: Into<String>>(msg: S, obj: ObjectRef) -> ObjectRef {
     err(ErrKind::String, msg, obj)
 }

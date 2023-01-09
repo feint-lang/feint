@@ -23,6 +23,8 @@ pub enum ErrKind {
     FileNotFound,
     FileUnreadable,
     IndexOutOfBounds,
+    ModuleNotFound,
+    ModuleCouldNotBeLoaded,
     String,
     Ok,
 }
@@ -37,6 +39,8 @@ static ERR_KINDS: Lazy<Vec<ErrKind>> = Lazy::new(|| {
         FileNotFound,
         FileUnreadable,
         IndexOutOfBounds,
+        ModuleNotFound,
+        ModuleCouldNotBeLoaded,
         String,
         Ok,
     ]
@@ -53,6 +57,8 @@ impl ErrKind {
             FileNotFound => "file_not_found",
             FileUnreadable => "file_unreadable",
             IndexOutOfBounds => "index_out_of_bounds",
+            ModuleNotFound => "module_not_found",
+            ModuleCouldNotBeLoaded => "module_could_not_be_loaded",
             String => "string",
             Ok => "ok",
         }
@@ -140,6 +146,8 @@ impl fmt::Display for ErrKind {
             FileNotFound => "File not found",
             FileUnreadable => "File could not be read",
             IndexOutOfBounds => "Index out of bounds",
+            ModuleNotFound => "Module not found",
+            ModuleCouldNotBeLoaded => "Module could not be loaded",
             String => "String error",
             Ok => "OK (not an error)",
         };

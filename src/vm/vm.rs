@@ -111,7 +111,7 @@ impl VM {
     }
 
     pub fn execute_func(&mut self, func: &Func, start: usize) -> VMExeResult {
-        self.execute_code(&func.code, start)
+        self.execute_code(func.code(), start)
     }
 
     /// Execute the given code object's instructions and return the VM's
@@ -181,7 +181,7 @@ impl VM {
                 }
                 // Modules
                 LoadModule(name) => {
-                    let module = modules::get_module(name.as_str());
+                    let (module, _) = modules::get_module(name.as_str())?;
                     self.push_temp(module);
                 }
                 // Vars

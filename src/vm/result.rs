@@ -4,7 +4,6 @@ use std::fmt::Formatter;
 use crate::compiler::CompErr;
 use crate::parser::ParseErr;
 use crate::types::ObjectRef;
-use crate::vm::RuntimeErrKind::ConfigValueNotSet;
 
 pub type CallDepth = usize;
 pub type VMExeResult = Result<VMState, RuntimeErr>;
