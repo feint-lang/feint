@@ -361,6 +361,13 @@ pub trait ObjectTrait {
     make_type_checker!(is_str, Str);
     make_type_checker!(is_tuple, Tuple);
 
+    // XXX: Currently, everything but `Cell`s are immutable. This
+    //      anticipates types that are likely to be made mutable in the
+    //      future.
+    fn is_immutable(&self) -> bool {
+        !(self.is_cell() || self.is_file() || self.is_list() || self.is_map())
+    }
+
     fn is_seq(&self) -> bool {
         self.is_list() || self.is_tuple()
     }

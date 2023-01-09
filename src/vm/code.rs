@@ -125,9 +125,27 @@ impl Code {
 
     // Constants -------------------------------------------------------
 
-    pub fn add_const(&mut self, constant: ObjectRef) -> usize {
+    pub fn add_const(&mut self, val_ref: ObjectRef) -> usize {
+        let val_guard = val_ref.read().unwrap();
+        let val = &*val_guard;
+
+        // XXX: Functions are immutable and comparable, but it feels
+        //      potentially unsafe to treat them as such here.
+        let is_comparable = val.is_immutable() && !val.is_func();
+
+        for (index, other_ref) in self.iter_constants().enumerate() {
+            let other = other_ref.read().unwrap();
+            let other_is_comparable = other.is_immutable() && !other.is_func();
+            if is_comparable && other_is_comparable && other.is_equal(val) {
+                log::trace!("Constant {other} found @ index {index}; not adding");
+                return index;
+            }
+        }
+
         let index = self.constants.len();
-        self.constants.push(constant);
+        log::trace!("Constant {val} not found; adding @ index {index}");
+        drop(val_guard);
+        self.constants.push(val_ref);
         index
     }
 
