@@ -76,7 +76,7 @@ impl Executor {
             Inst::DeclareVar(name.to_owned()),
             Inst::AssignVar(name.to_owned()),
         ]);
-        if let Err(err) = self.vm.execute_code(&code, 0) {
+        if let Err(err) = self.vm.execute_code(None, &code, 0) {
             eprintln!("Could not assign TOS to {name}: {err}");
         }
     }

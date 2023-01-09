@@ -107,11 +107,11 @@ impl VM {
     }
 
     pub fn execute_module(&mut self, module: &mut Module, start: usize) -> VMExeResult {
-        self.execute_code(module.code(), start)
+        self.execute_code(Some(module), module.code(), start)
     }
 
     pub fn execute_func(&mut self, func: &Func, start: usize) -> VMExeResult {
-        self.execute_code(func.code(), start)
+        self.execute_code(None, func.code(), start)
     }
 
     /// Execute the given code object's instructions and return the VM's
@@ -120,7 +120,12 @@ impl VM {
     /// instructions. When a HALT instruction is encountered, the VM's
     /// state will be cleared; it can be "restarted" by passing more
     /// instructions to execute.
-    pub fn execute_code(&mut self, code: &Code, start: usize) -> VMExeResult {
+    pub fn execute_code(
+        &mut self,
+        module: Option<&Module>,
+        code: &Code,
+        start: usize,
+    ) -> VMExeResult {
         use Inst::*;
 
         let handle_sigint = self.handle_sigint;
@@ -198,6 +203,13 @@ impl VM {
                 LoadVar(name) => {
                     if let Ok(depth) = self.ctx.get_var_depth(name.as_str(), None) {
                         self.push_var(depth, name.clone())?;
+                    } else if let Some(module) = module {
+                        if let Some(obj) = module.get_global(name) {
+                            self.push_temp(obj);
+                        } else {
+                            let obj = self.ctx.get_builtin(name.as_str())?;
+                            self.push_temp(obj);
+                        }
                     } else {
                         let obj = self.ctx.get_builtin(name.as_str())?;
                         self.push_temp(obj);
