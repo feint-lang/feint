@@ -1,5 +1,6 @@
 //! Front end for executing code from a source on a VM.
 use std::io::BufRead;
+use std::path::Path;
 
 use crate::compiler::{CompErr, CompErrKind, Compiler};
 use crate::modules;
@@ -85,14 +86,15 @@ impl Executor {
     }
 
     /// Execute source from file as script.
-    pub fn execute_file(&mut self, file_path: &str) -> ExeResult {
+    pub fn execute_file(&mut self, file_path: &Path) -> ExeResult {
         match source_from_file(file_path) {
             Ok(mut source) => {
-                self.current_file_name = file_path.to_owned();
+                self.current_file_name =
+                    file_path.to_str().unwrap_or("<unknown>").to_owned();
                 self.execute_script_from_source(&mut source)
             }
             Err(err) => {
-                let message = format!("{file_path}: {err}");
+                let message = format!("{}: {err}", file_path.display());
                 Err(ExeErr::new(ExeErrKind::CouldNotReadSourceFile(message)))
             }
         }

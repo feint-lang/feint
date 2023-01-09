@@ -1,6 +1,7 @@
 use std::collections::VecDeque;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Cursor, Take};
+use std::path::Path;
 use std::{fmt, io};
 
 /// This is used to set the initial capacity for the source's char
@@ -22,7 +23,9 @@ const MAX_LINE_LENGTH: u64 = 4096; // 2^12
 const MAX_LINE_LENGTH_USIZE: usize = MAX_LINE_LENGTH as usize;
 
 /// Create source from the specified file.
-pub fn source_from_file(file_path: &str) -> Result<Source<BufReader<File>>, io::Error> {
+pub fn source_from_file(
+    file_path: &Path,
+) -> Result<Source<BufReader<File>>, io::Error> {
     let file = File::open(file_path)?;
     let reader = BufReader::new(file);
     let source = Source::new(reader);

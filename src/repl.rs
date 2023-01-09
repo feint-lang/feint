@@ -26,24 +26,20 @@ pub fn run(
 }
 
 pub struct Repl {
+    module: Module,
     reader: rustyline::Editor<()>,
     history_path: Option<PathBuf>,
     executor: Executor,
-    module: Module,
 }
 
 impl Repl {
     pub fn new(history_path: Option<PathBuf>, executor: Executor) -> Self {
+        let module = Module::with_name("$repl", "FeInt REPL module");
         let mut reader =
             rustyline::Editor::<()>::new().expect("Could initialize readline");
         reader.set_indent_size(4);
         reader.set_tab_stop(4);
-        Repl {
-            reader,
-            history_path,
-            executor,
-            module: Module::with_name("$repl", "$repl"),
-        }
+        Repl { module, reader, history_path, executor }
     }
 
     fn run(&mut self) -> ExitResult {
@@ -253,7 +249,7 @@ impl Repl {
                 self.reader.add_history_entry(input);
                 match self.reader.save_history(path.as_path()) {
                     Ok(_) => (),
-                    Err(err) => eprintln!("Could not save REPL history: {}", err),
+                    Err(err) => eprintln!("WARNING: Could not save REPL history: {}", err),
                 }
             }
             None => (),

@@ -6,7 +6,7 @@ edition = "2021"
 license-file = "LICENSE"
 
 [dependencies]
-clap = "~4.0.32"
+clap = { version = "~4.0.32", features = ["env"] }
 ctrlc = "~3.2.4"
 dirs = "~4.0.0"
 env_logger = "~0.10.0"

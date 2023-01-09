@@ -1,3 +1,6 @@
+set debug_binary ./target/debug/feint
+set release_binary ./target/release/feint
+
 # build
 alias b="cargo build"
 alias br="cargo build --release"
@@ -25,7 +28,6 @@ alias d="cargo run -- --dis --debug"
 alias l="RUST_LOG=feint=trace cargo run --"
 
 # run release binary
-set release_binary ./target/release/feint
 alias rr="cargo build --release && $release_binary --"
 alias cr="cargo build --release && $release_binary -- --code"
 alias dr="cargo build --release && $release_binary -- --dis --debug"
@@ -35,10 +37,10 @@ alias p="cargo flamegraph --root --"
 
 # run each example and show its exit code
 function e
-    cargo build --release
+    cargo build
     for f in examples/*.fi
         echo -n "> $f";
-        $release_binary $f 1>/dev/null
+        $debug_binary $f 1>/dev/null
         echo -- " -> $status"
     end
 end

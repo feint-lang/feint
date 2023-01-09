@@ -169,7 +169,7 @@ impl fmt::Display for ErrObj {
         if self.message.is_empty() {
             write!(f, "{} [{}]", kind, kind.name())
         } else {
-            write!(f, "{} [{}]:\n\n    message: {}", kind, kind.name(), msg)
+            write!(f, "[{}] {}: {}", kind.name(), kind, msg)
         }
     }
 }

@@ -1,11 +1,13 @@
 //! # FeInt code runner
+use std::path::Path;
+
 use crate::exe::Executor;
 use crate::result::{ExeErrKind, ExeResult, ExitResult};
 use crate::vm::{CallDepth, VMState};
 
 /// Run source from file.
 pub fn run_file(
-    file_path: &str,
+    file_path: &Path,
     max_call_depth: CallDepth,
     argv: Vec<String>,
     dis: bool,

@@ -4,6 +4,7 @@ use std::fmt::Formatter;
 use crate::compiler::CompErr;
 use crate::parser::ParseErr;
 use crate::types::ObjectRef;
+use crate::vm::RuntimeErrKind::ConfigValueNotSet;
 
 pub type CallDepth = usize;
 pub type VMExeResult = Result<VMState, RuntimeErr>;
@@ -43,6 +44,18 @@ pub struct RuntimeErr {
 impl RuntimeErr {
     fn new(kind: RuntimeErrKind) -> Self {
         Self { kind }
+    }
+
+    pub fn config_name_not_known<S: Into<String>>(name: S) -> Self {
+        Self::new(RuntimeErrKind::ConfigNameNotKnown(name.into()))
+    }
+
+    pub fn config_value_not_set<S: Into<String>>(name: S) -> Self {
+        Self::new(RuntimeErrKind::ConfigValueNotSet(name.into()))
+    }
+
+    pub fn config_value_is_not_valid<S: Into<String>>(name: S, msg: S) -> Self {
+        Self::new(RuntimeErrKind::ConfigValueIsNotValid(name.into(), msg.into()))
     }
 
     pub fn exit(code: u8) -> Self {
@@ -112,12 +125,15 @@ impl RuntimeErr {
 
 impl fmt::Display for RuntimeErr {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self.kind)
+        write!(f, "{}", self.kind)
     }
 }
 
 #[derive(Clone, Debug)]
 pub enum RuntimeErrKind {
+    ConfigNameNotKnown(String),
+    ConfigValueNotSet(String),
+    ConfigValueIsNotValid(String, String),
     Exit(u8),
     AssertionFailed(String),
     EmptyStack,
@@ -142,6 +158,17 @@ pub enum RuntimeErrKind {
 
 impl fmt::Display for RuntimeErrKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self)
+        use RuntimeErrKind::*;
+        let str = match self {
+            ConfigNameNotKnown(name) => {
+                format!("Unknown FeInt config name: {name}")
+            }
+            ConfigValueNotSet(name) => format!("FeInt config value not set: {name}"),
+            ConfigValueIsNotValid(name, val) => {
+                format!("FeInt config value not valid for {name}: {val}")
+            }
+            _ => format!("{self:?}"),
+        };
+        write!(f, "{str}")
     }
 }
