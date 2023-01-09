@@ -69,8 +69,8 @@ pub static STR_TYPE: Lazy<new::obj_ref_t!(StrType)> = Lazy::new(|| {
             let mut tera_context = Context::new();
             context.iter().for_each(|(k, v)| {
                 let v = v.read().unwrap();
-                let v = v.get_str_val().unwrap();
-                tera_context.insert(k, v);
+                let v = v.to_string();
+                tera_context.insert(k, v.as_str());
             });
             tera.add_raw_template("str.render.template", value).unwrap();
             let result = tera.render("str.render.template", &tera_context);
