@@ -26,7 +26,7 @@ pub static FILE_TYPE: Lazy<new::obj_ref_t!(FileType)> = Lazy::new(|| {
 
     class.ns_mut().add_entries(&[
         // Class Methods
-        gen::meth!("new", type_ref, &["file_name"], |_, args, _| {
+        gen::meth!("new", type_ref, &["file_name"], "", |_, args, _| {
             let arg = gen::use_arg!(args, 0);
             if let Some(file_name) = arg.get_str_val() {
                 let path = Path::new(file_name);
@@ -41,12 +41,12 @@ pub static FILE_TYPE: Lazy<new::obj_ref_t!(FileType)> = Lazy::new(|| {
             }
         }),
         // Instance Attributes
-        gen::prop!("text", type_ref, |this, _, _| {
+        gen::prop!("text", type_ref, "", |this, _, _| {
             let this = this.read().unwrap();
             let this = this.down_to_file().unwrap();
             Ok(this.text())
         }),
-        gen::prop!("lines", type_ref, |this, _, _| {
+        gen::prop!("lines", type_ref, "", |this, _, _| {
             let this = this.read().unwrap();
             let this = &mut this.down_to_file().unwrap();
             Ok(this.lines())

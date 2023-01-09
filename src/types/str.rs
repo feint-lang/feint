@@ -24,42 +24,42 @@ pub static STR_TYPE: Lazy<new::obj_ref_t!(StrType)> = Lazy::new(|| {
 
     class.ns_mut().add_entries(&[
         // Class Methods -----------------------------------------------
-        gen::meth!("new", type_ref, &["value"], |_, args, _| {
+        gen::meth!("new", type_ref, &["value"], "", |_, args, _| {
             let arg = gen::use_arg!(args, 0);
             Ok(if arg.is_str() { args[0].clone() } else { new::str(arg.to_string()) })
         }),
         // Instance Attributes -----------------------------------------
-        gen::prop!("length", type_ref, |this, _, _| {
+        gen::prop!("length", type_ref, "", |this, _, _| {
             let this = this.read().unwrap();
             let value = this.get_str_val().unwrap();
             Ok(new::int(value.len()))
         }),
         // Instance Methods --------------------------------------------
-        gen::meth!("starts_with", type_ref, &["prefix"], |this, args, _| {
+        gen::meth!("starts_with", type_ref, &["prefix"], "", |this, args, _| {
             let this = this.read().unwrap();
             let value = this.get_str_val().unwrap();
             let arg = gen::use_arg!(args, 0);
             let prefix = gen::use_arg_str!(arg);
             Ok(new::bool(value.starts_with(prefix)))
         }),
-        gen::meth!("ends_with", type_ref, &["suffix"], |this, args, _| {
+        gen::meth!("ends_with", type_ref, &["suffix"], "", |this, args, _| {
             let this = this.read().unwrap();
             let value = this.get_str_val().unwrap();
             let arg = gen::use_arg!(args, 0);
             let suffix = gen::use_arg_str!(arg);
             Ok(new::bool(value.ends_with(suffix)))
         }),
-        gen::meth!("upper", type_ref, &[], |this, _, _| {
+        gen::meth!("upper", type_ref, &[], "", |this, _, _| {
             let this = this.read().unwrap();
             let value = this.get_str_val().unwrap();
             Ok(new::str(value.to_uppercase()))
         }),
-        gen::meth!("lower", type_ref, &[], |this, _, _| {
+        gen::meth!("lower", type_ref, &[], "", |this, _, _| {
             let this = this.read().unwrap();
             let value = this.get_str_val().unwrap();
             Ok(new::str(value.to_lowercase()))
         }),
-        gen::meth!("render", type_ref, &["context"], |this_obj, args, _| {
+        gen::meth!("render", type_ref, &["context"], "", |this_obj, args, _| {
             let this = this_obj.read().unwrap();
             let value = this.get_str_val().unwrap();
             let arg = gen::use_arg!(args, 0);
@@ -79,14 +79,14 @@ pub static STR_TYPE: Lazy<new::obj_ref_t!(StrType)> = Lazy::new(|| {
                 Err(err) => new::string_err(err.to_string(), this_obj.clone()),
             })
         }),
-        gen::meth!("repeat", type_ref, &["count"], |this, args, _| {
+        gen::meth!("repeat", type_ref, &["count"], "", |this, args, _| {
             let this = this.read().unwrap();
             let value = this.get_str_val().unwrap();
             let arg1 = gen::use_arg!(args, 0);
             let count = gen::use_arg_usize!(arg1);
             Ok(new::str(value.repeat(count)))
         }),
-        gen::meth!("replace", type_ref, &["old", "new"], |this, args, _| {
+        gen::meth!("replace", type_ref, &["old", "new"], "", |this, args, _| {
             let this = this.read().unwrap();
             let value = this.get_str_val().unwrap();
             let arg1 = gen::use_arg!(args, 0);

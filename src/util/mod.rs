@@ -7,8 +7,10 @@ pub(crate) use source::{
     source_from_file, source_from_stdin, source_from_text, Location, Source,
 };
 pub(crate) use stack::Stack;
+pub(crate) use string::format_doc;
 
 mod call;
 mod operators;
 mod source;
 mod stack;
+mod string;

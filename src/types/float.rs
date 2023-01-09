@@ -26,7 +26,7 @@ pub static FLOAT_TYPE: Lazy<new::obj_ref_t!(FloatType)> = Lazy::new(|| {
 
     class.ns_mut().add_entries(&[
         // Class Methods -----------------------------------------------
-        gen::meth!("new", type_ref, &["value"], |_, args, _| {
+        gen::meth!("new", type_ref, &["value"], "", |_, args, _| {
             let arg = gen::use_arg!(args, 0);
             let float = if let Some(val) = arg.get_float_val() {
                 new::float(*val)

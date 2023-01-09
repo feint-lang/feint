@@ -27,8 +27,8 @@ pub struct Closure {
     ns: Namespace,
     name: String,
     params: Params,
-    pub func: ObjectRef,
-    pub captured: IndexMap<String, ObjectRef>,
+    func: ObjectRef,
+    captured: IndexMap<String, ObjectRef>,
 }
 
 gen::standard_object_impls!(Closure);
@@ -38,16 +38,28 @@ impl Closure {
         let func = func_ref.read().unwrap();
         let func = func.down_to_func().unwrap();
         Self {
-            ns: Namespace::new(),
+            ns: Namespace::with_entries(&[("$doc", func.get_doc())]),
             name: func.name().to_owned(),
             params: func.params().clone(),
             func: func_ref.clone(),
             captured,
         }
     }
+
+    pub fn func(&self) -> ObjectRef {
+        self.func.clone()
+    }
+
+    pub fn captured(&self) -> &IndexMap<String, ObjectRef> {
+        &self.captured
+    }
 }
 
 impl FuncTrait for Closure {
+    fn ns(&self) -> &Namespace {
+        &self.ns
+    }
+
     fn name(&self) -> &str {
         self.name.as_str()
     }

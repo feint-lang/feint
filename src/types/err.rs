@@ -40,7 +40,7 @@ pub static ERR_TYPE: Lazy<new::obj_ref_t!(ErrType)> = Lazy::new(|| {
 
     class.ns_mut().add_entries(&[
         // Class Methods -----------------------------------------------
-        gen::meth!("new", type_ref, &["type", "msg"], |_, args, _| {
+        gen::meth!("new", type_ref, &["type", "msg"], "", |_, args, _| {
             let name = "Err.new()";
 
             let result = check_args(name, &args, false, 2, Some(2));
@@ -79,7 +79,7 @@ pub static ERR_TYPE: Lazy<new::obj_ref_t!(ErrType)> = Lazy::new(|| {
             Ok(new::err(kind, msg, new::nil()))
         }),
         // Instance Attributes -----------------------------------------
-        gen::prop!("type", type_ref, |this, _, _| {
+        gen::prop!("type", type_ref, "", |this, _, _| {
             let this = this.read().unwrap();
             let this = this.down_to_err().unwrap();
             Ok(this.kind.get_obj().unwrap())

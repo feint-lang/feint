@@ -1,8 +1,8 @@
 use std::ops::Index;
 use std::slice::Iter;
 
-use crate::types::{FuncTrait, ObjectRef};
-use crate::util::Location;
+use crate::types::{new, FuncTrait, ObjectRef};
+use crate::util::{format_doc, Location};
 
 use super::inst::Inst;
 use super::result::RuntimeErr;
@@ -86,6 +86,19 @@ impl Code {
         }
         self.chunk.extend(code.chunk);
         self.constants.extend(code.constants);
+    }
+
+    /// Get docstring for code unit, if there is one.
+    pub fn get_doc(&self) -> ObjectRef {
+        if let Some(Inst::LoadConst(0)) = self.chunk.get(1) {
+            if let Ok(obj_ref) = self.get_const(0) {
+                let obj = obj_ref.read().unwrap();
+                if let Some(doc) = obj.get_str_val() {
+                    return new::str(format_doc(doc));
+                }
+            }
+        }
+        new::nil()
     }
 
     // Instructions ----------------------------------------------------

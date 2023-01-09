@@ -61,7 +61,11 @@ impl Compiler {
             code.push_inst(Inst::Pop);
             code.push_inst(Inst::Halt(0));
         }
-        Ok(Module::new(name.to_owned(), Namespace::new(), code, "$main"))
+        Ok(Module::new(
+            name.to_owned(),
+            Namespace::with_entries(&[("$doc", new::str("$main script module"))]),
+            code,
+        ))
     }
 
     /// Compile AST module node to module object.
@@ -69,7 +73,7 @@ impl Compiler {
         let mut code = self.compile_module_to_code(name, module)?;
         let ns = Namespace::new();
         code.push_inst(Inst::Pop);
-        Ok(Module::new(name.to_owned(), ns, code, name))
+        Ok(Module::new(name.to_owned(), ns, code))
     }
 
     /// Compile AST module node to code object.

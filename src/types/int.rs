@@ -20,6 +20,10 @@ use super::ns::Namespace;
 
 // Int Type ------------------------------------------------------------
 
+static DOC: &str = "
+Builtin Int type
+";
+
 gen::type_and_impls!(IntType, Int);
 
 pub static INT_TYPE: Lazy<new::obj_ref_t!(IntType)> = Lazy::new(|| {
@@ -27,8 +31,9 @@ pub static INT_TYPE: Lazy<new::obj_ref_t!(IntType)> = Lazy::new(|| {
     let mut class = type_ref.write().unwrap();
 
     class.ns_mut().add_entries(&[
+        ("$doc", new::str(DOC)),
         // Class Methods -----------------------------------------------
-        gen::meth!("new", type_ref, &["value"], |_, args, _| {
+        gen::meth!("new", type_ref, &["value"], "", |_, args, _| {
             let arg = gen::use_arg!(args, 0);
             let int = if let Some(val) = arg.get_int_val() {
                 new::int(val.clone())

@@ -17,6 +17,7 @@ use super::proc::PROC;
 
 pub static SYSTEM: Lazy<new::obj_ref_t!(Module)> = Lazy::new(|| {
     let entries: Vec<(&str, ObjectRef)> = vec![
+        ("$doc", new::str("System module")),
         ("argv", new::empty_tuple()),
         (
             "modules",
@@ -26,47 +27,53 @@ pub static SYSTEM: Lazy<new::obj_ref_t!(Module)> = Lazy::new(|| {
             ]),
         ),
         (
-            // Exit program with return code.
-            //
-            // Args:
-            //     return_code?: Int = 0
             "exit",
-            new::builtin_func("exit", None, &[""], |_, args, _| {
-                let name = "system.exit()";
+            new::builtin_func(
+                "exit",
+                None,
+                &[""],
+                "Exit program with return code.
 
-                let result = check_args(name, &args, true, 0, Some(1));
-                if let Err(err) = result {
-                    return Ok(err);
-                }
-                let (n_args, _, var_args_obj) = result.unwrap();
+                Args:
+                    return_code?: Int = 0",
+                |_, args, _| {
+                    let name = "system.exit()";
 
-                if n_args == 0 {
-                    return Err(RuntimeErr::exit(0));
-                }
-
-                let var_args = var_args_obj.read().unwrap();
-                let code_arg = var_args.get_item(0, var_args_obj.clone());
-                let code = code_arg.read().unwrap();
-
-                if let Some(int) = code.get_int_val() {
-                    let max = u8::MAX;
-                    if int < &BigInt::from(0) || int > &BigInt::from(max) {
-                        let message =
-                            format!("{name} return code must be in [0, {max}]");
-                        Ok(new::arg_err(message, new::nil()))
-                    } else {
-                        let code = int.to_u8().unwrap();
-                        Err(RuntimeErr::exit(code))
+                    let result = check_args(name, &args, true, 0, Some(1));
+                    if let Err(err) = result {
+                        return Ok(err);
                     }
-                } else {
-                    let message = format!("{name} expected an Int; got {:?}", &*code);
-                    Ok(new::arg_err(message, new::nil()))
-                }
-            }),
+                    let (n_args, _, var_args_obj) = result.unwrap();
+
+                    if n_args == 0 {
+                        return Err(RuntimeErr::exit(0));
+                    }
+
+                    let var_args = var_args_obj.read().unwrap();
+                    let code_arg = var_args.get_item(0, var_args_obj.clone());
+                    let code = code_arg.read().unwrap();
+
+                    if let Some(int) = code.get_int_val() {
+                        let max = u8::MAX;
+                        if int < &BigInt::from(0) || int > &BigInt::from(max) {
+                            let message =
+                                format!("{name} return code must be in [0, {max}]");
+                            Ok(new::arg_err(message, new::nil()))
+                        } else {
+                            let code = int.to_u8().unwrap();
+                            Err(RuntimeErr::exit(code))
+                        }
+                    } else {
+                        let message =
+                            format!("{name} expected an Int; got {:?}", &*code);
+                        Ok(new::arg_err(message, new::nil()))
+                    }
+                },
+            ),
         ),
     ];
 
-    new::builtin_module("system", Namespace::with_entries(&entries), "System")
+    new::builtin_module("system", Namespace::with_entries(&entries))
 });
 
 /// Add system module to `system.modules`, set `argv`, etc. This has to

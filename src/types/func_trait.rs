@@ -1,3 +1,4 @@
+use crate::types::{Namespace, ObjectRef};
 use std::fmt;
 
 use super::result::Params;
@@ -5,8 +6,13 @@ use super::result::Params;
 // Function Trait ------------------------------------------------------
 
 pub trait FuncTrait {
+    fn ns(&self) -> &Namespace;
     fn name(&self) -> &str;
     fn params(&self) -> &Params;
+
+    fn get_doc(&self) -> ObjectRef {
+        self.ns().get_obj("$doc").unwrap().clone()
+    }
 
     /// Returns the required number of args.
     fn arity(&self) -> usize {

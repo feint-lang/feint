@@ -16,6 +16,7 @@ use crate::types::err_type::ERR_TYPE_TYPE;
 use crate::types::file::FILE_TYPE;
 use crate::types::float::FLOAT_TYPE;
 use crate::types::func::FUNC_TYPE;
+use crate::types::gen::use_arg;
 use crate::types::int::INT_TYPE;
 use crate::types::list::LIST_TYPE;
 use crate::types::map::MAP_TYPE;
@@ -29,6 +30,7 @@ use crate::vm::{RuntimeErr, RuntimeObjResult};
 
 pub static BUILTINS: Lazy<new::obj_ref_t!(Module)> = Lazy::new(|| {
     let entries: Vec<(&str, ObjectRef)> = vec![
+        ("$doc", new::str("Builtins module")),
         ("Type", TYPE_TYPE.clone()),
         ("Always", ALWAYS_TYPE.clone()),
         ("Bool", BOOL_TYPE.clone()),
@@ -48,101 +50,164 @@ pub static BUILTINS: Lazy<new::obj_ref_t!(Module)> = Lazy::new(|| {
         ("Str", STR_TYPE.clone()),
         ("Tuple", TUPLE_TYPE.clone()),
         (
-            // Print representation of zero or more objects to stdout.
-            //
-            // Args:
-            //    objects?: ObjectRef[]
-            "print",
-            new::builtin_func("print", None, &[""], |_, args, _| print(&args, false)),
-        ),
-        (
-            // Print representation of zero or more objects to stderr.
-            //
-            // Args:
-            //    objects?: ObjectRef[]
-            "print_err",
-            new::builtin_func("print_err", None, &[""], |_, args, _| {
-                print(&args, true)
-            }),
-        ),
-        (
-            // Check condition and return error if false.
-            //
-            // Args:
-            //     condition: Bool
-            //     message?: Any
-            //     throw?: Bool = false
-            //
-            // Returns:
-            //     true: if the assertion succeeded
-            //     Err: if the assertion failed and throw unset
-            //     RuntimeErr: if the assertion failed and throw set
-            "assert",
-            new::builtin_func("assert", None, &["assertion", ""], |_, args, _| {
-                let result = check_args("assert()", &args, true, 1, Some(3));
-                if let Err(err) = result {
-                    return Ok(err);
-                }
-                let (_, n_var_args, var_args_obj) = result.unwrap();
+            "help",
+            new::builtin_func(
+                "help",
+                None,
+                &["obj"],
+                "Print the docstring for an object.
 
-                let arg = args.get(0).unwrap();
-                let arg = arg.read().unwrap();
-                let success = arg.bool_val()?;
-
-                if success {
-                    return Ok(new::true_());
-                }
-
-                let var_args = var_args_obj.read().unwrap();
-
-                let msg = if n_var_args == 0 {
-                    "".to_string()
-                } else {
-                    let msg_arg = var_args.get_item(0, var_args_obj.clone());
-                    let msg_arg = msg_arg.read().unwrap();
-                    msg_arg.to_string()
-                };
-
-                if n_var_args == 2 {
-                    let throw_arg = var_args.get_item(1, var_args_obj.clone());
-                    let throw_arg = throw_arg.read().unwrap();
-                    if throw_arg.bool_val()? {
-                        return Err(RuntimeErr::assertion_failed(msg));
+                Args:
+                   object: Any",
+                |_, args, _| {
+                    if let Err(err) = check_args("help", &args, false, 1, Some(1)) {
+                        return Ok(err);
                     }
-                }
+                    let arg = use_arg!(args, 0);
+                    let obj = args[0].clone();
+                    let doc = arg.get_attr("$doc", obj.clone());
+                    let doc = doc.read().unwrap();
+                    if doc.is_err() {
+                        let obj = obj.read().unwrap();
+                        let type_obj_ref = obj.type_obj();
+                        let type_obj = type_obj_ref.read().unwrap();
+                        let doc = type_obj.get_attr("$doc", type_obj_ref.clone());
+                        let doc = doc.read().unwrap();
+                        if doc.is_err() {
+                            eprintln!(
+                                concat!(
+                                    "Could not read $doc attribute of object {:?} ",
+                                    "or its type {}"
+                                ),
+                                &*obj, type_obj
+                            );
+                        } else {
+                            println!("{doc}");
+                        }
+                    } else {
+                        println!("{doc}");
+                    }
+                    Ok(new::nil())
+                },
+            ),
+        ),
+        (
+            "print",
+            new::builtin_func(
+                "print",
+                None,
+                &[""],
+                "Print representation of zero or more objects to stdout.
 
-                Ok(new::assertion_err(msg, new::nil()))
-            }),
+                Args:
+                   objects?: ObjectRef[]",
+                |_, args, _| print(&args, false),
+            ),
         ),
         (
-            // Get the type of an object.
-            //
-            // Args:
-            //
-            //    object: ObjectRef
+            "print_err",
+            new::builtin_func(
+                "print_err",
+                None,
+                &[""],
+                "Print representation of zero or more objects to stderr.
+
+                Args:
+                    objects?: ObjectRef[]",
+                |_, args, _| print(&args, true),
+            ),
+        ),
+        (
+            "assert",
+            new::builtin_func(
+                "assert",
+                None,
+                &["assertion", ""],
+                "Check condition and return error if false.
+            
+                Args:
+                    condition: Bool
+                    message?: Any
+                    throw?: Bool = false
+                
+                Returns:
+                    true: if the assertion succeeded
+                    Err: if the assertion failed and throw unset
+                    RuntimeErr: if the assertion failed and throw set",
+                |_, args, _| {
+                    let result = check_args("assert()", &args, true, 1, Some(3));
+                    if let Err(err) = result {
+                        return Ok(err);
+                    }
+                    let (_, n_var_args, var_args_obj) = result.unwrap();
+
+                    let arg = args.get(0).unwrap();
+                    let arg = arg.read().unwrap();
+                    let success = arg.bool_val()?;
+
+                    if success {
+                        return Ok(new::true_());
+                    }
+
+                    let var_args = var_args_obj.read().unwrap();
+
+                    let msg = if n_var_args == 0 {
+                        "".to_string()
+                    } else {
+                        let msg_arg = var_args.get_item(0, var_args_obj.clone());
+                        let msg_arg = msg_arg.read().unwrap();
+                        msg_arg.to_string()
+                    };
+
+                    if n_var_args == 2 {
+                        let throw_arg = var_args.get_item(1, var_args_obj.clone());
+                        let throw_arg = throw_arg.read().unwrap();
+                        if throw_arg.bool_val()? {
+                            return Err(RuntimeErr::assertion_failed(msg));
+                        }
+                    }
+
+                    Ok(new::assertion_err(msg, new::nil()))
+                },
+            ),
+        ),
+        (
             "type",
-            new::builtin_func("type", None, &["object"], |_, args, _| {
-                let arg = args.first().unwrap();
-                let arg = arg.read().unwrap();
-                Ok(arg.type_obj().clone())
-            }),
+            new::builtin_func(
+                "type",
+                None,
+                &["object"],
+                "Get the type of an object.
+
+                Args:
+                    object: ObjectRef",
+                |_, args, _| {
+                    let arg = args.first().unwrap();
+                    let arg = arg.read().unwrap();
+                    Ok(arg.type_obj().clone())
+                },
+            ),
         ),
         (
-            // Get the ID of an object.
-            //
-            // Args:
-            //
-            //    object: ObjectRef
             "id",
-            new::builtin_func("id", None, &["object"], |_, args, _| {
-                let arg = args.first().unwrap();
-                let arg = arg.read().unwrap();
-                Ok(new::int(arg.id()))
-            }),
+            new::builtin_func(
+                "id",
+                None,
+                &["object"],
+                "Get the ID of an object.
+
+                Args:
+                    object: ObjectRef",
+                |_, args, _| {
+                    let arg = args.first().unwrap();
+                    let arg = arg.read().unwrap();
+                    Ok(new::int(arg.id()))
+                },
+            ),
         ),
     ];
 
-    new::builtin_module("builtins", Namespace::with_entries(&entries), "Builtins")
+    new::builtin_module("builtins", Namespace::with_entries(&entries))
 });
 
 fn print(args: &Args, err: bool) -> RuntimeObjResult {

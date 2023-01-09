@@ -25,7 +25,7 @@ pub static BOUND_FUNC_TYPE: Lazy<new::obj_ref_t!(BoundFuncType)> =
 pub struct BoundFunc {
     ns: Namespace,
     func: ObjectRef,
-    pub this: ObjectRef,
+    this: ObjectRef,
     name: String,
     params: Params,
 }
@@ -35,25 +35,33 @@ gen::standard_object_impls!(BoundFunc);
 impl BoundFunc {
     pub fn new(func: ObjectRef, this: ObjectRef) -> Self {
         let f = func.read().unwrap();
-        let (name, params) = if let Some(f) = f.down_to_builtin_func() {
-            (f.name().to_string(), f.params().clone())
+        let (name, params, doc) = if let Some(f) = f.down_to_builtin_func() {
+            (f.name().to_string(), f.params().clone(), f.get_doc())
         } else if let Some(f) = f.down_to_func() {
-            (f.name().to_string(), f.params().clone())
+            (f.name().to_string(), f.params().clone(), f.get_doc())
         } else if let Some(f) = f.down_to_closure() {
-            (f.name().to_string(), f.params().clone())
+            (f.name().to_string(), f.params().clone(), f.get_doc())
         } else {
             panic!("Unexpected bound func type: {f}")
         };
         drop(f);
-        Self { ns: Namespace::new(), func, this, name, params }
+        Self { ns: Namespace::with_entries(&[("$doc", doc)]), func, this, name, params }
     }
 
     pub fn func(&self) -> ObjectRef {
         self.func.clone()
     }
+
+    pub fn this(&self) -> ObjectRef {
+        self.this.clone()
+    }
 }
 
 impl FuncTrait for BoundFunc {
+    fn ns(&self) -> &Namespace {
+        &self.ns
+    }
+
     fn name(&self) -> &str {
         self.name.as_str()
     }

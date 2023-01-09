@@ -31,16 +31,19 @@ pub struct Module {
 gen::standard_object_impls!(Module);
 
 impl Module {
-    pub fn new(name: String, ns: Namespace, code: Code, doc: &str) -> Self {
+    pub fn new(name: String, ns: Namespace, code: Code) -> Self {
         let name_global = new::str(name.as_str());
+        let doc = code.get_doc();
         let mut module = Self { ns, name, code };
         module.add_global("$name", name_global);
-        module.add_global("$doc", new::str(doc));
+        if !module.has_global("$doc") {
+            module.add_global("$doc", doc);
+        }
         module
     }
 
-    pub fn with_name(name: &str, doc: &str) -> Self {
-        Self::new(name.to_owned(), Namespace::new(), Code::new(), doc)
+    pub fn with_name(name: &str) -> Self {
+        Self::new(name.to_owned(), Namespace::new(), Code::new())
     }
 
     pub fn name(&self) -> &str {

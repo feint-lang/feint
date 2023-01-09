@@ -51,7 +51,7 @@ impl CallFrame {
         if let Some(closure) = &self.closure {
             let closure = closure.read().unwrap();
             let closure = closure.down_to_closure().unwrap();
-            if let Some(obj) = closure.captured.get(name) {
+            if let Some(obj) = closure.captured().get(name) {
                 return Ok(obj.clone());
             }
         }
@@ -381,7 +381,7 @@ impl VM {
                                     let closure = closure.read().unwrap();
                                     let closure = closure.down_to_closure().unwrap();
                                     let result = closure
-                                        .captured
+                                        .captured()
                                         .iter()
                                         .find(|(n, _)| *n == name);
                                     if let Some((name, cell)) = result {
@@ -789,16 +789,17 @@ impl VM {
         } else if let Some(bound_func) = callable.down_to_bound_func() {
             let func_ref = bound_func.func();
             let func_obj = func_ref.read().unwrap();
-            let this_opt = Some(bound_func.this.clone());
+            let this_opt = Some(bound_func.this());
             if let Some(func) = func_obj.down_to_builtin_func() {
                 log::trace!(
                     "CALL bound builtin func {} with this: {}",
                     func.name(),
-                    bound_func.this.read().unwrap()
+                    bound_func.this().read().unwrap()
                 );
                 if let Some(expected_type) = func.this_type() {
                     let expected_type = &*expected_type.read().unwrap();
-                    let this = bound_func.this.read().unwrap();
+                    let this = bound_func.this();
+                    let this = this.read().unwrap();
                     let this_type = this.type_obj();
                     let this_type = this_type.read().unwrap();
                     // class method || instance method
@@ -813,13 +814,13 @@ impl VM {
                 log::trace!(
                     "CALL bound func {} with this: {}",
                     func.name(),
-                    bound_func.this.read().unwrap()
+                    bound_func.this().read().unwrap()
                 );
                 self.call_func(func, this_opt, args, None)
             } else if callable.is_closure() {
                 log::trace!(
                     "CALL bound closure with this: {}",
-                    bound_func.this.read().unwrap()
+                    bound_func.this().read().unwrap()
                 );
                 self.call_closure(func_ref.clone(), this_opt, args)
             } else {
@@ -838,7 +839,7 @@ impl VM {
     ) -> RuntimeResult {
         let args = self.check_call_args(func, &this_opt, args)?;
         self.push_call_frame(this_opt.clone(), None)?;
-        let result = (func.func)(self.find_this(), args, self);
+        let result = (func.func())(self.find_this(), args, self);
         match result {
             Ok(return_val) => {
                 self.push_return_val(return_val);
@@ -891,7 +892,8 @@ impl VM {
     ) -> RuntimeResult {
         let closure = closure_ref.read().unwrap();
         let closure = closure.down_to_closure().unwrap();
-        let func = closure.func.read().unwrap();
+        let func = closure.func();
+        let func = func.read().unwrap();
         let func = func.down_to_func().unwrap();
         self.call_func(func, this_opt, args, Some(closure_ref.clone()))
     }

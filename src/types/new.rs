@@ -94,6 +94,7 @@ macro_rules! obj_ref {
     };
 }
 
+use crate::util::format_doc;
 pub(crate) use obj_ref;
 
 #[inline]
@@ -133,14 +134,16 @@ pub fn builtin_func(
     name: &str,
     this_type: Option<ObjectRef>,
     params: &[&str],
+    doc: &str,
     func: BuiltinFn,
 ) -> ObjectRef {
     let params = params.iter().map(|n| n.to_string()).collect();
-    obj_ref!(BuiltinFunc::new(name.to_owned(), this_type, params, func))
+    let doc = format_doc(doc);
+    obj_ref!(BuiltinFunc::new(name.to_owned(), this_type, params, str(doc), func))
 }
 
-pub fn builtin_module(name: &str, ns: Namespace, doc: &str) -> obj_ref_t!(Module) {
-    obj_ref!(Module::new(name.into(), ns, Code::new(), doc))
+pub fn builtin_module(name: &str, ns: Namespace) -> obj_ref_t!(Module) {
+    obj_ref!(Module::new(name.into(), ns, Code::new()))
 }
 
 pub fn cell() -> ObjectRef {
@@ -235,8 +238,8 @@ pub fn float_from_string<S: Into<String>>(value: S) -> ObjectRef {
 /// NOTE: User functions are created in the compiler where name and
 ///       params are already owned, so we don't do any conversion here
 ///       like with builtin functions above.
-pub fn func(name: String, params: Params, code: Code) -> ObjectRef {
-    obj_ref!(Func::new(name, params, code))
+pub fn func<S: Into<String>>(name: S, params: Params, code: Code) -> ObjectRef {
+    obj_ref!(Func::new(name.into(), params, code))
 }
 
 pub fn int<I: Into<BigInt>>(value: I) -> ObjectRef {
@@ -273,9 +276,8 @@ pub fn _module<S: Into<String>>(
     name: S,
     ns: Namespace,
     code: Code,
-    doc: &str,
 ) -> obj_ref_t!(Module) {
-    obj_ref!(Module::new(name.into(), ns, code, doc))
+    obj_ref!(Module::new(name.into(), ns, code))
 }
 
 pub fn prop(getter: ObjectRef) -> ObjectRef {

@@ -31,7 +31,7 @@ pub struct BuiltinFunc {
     name: String,
     this_type: Option<ObjectRef>,
     params: Params,
-    pub func: BuiltinFn,
+    func: BuiltinFn,
 }
 
 gen::standard_object_impls!(BuiltinFunc);
@@ -41,12 +41,14 @@ impl BuiltinFunc {
         name: String,
         this_type: Option<ObjectRef>,
         params: Params,
+        doc: ObjectRef,
         func: BuiltinFn,
     ) -> Self {
         Self {
             ns: Namespace::with_entries(&[
                 // Instance Attributes
                 ("$name", new::str(name.as_str())),
+                ("$doc", doc),
             ]),
             name,
             this_type,
@@ -58,9 +60,17 @@ impl BuiltinFunc {
     pub fn this_type(&self) -> Option<ObjectRef> {
         self.this_type.clone()
     }
+
+    pub fn func(&self) -> &BuiltinFn {
+        &self.func
+    }
 }
 
 impl FuncTrait for BuiltinFunc {
+    fn ns(&self) -> &Namespace {
+        &self.ns
+    }
+
     fn name(&self) -> &str {
         self.name.as_str()
     }

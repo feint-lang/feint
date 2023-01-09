@@ -86,7 +86,7 @@ pub static ERR_TYPE_TYPE: Lazy<new::obj_ref_t!(ErrTypeType)> = Lazy::new(|| {
 
     ns.add_entries(&[
         // Instance Attributes -----------------------------------------
-        gen::prop!("name", type_ref, |this, _, _| {
+        gen::prop!("name", type_ref, "", |this, _, _| {
             let this = this.read().unwrap();
             let this = this.as_any().downcast_ref::<ErrTypeObj>().unwrap();
             Ok(new::str(this.name()))

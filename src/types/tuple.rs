@@ -25,23 +25,23 @@ pub static TUPLE_TYPE: Lazy<new::obj_ref_t!(TupleType)> = Lazy::new(|| {
 
     class.ns_mut().add_entries(&[
         // Instance Attributes -----------------------------------------
-        gen::prop!("length", type_ref, |this, _, _| {
+        gen::prop!("length", type_ref, "", |this, _, _| {
             let this = this.read().unwrap();
             let this = this.down_to_tuple().unwrap();
             Ok(new::int(this.len()))
         }),
-        gen::prop!("is_empty", type_ref, |this, _, _| {
+        gen::prop!("is_empty", type_ref, "", |this, _, _| {
             let this = this.read().unwrap();
             let this = this.down_to_tuple().unwrap();
             Ok(new::bool(this.len() == 0))
         }),
-        gen::prop!("sum", type_ref, |this, _, _| {
+        gen::prop!("sum", type_ref, "", |this, _, _| {
             let this = this.read().unwrap();
             let this = this.down_to_tuple().unwrap();
             seq::sum(&this.items)
         }),
         // Instance Methods --------------------------------------------
-        gen::meth!("get", type_ref, &["index"], |this, args, _| {
+        gen::meth!("get", type_ref, &["index"], "", |this, args, _| {
             let this = this.read().unwrap();
             let this = this.down_to_tuple().unwrap();
             let arg = gen::use_arg!(args, 0);
@@ -52,12 +52,12 @@ pub static TUPLE_TYPE: Lazy<new::obj_ref_t!(TupleType)> = Lazy::new(|| {
             };
             Ok(result)
         }),
-        gen::meth!("map", type_ref, &["map_fn"], |this_obj, args, vm| {
+        gen::meth!("map", type_ref, &["map_fn"], "", |this_obj, args, vm| {
             let this = this_obj.read().unwrap();
             let this = this.down_to_tuple().unwrap();
             seq::map(&this_obj, &this.items, &args, vm)
         }),
-        gen::meth!("join", type_ref, &["sep"], |this, args, _| {
+        gen::meth!("join", type_ref, &["sep"], "", |this, args, _| {
             let this = this.read().unwrap();
             let this = this.down_to_tuple().unwrap();
             seq::join(&this.items, &args)

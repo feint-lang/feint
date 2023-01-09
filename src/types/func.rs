@@ -39,6 +39,7 @@ impl Func {
             ns: Namespace::with_entries(&[
                 // Instance Attributes
                 ("$name", new::str(name.as_str())),
+                ("$doc", code.get_doc()),
             ]),
             name,
             params,
@@ -64,6 +65,10 @@ impl Func {
 }
 
 impl FuncTrait for Func {
+    fn ns(&self) -> &Namespace {
+        &self.ns
+    }
+
     fn name(&self) -> &str {
         self.name.as_str()
     }

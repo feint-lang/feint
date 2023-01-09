@@ -1,4 +1,6 @@
 #!./target/release/feint
+"Script to generate a new builtin type definition."
+
 import args
 import system
 

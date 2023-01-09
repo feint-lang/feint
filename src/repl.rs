@@ -34,7 +34,7 @@ pub struct Repl {
 
 impl Repl {
     pub fn new(history_path: Option<PathBuf>, executor: Executor) -> Self {
-        let module = Module::with_name("$repl", "FeInt REPL module");
+        let module = Module::with_name("$repl");
         let mut reader =
             rustyline::Editor::<()>::new().expect("Could initialize readline");
         reader.set_indent_size(4);
@@ -249,7 +249,9 @@ impl Repl {
                 self.reader.add_history_entry(input);
                 match self.reader.save_history(path.as_path()) {
                     Ok(_) => (),
-                    Err(err) => eprintln!("WARNING: Could not save REPL history: {}", err),
+                    Err(err) => {
+                        eprintln!("WARNING: Could not save REPL history: {}", err)
+                    }
                 }
             }
             None => (),
