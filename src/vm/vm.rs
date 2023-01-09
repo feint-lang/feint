@@ -636,7 +636,11 @@ impl VM {
                     //       a type.
 
                     let func = new::bound_func(prop.getter(), a_ref.clone());
-                    return self.call(func, vec![]);
+                    if a.is_type_object() {
+                        func
+                    } else {
+                        return self.call(func, vec![]);
+                    }
                 } else {
                     drop(obj);
                     obj_ref

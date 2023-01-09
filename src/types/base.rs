@@ -361,6 +361,11 @@ pub trait ObjectTrait {
     make_type_checker!(is_str, Str);
     make_type_checker!(is_tuple, Tuple);
 
+    /// Is this object a type object?
+    fn is_type_object(&self) -> bool {
+        self.type_obj().read().unwrap().is_type_type()
+    }
+
     // XXX: Currently, everything but `Cell`s are immutable. This
     //      anticipates types that are likely to be made mutable in the
     //      future.
