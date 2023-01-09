@@ -13,13 +13,23 @@ use super::result::Args;
 pub fn join(items: &[ObjectRef], args: &Args) -> RuntimeObjResult {
     let arg = gen::use_arg!(args, 0);
     let sep = gen::use_arg_str!(arg);
-    let mut strings = vec![];
-    for item in items.iter() {
+    let n_items = items.len();
+    let last_i = n_items - 1;
+
+    // XXX: Guessing at average word length
+    let capacity = n_items * 5 + ((last_i) * sep.len());
+    let mut string = String::with_capacity(capacity);
+
+    for (i, item) in items.iter().enumerate() {
         let item = item.read().unwrap();
         let str = item.to_string();
-        strings.push(str);
+        string.push_str(&str);
+        if i != last_i {
+            string.push_str(sep);
+        }
     }
-    Ok(new::str(strings.join(sep)))
+
+    Ok(new::str(string))
 }
 
 pub fn map(
