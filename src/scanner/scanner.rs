@@ -310,7 +310,7 @@ impl<'a, T: BufRead> Scanner<'a, T> {
         let quote = self.source.next().unwrap();
         let (string, terminated) = self.read_string(quote);
         if terminated {
-            let format_string_tokens = scan_format_string(string.as_str())
+            let format_string_tokens = scan_format_string(string.as_str(), None)
                 .map_err(|err| ScanErr::new(ErrKind::FormatStrErr(err), start))?;
             Ok(Token::FormatStr(format_string_tokens))
         } else {

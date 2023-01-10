@@ -346,19 +346,19 @@ impl Executor {
                 use crate::format::FormatStrErr::*;
                 match err {
                     EmptyExpr(pos) => {
-                        loc = Location::new(loc.line, loc.col + pos);
+                        loc = Location::new(loc.line, loc.col + pos + 2);
                         "Syntax error in format string: expected expression".to_string()
                     }
                     UnmatchedOpeningBracket(pos) => {
-                        loc = Location::new(loc.line, loc.col + pos);
+                        loc = Location::new(loc.line, loc.col + pos + 2);
                         "Unmatched opening bracket in format string".to_string()
                     }
                     UnmatchedClosingBracket(pos) => {
-                        loc = Location::new(loc.line, loc.col + pos);
+                        loc = Location::new(loc.line, loc.col + pos + 2);
                         "Unmatched closing bracket in format string".to_string()
                     }
-                    ScanErr(_, pos) => {
-                        loc = Location::new(loc.line, loc.col + *pos);
+                    ScanErr(pos, _) => {
+                        loc = Location::new(loc.line, loc.col + pos + 2);
                         "Error while scanning format string".to_string()
                     }
                 }
