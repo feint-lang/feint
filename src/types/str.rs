@@ -3,8 +3,8 @@ use std::fmt;
 use std::sync::{Arc, RwLock};
 
 use once_cell::sync::Lazy;
-use tera::{Context, Tera};
 
+use crate::format::render_template;
 use crate::vm::{RuntimeBoolResult, RuntimeErr, RuntimeObjResult};
 
 use super::gen;
@@ -59,26 +59,25 @@ pub static STR_TYPE: Lazy<new::obj_ref_t!(StrType)> = Lazy::new(|| {
             let value = this.get_str_val().unwrap();
             Ok(new::str(value.to_lowercase()))
         }),
-        gen::meth!("render", type_ref, &["context"], "", |this_obj, args, _| {
-            let this = this_obj.read().unwrap();
-            let value = this.get_str_val().unwrap();
-            let arg = gen::use_arg!(args, 0);
-            let context = gen::use_arg_map!(arg);
-            let context = context.to_hash_map();
-            let mut tera = Tera::default();
-            let mut tera_context = Context::new();
-            context.iter().for_each(|(k, v)| {
-                let v = v.read().unwrap();
-                let v = v.to_string();
-                tera_context.insert(k, v.as_str());
-            });
-            tera.add_raw_template("str.render.template", value).unwrap();
-            let result = tera.render("str.render.template", &tera_context);
-            Ok(match result {
-                Ok(output) => new::str(output),
-                Err(err) => new::string_err(err.to_string(), this_obj.clone()),
-            })
-        }),
+        gen::meth!(
+            "render",
+            type_ref,
+            &["context"],
+            "Render string as template
+
+            Templates may contain `{{ name }}` vars which will be replaced with the
+            values provided in the context map.
+
+            Args:
+                context:
+                    Map<Str, Str> A map containing values to be rendered
+                    into the template",
+            |this, args, _| {
+                let context = args[0].clone();
+                let result = render_template(this.clone(), context)?;
+                Ok(result)
+            }
+        ),
         gen::meth!("repeat", type_ref, &["count"], "", |this, args, _| {
             let this = this.read().unwrap();
             let value = this.get_str_val().unwrap();

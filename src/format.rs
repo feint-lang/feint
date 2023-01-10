@@ -1,10 +1,12 @@
-use crate::scanner::{ScanTokensResult, Scanner, TokenWithLocation};
+use crate::scanner::{ScanTokensResult, Scanner, Token, TokenWithLocation as TWL};
+use crate::types::{new, ObjectRef};
 use crate::util::source_from_text;
+use crate::vm::RuntimeObjResult;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum FormatStrToken {
     Str(String),
-    Expr(Vec<TokenWithLocation>),
+    Expr(Vec<TWL>),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -106,4 +108,66 @@ pub fn scan_format_string(
     }
 
     Ok(tokens)
+}
+
+pub fn render_template(
+    template_ref: ObjectRef,
+    context_ref: ObjectRef,
+) -> RuntimeObjResult {
+    use Token::{EndOfStatement, Ident};
+
+    let template = template_ref.read().unwrap();
+    let template = template.to_string();
+
+    let context = context_ref.read().unwrap();
+    let context = if let Some(context) = context.down_to_map() {
+        context.to_hash_map()
+    } else {
+        return Ok(new::string_err(
+            "Expected context to be a map",
+            template_ref.clone(),
+        ));
+    };
+
+    let scan_result = scan_format_string(template.as_str(), Some(("{{", "}}")));
+
+    let format_tokens = match scan_result {
+        Ok(tokens) => tokens,
+        Err(err) => {
+            let msg = format!("Could not parse template: {err:?}");
+            return Ok(new::string_err(msg, template_ref.clone()));
+        }
+    };
+
+    let mut output = String::with_capacity(template.len());
+
+    for format_token in format_tokens {
+        match format_token {
+            FormatStrToken::Str(string) => {
+                output.push_str(string.as_str());
+            }
+            FormatStrToken::Expr(tokens) => match &tokens[..] {
+                [TWL { token: Ident(name), .. }, TWL { token: EndOfStatement, .. }] => {
+                    if let Some(val) = context.get(name.as_str()) {
+                        let val = val.read().unwrap();
+                        let val = val.to_string();
+                        output.push_str(val.as_str());
+                    } else {
+                        let msg = format!("Name not found in context: {name}");
+                        return Ok(new::string_err(msg, template_ref.clone()));
+                    }
+                }
+                _ => {
+                    let tokens: Vec<Token> =
+                        tokens.iter().map(|t| &t.token).cloned().collect();
+                    let msg = format!(
+                        "Template is contains an invalid expression: {tokens:?}"
+                    );
+                    return Ok(new::string_err(msg, template_ref.clone()));
+                }
+            },
+        }
+    }
+
+    Ok(new::str(output))
 }
