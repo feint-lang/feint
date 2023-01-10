@@ -87,7 +87,7 @@ pub static BUILTINS: Lazy<new::obj_ref_t!(Module)> = Lazy::new(|| {
                     } else {
                         println!("{doc}");
                     }
-                    Ok(new::nil())
+                    Ok(new::empty_str())
                 },
             ),
         ),

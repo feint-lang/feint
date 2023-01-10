@@ -557,7 +557,11 @@ impl Visitor {
                 self.add_const(new::float(value));
             }
             Kind::String(value) => {
-                self.add_const(new::str(value));
+                if value.is_empty() {
+                    self.push_empty_str();
+                } else {
+                    self.add_const(new::str(value));
+                }
             }
         }
         Ok(())
@@ -972,6 +976,10 @@ impl Visitor {
 
     fn push_always(&mut self) {
         self.push(Inst::LoadAlways)
+    }
+
+    fn push_empty_str(&mut self) {
+        self.push(Inst::LoadEmptyStr)
     }
 
     fn push_empty_tuple(&mut self) {

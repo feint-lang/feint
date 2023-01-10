@@ -39,15 +39,16 @@ static NIL: Lazy<obj_ref_t!(Nil)> = Lazy::new(|| obj_ref!(Nil::new()));
 static TRUE: Lazy<obj_ref_t!(Bool)> = Lazy::new(|| obj_ref!(Bool::new(true)));
 static FALSE: Lazy<obj_ref_t!(Bool)> = Lazy::new(|| obj_ref!(Bool::new(false)));
 static ALWAYS: Lazy<obj_ref_t!(Always)> = Lazy::new(|| obj_ref!(Always::new()));
+static EMPTY_STR: Lazy<obj_ref_t!(Str)> =
+    Lazy::new(|| obj_ref!(Str::new("".to_owned())));
+static EMPTY_TUPLE: Lazy<obj_ref_t!(Tuple)> =
+    Lazy::new(|| obj_ref!(Tuple::new(vec![])));
 
 static OK_ERR: Lazy<obj_ref_t!(ErrObj)> = Lazy::new(|| {
     obj_ref!(ErrObj::with_responds_to_bool(ErrKind::Ok, "".to_string(), nil()))
 });
 
-static EMPTY_TUPLE: Lazy<obj_ref_t!(Tuple)> =
-    Lazy::new(|| obj_ref!(Tuple::new(vec![])));
-
-static SHARED_INT_INDEX: usize = 5;
+static SHARED_INT_INDEX: usize = 6;
 static SHARED_INT_MAX: usize = 256;
 static SHARED_INT_MAX_BIGINT: Lazy<BigInt> = Lazy::new(|| BigInt::from(SHARED_INT_MAX));
 pub static SHARED_INTS: Lazy<Vec<obj_ref_t!(Int)>> = Lazy::new(|| {
@@ -284,8 +285,17 @@ pub fn prop(getter: ObjectRef) -> ObjectRef {
     obj_ref!(Prop::new(getter))
 }
 
-pub fn str<S: Into<String>>(value: S) -> ObjectRef {
-    obj_ref!(Str::new(value.into()))
+pub fn str<S: Into<String>>(val: S) -> ObjectRef {
+    let val = val.into();
+    if val.is_empty() {
+        empty_str()
+    } else {
+        obj_ref!(Str::new(val))
+    }
+}
+
+pub fn empty_str() -> ObjectRef {
+    EMPTY_STR.clone()
 }
 
 pub fn tuple(items: Vec<ObjectRef>) -> ObjectRef {

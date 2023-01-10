@@ -168,6 +168,9 @@ impl VM {
                 LoadAlways => {
                     self.push_global_const(self.ctx.always_index)?;
                 }
+                LoadEmptyStr => {
+                    self.push_global_const(self.ctx.empty_str_index)?;
+                }
                 LoadEmptyTuple => {
                     self.push_global_const(self.ctx.empty_tuple_index)?;
                 }

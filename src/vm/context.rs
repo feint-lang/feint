@@ -15,6 +15,7 @@ pub struct RuntimeContext {
     pub true_index: usize,
     pub false_index: usize,
     pub always_index: usize,
+    pub empty_str_index: usize,
     pub empty_tuple_index: usize,
 }
 
@@ -28,6 +29,7 @@ impl RuntimeContext {
             new::true_(),
             new::false_(),
             new::always(),
+            new::empty_str(),
             new::empty_tuple(),
         ];
         for int in new::SHARED_INTS.iter() {
@@ -40,7 +42,8 @@ impl RuntimeContext {
             true_index: 1,
             false_index: 2,
             always_index: 3,
-            empty_tuple_index: 4,
+            empty_str_index: 4,
+            empty_tuple_index: 5,
         }
     }
 
