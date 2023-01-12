@@ -20,10 +20,10 @@ import :
     | "import" "from" IMPORT_PATH ":" IMPORT_IDENT ("," IMPORT_IDENT)*
 
 jump :
-    | "jump" IDENT
+    | "jump" VAR_IDENT
 
 label :
-    | IDENT ":"
+    | ":" VAR_IDENT ":"
 
 # Expressions ----------------------------------------------------------
 
@@ -43,14 +43,14 @@ basic_expr :
     | assignment
 
 atom :
-    | nil
+    | "nil"
     | "true" | "false"
     | INT
     | FLOAT
     | string
     | format_string
     | tuple
-    | NAME
+    | IDENT
 
 string :
     | QUOTE CHAR* QUOTE
@@ -173,25 +173,25 @@ cond :
     | inline_block
 
 func :
-    | "(" [params] ")" "=>" suite
+    | params "=>" suite
 
 inline_func :
-    | "(" [params] ")" "=>" expr
+    | params "=>" expr
 
 params :
-    | IDENT ("," IDENT)* [","]
+    | "(" [VAR_IDENT ("," VAR_IDENT)* [","]] ")"
 
 call :
-    | ( IDENT | expr ) "(" [args] ")"
+    | ( expr ) "(" [args] ")"
 
 args :
     | tuple_expr ("," tuple_expr)* [","]
 
 type :
-    | "(" params ")" "=>" suite
+    | params "=>" suite
 
 inline_type :
-    | "(" params ")" "=>" expr
+    | params "=>" expr
 
 # Comments -------------------------------------------------------------
 
@@ -204,24 +204,39 @@ CHAR : ".*"
 COMMENT_CHAR : "[^\n]*"
 QUOTE : "[\"']"
 
-NAME:
-    | IDENT
+IDENT:
+    | VAR_IDENT
     | SPECIAL_IDENT
     | TYPE_IDENT
     | TYPE_FUNC_IDENT
 
 # Identifiers
-IDENT           : "[a-z]|[a-z][a-z0-9_]*[a-z0-9]"
-CONST_IDENT     : "[A-Z]|[A-Z][A-Z0-9_]*[A-Za-z0-9]"
+VAR_IDENT       : "[a-z]|[a-z][a-z0-9_]*[a-z0-9]"
+CONST_IDENT     : "[A-Z]|[A-Z][A-Z0-9_]*[A-Z0-9]"
 TYPE_IDENT      : "[A-Z]|[A-Z][A-Za-z0-9]*[A-Za-z0-9]"
-TYPE_FUNC_IDENT : "@" IDENT
-SPECIAL_IDENT   : "$" IDENT
+TYPE_FUNC_IDENT : "@" VAR_IDENT
+SPECIAL_IDENT   : "$" VAR_IDENT
 
 # Imports
 IMPORT_PATH :
-    | IDENT ("." IDENT)*
+    | VAR_IDENT ("." VAR_IDENT)*
 IMPORT_IDENT :
-    | IDENT ["as" IDENT]
+    | VAR_IDENT ["as" VAR_IDENT]
+
+# Numbers --------------------------------------------------------------
+
+NUM : INT | FLOAT
+
+INT : (INT_02 | INT_08 | INT_10 | INT_16)
+
+INT_02  : "[+-]?0b_?{ BINARY }"
+INT_08  : "[+-]?0o_?{ OCTAL }"
+INT_10  : "[+-]?({ ZERO }|{ NATURAL })"
+INT_16  : "[+-]?0x_{ HEX }"
+
+FLOAT :
+    | "{ DECIMAL }\.{ DECIMAL }"
+    | "{ DECIMAL }(\.{ DECIMAL })?(e|E)[+-]?{ DECIMAL }"
 
 # Numeric character sets allowing for underscores between digits
 ZERO    : "0(_?0+)*"
@@ -230,15 +245,3 @@ OCTAL   : "[0-7](_?[0-7]+)*"
 DECIMAL : "[0-9](_?[0-9]+)*"
 NATURAL : "[1-9](_?[0-9]+)*"
 HEX     : "[A-Za-z0-9](_?[A-Za-z0-9]+)*"
-
-INT : (INT_02 | INT_08 | INT_10 | INT_16)
-
-# Integers
-INT_02  : "(+|-)?0b_?{ BINARY }"
-INT_08  : "(+|-)?0o_?{ OCTAL }"
-INT_10  : "(+|-)?({ ZERO }|{ NATURAL })"
-INT_16  : "(+|-)?0x_{ HEX }"
-
-FLOAT :
-    | "{ DECIMAL }\.{ DECIMAL }"
-    | "{ DECIMAL }(\.{ DECIMAL })?(e|E)[+-]?{ DECIMAL }"

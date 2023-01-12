@@ -45,6 +45,14 @@ automatically with args passed on the command line (AKA `argv`).
 
 `$main` is equivalent to `if __name__ == "__main__": ...` in Python.
 
+## Writing
+
+There's a work-in-progress [tree-sitter implementation] that includes
+instructions for use with [neovim].
+
+[tree-sitter implementation]: https://github.com/wylee/tree-sitter-feint
+[neovim]: https://neovim.io/
+
 ## Ideas
 
 - Everything is an object of some type
@@ -81,7 +89,6 @@ TODO
 - BuiltinFunc (e.g., `print()`)
 - Func
 - Module
-- Namespace
 
 ## Vars
 
