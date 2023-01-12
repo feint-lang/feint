@@ -21,16 +21,28 @@ macro_rules! type_and_impls {
 
         impl $type_name {
             pub fn new() -> Self {
+                let name = new::str(stringify!($name));
+                let full_name = new::str(concat!("builtins.", stringify!($name)));
                 Self {
                     ns: Namespace::with_entries(&[
-                        // Class Attributes
-                        ("$name", new::str(stringify!($name))),
-                        (
-                            "$full_name",
-                            new::str(concat!("builtins.", stringify!($name))),
-                        ),
+                        ("$name", name),
+                        ("$full_name", full_name),
                     ]),
                 }
+            }
+
+            pub fn with_attrs(attrs: &[(&str, ObjectRef)]) -> Self {
+                let mut type_obj = Self::new();
+                type_obj.ns.add_entries(attrs);
+                type_obj
+            }
+
+            pub fn set_attr(&mut self, name: &str, val: ObjectRef) {
+                self.ns.add_entry(name, val);
+            }
+
+            pub fn set_attrs(&mut self, attrs: &[(&str, ObjectRef)]) {
+                self.ns.add_entries(attrs);
             }
         }
 

@@ -36,9 +36,9 @@ gen::type_and_impls!(ErrType, Err);
 
 pub static ERR_TYPE: Lazy<new::obj_ref_t!(ErrType)> = Lazy::new(|| {
     let type_ref = new::obj_ref!(ErrType::new());
-    let mut class = type_ref.write().unwrap();
+    let mut type_obj = type_ref.write().unwrap();
 
-    class.ns_mut().add_entries(&[
+    type_obj.set_attrs(&[
         // Class Methods -----------------------------------------------
         gen::meth!("new", type_ref, &["type", "msg"], "", |_, args, _| {
             let name = "Err.new()";

@@ -21,9 +21,9 @@ gen::type_and_impls!(TupleType, Tuple);
 
 pub static TUPLE_TYPE: Lazy<new::obj_ref_t!(TupleType)> = Lazy::new(|| {
     let type_ref = new::obj_ref!(TupleType::new());
-    let mut class = type_ref.write().unwrap();
+    let mut type_obj = type_ref.write().unwrap();
 
-    class.ns_mut().add_entries(&[
+    type_obj.set_attrs(&[
         // Instance Attributes -----------------------------------------
         gen::prop!("length", type_ref, "", |this, _, _| {
             let this = this.read().unwrap();

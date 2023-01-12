@@ -76,15 +76,14 @@ gen::type_and_impls!(ErrTypeType, ErrType);
 
 pub static ERR_TYPE_TYPE: Lazy<new::obj_ref_t!(ErrTypeType)> = Lazy::new(|| {
     let type_ref = new::obj_ref!(ErrTypeType::new());
-    let mut class = type_ref.write().unwrap();
-    let ns = class.ns_mut();
+    let mut type_obj = type_ref.write().unwrap();
 
     // Types as class attributes
     for kind in ERR_KINDS.iter() {
-        ns.add_entry((kind.name(), new::obj_ref!(ErrTypeObj::new(kind.clone()))));
+        type_obj.set_attr(kind.name(), new::obj_ref!(ErrTypeObj::new(kind.clone())));
     }
 
-    ns.add_entries(&[
+    type_obj.set_attrs(&[
         // Instance Attributes -----------------------------------------
         gen::prop!("name", type_ref, "", |this, _, _| {
             let this = this.read().unwrap();

@@ -22,9 +22,9 @@ gen::type_and_impls!(FloatType, Float);
 
 pub static FLOAT_TYPE: Lazy<new::obj_ref_t!(FloatType)> = Lazy::new(|| {
     let type_ref = new::obj_ref!(FloatType::new());
-    let mut class = type_ref.write().unwrap();
+    let mut type_obj = type_ref.write().unwrap();
 
-    class.ns_mut().add_entries(&[
+    type_obj.set_attrs(&[
         // Class Methods -----------------------------------------------
         gen::meth!("new", type_ref, &["value"], "", |_, args, _| {
             let arg = gen::use_arg!(args, 0);
