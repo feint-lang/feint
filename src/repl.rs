@@ -9,7 +9,7 @@ use crate::exe::Executor;
 use crate::parser::ParseErrKind;
 use crate::result::{ExeErr, ExeErrKind, ExitResult};
 use crate::scanner::ScanErrKind;
-use crate::types::{Module, ObjectRef, ObjectTrait};
+use crate::types::{Module, ObjectTrait};
 use crate::vm::VMState;
 
 /// Run FeInt REPL until user exits.
@@ -109,15 +109,7 @@ impl Repl {
 
         if let Ok(vm_state) = result {
             return match vm_state {
-                VMState::Idle(obj_ref) => {
-                    if let Some(obj_ref) = obj_ref {
-                        self.print(obj_ref);
-                        self.executor.assign_top("_");
-                    } else {
-                        eprintln!("No result on stack");
-                    }
-                    None
-                }
+                VMState::Idle(_) => None,
                 VMState::Halted(0) => None,
                 VMState::Halted(code) => {
                     Some(Err((code, Some(format!("Halted abnormally: {}", code)))))
@@ -169,19 +161,15 @@ impl Repl {
                 eprintln!("{:=>72}", "");
                 eprintln!("FeInt Help");
                 eprintln!("{:->72}", "");
-                eprintln!(".help  -> show help");
-                eprintln!(".exit  -> exit");
-                eprintln!(".stack -> show VM stack (top first)");
-                eprintln!(".emacs -> switch to emacs-style input (default)");
-                eprintln!(".vi    -> switch to vi-style input");
+                eprintln!(".help      -> show this help");
+                eprintln!(".exit      -> exit");
+                eprintln!(".globals   -> show REPL module globals");
+                eprintln!(".constants -> show REPL module constants");
+                eprintln!(".dis       -> disassemble REPL module");
+                eprintln!(".stack     -> show VM stack (top first)");
+                eprintln!(".emacs     -> switch to emacs-style input (default)");
+                eprintln!(".vi        -> switch to vi-style input");
                 eprintln!("{:=>72}", "");
-            }
-            ".stack" => {
-                self.executor.display_stack();
-            }
-            ".dis" => {
-                let mut disassembler = dis::Disassembler::new();
-                disassembler.disassemble(self.module.code());
             }
             ".globals" => {
                 eprintln!("{:=>72}", "");
@@ -192,6 +180,18 @@ impl Repl {
                 }
                 eprintln!("{:=>72}", "");
             }
+            ".constants" => {
+                for (i, val) in self.module.code().iter_constants().enumerate() {
+                    println!("{i} = {:?}", &*val.read().unwrap());
+                }
+            }
+            ".dis" => {
+                let mut disassembler = dis::Disassembler::new();
+                disassembler.disassemble(self.module.code());
+            }
+            ".stack" => {
+                self.executor.display_stack();
+            }
             ".emacs" => {
                 self.reader.set_edit_mode(rustyline::config::EditMode::Emacs);
             }
@@ -201,14 +201,6 @@ impl Repl {
             _ => return false,
         }
         true
-    }
-
-    /// Print eval result if it's not nil.
-    fn print(&self, obj_ref: ObjectRef) {
-        let obj = obj_ref.read().unwrap();
-        if !obj.is_nil() {
-            println!("{:?}", &*obj);
-        }
     }
 
     fn continue_on_err(&self, err: ExeErr) -> bool {

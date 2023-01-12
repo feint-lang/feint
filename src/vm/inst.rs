@@ -91,7 +91,8 @@ pub enum Inst {
     // capture. If empty, a regular function will be created.
     CaptureSet(Vec<String>),
 
-    // Make function or closure depending on capture set.
+    // Make function or closure depending on capture set. The argument
+    // is the index of the function constant.
     MakeFunc(usize),
 
     LoadModule(String),
@@ -113,7 +114,11 @@ pub enum Inst {
     //       replaced with a jump to a RETURN target.
     ReturnPlaceholder(usize, usize), // jump address, scope depth
 
-    // Disassembler ----------------------------------------------------
+    // Miscellaneous ---------------------------------------------------
+
+    // Pop TOS and print it.
+    PrintTop,
+
     DisplayStack(String),
 }
 

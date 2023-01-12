@@ -121,6 +121,10 @@ impl Code {
         self.chunk.push(inst)
     }
 
+    pub fn pop_inst(&mut self) -> Option<Inst> {
+        self.chunk.pop()
+    }
+
     pub fn insert_inst(&mut self, index: usize, inst: Inst) {
         self.chunk.insert(index, inst);
     }

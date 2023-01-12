@@ -58,7 +58,6 @@ impl Compiler {
             code.push_inst(Inst::Call(argc));
             code.push_inst(Inst::HaltTop);
         } else {
-            code.push_inst(Inst::Pop);
             code.push_inst(Inst::Halt(0));
         }
         Ok(Module::new(
@@ -70,9 +69,8 @@ impl Compiler {
 
     /// Compile AST module node to module object.
     pub fn compile_module(&mut self, name: &str, module: ast::Module) -> CompResult {
-        let mut code = self.compile_module_to_code(name, module)?;
+        let code = self.compile_module_to_code(name, module)?;
         let ns = Namespace::new();
-        code.push_inst(Inst::Pop);
         Ok(Module::new(name.to_owned(), ns, code))
     }
 
@@ -95,9 +93,9 @@ impl Compiler {
             self.compile_func(addr, scope_tree_pointer, name, node)?;
         }
         let mut visitor = self.visitor_stack.pop().unwrap().0;
-        // XXX: The NOOP ensures there's always jump target at the end
-        //      of a module.
-        visitor.push(Inst::NoOp);
+        // XXX: This keeps the stack clean and ensures there's always
+        //      jump target at the end of the module.
+        visitor.push(Inst::Pop);
         Ok(visitor.code)
     }
 

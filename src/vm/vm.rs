@@ -491,7 +491,17 @@ impl VM {
                     eprintln!("Return placeholder at {addr} was not updated");
                     break Ok(VMState::Halted(255));
                 }
-                // Disassembler
+                // Miscellaneous
+                PrintTop => {
+                    if let Ok(obj) = self.pop_obj() {
+                        let obj = obj.read().unwrap();
+                        if !obj.is_nil() {
+                            println!("{:?}", &*obj);
+                        }
+                    } else {
+                        return Err(RuntimeErr::empty_stack());
+                    }
+                }
                 DisplayStack(message) => {
                     eprintln!("\nSTACK: {message}\n");
                     self.display_stack();

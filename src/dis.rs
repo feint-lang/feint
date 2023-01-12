@@ -52,7 +52,6 @@ impl Disassembler {
     fn format_inst(&mut self, code: &Code, inst: &Inst) -> String {
         use Inst::*;
         match inst {
-            DisplayStack(message) => self.align("DISPLAY_STACK", message),
             NoOp => self.align("NOOP", "ø"),
             Pop => self.align("POP", ""),
             LoadGlobalConst(index) => {
@@ -148,6 +147,8 @@ impl Disassembler {
             ReturnPlaceholder(addr, _) => {
                 self.align("PLACEHOLDER", format!("RETURN @ {addr}"))
             }
+            PrintTop => self.align("PRINT_TOP", ""),
+            DisplayStack(message) => self.align("DISPLAY_STACK", message),
         }
     }
 }

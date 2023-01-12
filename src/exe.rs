@@ -13,8 +13,8 @@ use crate::util::{
     source_from_file, source_from_stdin, source_from_text, Location, Source,
 };
 use crate::vm::{
-    CallDepth, Code, Inst, RuntimeContext, RuntimeErr, RuntimeErrKind, VMExeResult,
-    VMState, DEFAULT_MAX_CALL_DEPTH, VM,
+    CallDepth, Inst, RuntimeContext, RuntimeErr, RuntimeErrKind, VMExeResult, VMState,
+    DEFAULT_MAX_CALL_DEPTH, VM,
 };
 use crate::{ast, dis};
 
@@ -71,16 +71,6 @@ impl Executor {
         self.vm.install_sigint_handler();
     }
 
-    pub fn assign_top(&mut self, name: &str) {
-        let code = Code::with_chunk(vec![
-            Inst::DeclareVar(name.to_owned()),
-            Inst::AssignVar(name.to_owned()),
-        ]);
-        if let Err(err) = self.vm.execute_code(None, &code, 0) {
-            eprintln!("Could not assign TOS to {name}: {err}");
-        }
-    }
-
     /// Execute text entered in REPL. REPL execution is different from
     /// the other types of execution where the text or source is
     /// compiled all at once and executed as a script. In the REPL, code
@@ -93,10 +83,25 @@ impl Executor {
         let mut compiler = Compiler::new(false);
 
         let comp_result = compiler.compile_module_to_code(module.name(), ast_module);
-        let code = comp_result.map_err(|err| {
+
+        let mut code = comp_result.map_err(|err| {
             self.handle_comp_err(&err, source);
             ExeErr::new(ExeErrKind::CompErr(err.kind))
         })?;
+
+        // Assign TOS to _, print it, then pop it to clear the stack
+        let last_inst = code.pop_inst();
+        if let Some(Inst::Pop) = last_inst {
+            code.push_inst(Inst::DeclareVar("_".to_owned()));
+            code.push_inst(Inst::AssignVar("_".to_owned()));
+            code.push_inst(Inst::PrintTop);
+        } else {
+            let last_inst = match last_inst {
+                Some(inst) => format!("{inst:?}"),
+                None => "[EMPTY CHUNK]".to_owned(),
+            };
+            panic!("Expected module chunk to end with POP; got {last_inst}");
+        }
 
         // XXX: Rather than extending the module's code object, perhaps
         //      it would be better to compile INTO the existing module.
