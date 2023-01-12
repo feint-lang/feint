@@ -6,6 +6,7 @@ use std::sync::{Arc, RwLock};
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 
+use crate::dis::Disassembler;
 use crate::modules;
 use crate::types::FuncTrait;
 use crate::vm::{RuntimeBoolResult, RuntimeErr, RuntimeObjResult};
@@ -184,17 +185,17 @@ pub trait ObjectTrait {
     fn get_attr(&self, name: &str, this: ObjectRef) -> ObjectRef {
         // Special attributes that *cannot* be overridden --------------
 
+        if name == "$id" {
+            return self.id_obj();
+        }
+
         if name == "$type" {
-            return self.type_obj().clone();
+            return self.type_obj();
         }
 
         if name == "$module" {
             let module = self.class().read().unwrap().module().clone();
             return module;
-        }
-
-        if name == "$id" {
-            return self.id_obj();
         }
 
         if name == "$names" {
@@ -209,6 +210,19 @@ pub trait ObjectTrait {
             names.dedup();
             let items = names.iter().map(new::str).collect();
             return new::tuple(items);
+        }
+
+        if name == "$dis" {
+            if let Some(f) = self.down_to_func() {
+                let mut dis = Disassembler::new();
+                dis.disassemble(f.code());
+            } else if let Some(m) = self.down_to_mod() {
+                let mut dis = Disassembler::new();
+                dis.disassemble(m.code());
+            } else {
+                eprintln!("Cannot disassemble object: {}", &*this.read().unwrap());
+            }
+            return new::nil();
         }
 
         // Instance attributes -----------------------------------------
