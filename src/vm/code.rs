@@ -77,14 +77,12 @@ impl Code {
     /// IMPORTANT: ALL instructions that hold a const index MUST be
     ///            updated here.
     pub fn extend(&mut self, mut code: Self) {
-        use Inst::{LoadConst, MakeFunc};
+        use Inst::LoadConst;
         let mut replacements = vec![];
         let const_offset = self.constants.len();
         for (addr, inst) in code.iter_chunk().enumerate() {
             if let LoadConst(index) = inst {
                 replacements.push((addr, LoadConst(const_offset + index)));
-            } else if let MakeFunc(index) = inst {
-                replacements.push((addr, MakeFunc(const_offset + index)));
             }
         }
         for (addr, inst) in replacements {
@@ -160,13 +158,11 @@ impl Code {
             let other = other_ref.read().unwrap();
             let other_is_comparable = other.is_immutable() && !other.is_func();
             if is_comparable && other_is_comparable && other.is_equal(val) {
-                log::trace!("Constant {other} found @ index {index}; not adding");
                 return index;
             }
         }
 
         let index = self.constants.len();
-        log::trace!("Constant {val} not found; adding @ index {index}");
         drop(val_guard);
         self.constants.push(val_ref);
         index

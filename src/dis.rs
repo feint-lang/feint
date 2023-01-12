@@ -116,13 +116,7 @@ impl Disassembler {
             CaptureSet(names) => {
                 self.align("CAPTURE_SET", format!("[{}]", names.join(", ")))
             }
-            MakeFunc(index) => {
-                let func = match code.get_const(*index) {
-                    Ok(obj) => obj.read().unwrap().to_string(),
-                    Err(err) => err.to_string(),
-                };
-                self.align("MAKE_FUNC", func)
-            }
+            MakeFunc => self.align("MAKE_FUNC", ""),
             LoadModule(name) => self.align("IMPORT", name),
             Halt(code) => self.align("HALT", code),
             HaltTop => self.align("HALT_TOP", ""),

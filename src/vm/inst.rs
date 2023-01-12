@@ -91,9 +91,12 @@ pub enum Inst {
     // capture. If empty, a regular function will be created.
     CaptureSet(Vec<String>),
 
-    // Make function or closure depending on capture set. The argument
-    // is the index of the function constant.
-    MakeFunc(usize),
+    // Make function or closure depending on capture set. MAKE_FUNC
+    // expects the following entries at TOS:
+    //
+    // TOS capture_set: Map (added by CAPTURE_SET)
+    //     func: Func       (added by LOAD_CONST)
+    MakeFunc,
 
     LoadModule(String),
 
@@ -162,7 +165,7 @@ impl PartialEq for Inst {
             (MakeList(a), MakeList(b)) => a == b,
             (MakeMap(a), MakeMap(b)) => a == b,
             (CaptureSet(a), CaptureSet(b)) => a == b,
-            (MakeFunc(a), MakeFunc(b)) => a == b,
+            (MakeFunc, MakeFunc) => true,
             (LoadModule(a), LoadModule(b)) => a == b,
             (Halt(a), Halt(b)) => a == b,
             (HaltTop, HaltTop) => true,

@@ -252,7 +252,7 @@ impl Compiler {
         let parent_visitor = &mut self.visitor_stack.peek_mut().unwrap().0;
         let const_index = parent_visitor.code.add_const(func);
 
-        parent_visitor.replace(func_addr + 1, Inst::MakeFunc(const_index));
+        parent_visitor.replace(func_addr, Inst::LoadConst(const_index));
 
         Ok(())
     }
@@ -491,12 +491,13 @@ impl Visitor {
                 let addr = self.len();
                 let pointer = self.scope_tree.pointer();
                 self.func_nodes.push((addr, pointer, name, func));
-                self.push(Inst::CaptureSet(vec![]));
                 self.push(Inst::Placeholder(
                     addr,
-                    Box::new(Inst::MakeFunc(0)),
-                    "Function placeholder not updated".to_owned(),
+                    Box::new(Inst::LoadConst(0)),
+                    "Function constant index not updated".to_owned(),
                 ));
+                self.push(Inst::CaptureSet(vec![]));
+                self.push(Inst::MakeFunc);
             }
             Kind::Call(call) => self.visit_call(call)?,
             Kind::UnaryOp(op, b) => self.visit_unary_op(op, *b)?,

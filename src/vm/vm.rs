@@ -185,7 +185,8 @@ impl VM {
                     self.loc = (*start, *end);
                 }
                 LoadConst(index) => {
-                    self.push_const(code, *index)?;
+                    let obj = code.get_const(*index)?.clone();
+                    self.push(ValueStackKind::Constant(obj, *index));
                 }
                 // Modules
                 LoadModule(name) => {
@@ -411,20 +412,14 @@ impl VM {
                     }
                     self.push_temp(new::map(entries));
                 }
-                MakeFunc(func_const_index) => {
+                MakeFunc => {
                     let capture_set = self.pop_obj()?;
                     let capture_set = capture_set.read().unwrap();
                     let capture_set = capture_set.down_to_map().unwrap();
-
-                    if capture_set.is_empty() {
-                        self.push_const(code, *func_const_index)?;
-                    } else {
-                        log::trace!("CREATING CLOSURE FOR {func_const_index}");
-
-                        let func_ref = code.get_const(*func_const_index)?.clone();
-                        let func = func_ref.read().unwrap();
-                        let func = func.down_to_func().unwrap();
-
+                    if !capture_set.is_empty() {
+                        let func_ref = self.pop_obj()?;
+                        let func_obj = func_ref.read().unwrap();
+                        let func = func_obj.down_to_func().unwrap();
                         let mut captured = capture_set.to_hash_map();
 
                         // XXX: This gets around a chicken-and-egg
@@ -441,9 +436,7 @@ impl VM {
                             }
                         }
 
-                        let closure = new::closure(func_ref.clone(), captured);
-
-                        self.push_temp(closure);
+                        self.push_temp(new::closure(func_ref.clone(), captured));
                     }
                 }
                 // VM control
@@ -1020,12 +1013,6 @@ impl VM {
     fn push_global_const(&mut self, index: usize) -> RuntimeResult {
         let obj = self.ctx.get_global_const(index)?;
         self.push(ValueStackKind::GlobalConstant(obj, index));
-        Ok(())
-    }
-
-    fn push_const(&mut self, code: &Code, index: usize) -> RuntimeResult {
-        let obj = code.get_const(index)?.clone();
-        self.push(ValueStackKind::Constant(obj, index));
         Ok(())
     }
 
