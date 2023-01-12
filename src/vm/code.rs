@@ -73,16 +73,22 @@ impl Code {
     /// - Free vars are ignored for now since this is mainly intended
     ///   for extending modules (where there are no free vars) and not
     ///   functions
+    ///
+    /// IMPORTANT: ALL instructions that hold a const index MUST be
+    ///            updated here.
     pub fn extend(&mut self, mut code: Self) {
+        use Inst::{LoadConst, MakeFunc};
         let mut replacements = vec![];
         let const_offset = self.constants.len();
         for (addr, inst) in code.iter_chunk().enumerate() {
-            if let Inst::LoadConst(index) = inst {
-                replacements.push((addr, *index));
+            if let LoadConst(index) = inst {
+                replacements.push((addr, LoadConst(const_offset + index)));
+            } else if let MakeFunc(index) = inst {
+                replacements.push((addr, MakeFunc(const_offset + index)));
             }
         }
-        for (addr, index) in replacements {
-            code.replace_inst(addr, Inst::LoadConst(index + const_offset));
+        for (addr, inst) in replacements {
+            code.replace_inst(addr, inst);
         }
         self.chunk.extend(code.chunk);
         self.constants.extend(code.constants);
