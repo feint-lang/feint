@@ -4,15 +4,15 @@ use num_bigint::BigInt;
 
 use crate::vm::{RuntimeErr, RuntimeObjResult, VM};
 
-use super::gen;
+use super::gen::{use_arg, use_arg_str};
 use super::new;
 
 use super::base::ObjectRef;
 use super::result::Args;
 
 pub fn join(items: &[ObjectRef], args: &Args) -> RuntimeObjResult {
-    let arg = gen::use_arg!(args, 0);
-    let sep = gen::use_arg_str!(arg);
+    let arg = use_arg!(args, 0);
+    let sep = use_arg_str!(join, sep, arg);
     let n_items = items.len();
     let last_i = n_items - 1;
 

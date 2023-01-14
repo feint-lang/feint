@@ -7,7 +7,7 @@ use once_cell::sync::Lazy;
 use crate::format::render_template;
 use crate::vm::{RuntimeBoolResult, RuntimeErr, RuntimeObjResult};
 
-use super::gen;
+use super::gen::{self, use_arg, use_arg_str, use_arg_usize};
 use super::new;
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
@@ -25,7 +25,7 @@ pub static STR_TYPE: Lazy<new::obj_ref_t!(StrType)> = Lazy::new(|| {
     type_obj.add_attrs(&[
         // Class Methods -----------------------------------------------
         gen::meth!("new", type_ref, &["value"], "", |_, args, _| {
-            let arg = gen::use_arg!(args, 0);
+            let arg = use_arg!(args, 0);
             Ok(if arg.is_str() { args[0].clone() } else { new::str(arg.to_string()) })
         }),
         // Instance Attributes -----------------------------------------
@@ -38,15 +38,15 @@ pub static STR_TYPE: Lazy<new::obj_ref_t!(StrType)> = Lazy::new(|| {
         gen::meth!("starts_with", type_ref, &["prefix"], "", |this, args, _| {
             let this = this.read().unwrap();
             let value = this.get_str_val().unwrap();
-            let arg = gen::use_arg!(args, 0);
-            let prefix = gen::use_arg_str!(arg);
+            let arg = use_arg!(args, 0);
+            let prefix = use_arg_str!(starts_with, prefix, arg);
             Ok(new::bool(value.starts_with(prefix)))
         }),
         gen::meth!("ends_with", type_ref, &["suffix"], "", |this, args, _| {
             let this = this.read().unwrap();
             let value = this.get_str_val().unwrap();
-            let arg = gen::use_arg!(args, 0);
-            let suffix = gen::use_arg_str!(arg);
+            let arg = use_arg!(args, 0);
+            let suffix = use_arg_str!(ends_with, suffix, arg);
             Ok(new::bool(value.ends_with(suffix)))
         }),
         gen::meth!("upper", type_ref, &[], "", |this, _, _| {
@@ -81,17 +81,16 @@ pub static STR_TYPE: Lazy<new::obj_ref_t!(StrType)> = Lazy::new(|| {
         gen::meth!("repeat", type_ref, &["count"], "", |this, args, _| {
             let this = this.read().unwrap();
             let value = this.get_str_val().unwrap();
-            let arg1 = gen::use_arg!(args, 0);
-            let count = gen::use_arg_usize!(arg1);
+            let count = use_arg_usize!(get, index, args, 0);
             Ok(new::str(value.repeat(count)))
         }),
         gen::meth!("replace", type_ref, &["old", "new"], "", |this, args, _| {
             let this = this.read().unwrap();
             let value = this.get_str_val().unwrap();
-            let arg1 = gen::use_arg!(args, 0);
-            let arg2 = gen::use_arg!(args, 1);
-            let old = gen::use_arg_str!(arg1);
-            let new = gen::use_arg_str!(arg2);
+            let arg1 = use_arg!(args, 0);
+            let arg2 = use_arg!(args, 1);
+            let old = use_arg_str!(replace, old, arg1);
+            let new = use_arg_str!(replace, new, arg2);
             let result = value.replace(old, new);
             Ok(new::str(result))
         }),

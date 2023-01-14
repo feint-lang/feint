@@ -232,25 +232,39 @@ macro_rules! _use_arg_map {
 }
 
 macro_rules! use_arg_str {
-    ( $arg:ident ) => {{
+    ( $func_name:ident, $arg_name:ident, $arg:ident ) => {{
         if let Some(val) = $arg.get_str_val() {
             val
         } else {
-            // NOTE: This should never happen from user code.
-            let msg = format!("Expected string; got {}", $arg.class().read().unwrap());
-            return Err(RuntimeErr::arg_err(msg));
+            let msg = format!(
+                "{}() expected {} to be a Str",
+                stringify!($func_name),
+                stringify!($arg_name)
+            );
+            return Ok(new::arg_err(msg, new::nil()));
         }
     }};
 }
 
 macro_rules! use_arg_usize {
-    ( $arg:ident ) => {{
-        if let Some(val) = $arg.get_usize_val() {
-            val
+    ( $func_name:ident, $arg_name:ident, $args:ident, $index:literal ) => {{
+        if $index < $args.len() {
+            let arg = $args[$index].read().unwrap();
+            if let Some(val) = arg.get_usize_val() {
+                val
+            } else {
+                let msg = format!(
+                    "{}() expected {} to be an index (usize)",
+                    stringify!($func_name),
+                    stringify!($arg_name)
+                );
+                return Ok(new::arg_err(msg, new::nil()));
+            }
         } else {
             // NOTE: This should never happen from user code.
-            let msg = format!("Expected index; got {}", $arg.class().read().unwrap());
-            return Err(RuntimeErr::arg_err(msg));
+            let msg =
+                format!("{}() didn't receive enough args", stringify!($func_name));
+            return Err(RuntimeErr::index_out_of_bounds(msg, $index));
         }
     }};
 }

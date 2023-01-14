@@ -44,8 +44,7 @@ pub static TUPLE_TYPE: Lazy<new::obj_ref_t!(TupleType)> = Lazy::new(|| {
         gen::meth!("get", type_ref, &["index"], "", |this, args, _| {
             let this = this.read().unwrap();
             let this = this.down_to_tuple().unwrap();
-            let arg = gen::use_arg!(args, 0);
-            let index = gen::use_arg_usize!(arg);
+            let index = gen::use_arg_usize!(get, index, args, 0);
             let result = match this.get(index) {
                 Some(obj) => obj,
                 None => new::nil(),

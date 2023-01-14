@@ -124,7 +124,7 @@ mod str {
 
     #[test]
     fn test_starts_with_bad_arg() {
-        assert_result_is_err(run_text("'abc'.starts_with(1)"));
+        assert_result_is_err(run_text("assert('abc'.starts_with(1), '', true)"));
     }
 }
 
