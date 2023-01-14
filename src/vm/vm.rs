@@ -207,24 +207,15 @@ impl VM {
                 LoadVar(name) => {
                     if let Ok(depth) = self.ctx.get_var_depth(name.as_str(), None) {
                         self.push_var(depth, name.clone())?;
-                    } else if let Some(module) = module {
-                        if let Some(obj) = module.get_global(name) {
-                            self.push_temp(obj);
-                        } else {
-                            let obj = self.ctx.get_builtin(name.as_str())?;
-                            self.push_temp(obj);
-                        }
                     } else {
-                        let obj = self.ctx.get_builtin(name.as_str())?;
-                        self.push_temp(obj);
+                        self.push_temp_from_module_or_builtins(name, module);
                     }
                 }
                 LoadOuterVar(name) => {
                     if let Ok(depth) = self.ctx.get_outer_var_depth(name.as_str()) {
                         self.push_var(depth, name.clone())?;
                     } else {
-                        let obj = self.ctx.get_builtin(name.as_str())?;
-                        self.push_temp(obj);
+                        self.push_temp_from_module_or_builtins(name, module);
                     }
                 }
                 AssignCell(name) => {
@@ -1028,6 +1019,28 @@ impl VM {
             self.push(ValueStackKind::Var(obj_ref.clone(), depth, name));
         }
         Ok(())
+    }
+
+    /// This is the fallback when loading a var fails because `name`
+    /// isn't found. First, try getting the var from the specified
+    /// `module`'s globals (if a module was specified). Otherwise, fall
+    /// back to the builtins.
+    fn push_temp_from_module_or_builtins(
+        &mut self,
+        name: &str,
+        module: Option<&Module>,
+    ) {
+        if let Some(module) = module {
+            if let Some(obj) = module.get_global(name) {
+                self.push_temp(obj);
+            } else {
+                let obj = self.ctx.get_builtin(name);
+                self.push_temp(obj);
+            }
+        } else {
+            let obj = self.ctx.get_builtin(name);
+            self.push_temp(obj);
+        }
     }
 
     fn push_temp(&mut self, obj: ObjectRef) {

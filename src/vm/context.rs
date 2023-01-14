@@ -230,17 +230,10 @@ impl RuntimeContext {
 
     /// Get builtin object. This is used as a fallback when a name isn't
     /// found in the current scope.
-    /// TODO: Cache builtins up front (like before, just not in the
-    ///       global namespace).
-    pub fn get_builtin(&self, name: &str) -> RuntimeObjResult {
+    pub fn get_builtin(&self, name: &str) -> ObjectRef {
         let builtins = modules::BUILTINS.read().unwrap();
         let builtins = builtins.down_to_mod().unwrap();
-        if let Some(obj) = builtins.ns().get_obj(name) {
-            Ok(obj)
-        } else {
-            let message = format!("Name not found: {name}");
-            Err(RuntimeErr::name_err(message))
-        }
+        builtins.get_attr(name, modules::BUILTINS.clone())
     }
 
     pub fn iter_vars(&self) -> indexmap::map::Iter<'_, String, ObjectRef> {
