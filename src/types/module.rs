@@ -63,11 +63,6 @@ impl Module {
         self.ns.get_obj(name)
     }
 
-    pub fn get_last_added_global(&self) -> ObjectRef {
-        let (_, obj) = self.ns.get_last_obj().unwrap();
-        obj.clone()
-    }
-
     pub fn has_global(&self, name: &str) -> bool {
         self.ns.has(name)
     }
