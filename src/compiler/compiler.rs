@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::fmt;
 use std::fmt::Formatter;
 
@@ -44,10 +45,10 @@ impl Compiler {
     pub fn compile_script(
         &mut self,
         name: &str,
-        module: ast::Module,
+        ast_module: ast::Module,
         argv: &Vec<String>,
     ) -> CompResult {
-        let mut code = self.compile_module_to_code(name, module)?;
+        let mut code = self.compile_module_to_code(name, ast_module)?;
         if code.has_main() {
             let argc = argv.len();
             for arg in argv {
@@ -69,8 +70,12 @@ impl Compiler {
     }
 
     /// Compile AST module node to module object.
-    pub fn compile_module(&mut self, name: &str, module: ast::Module) -> CompResult {
-        let code = self.compile_module_to_code(name, module)?;
+    pub fn compile_module(
+        &mut self,
+        name: &str,
+        ast_module: ast::Module,
+    ) -> CompResult {
+        let code = self.compile_module_to_code(name, ast_module)?;
         let ns = Namespace::new();
         Ok(Module::new(name.to_owned(), ns, code, None))
     }
@@ -83,6 +88,7 @@ impl Compiler {
     ) -> Result<Code, CompErr> {
         let mut visitor = Visitor::for_module(name, self.check_names);
         visitor.visit_module(module)?;
+        let global_names = visitor.scope_tree.global_names();
         assert!(
             visitor.scope_tree.in_global_scope(),
             "Expected to be in global scope after compiling module"
@@ -91,10 +97,10 @@ impl Compiler {
         let func_nodes = visitor.func_nodes.to_vec();
         self.visitor_stack.push((visitor, 0));
         for (addr, scope_tree_pointer, name, node) in func_nodes {
-            self.compile_func(addr, scope_tree_pointer, name, node)?;
+            self.compile_func(addr, scope_tree_pointer, name, node, &global_names)?;
         }
         let mut visitor = self.visitor_stack.pop().unwrap().0;
-        // XXX: This keeps the stack clean and ensures there's always
+        // XXX: This keeps the stack clean and ensures there's always a
         //      jump target at the end of the module.
         visitor.push(Inst::Pop);
         Ok(visitor.code)
@@ -112,6 +118,10 @@ impl Compiler {
         parent_scope_pointer: usize,
         func_name: String,
         node: ast::Func,
+        // Global names in the module containing the function used for
+        // name-checking free vars that aren't found in an outer
+        // function.
+        global_names: &HashSet<String>,
     ) -> VisitResult {
         let stack = &mut self.visitor_stack;
         let params = node.params.clone();
@@ -121,7 +131,7 @@ impl Compiler {
 
         // Unresolved names are assumed to be builtins.
         let builtins = BUILTINS.read().unwrap();
-        let mut presumed_builtins = vec![];
+        let mut presumed_globals = vec![];
 
         // Captured vars in current function. These are free vars in the
         // current function that are defined in an enclosing function or
@@ -139,6 +149,11 @@ impl Compiler {
 
             for (up_visitor, up_scope_pointer) in stack.iter() {
                 found_stack_index -= 1;
+
+                // XXX: Don't capture globals (they're handled below).
+                if up_visitor.in_global_scope() {
+                    break;
+                }
 
                 let result = up_visitor
                     .scope_tree
@@ -183,13 +198,16 @@ impl Compiler {
             }
 
             if !found {
-                presumed_builtins.push((*free_var_addr, name.to_owned(), *start, *end));
+                presumed_globals.push((*free_var_addr, name.to_owned(), *start, *end));
             }
         }
 
-        for (addr, name, start, end) in presumed_builtins.into_iter() {
-            if builtins.has_global(name.as_str()) || !self.check_names {
-                visitor.replace(addr, Inst::LoadVar(name.to_owned()));
+        for (addr, name, start, end) in presumed_globals.into_iter() {
+            if !self.check_names
+                || global_names.contains(&name)
+                || builtins.has_global(name.as_str())
+            {
+                visitor.replace(addr, Inst::LoadOuterVar(name.to_owned()));
             } else {
                 return Err(CompErr::name_not_found(name, start, end));
             }
@@ -243,7 +261,7 @@ impl Compiler {
         let inner_func_nodes = visitor.func_nodes.to_vec();
         self.visitor_stack.push((visitor, parent_scope_pointer));
         for (addr, scope_tree_pointer, name, node) in inner_func_nodes {
-            self.compile_func(addr, scope_tree_pointer, name, node)?;
+            self.compile_func(addr, scope_tree_pointer, name, node, global_names)?;
         }
         let visitor = self.visitor_stack.pop().unwrap().0;
 

@@ -1,6 +1,6 @@
 //! The scope tree keeps track of nested scopes during compilation.
 //! Currently, it's only used resolve jump targets to labels.
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 pub struct ScopeTree {
     storage: Vec<Scope>,
@@ -9,16 +9,21 @@ pub struct ScopeTree {
 
 impl ScopeTree {
     pub fn new(initial_scope_kind: ScopeKind) -> Self {
-        let global_scope = Scope::new(initial_scope_kind, 0, None);
-        Self { storage: vec![global_scope], pointer: 0 }
+        let initial_scope = Scope::new(initial_scope_kind, 0, None);
+        Self { storage: vec![initial_scope], pointer: 0 }
     }
 
     pub fn pointer(&self) -> usize {
         self.pointer
     }
 
+    /// Whether the initial scope for this tree is a module.
+    pub fn is_module(&self) -> bool {
+        self.storage[0].is_module()
+    }
+
     pub fn in_global_scope(&self) -> bool {
-        self.current().is_global()
+        self.current().is_module()
     }
 
     pub fn in_func_scope(&self) -> bool {
@@ -35,6 +40,16 @@ impl ScopeTree {
 
     fn get_mut(&mut self, index: usize) -> &mut Scope {
         &mut self.storage[index]
+    }
+
+    /// Get global names for this scope tree. This will only be
+    /// populated if the tree's initial scope is a module.
+    pub fn global_names(&self) -> HashSet<String> {
+        if self.is_module() {
+            self.storage[0].vars.iter().map(|v| v.name.clone()).collect()
+        } else {
+            HashSet::new()
+        }
     }
 
     // Traversal -------------------------------------------------------
@@ -228,7 +243,7 @@ impl Scope {
         }
     }
 
-    pub fn is_global(&self) -> bool {
+    pub fn is_module(&self) -> bool {
         self.kind == ScopeKind::Module
     }
 
