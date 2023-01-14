@@ -213,9 +213,29 @@ pub trait ObjectTrait {
         }
 
         if name == "$dis" {
+            // User functions, bound functions wrapping user functions,
+            // and closures wrapping user functions can be disassembled.
             if let Some(f) = self.down_to_func() {
                 let mut dis = Disassembler::new();
                 dis.disassemble(f.code());
+            } else if let Some(b) = self.down_to_bound_func() {
+                let f = b.func();
+                let f = f.read().unwrap();
+                if let Some(f) = f.down_to_func() {
+                    let mut dis = Disassembler::new();
+                    dis.disassemble(f.code());
+                } else {
+                    eprintln!("Cannot disassemble bound func: {}", b);
+                }
+            } else if let Some(c) = self.down_to_closure() {
+                let f = c.func();
+                let f = f.read().unwrap();
+                if let Some(f) = f.down_to_func() {
+                    let mut dis = Disassembler::new();
+                    dis.disassemble(f.code());
+                } else {
+                    eprintln!("Cannot disassemble closure: {}", c);
+                }
             } else if let Some(m) = self.down_to_mod() {
                 let mut dis = Disassembler::new();
                 dis.disassemble(m.code());
