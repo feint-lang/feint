@@ -84,7 +84,7 @@ pub enum Token {
     Continue,      // continue
     Return,        // return
     Jump,          // jump label
-    Label(String), // label:
+    Label(String), // :label:
 
     // Import/export ---------------------------------------------------
     Import,  // import <module>

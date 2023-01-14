@@ -86,12 +86,12 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
         let token = self.expect_next_token()?;
         let start = token.start;
         let statement = match token.token {
-            Jump => self.jump(start)?,
-            Label(name) => self.label(name, start)?,
             Break => self.break_(start)?,
             Continue => self.continue_(start, token.end)?,
-            Return => self.return_(start)?,
             Import => self.import(start)?,
+            Jump => self.jump(start)?,
+            Label(name) => self.label(name, start)?,
+            Return => self.return_(start)?,
             _ => {
                 self.lookahead_queue.push_front(token);
                 let expr = self.expr(0)?;
@@ -155,6 +155,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
         Ok(ast::Statement::new_return(expr, start, end))
     }
 
+    /// Handle `import`.
     fn import(&mut self, start: Location) -> StatementResult {
         let name_expr = self.expr(0)?;
         if let Some(name) = name_expr.is_ident() {

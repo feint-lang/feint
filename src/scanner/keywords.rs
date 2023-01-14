@@ -10,10 +10,6 @@ pub static KEYWORDS: Lazy<HashMap<&'static str, Token>> = Lazy::new(|| {
         ("nil", Nil),
         ("true", True),
         ("false", False),
-        ("import", Import),
-        ("export", Export),
-        ("from", From),
-        ("package", Package),
         ("as", As),
         ("block", Block),
         ("if", If),
@@ -22,8 +18,12 @@ pub static KEYWORDS: Lazy<HashMap<&'static str, Token>> = Lazy::new(|| {
         ("loop", Loop),
         ("break", Break),
         ("continue", Continue),
-        ("return", Return),
         ("jump", Jump),
+        ("import", Import),
+        ("export", Export),
+        ("from", From),
+        ("package", Package),
+        ("return", Return),
     ]
     .iter()
     .cloned()

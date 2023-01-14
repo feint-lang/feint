@@ -42,26 +42,18 @@ pub struct Statement {
 
 #[derive(Clone, PartialEq)]
 pub enum StatementKind {
-    Jump(String),
-    Label(String, Expr),
     Break(Expr),
     Continue,
-    Return(Expr),
     Import(String),
+    Jump(String),
+    Label(String, Expr),
+    Return(Expr),
     Expr(Expr),
 }
 
 impl Statement {
     pub fn new(kind: StatementKind, start: Location, end: Location) -> Self {
         Self { kind, start, end }
-    }
-
-    pub fn new_jump(name: String, start: Location, end: Location) -> Self {
-        Self::new(StatementKind::Jump(name), start, end)
-    }
-
-    pub fn new_label(name: String, expr: Expr, start: Location, end: Location) -> Self {
-        Self::new(StatementKind::Label(name, expr), start, end)
     }
 
     pub fn new_break(expr: Expr, start: Location, end: Location) -> Self {
@@ -72,12 +64,20 @@ impl Statement {
         Self::new(StatementKind::Continue, start, end)
     }
 
-    pub fn new_return(expr: Expr, start: Location, end: Location) -> Self {
-        Self::new(StatementKind::Return(expr), start, end)
-    }
-
     pub fn new_import(name: String, start: Location, end: Location) -> Self {
         Self::new(StatementKind::Import(name), start, end)
+    }
+
+    pub fn new_jump(name: String, start: Location, end: Location) -> Self {
+        Self::new(StatementKind::Jump(name), start, end)
+    }
+
+    pub fn new_label(name: String, expr: Expr, start: Location, end: Location) -> Self {
+        Self::new(StatementKind::Label(name, expr), start, end)
+    }
+
+    pub fn new_return(expr: Expr, start: Location, end: Location) -> Self {
+        Self::new(StatementKind::Return(expr), start, end)
     }
 
     pub fn new_expr(expr: Expr, start: Location, end: Location) -> Self {
@@ -94,15 +94,15 @@ impl fmt::Debug for Statement {
 impl fmt::Debug for StatementKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Expr(expr) => write!(f, "{:?}", expr),
+            Self::Break(expr) => write!(f, "break {expr:?}"),
+            Self::Continue => write!(f, "continue"),
+            Self::Import(name) => write!(f, "import {name:?}"),
+            Self::Jump(label_index) => write!(f, "jump: {label_index}",),
             Self::Label(label_index, expr) => {
                 write!(f, "label: {label_index} {expr:?}")
             }
-            Self::Jump(label_index) => write!(f, "jump: {label_index}",),
-            Self::Break(expr) => write!(f, "break {expr:?}"),
-            Self::Continue => write!(f, "continue"),
             Self::Return(expr) => write!(f, "return {expr:?}"),
-            Self::Import(name) => write!(f, "import {name:?}"),
+            Self::Expr(expr) => write!(f, "{:?}", expr),
         }
     }
 }

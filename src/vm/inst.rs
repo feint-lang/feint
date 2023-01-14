@@ -78,7 +78,8 @@ pub enum Inst {
     // it.
     Call(usize),
 
-    // Return is a jump target that exits the function's scope.
+    // RETURN is a jump target at the end of a function. Its only
+    // purpose is to serve as a jump target for explicit returns.
     Return,
 
     // These make compound objects from the top N items on the stack.

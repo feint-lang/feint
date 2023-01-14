@@ -405,6 +405,9 @@ impl Visitor {
     fn visit_statement(&mut self, node: ast::Statement) -> VisitResult {
         type Kind = ast::StatementKind;
         match node.kind {
+            Kind::Break(expr) => self.visit_break(expr)?,
+            Kind::Continue => self.visit_continue()?,
+            Kind::Import(name) => self.visit_import(name)?,
             Kind::Jump(name) => {
                 let jump_addr = self.len();
                 self.push(Inst::Placeholder(
@@ -423,10 +426,7 @@ impl Visitor {
                     ));
                 }
             }
-            Kind::Break(expr) => self.visit_break(expr)?,
-            Kind::Continue => self.visit_continue()?,
             Kind::Return(expr) => self.visit_return(expr)?,
-            Kind::Import(name) => self.visit_import(name)?,
             Kind::Expr(expr) => self.visit_expr(expr, None)?,
         }
         Ok(())
@@ -443,17 +443,17 @@ impl Visitor {
         Ok(())
     }
 
-    fn visit_return(&mut self, expr: ast::Expr) -> VisitResult {
-        self.visit_expr(expr, None)?;
-        self.push(Inst::ReturnPlaceholder(self.len(), self.scope_depth));
-        Ok(())
-    }
-
     fn visit_import(&mut self, name: String) -> VisitResult {
         self.scope_tree.add_var(self.len(), name.as_str(), true);
         self.push(Inst::DeclareVar(name.clone()));
         self.push(Inst::LoadModule(name.clone()));
         self.push(Inst::AssignVar(name));
+        Ok(())
+    }
+
+    fn visit_return(&mut self, expr: ast::Expr) -> VisitResult {
+        self.visit_expr(expr, None)?;
+        self.push(Inst::ReturnPlaceholder(self.len(), self.scope_depth));
         Ok(())
     }
 
