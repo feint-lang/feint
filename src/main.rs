@@ -30,6 +30,12 @@ fn main() -> ExitCode {
         .num_args(1)
         .help("Use this to run short snippets of code");
 
+    let dis_arg = Arg::new("dis")
+        .short('i')
+        .long("dis")
+        .action(ArgAction::SetTrue)
+        .help("disassemble instructions?");
+
     let history_path_arg = Arg::new("history_path")
         .long("history-path")
         .required(false)
@@ -70,18 +76,10 @@ fn main() -> ExitCode {
                 .help("Maximum call/recursion depth"),
         )
         .arg(
-            Arg::new("dis")
-                .short('i')
-                .long("dis")
-                .action(ArgAction::SetTrue)
-                .help("disassemble instructions?"),
-        )
-        .arg(
             Arg::new("debug")
                 .short('d')
                 .long("debug")
-                .action(ArgAction::Set)
-                .default_value("false")
+                .action(ArgAction::SetTrue)
                 .value_parser(FalseyValueParser::new())
                 .env("FEINT_DEBUG")
                 .help("Enable debug mode?"),
@@ -89,6 +87,7 @@ fn main() -> ExitCode {
         // Subcommand: run (when no subcommand is specified)
         .arg(&file_name_arg)
         .arg(&code_arg)
+        .arg(&dis_arg)
         .arg(&history_path_arg)
         .arg(&no_history_arg)
         .arg(&argv_arg)
@@ -98,6 +97,7 @@ fn main() -> ExitCode {
                 .about("Run script or code")
                 .arg(&file_name_arg)
                 .arg(&code_arg)
+                .arg(&dis_arg)
                 .arg(&history_path_arg)
                 .arg(&no_history_arg)
                 .arg(&argv_arg),
