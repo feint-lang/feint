@@ -1,15 +1,14 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 use once_cell::sync::Lazy;
 
-use crate::vm::RuntimeErr;
+use crate::vm::{RuntimeErr, DEFAULT_MAX_CALL_DEPTH};
 
 pub static CONFIG: Lazy<Arc<RwLock<Config>>> =
     Lazy::new(|| Arc::new(RwLock::new(Config::default())));
 
 pub struct Config {
-    known_names: HashSet<String>,
     entries: HashMap<String, ValKind>,
 }
 
@@ -23,23 +22,21 @@ type NameResult = Result<(), RuntimeErr>;
 
 impl Default for Config {
     fn default() -> Self {
-        let names = [
+        use ValKind::*;
+        let mut entries = HashMap::new();
+        entries.insert(
             "builtin_module_search_path".to_owned(),
-            "max_call_depth".to_owned(),
-            "debug".to_owned(),
-        ];
-        let names = HashSet::from(names);
-        Self::new(names)
+            Str("src/modules".to_owned()),
+        );
+        entries.insert("max_call_depth".to_owned(), Usize(DEFAULT_MAX_CALL_DEPTH));
+        entries.insert("debug".to_owned(), Bool(false));
+        Self { entries }
     }
 }
 
 impl Config {
-    pub fn new(known_names: HashSet<String>) -> Self {
-        Self { known_names, entries: HashMap::new() }
-    }
-
     fn check_name(&self, name: &str) -> NameResult {
-        if self.known_names.contains(name) {
+        if self.entries.contains_key(name) {
             Ok(())
         } else {
             Err(RuntimeErr::config_name_not_known(name))
