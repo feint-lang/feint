@@ -445,6 +445,7 @@ impl Visitor {
                 }
             }
             Kind::Return(expr) => self.visit_return(expr)?,
+            Kind::Throw(expr) => self.visit_throw(expr)?,
             Kind::Expr(expr) => self.visit_expr(expr, None)?,
         }
         Ok(())
@@ -466,6 +467,12 @@ impl Visitor {
         self.push(Inst::DeclareVar(name.clone()));
         self.push(Inst::LoadModule(name.clone()));
         self.push(Inst::AssignVar(name));
+        Ok(())
+    }
+
+    fn visit_throw(&mut self, expr: ast::Expr) -> VisitResult {
+        self.visit_expr(expr, None)?;
+        self.push(Inst::Throw);
         Ok(())
     }
 

@@ -492,6 +492,7 @@ impl Executor {
             NameErr(message) => format!("Name error: {message}"),
             TypeErr(message) => format!("Type error: {message}"),
             NotCallable(type_name) => format!("Object is not callable: {type_name}"),
+            Throw(obj) => format!("{}", obj.read().unwrap()),
             kind => format!("Unhandled runtime error: {}", kind),
         };
         if self.debug {
