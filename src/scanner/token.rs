@@ -186,7 +186,7 @@ impl Token {
             Self::Return => "return",
             Self::Jump => "jump",
             Self::Label(_name) => "label",
-            Self::Throw => "throw",
+            Self::Throw => "$throw",
 
             // Import/export ---------------------------------------------------
             Self::Import => "import",
