@@ -64,6 +64,7 @@ impl Compiler {
             name.to_owned(),
             Namespace::with_entries(&[("$doc", new::str("$main script module"))]),
             code,
+            None,
         ))
     }
 
@@ -71,7 +72,7 @@ impl Compiler {
     pub fn compile_module(&mut self, name: &str, module: ast::Module) -> CompResult {
         let code = self.compile_module_to_code(name, module)?;
         let ns = Namespace::new();
-        Ok(Module::new(name.to_owned(), ns, code))
+        Ok(Module::new(name.to_owned(), ns, code, None))
     }
 
     /// Compile AST module node to code object.

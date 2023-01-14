@@ -31,19 +31,24 @@ pub struct Module {
 gen::standard_object_impls!(Module);
 
 impl Module {
-    pub fn new(name: String, ns: Namespace, code: Code) -> Self {
-        let name_global = new::str(name.as_str());
-        let doc = code.get_doc();
-        let mut module = Self { ns, name, code };
-        module.add_global("$name", name_global);
-        if !module.has_global("$doc") {
-            module.add_global("$doc", doc);
+    /// NOTE: The `$doc` attribute should only be passed for builtin
+    ///       modules implemented in Rust and for special cases such as
+    ///       the REPL module. Modules implemented in FeInt will have
+    ///       their `$doc` attribute initialized from their module level
+    ///       docstring.
+    pub fn new(name: String, mut ns: Namespace, code: Code, doc: Option<&str>) -> Self {
+        ns.add_obj("$name", new::str(name.as_str()));
+        if let Some(doc) = doc {
+            ns.add_obj("$doc", new::str(doc));
+        } else {
+            let doc = code.get_doc();
+            ns.add_obj("$doc", doc);
         }
-        module
+        Self { ns, name, code }
     }
 
-    pub fn with_name(name: &str) -> Self {
-        Self::new(name.to_owned(), Namespace::new(), Code::new())
+    pub fn with_name(name: &str, doc: Option<&str>) -> Self {
+        Self::new(name.to_owned(), Namespace::new(), Code::new(), doc)
     }
 
     pub fn name(&self) -> &str {

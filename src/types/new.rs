@@ -143,8 +143,8 @@ pub fn builtin_func(
     obj_ref!(BuiltinFunc::new(name.to_owned(), this_type, params, str(doc), func))
 }
 
-pub fn builtin_module(name: &str, ns: Namespace) -> obj_ref_t!(Module) {
-    obj_ref!(Module::new(name.into(), ns, Code::new()))
+pub fn builtin_module(name: &str, ns: Namespace, doc: &str) -> obj_ref_t!(Module) {
+    obj_ref!(Module::new(name.into(), ns, Code::new(), Some(doc)))
 }
 
 pub fn cell() -> ObjectRef {
@@ -271,14 +271,6 @@ pub fn list(items: Vec<ObjectRef>) -> ObjectRef {
 pub fn map(entries: Vec<(String, ObjectRef)>) -> ObjectRef {
     let entries: IndexMap<String, ObjectRef> = entries.into_iter().collect();
     obj_ref!(Map::new(entries))
-}
-
-pub fn _module<S: Into<String>>(
-    name: S,
-    ns: Namespace,
-    code: Code,
-) -> obj_ref_t!(Module) {
-    obj_ref!(Module::new(name.into(), ns, code))
 }
 
 pub fn prop(getter: ObjectRef) -> ObjectRef {

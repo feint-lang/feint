@@ -17,7 +17,6 @@ use super::proc::PROC;
 
 pub static SYSTEM: Lazy<new::obj_ref_t!(Module)> = Lazy::new(|| {
     let entries: Vec<(&str, ObjectRef)> = vec![
-        ("$doc", new::str("System module")),
         ("argv", new::empty_tuple()),
         (
             "modules",
@@ -73,7 +72,7 @@ pub static SYSTEM: Lazy<new::obj_ref_t!(Module)> = Lazy::new(|| {
         ),
     ];
 
-    new::builtin_module("system", Namespace::with_entries(&entries))
+    new::builtin_module("system", Namespace::with_entries(&entries), "System module")
 });
 
 /// Add system module to `system.modules`, set `argv`, etc. This has to

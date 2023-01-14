@@ -30,7 +30,6 @@ use crate::vm::{RuntimeErr, RuntimeObjResult};
 
 pub static BUILTINS: Lazy<new::obj_ref_t!(Module)> = Lazy::new(|| {
     let entries: Vec<(&str, ObjectRef)> = vec![
-        ("$doc", new::str("Builtins module")),
         ("Type", TYPE_TYPE.clone()),
         ("Always", ALWAYS_TYPE.clone()),
         ("Bool", BOOL_TYPE.clone()),
@@ -207,7 +206,11 @@ pub static BUILTINS: Lazy<new::obj_ref_t!(Module)> = Lazy::new(|| {
         ),
     ];
 
-    new::builtin_module("builtins", Namespace::with_entries(&entries))
+    new::builtin_module(
+        "builtins",
+        Namespace::with_entries(&entries),
+        "Builtins module",
+    )
 });
 
 fn print(args: &Args, err: bool) -> RuntimeObjResult {
