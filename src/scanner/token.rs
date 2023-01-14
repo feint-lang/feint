@@ -85,7 +85,7 @@ pub enum Token {
     Return,        // return
     Jump,          // jump label
     Label(String), // :label:
-    Throw,
+    Halt,
 
     // Import/export ---------------------------------------------------
     Import,  // import <module>
@@ -186,7 +186,7 @@ impl Token {
             Self::Return => "return",
             Self::Jump => "jump",
             Self::Label(_name) => "label",
-            Self::Throw => "$throw",
+            Self::Halt => "$halt",
 
             // Import/export ---------------------------------------------------
             Self::Import => "import",

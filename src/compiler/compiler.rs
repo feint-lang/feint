@@ -445,7 +445,7 @@ impl Visitor {
                 }
             }
             Kind::Return(expr) => self.visit_return(expr)?,
-            Kind::Throw(expr) => self.visit_throw(expr)?,
+            Kind::Halt(expr) => self.visit_halt(expr)?,
             Kind::Expr(expr) => self.visit_expr(expr, None)?,
         }
         Ok(())
@@ -470,9 +470,9 @@ impl Visitor {
         Ok(())
     }
 
-    fn visit_throw(&mut self, expr: ast::Expr) -> VisitResult {
+    fn visit_halt(&mut self, expr: ast::Expr) -> VisitResult {
         self.visit_expr(expr, None)?;
-        self.push(Inst::Throw);
+        self.push(Inst::HaltTop);
         Ok(())
     }
 

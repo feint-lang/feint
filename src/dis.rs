@@ -109,7 +109,6 @@ impl Disassembler {
             InplaceOp(op) => self.align("INPLACE_OP", op),
             Call(num_args) => self.align("CALL", num_args),
             Return => self.align("RETURN", ""),
-            Throw => self.align("THROW", ""),
             MakeString(n) => self.align("MAKE_STRING", n),
             MakeTuple(n) => self.align("MAKE_TUPLE", n),
             MakeList(n) => self.align("MAKE_LIST", n),

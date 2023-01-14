@@ -335,18 +335,6 @@ impl VM {
                     // a marker for the end of a function and a jump
                     // target for explicit returns.
                 }
-                Throw => {
-                    let obj = self.pop_obj()?;
-                    {
-                        let obj = obj.read().unwrap();
-                        if let Some(int) = obj.down_to_int() {
-                            if let Some(exit_code) = int.value().to_u8() {
-                                return Err(RuntimeErr::exit(exit_code));
-                            }
-                        }
-                    }
-                    return Err(RuntimeErr::throw(obj));
-                }
                 // Object construction
                 MakeString(n) => {
                     let objects = self.pop_n_obj(*n)?;

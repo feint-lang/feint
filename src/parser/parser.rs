@@ -83,7 +83,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
         log::trace!("BEGIN STATEMENT level {level}");
         self.statement_level += 1;
         use Token::{
-            Break, Continue, EndOfStatement, Import, Jump, Label, Return, Throw,
+            Break, Continue, EndOfStatement, Halt, Import, Jump, Label, Return,
         };
         let token = self.expect_next_token()?;
         let start = token.start;
@@ -94,7 +94,7 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
             Jump => self.jump(start)?,
             Label(name) => self.label(name, start)?,
             Return => self.return_(start)?,
-            Throw => self.throw(start)?,
+            Halt => self.halt(start)?,
             _ => {
                 self.lookahead_queue.push_front(token);
                 let expr = self.expr(0)?;
@@ -158,11 +158,11 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
         Ok(ast::Statement::new_return(expr, start, end))
     }
 
-    /// Handle `throw`.
-    fn throw(&mut self, start: Location) -> StatementResult {
+    /// Handle `halt`. Arg must be an int in the u8 range.
+    fn halt(&mut self, start: Location) -> StatementResult {
         let expr = self.expr(0)?;
         let end = expr.end;
-        Ok(ast::Statement::new_throw(expr, start, end))
+        Ok(ast::Statement::new_halt(expr, start, end))
     }
 
     /// Handle `import`.

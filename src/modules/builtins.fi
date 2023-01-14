@@ -54,14 +54,14 @@ assert: Bool | Err = (condition: Bool, ...) =>
     Args:
         condition: Bool
         message?: Any
-        throw?: Bool = false
+        halt?: Bool = false
 
     Returns:
         true: if the assertion succeeded
-        Err: if the assertion failed and `throw` is unset
+        Err: if the assertion failed and `halt` is unset
 
-    Throws:
-        RuntimeErr: if the assertion failed and `throw` is set
+    NOTE: If `halt` is set, the program will be exit immediately with
+          an error code.
 
     "
     if condition ->
@@ -74,6 +74,6 @@ assert: Bool | Err = (condition: Bool, ...) =>
             *   -> Err.new(ErrType.assertion, Str.new(msg))
 
         if $args.get(1) ->
-            $throw err
+            $halt 1
 
         err

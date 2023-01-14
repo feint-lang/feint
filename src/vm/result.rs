@@ -121,10 +121,6 @@ impl RuntimeErr {
     pub fn arg_err<S: Into<String>>(message: S) -> Self {
         Self::new(RuntimeErrKind::ArgErr(message.into()))
     }
-
-    pub fn throw(obj: ObjectRef) -> Self {
-        Self::new(RuntimeErrKind::Throw(obj))
-    }
 }
 
 impl fmt::Display for RuntimeErr {
@@ -158,7 +154,6 @@ pub enum RuntimeErrKind {
     IndexOutOfBounds(String, usize),
     NotCallable(String),
     ArgErr(String),
-    Throw(ObjectRef),
 }
 
 impl fmt::Display for RuntimeErrKind {

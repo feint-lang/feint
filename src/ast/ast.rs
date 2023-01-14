@@ -48,7 +48,7 @@ pub enum StatementKind {
     Jump(String),
     Label(String, Expr),
     Return(Expr),
-    Throw(Expr),
+    Halt(Expr),
     Expr(Expr),
 }
 
@@ -81,8 +81,8 @@ impl Statement {
         Self::new(StatementKind::Return(expr), start, end)
     }
 
-    pub fn new_throw(expr: Expr, start: Location, end: Location) -> Self {
-        Self::new(StatementKind::Throw(expr), start, end)
+    pub fn new_halt(expr: Expr, start: Location, end: Location) -> Self {
+        Self::new(StatementKind::Halt(expr), start, end)
     }
 
     pub fn new_expr(expr: Expr, start: Location, end: Location) -> Self {
@@ -107,7 +107,7 @@ impl fmt::Debug for StatementKind {
                 write!(f, "label: {label_index} {expr:?}")
             }
             Self::Return(expr) => write!(f, "return {expr:?}"),
-            Self::Throw(expr) => write!(f, "throw {expr:?}"),
+            Self::Halt(expr) => write!(f, "halt {expr:?}"),
             Self::Expr(expr) => write!(f, "{:?}", expr),
         }
     }

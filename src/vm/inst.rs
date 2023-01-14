@@ -82,11 +82,6 @@ pub enum Inst {
     // purpose is to serve as a jump target for explicit returns.
     Return,
 
-    // THROW provides a simplistic way to exit and print an error. It
-    // can be used as a synonym for system.exit() by throwing an Int
-    // that can be interpreted as an exit code (a u8).
-    Throw,
-
     // These make compound objects from the top N items on the stack.
     MakeString(usize),
     MakeTuple(usize),
