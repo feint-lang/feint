@@ -37,11 +37,11 @@ macro_rules! type_and_impls {
                 type_obj
             }
 
-            pub fn set_attr(&mut self, name: &str, val: ObjectRef) {
-                self.ns.add_entry(name, val);
+            pub fn add_attr(&mut self, name: &str, val: ObjectRef) {
+                self.ns.add_obj(name, val);
             }
 
-            pub fn set_attrs(&mut self, attrs: &[(&str, ObjectRef)]) {
+            pub fn add_attrs(&mut self, attrs: &[(&str, ObjectRef)]) {
                 self.ns.add_entries(attrs);
             }
         }

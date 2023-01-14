@@ -80,10 +80,10 @@ pub static ERR_TYPE_TYPE: Lazy<new::obj_ref_t!(ErrTypeType)> = Lazy::new(|| {
 
     // Types as class attributes
     for kind in ERR_KINDS.iter() {
-        type_obj.set_attr(kind.name(), new::obj_ref!(ErrTypeObj::new(kind.clone())));
+        type_obj.add_attr(kind.name(), new::obj_ref!(ErrTypeObj::new(kind.clone())));
     }
 
-    type_obj.set_attrs(&[
+    type_obj.add_attrs(&[
         // Instance Attributes -----------------------------------------
         gen::prop!("name", type_ref, "", |this, _, _| {
             let this = this.read().unwrap();

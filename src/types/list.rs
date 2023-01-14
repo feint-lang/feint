@@ -23,7 +23,7 @@ pub static LIST_TYPE: Lazy<new::obj_ref_t!(ListType)> = Lazy::new(|| {
     let type_ref = new::obj_ref!(ListType::new());
     let mut type_obj = type_ref.write().unwrap();
 
-    type_obj.set_attrs(&[
+    type_obj.add_attrs(&[
         // Instance Attributes -----------------------------------------
         gen::prop!("length", type_ref, "", |this, _, _| {
             let this = this.read().unwrap();

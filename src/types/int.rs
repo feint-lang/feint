@@ -30,7 +30,7 @@ pub static INT_TYPE: Lazy<new::obj_ref_t!(IntType)> = Lazy::new(|| {
     let type_ref = new::obj_ref!(IntType::new());
     let mut type_obj = type_ref.write().unwrap();
 
-    type_obj.set_attrs(&[
+    type_obj.add_attrs(&[
         ("$doc", new::str(DOC)),
         // Class Methods -----------------------------------------------
         gen::meth!("new", type_ref, &["value"], "", |_, args, _| {
