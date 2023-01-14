@@ -37,7 +37,7 @@ impl Executor {
     ) -> Self {
         let vm = VM::new(RuntimeContext::new(), max_call_depth);
         let current_file_name = "<none>".to_owned();
-        modules::init_system_module(&argv);
+        modules::bootstrap(&argv);
         Self { vm, argv, incremental, dis, debug, current_file_name }
     }
 

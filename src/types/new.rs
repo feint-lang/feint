@@ -177,10 +177,6 @@ pub fn arg_err<S: Into<String>>(msg: S, obj: ObjectRef) -> ObjectRef {
     err(ErrKind::Arg, msg, obj)
 }
 
-pub fn assertion_err<S: Into<String>>(msg: S, obj: ObjectRef) -> ObjectRef {
-    err(ErrKind::Assertion, msg, obj)
-}
-
 pub fn attr_err<S: Into<String>>(msg: S, obj: ObjectRef) -> ObjectRef {
     err(ErrKind::Attr, msg, obj)
 }

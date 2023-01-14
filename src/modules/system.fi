@@ -1,0 +1,6 @@
+exit = (...) =>
+    "Exit program with return code."
+    code = match $args.length ->
+        0 -> 0
+        * -> $args.0
+    throw code

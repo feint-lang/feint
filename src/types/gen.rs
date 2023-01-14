@@ -219,14 +219,25 @@ macro_rules! use_arg {
 // The use_arg_<type> macros convert the supplied arg to a value of the
 // given type if possible or return an Err if not.
 
-macro_rules! _use_arg_map {
-    ( $arg:ident ) => {{
-        if let Some(map) = $arg.get_map_val() {
-            map
+macro_rules! use_arg_bool {
+    ( $func_name:ident, $arg_name:ident, $args:ident, $index:literal ) => {{
+        if $index < $args.len() {
+            let arg = $args[$index].read().unwrap();
+            if let Some(val) = arg.get_bool_val() {
+                *val
+            } else {
+                let msg = format!(
+                    "{}() expected {} to be a Bool",
+                    stringify!($func_name),
+                    stringify!($arg_name)
+                );
+                return Ok(new::arg_err(msg, new::nil()));
+            }
         } else {
-            // note: this should never happen from user code.
-            let msg = format!("Expected map; got {}", $arg.class().read().unwrap());
-            return Err(RuntimeErr::arg_err(msg));
+            // NOTE: This should never happen from user code.
+            let msg =
+                format!("{}() didn't receive enough args", stringify!($func_name));
+            return Err(RuntimeErr::index_out_of_bounds(msg, $index));
         }
     }};
 }
@@ -272,5 +283,6 @@ macro_rules! use_arg_usize {
 pub(crate) use meth;
 pub(crate) use prop;
 pub(crate) use use_arg;
+pub(crate) use use_arg_bool;
 pub(crate) use use_arg_str;
 pub(crate) use use_arg_usize;

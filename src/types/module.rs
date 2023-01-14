@@ -67,6 +67,10 @@ impl Module {
         self.ns.has(name)
     }
 
+    pub fn iter_globals(&self) -> indexmap::map::Iter<'_, String, ObjectRef> {
+        self.ns.iter()
+    }
+
     pub fn code(&self) -> &Code {
         &self.code
     }

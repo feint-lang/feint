@@ -190,7 +190,7 @@ impl VM {
                 }
                 // Modules
                 LoadModule(name) => {
-                    let (module, _) = modules::get_module(name.as_str())?;
+                    let module = modules::get_module(name.as_str())?;
                     self.push_temp(module);
                 }
                 // Vars
