@@ -12,7 +12,8 @@ fn execute_simple_program() {
     code.push_inst(Inst::LoadConst(j));
     code.push_inst(Inst::BinaryOp(BinaryOperator::Add));
     code.push_inst(Inst::Halt(0));
-    assert!(matches!(vm.execute_code(None, &code, 0), Ok(VMState::Halted(0))));
+    assert!(matches!(vm.execute_code(None, &code, 0), Ok(())));
+    assert!(matches!(vm.state, VMState::Halted(0)));
 }
 
 #[test]

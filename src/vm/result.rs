@@ -6,7 +6,7 @@ use crate::parser::ParseErr;
 use crate::types::ObjectRef;
 
 pub type CallDepth = usize;
-pub type VMExeResult = Result<VMState, RuntimeErr>;
+pub type VMExeResult = Result<(), RuntimeErr>;
 pub type RuntimeResult = Result<(), RuntimeErr>;
 pub type RuntimeObjResult = Result<ObjectRef, RuntimeErr>;
 pub type RuntimeBoolResult = Result<bool, RuntimeErr>;
@@ -17,8 +17,9 @@ pub type PopNObjResult = Result<Vec<ObjectRef>, RuntimeErr>;
 pub type PeekResult<'a> = Result<&'a ValueStackKind, RuntimeErr>;
 pub type PeekObjResult = Result<ObjectRef, RuntimeErr>;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum VMState {
+    Running,
     Idle(Option<ObjectRef>),
     Halted(u8),
 }

@@ -61,6 +61,7 @@ impl CallFrame {
 
 pub struct VM {
     pub(crate) ctx: RuntimeContext,
+    pub(crate) state: VMState,
     // The scope stack contains pointers into the value stack. When a
     // scope is entered, the current, pre-scope stack position is
     // recorded. When a scope is exited, its corresponding pointer is
@@ -96,6 +97,7 @@ impl VM {
         let sigint_flag = Arc::new(AtomicBool::new(false));
         VM {
             ctx,
+            state: VMState::Idle(None),
             scope_stack: Stack::with_capacity(max_call_depth),
             value_stack: Stack::with_capacity(max_call_depth * 8),
             call_stack: Stack::with_capacity(max_call_depth),
@@ -128,6 +130,8 @@ impl VM {
     ) -> VMExeResult {
         use Inst::*;
 
+        self.set_running();
+
         let handle_sigint = self.handle_sigint;
         let sigint_flag = self.sigint_flag.clone();
         let mut sigint_counter = 0u32;
@@ -138,7 +142,10 @@ impl VM {
         let len_chunk = code.len_chunk();
 
         match start.cmp(&len_chunk) {
-            cmp::Ordering::Equal => return Ok(VMState::Idle(None)),
+            cmp::Ordering::Equal => {
+                self.set_idle(None);
+                return Ok(());
+            }
             cmp::Ordering::Greater => panic!("Code start index out of bounds"),
             _ => (),
         }
@@ -444,48 +451,45 @@ impl VM {
                 }
                 // VM control
                 Halt(return_code) => {
-                    self.halt();
-                    break Ok(VMState::Halted(*return_code));
+                    self.halt(*return_code);
+                    break Ok(());
                 }
                 HaltTop => {
                     let obj = self.pop_obj()?;
                     let obj = obj.read().unwrap();
                     let return_code = match obj.get_int_val() {
-                        Some(int) => {
-                            self.halt();
-                            int.to_u8().unwrap_or(255)
-                        }
-                        None => 0,
+                        Some(int) => int.to_u8().unwrap_or(255),
+                        None => 255,
                     };
-                    break Ok(VMState::Halted(return_code));
+                    self.halt(return_code);
+                    break Ok(());
                 }
                 // Placeholders
                 Placeholder(addr, inst, message) => {
-                    self.halt();
                     eprintln!(
                         "Placeholder at {addr} was not updated: {inst:?}\n{message}"
                     );
-                    break Ok(VMState::Halted(255));
+                    self.halt(255);
                 }
                 FreeVarPlaceholder(addr, name) => {
-                    self.halt();
                     eprintln!("Var placeholder at {addr} was not updated: {name}");
-                    break Ok(VMState::Halted(255));
+                    self.halt(255);
+                    break Ok(());
                 }
                 BreakPlaceholder(addr, _) => {
-                    self.halt();
                     eprintln!("Break placeholder at {addr} was not updated");
-                    break Ok(VMState::Halted(255));
+                    self.halt(255);
+                    break Ok(());
                 }
                 ContinuePlaceholder(addr, _) => {
-                    self.halt();
                     eprintln!("Continue placeholder at {addr} was not updated");
-                    break Ok(VMState::Halted(255));
+                    self.halt(255);
+                    break Ok(());
                 }
                 ReturnPlaceholder(addr, _) => {
-                    self.halt();
                     eprintln!("Return placeholder at {addr} was not updated");
-                    break Ok(VMState::Halted(255));
+                    self.halt(255);
+                    break Ok(());
                 }
                 // Miscellaneous
                 PrintTop => {
@@ -512,7 +516,8 @@ impl VM {
                 if sigint_counter == 1024 {
                     if sigint_flag.load(Ordering::Relaxed) {
                         self.handle_sigint();
-                        break Ok(VMState::Idle(None));
+                        self.set_idle(None);
+                        break Ok(());
                     }
                     sigint_counter = 0;
                 }
@@ -524,16 +529,12 @@ impl VM {
             } else {
                 ip += 1;
                 if ip == len_chunk {
-                    break Ok(VMState::Idle(
-                        self.peek_obj().map_or_else(|_| None, Some),
-                    ));
+                    let top = self.peek_obj().map_or_else(|_| None, Some);
+                    self.set_idle(top.clone());
+                    break Ok(());
                 }
             }
         }
-    }
-
-    pub fn halt(&mut self) {
-        self.reset();
     }
 
     /// Get location of current statement (start and end).
@@ -556,7 +557,26 @@ impl VM {
         self.reset();
     }
 
-    /// Reset internal state.
+    // State -----------------------------------------------------------
+
+    fn set_running(&mut self) {
+        self.state = VMState::Running;
+    }
+
+    fn set_idle(&mut self, obj: Option<ObjectRef>) {
+        self.state = VMState::Idle(obj);
+    }
+
+    pub fn halt(&mut self, exit_code: u8) {
+        self.state = VMState::Halted(exit_code);
+        self.reset();
+    }
+
+    pub fn is_halted(&self) -> bool {
+        matches!(self.state, VMState::Halted(_))
+    }
+
+    /// Completely reset internal state.
     fn reset(&mut self) {
         self.scope_stack.truncate(0);
         self.value_stack.truncate(0);
@@ -751,6 +771,9 @@ impl VM {
 
     // NOTE: Popping a call frame is very similar to exiting a scope.
     fn pop_call_frame(&mut self) -> RuntimeResult {
+        if self.is_halted() {
+            return Ok(());
+        }
         let return_val = self.pop_obj();
         if let Some(frame) = self.call_stack.pop() {
             self.value_stack.truncate(frame.stack_pointer);

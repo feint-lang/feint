@@ -109,6 +109,7 @@ impl Repl {
 
         if let Ok(vm_state) = result {
             return match vm_state {
+                VMState::Running => None,
                 VMState::Idle(_) => None,
                 VMState::Halted(0) => None,
                 VMState::Halted(code) => {

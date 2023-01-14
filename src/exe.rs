@@ -64,7 +64,7 @@ impl Executor {
     }
 
     pub fn halt(&mut self) {
-        self.vm.halt();
+        self.vm.halt(0);
     }
 
     pub fn install_sigint_handler(&mut self) {
@@ -177,11 +177,11 @@ impl Executor {
             self.display_vm_state(&result);
         }
         match result {
-            Ok(state) => {
+            Ok(()) => {
                 for (name, obj) in self.vm.ctx.globals().iter() {
                     module.add_global(name, obj.clone());
                 }
-                Ok(state)
+                Ok(self.vm.state.clone())
             }
             Err(err) => {
                 if let RuntimeErrKind::Exit(code) = err.kind {

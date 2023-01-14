@@ -48,7 +48,12 @@ fn exit(result: ExeResult) -> ExitResult {
         Ok(vm_state) => match vm_state {
             VMState::Halted(0) => Ok(None),
             VMState::Halted(code) => Err((code, None)),
-            VMState::Idle(_) => Err((255, Some("Never halted".to_owned()))),
+            VMState::Running => {
+                Err((255, Some("VM should be halted, not running".to_owned())))
+            }
+            VMState::Idle(_) => {
+                Err((255, Some("VM should be halted, not idle".to_owned())))
+            }
         },
         // TODO: Return error code depending on error type?
         Err(err) => {
