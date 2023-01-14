@@ -172,7 +172,7 @@ pub(crate) use type_and_impls;
 ///
 /// Returns a 2-tuple containing the method name and the builtin
 /// function object itself. This makes it easy to add the method to the
-/// type's namespace by calling `ns.add_entry(meth!(...))`.
+/// type's namespace by calling `ns.add_obj(meth!(...))`.
 macro_rules! meth {
     ( $name:literal, $this_type:expr, $params:expr, $doc:literal, $func:expr ) => {
         (

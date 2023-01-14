@@ -52,13 +52,6 @@ impl Namespace {
         self.objects.insert(name.into(), obj);
     }
 
-    /// This is a special case of `add_obj` that accepts an "entry"
-    /// instead of a separate name and object, where an "entry" is a
-    /// 2-tuple containing the name and object.
-    pub fn add_entry<S: Into<String>>(&mut self, name: S, val: ObjectRef) {
-        self.objects.insert(name.into(), val);
-    }
-
     pub fn add_entries(&mut self, entries: &[(&str, ObjectRef)]) {
         self.objects.extend(entries.iter().map(|(k, v)| (k.to_string(), v.clone())));
     }
