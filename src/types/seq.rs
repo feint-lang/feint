@@ -13,6 +13,11 @@ use super::result::Args;
 pub fn join(items: &[ObjectRef], args: &Args) -> RuntimeObjResult {
     let arg = use_arg!(args, 0);
     let sep = use_arg_str!(join, sep, arg);
+
+    if items.is_empty() {
+        return Ok(new::empty_str());
+    }
+
     let n_items = items.len();
     let last_i = n_items - 1;
 
