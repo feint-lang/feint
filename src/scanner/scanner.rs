@@ -199,7 +199,9 @@ impl<'a, T: BufRead> Scanner<'a, T> {
             Some(('%', _, _)) => Percent,
             Some(('^', _, _)) => Caret,
             Some((c @ '0'..='9', _, _)) => self.handle_number(c, start)?,
-            Some(('_', _, _)) => self.handle_ident('_', IdentKind::Ident, start)?,
+            Some(('_', _, _)) => {
+                self.handle_ident('_', IdentKind::Placeholder, start)?
+            }
             Some((c @ 'a'..='z', _, _)) => {
                 self.handle_ident(c, IdentKind::Ident, start)?
             }
@@ -372,16 +374,6 @@ impl<'a, T: BufRead> Scanner<'a, T> {
     ) -> AddTokenResult {
         use IdentKind::*;
 
-        // Special case for underscore placeholder vars.
-        if first_char == '_' {
-            let count = self.consume_contiguous('_') + 1;
-            let mut ident = String::with_capacity(count as usize);
-            for _ in 0..count {
-                ident.push('_');
-            }
-            return Ok(Token::Ident(ident));
-        }
-
         let ident = self.read_ident(first_char);
 
         let kind = match self.check_ident(ident.as_str(), kind, start) {
@@ -397,33 +389,28 @@ impl<'a, T: BufRead> Scanner<'a, T> {
             }
         };
 
-        let ident_token = match kind {
-            Ident => {
-                // Keyword
-                if let Some(token) = KEYWORDS.get(ident.as_str()) {
-                    if token == &Token::If {
-                        self.if_stack.push(start);
-                    } else if token == &Token::Else {
-                        if self.maybe_exit_inline_scope(start, true) {
-                            self.add_token_to_queue(
-                                Token::EndOfStatement,
-                                start,
-                                start,
-                            );
-                        }
-                        self.if_stack.pop();
-                    }
-                    return Ok(token.clone());
+        // Keyword (NOTE: keywords can use any ident style)
+        if let Some(token) = KEYWORDS.get(ident.as_str()) {
+            if token == &Token::If {
+                self.if_stack.push(start);
+            } else if token == &Token::Else {
+                if self.maybe_exit_inline_scope(start, true) {
+                    self.add_token_to_queue(Token::EndOfStatement, start, start);
                 }
-
-                // Ident
-                Token::Ident(ident)
+                self.if_stack.pop();
             }
+            return Ok(token.clone());
+        }
+
+        let ident_token = match kind {
+            Ident => Token::Ident(ident),
             Const => Token::ConstIdent(ident),
             Type => Token::TypeIdent(ident),
             TypeFunc => Token::TypeFuncIdent(ident),
             Special => Token::SpecialIdent(ident),
+            Placeholder => Token::Ident(ident),
         };
+
         Ok(ident_token)
     }
 
@@ -992,6 +979,16 @@ impl<'a, T: BufRead> Scanner<'a, T> {
                     ))
                 }
             }
+            Placeholder => {
+                if PLACEHOLDER_IDENT_REGEX.is_match(ident) {
+                    Ok(kind)
+                } else {
+                    Err(ScanErr::new(
+                        ErrKind::InvalidPlaceholderIdent(ident.to_owned()),
+                        start,
+                    ))
+                }
+            }
         }
     }
 }
@@ -1023,6 +1020,7 @@ enum IdentKind {
     Type,
     TypeFunc,
     Special,
+    Placeholder, // one or more contiguous underscores
 }
 
 static IDENT_REGEX: Lazy<Regex> =
@@ -1033,3 +1031,6 @@ static CONST_IDENT_REGEX: Lazy<Regex> =
 
 static TYPE_IDENT_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^([A-Z]|[A-Z][A-Za-z0-9]*[A-Za-z0-9])$").unwrap());
+
+static PLACEHOLDER_IDENT_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^_+$").unwrap());

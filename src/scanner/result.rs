@@ -53,4 +53,5 @@ pub enum ScanErrKind {
     InvalidConstOrTypeIdent(String),
     InvalidTypeFuncIdent(String),
     InvalidSpecialIdent(String),
+    InvalidPlaceholderIdent(String),
 }
