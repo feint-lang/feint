@@ -5,7 +5,7 @@ pub mod config;
 pub mod dis;
 pub mod exe;
 pub mod repl;
-pub mod run;
+pub mod result;
 pub mod vm;
 
 mod ast;
@@ -13,7 +13,6 @@ mod compiler;
 mod format;
 mod modules;
 mod parser;
-mod result;
 mod scanner;
 mod types;
 mod util;

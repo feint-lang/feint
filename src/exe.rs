@@ -37,7 +37,6 @@ impl Executor {
     ) -> Self {
         let vm = VM::new(RuntimeContext::new(), max_call_depth);
         let current_file_name = "<none>".to_owned();
-        modules::bootstrap(&argv);
         Self { vm, argv, incremental, dis, debug, current_file_name }
     }
 
@@ -60,6 +59,19 @@ impl Executor {
             dis: false,
             debug: false,
             current_file_name,
+        }
+    }
+
+    /// Bootstrap and return error on failure.
+    pub fn bootstrap(&self) -> Result<(), ExeErr> {
+        modules::bootstrap(&self.argv)
+    }
+
+    /// Bootstrap and panic on failure. This is intended for use in,
+    /// e.g., tests.
+    pub fn bootstrap_panic(&self) {
+        if let Err(err) = self.bootstrap() {
+            panic!("{err}");
         }
     }
 

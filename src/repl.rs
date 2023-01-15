@@ -7,23 +7,10 @@ use rustyline::error::ReadlineError;
 use crate::dis;
 use crate::exe::Executor;
 use crate::parser::ParseErrKind;
-use crate::result::{ExeErr, ExeErrKind, ExitResult};
+use crate::result::{ExeErr, ExeErrKind, ExeResult};
 use crate::scanner::ScanErrKind;
 use crate::types::{Module, ObjectTrait};
 use crate::vm::VMState;
-
-/// Run FeInt REPL until user exits.
-pub fn run(
-    history_path: Option<PathBuf>,
-    argv: Vec<String>,
-    dis: bool,
-    debug: bool,
-) -> ExitResult {
-    let mut executor = Executor::new(256, argv, true, dis, debug);
-    executor.install_sigint_handler();
-    let mut repl = Repl::new(history_path, executor);
-    repl.run()
-}
 
 pub struct Repl {
     module: Module,
@@ -42,7 +29,7 @@ impl Repl {
         Repl { module, reader, history_path, executor }
     }
 
-    fn run(&mut self) -> ExitResult {
+    pub fn run(&mut self) -> ExeResult {
         println!("Welcome to the FeInt REPL (read/eval/print loop)");
         println!("Type a line of code, then hit Enter to evaluate it");
         self.load_history();
@@ -65,12 +52,13 @@ impl Repl {
                 }
                 // User hit Ctrl-D
                 Err(ReadlineError::Eof) => {
-                    break Ok(None);
+                    break Ok(VMState::Halted(0));
                 }
                 // Unexpected error encountered while attempting to read
                 // a line.
                 Err(err) => {
-                    break Err((1, Some(format!("Could not read line: {}", err))));
+                    let msg = format!("Could not read line: {}", err);
+                    break Err(ExeErr::new(ExeErrKind::ReplErr(msg)));
                 }
             }
         };
@@ -93,36 +81,41 @@ impl Repl {
     }
 
     /// Evaluate text. Returns `None` to indicate to the main loop to
-    /// continue reading and evaluating input. Returns an `ExitResult`
-    /// to indicate to the main loop to exit.
-    pub fn eval(&mut self, text: &str, continue_on_err: bool) -> Option<ExitResult> {
+    /// continue reading and evaluating input. Returns an `ExeResult` to
+    /// indicate to the main loop to exit.
+    pub fn eval(&mut self, text: &str, continue_on_err: bool) -> Option<ExeResult> {
         self.add_history_entry(text);
 
         if matches!(text, ".exit" | ".quit") {
-            return Some(Ok(None));
+            return Some(Ok(VMState::Halted(0)));
         } else if self.handle_command(text) {
             return None;
         }
 
         let result = self.executor.execute_repl(text, &mut self.module);
 
-        if let Ok(vm_state) = result {
-            return match vm_state {
-                VMState::Running => None,
-                VMState::Idle(_) => None,
-                VMState::Halted(0) => Some(Ok(None)),
-                VMState::Halted(code) => Some(Err((code, None))),
-            };
-        }
+        match result {
+            Ok(vm_state) => {
+                return match vm_state {
+                    VMState::Running => None,
+                    VMState::Idle(_) => None,
+                    // Halted:
+                    state => Some(Ok(state)),
+                };
+            }
+            Err(err) => {
+                // If the special Exit err is returned, exit.
+                if let Some(code) = err.exit_code() {
+                    return Some(Ok(VMState::Halted(code)));
+                }
 
-        let err = result.unwrap_err();
-
-        // If there's an error executing the current input, try to add
-        // more lines *if* the error can potentially be recovered from
-        // by adding more input.
-
-        if !(continue_on_err && self.continue_on_err(err)) {
-            return None;
+                // If there's an error executing the current input, try
+                // to add more lines *if* the error can potentially be
+                // recovered from by adding more input.
+                if !(continue_on_err && self.continue_on_err(err)) {
+                    return None;
+                }
+            }
         }
 
         // Add input until 2 successive blank lines are entered.
@@ -147,8 +140,8 @@ impl Repl {
                     blank_line_count = 0;
                 }
             } else {
-                let message = format!("{}", read_line_result.unwrap_err());
-                break Some(Err((2, Some(message))));
+                let msg = format!("{}", read_line_result.unwrap_err());
+                break Some(Err(ExeErr::new(ExeErrKind::ReplErr(msg))));
             }
         }
     }

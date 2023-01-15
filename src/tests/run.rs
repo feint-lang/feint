@@ -1,15 +1,17 @@
-use crate::result::ExitResult;
-use crate::run;
+use crate::exe::Executor;
+use crate::result::ExeResult;
 
-fn run_text(source: &str) -> ExitResult {
-    run::run_text(source, 16, vec![], false, false)
+fn run_text(text: &str) -> ExeResult {
+    let mut exe = Executor::new(16, vec![], false, false, false);
+    exe.bootstrap_panic();
+    exe.execute_text(text)
 }
 
-fn assert_result_is_ok(result: ExitResult) {
+fn assert_result_is_ok(result: ExeResult) {
     assert!(result.is_ok(), "{:?}", result.err());
 }
 
-fn assert_result_is_err(result: ExitResult) {
+fn assert_result_is_err(result: ExeResult) {
     assert!(result.is_err(), "{:?}", result);
 }
 

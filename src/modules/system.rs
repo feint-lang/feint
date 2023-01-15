@@ -6,9 +6,8 @@ use once_cell::sync::Lazy;
 
 use crate::config::CONFIG;
 use crate::exe::Executor;
-use crate::result::{ExeErr, ExeErrKind};
 use crate::types::{new, Module, Namespace, ObjectRef, ObjectTrait};
-use crate::vm::{RuntimeErr, RuntimeErrKind};
+use crate::vm::RuntimeErr;
 
 use super::builtins::BUILTINS;
 use super::proc::PROC;
@@ -85,12 +84,13 @@ pub fn load_fi_module(name: &str) -> Result<ObjectRef, RuntimeErr> {
         let result = executor.load_module(name, path.as_path());
         return match result {
             Ok(module) => Ok(new::obj_ref!(module)),
-            Err(ExeErr {
-                kind: ExeErrKind::RuntimeErr(RuntimeErrKind::Exit(code)),
-            }) => Err(RuntimeErr::exit(code)),
             Err(err) => {
-                let msg = format!("{name}:\n\n{err}");
-                Ok(new::module_could_not_be_loaded(msg, SYSTEM.clone()))
+                if let Some(code) = err.exit_code() {
+                    Err(RuntimeErr::exit(code))
+                } else {
+                    let msg = format!("{name}:\n\n{err}");
+                    Ok(new::module_could_not_be_loaded(msg, SYSTEM.clone()))
+                }
             }
         };
     }

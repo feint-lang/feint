@@ -1,7 +1,6 @@
-use num_traits::ToPrimitive;
-
+use crate::result::{ExeErr, ExeErrKind};
 use crate::types::{new, ObjectRef, ObjectTrait};
-use crate::vm::{RuntimeErr, RuntimeErrKind};
+use crate::vm::RuntimeErrKind;
 
 use super::builtins::BUILTINS;
 use super::system::{load_fi_module, SYSTEM};
@@ -14,7 +13,7 @@ use super::system::{load_fi_module, SYSTEM};
 ///    a deadlock.
 /// 3. Add objects implemented in FeInt modules to base modules
 ///    implemented in Rust.
-pub fn bootstrap(argv: &[String]) {
+pub fn bootstrap(argv: &[String]) -> Result<(), ExeErr> {
     {
         // XXX: New scopes ensure all locks are dropped.
         let mut system = SYSTEM.write().unwrap();
@@ -28,13 +27,16 @@ pub fn bootstrap(argv: &[String]) {
             if let Some(modules) = modules.down_to_map() {
                 modules.add("system".to_owned(), SYSTEM.clone());
             } else {
-                panic!("Expected system.modules to be a Map; got {modules}");
+                let msg = format!("Expected system.modules to be a Map; got {modules}");
+                return Err(ExeErr::new(ExeErrKind::Bootstrap(msg)));
             }
         }
     }
 
-    extend_module("builtins", BUILTINS.clone());
-    extend_module("system", SYSTEM.clone());
+    extend_module("builtins", BUILTINS.clone())?;
+    extend_module("system", SYSTEM.clone())?;
+
+    Ok(())
 }
 
 /// Extend a module implemented in Rust with the corresponding module
@@ -46,7 +48,7 @@ pub fn bootstrap(argv: &[String]) {
 ///      would need to be named to make them private (e.g.,
 ///      `$builtins`), but currently it's not possible to import a name
 ///      starting with a `$`.
-fn extend_module(name: &str, base_module_ref: ObjectRef) {
+fn extend_module(name: &str, base_module_ref: ObjectRef) -> Result<(), ExeErr> {
     let result = load_fi_module(name);
 
     match result {
@@ -58,33 +60,26 @@ fn extend_module(name: &str, base_module_ref: ObjectRef) {
                     base_module.ns_mut().add_obj(name, val.clone());
                 }
             } else {
-                panic!(
-                    concat!(
-                        "Panicking during attempt to load module {}.fi during bootstrap.\n",
-                        "Expected {}.fi to be a module; got {}.",
-                    ),
-                    name, name, module
-                );
+                let msg = format!("Expected {name}.fi to be a module; got {module}.",);
+                return Err(ExeErr::new(ExeErrKind::Bootstrap(msg)));
             }
         }
-        Err(RuntimeErr { kind: RuntimeErrKind::Exit(code) }) => {
-            eprintln!(
-                concat!(
+        Err(err) => {
+            return Err(if let RuntimeErrKind::Exit(_) = err.kind {
+                eprintln!(
+                    concat!(
                     "Exiting during attempt to load module {}.fi during bootstrap.\n",
                     "This was most likely caused by a module level system.exit() or $halt."
-                ),
-                name
-            );
-            std::process::exit(code.to_i32().unwrap_or(-255));
-        }
-        Err(err) => {
-            panic!(
-                concat!(
-                    "Panicking during attempt to load module {}.fi during bootstrap.\n",
-                    "Could not load {}.fi due to error: {}.",
-                ),
-                name, name, err
-            );
+                    ),
+                    name
+                );
+                ExeErr::new(ExeErrKind::RuntimeErr(err.kind))
+            } else {
+                let msg = format!("Could not load {name}.fi due to error: {err}.");
+                ExeErr::new(ExeErrKind::Bootstrap(msg))
+            });
         }
     }
+
+    Ok(())
 }

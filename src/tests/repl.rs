@@ -36,8 +36,9 @@ fn eval_if_with_no_block() {
 // Utilities -----------------------------------------------------------
 
 fn eval(input: &str) {
-    let executor = Executor::new(16, vec![], false, false, false);
-    let mut repl = Repl::new(None, executor);
+    let exe = Executor::new(16, vec![], false, false, false);
+    exe.bootstrap_panic();
+    let mut repl = Repl::new(None, exe);
     match repl.eval(input, false) {
         Some(Ok(_)) => assert!(false),
         Some(Err(_)) => assert!(false),

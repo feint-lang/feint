@@ -5,18 +5,6 @@ use crate::vm::{RuntimeErrKind, VMState};
 use core::fmt;
 use std::fmt::Formatter;
 
-/// Result type used by top level runners.
-///
-/// On success, Ok(None) or OK(Some(String)) should be returned. In both
-/// cases, the program will exit with error code 0. In the latter case,
-/// the specified message will be printed to stdout just before exiting.
-///
-/// On error, Err((u8, Option<(String))) should be returned. Note
-/// that on error, a message is *always* required. The program will
-/// print the specified message to stderr and then exit with the
-/// specified error code.
-pub(crate) type ExitResult = Result<Option<String>, (u8, Option<String>)>;
-
 /// Result type used by top level program executor.
 pub(crate) type ExeResult = Result<VMState, ExeErr>;
 
@@ -29,15 +17,26 @@ impl ExeErr {
     pub fn new(kind: ExeErrKind) -> Self {
         Self { kind }
     }
+
+    /// Return exit code if this error wraps a runtime exit error.
+    pub fn exit_code(&self) -> Option<u8> {
+        if let ExeErrKind::RuntimeErr(RuntimeErrKind::Exit(code)) = self.kind {
+            Some(code)
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(Debug)]
 pub enum ExeErrKind {
+    Bootstrap(String),
     CouldNotReadSourceFile(String),
     ScanErr(ScanErrKind),
     ParseErr(ParseErrKind),
     CompErr(CompErrKind),
     RuntimeErr(RuntimeErrKind),
+    ReplErr(String),
 }
 
 impl fmt::Display for ExeErr {
@@ -50,6 +49,9 @@ impl fmt::Display for ExeErrKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         use ExeErrKind::*;
         let msg = match self {
+            Bootstrap(msg) => {
+                format!("Bootstrap process failed: {msg}")
+            }
             CouldNotReadSourceFile(file_name) => {
                 format!("Could not read source file: {file_name}")
             }
@@ -57,6 +59,7 @@ impl fmt::Display for ExeErrKind {
             ParseErr(kind) => format!("Parse error: {kind:?}"),
             CompErr(kind) => format!("Compilation error: {kind:?}"),
             RuntimeErr(kind) => format!("Runtime error: {kind:?}"),
+            ReplErr(msg) => format!("REPL error: {msg}"),
         };
         write!(f, "{msg}")
     }

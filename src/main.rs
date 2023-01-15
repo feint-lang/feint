@@ -6,9 +6,10 @@ use clap::builder::FalseyValueParser;
 use clap::{parser::ValueSource, value_parser, Arg, ArgAction, ArgMatches, Command};
 
 use feint::config::CONFIG;
-use feint::repl;
-use feint::run;
-use feint::vm::{CallDepth, RuntimeErr, DEFAULT_MAX_CALL_DEPTH};
+use feint::exe::Executor;
+use feint::repl::Repl;
+use feint::result::ExeErrKind;
+use feint::vm::{CallDepth, RuntimeErr, VMState, DEFAULT_MAX_CALL_DEPTH};
 
 /// Interpret a file if one is specified. Otherwise, run the REPL.
 fn main() -> ExitCode {
@@ -115,7 +116,6 @@ fn main() -> ExitCode {
     let builtin_module_search_path =
         matches.get_one::<String>("builtin_module_search_path").unwrap();
     let max_call_depth = *matches.get_one("max_call_depth").unwrap();
-    let dis = *matches.get_one::<bool>("dis").unwrap();
     let debug = *matches.get_one::<bool>("debug").unwrap();
 
     let max_call_depth = match matches.value_source("max_call_depth") {
@@ -142,9 +142,9 @@ fn main() -> ExitCode {
     drop(config);
 
     let return_code = match matches.subcommand() {
-        Some(("run", matches)) => handle_run(matches, max_call_depth, dis, debug),
-        Some(("test", matches)) => handle_test(matches, max_call_depth, dis, debug),
-        None => handle_run(&matches, max_call_depth, dis, debug),
+        Some(("run", matches)) => handle_run(matches, max_call_depth, debug),
+        Some(("test", matches)) => handle_test(matches, max_call_depth, debug),
+        None => handle_run(&matches, max_call_depth, debug),
         Some((name, _)) => {
             unreachable!("Subcommand not defined: {}", name);
         }
@@ -172,68 +172,73 @@ fn check_config_results(
 }
 
 /// Subcommand: run
-fn handle_run(
-    matches: &ArgMatches,
-    max_call_depth: CallDepth,
-    dis: bool,
-    debug: bool,
-) -> u8 {
+fn handle_run(matches: &ArgMatches, max_call_depth: CallDepth, debug: bool) -> u8 {
     let file_name = matches.get_one::<String>("FILE_NAME");
     let code = matches.get_one::<String>("code");
+    let dis = *matches.get_one::<bool>("dis").unwrap();
     let history_path = matches.get_one::<String>("history_path");
     let save_repl_history = !matches.get_one::<bool>("no_history").unwrap();
-    let argv = matches
+    let mut argv: Vec<String> = matches
         .get_many::<String>("argv")
         .unwrap_or_default()
         .map(|v| v.to_string())
         .collect();
 
-    let result = if let Some(code) = code {
-        if let Some(file_name) = file_name {
-            let mut new_argv = vec![file_name.to_owned()];
-            new_argv.extend(argv);
-            run::run_text(code, max_call_depth, new_argv, dis, debug)
-        } else {
-            run::run_text(code, max_call_depth, argv, dis, debug)
+    // When running code via -c, the file_name is actually the first
+    // arg in argv.
+    if code.is_some() {
+        if let Some(arg) = file_name {
+            argv.insert(0, arg.to_owned());
         }
+    }
+
+    let mut exe = Executor::new(max_call_depth, argv, false, dis, debug);
+
+    // XXX: Stop clippy from erroneously suggesting `exe.bootstrap()?`.
+    #[allow(clippy::question_mark)]
+    let exe_result = if let Err(err) = exe.bootstrap() {
+        Err(err)
+    } else if let Some(code) = code {
+        exe.execute_text(code)
     } else if let Some(file_name) = file_name {
         if file_name == "-" {
-            run::run_stdin(max_call_depth, argv, dis, debug)
+            exe.execute_stdin()
         } else {
             let path = get_script_file_path(file_name);
-            run::run_file(&path, max_call_depth, argv, dis, debug)
+            exe.execute_file(path.as_path())
         }
     } else {
-        match save_repl_history {
-            true => {
-                let history_path = create_repl_history_file(history_path);
-                repl::run(history_path, argv, dis, debug)
-            }
-            false => repl::run(None, argv, dis, debug),
-        }
+        let history_path = create_repl_history_file(&save_repl_history, history_path);
+        exe.install_sigint_handler();
+        let mut repl = Repl::new(history_path, exe);
+        repl.run()
     };
 
-    match result {
-        Ok(Some(message)) => {
-            println!("{message}");
-            0
+    match exe_result {
+        Ok(vm_state) => match vm_state {
+            VMState::Running => {
+                eprintln!("VM should be idle or halted, not running");
+                255
+            }
+            VMState::Idle(_) => 0,
+            VMState::Halted(0) => 0,
+            VMState::Halted(code) => code,
+        },
+        Err(err) => {
+            let exit_code = err.exit_code().unwrap_or(255);
+            match err.kind {
+                ExeErrKind::Bootstrap(message) => eprintln!("{message}"),
+                ExeErrKind::CouldNotReadSourceFile(message) => eprintln!("{message}"),
+                ExeErrKind::ReplErr(message) => eprintln!("{message}"),
+                _ => (),
+            }
+            exit_code
         }
-        Ok(None) => 0,
-        Err((code, Some(message))) => {
-            eprintln!("{message}");
-            code
-        }
-        Err((code, None)) => code,
     }
 }
 
 /// Subcommand: test
-fn handle_test(
-    _matches: &ArgMatches,
-    _max_call_depth: CallDepth,
-    _dis: bool,
-    _debug: bool,
-) -> u8 {
+fn handle_test(_matches: &ArgMatches, _max_call_depth: CallDepth, _debug: bool) -> u8 {
     println!("Command test not yet implemented");
     0
 }
@@ -265,7 +270,11 @@ fn get_script_file_path(name: &String) -> PathBuf {
 }
 
 /// Convert REPL history path from CLI to a `PathBuf`, if possible.
-fn create_repl_history_file(path: Option<&String>) -> Option<PathBuf> {
+fn create_repl_history_file(cond: &bool, path: Option<&String>) -> Option<PathBuf> {
+    if !cond {
+        return None;
+    }
+
     let default = String::from("repl-history");
     let path = str_to_path_buf(path, Some(&default));
 
