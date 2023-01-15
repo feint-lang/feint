@@ -1,4 +1,7 @@
+use num_traits::ToPrimitive;
+
 use crate::types::{new, ObjectRef, ObjectTrait};
+use crate::vm::{RuntimeErr, RuntimeErrKind};
 
 use super::builtins::BUILTINS;
 use super::system::{load_fi_module, SYSTEM};
@@ -55,11 +58,33 @@ fn extend_module(name: &str, base_module_ref: ObjectRef) {
                     base_module.ns_mut().add_obj(name, val.clone());
                 }
             } else {
-                panic!("Expected {name}.fi to be a module; got {module}");
+                panic!(
+                    concat!(
+                        "Panicking during attempt to load module {}.fi during bootstrap.\n",
+                        "Expected {}.fi to be a module; got {}.",
+                    ),
+                    name, name, module
+                );
             }
         }
+        Err(RuntimeErr { kind: RuntimeErrKind::Exit(code) }) => {
+            eprintln!(
+                concat!(
+                    "Exiting during attempt to load module {}.fi during bootstrap.\n",
+                    "This was most likely caused by a module level system.exit() or $halt."
+                ),
+                name
+            );
+            std::process::exit(code.to_i32().unwrap_or(-255));
+        }
         Err(err) => {
-            panic!("Could not load {name}.fi module: {err}");
+            panic!(
+                concat!(
+                    "Panicking during attempt to load module {}.fi during bootstrap.\n",
+                    "Could not load {}.fi due to error: {}.",
+                ),
+                name, name, err
+            );
         }
     }
 }

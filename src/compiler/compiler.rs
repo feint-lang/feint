@@ -58,8 +58,6 @@ impl Compiler {
             code.push_inst(Inst::LoadVar("$main".to_string()));
             code.push_inst(Inst::Call(argc));
             code.push_inst(Inst::HaltTop);
-        } else {
-            code.push_inst(Inst::Halt(0));
         }
         Ok(Module::new(
             name.to_owned(),

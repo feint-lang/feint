@@ -46,16 +46,13 @@ pub fn run_text(
 fn exit(result: ExeResult) -> ExitResult {
     match result {
         Ok(vm_state) => match vm_state {
+            VMState::Running => {
+                Err((255, Some("VM should be idle or halted, not running".to_owned())))
+            }
+            VMState::Idle(_) => Ok(None),
             VMState::Halted(0) => Ok(None),
             VMState::Halted(code) => Err((code, None)),
-            VMState::Running => {
-                Err((255, Some("VM should be halted, not running".to_owned())))
-            }
-            VMState::Idle(_) => {
-                Err((255, Some("VM should be halted, not idle".to_owned())))
-            }
         },
-        // TODO: Return error code depending on error type?
         Err(err) => {
             let message = match err.kind {
                 ExeErrKind::CouldNotReadSourceFile(message) => Some(message),

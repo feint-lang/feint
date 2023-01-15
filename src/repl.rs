@@ -74,7 +74,6 @@ impl Repl {
                 }
             }
         };
-        self.executor.halt();
         result
     }
 
@@ -93,9 +92,9 @@ impl Repl {
         }
     }
 
-    /// Evaluate text. Returns None to indicate to the main loop to
-    /// continue reading and evaluating input. Returns some result to
-    /// indicate to the main loop to exit.
+    /// Evaluate text. Returns `None` to indicate to the main loop to
+    /// continue reading and evaluating input. Returns an `ExitResult`
+    /// to indicate to the main loop to exit.
     pub fn eval(&mut self, text: &str, continue_on_err: bool) -> Option<ExitResult> {
         self.add_history_entry(text);
 
@@ -111,10 +110,8 @@ impl Repl {
             return match vm_state {
                 VMState::Running => None,
                 VMState::Idle(_) => None,
-                VMState::Halted(0) => None,
-                VMState::Halted(code) => {
-                    Some(Err((code, Some(format!("Halted abnormally: {}", code)))))
-                }
+                VMState::Halted(0) => Some(Ok(None)),
+                VMState::Halted(code) => Some(Err((code, None))),
             };
         }
 

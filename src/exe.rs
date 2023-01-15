@@ -63,10 +63,6 @@ impl Executor {
         }
     }
 
-    pub fn halt(&mut self) {
-        self.vm.halt(0);
-    }
-
     pub fn install_sigint_handler(&mut self) {
         self.vm.install_sigint_handler();
     }
@@ -184,8 +180,8 @@ impl Executor {
                 Ok(self.vm.state.clone())
             }
             Err(err) => {
-                if let RuntimeErrKind::Exit(code) = err.kind {
-                    Ok(VMState::Halted(code))
+                if let RuntimeErrKind::Exit(_) = err.kind {
+                    Err(ExeErr::new(ExeErrKind::RuntimeErr(err.kind)))
                 } else {
                     let start = self.vm.loc().0;
                     let line = source
@@ -226,7 +222,12 @@ impl Executor {
                     file_path.to_str().unwrap_or("<unknown>").to_owned();
                 match self.compile_module(name, &mut source) {
                     Ok(mut module) => {
-                        match self.execute_module(&mut module, 0, false, &mut source) {
+                        match self.execute_module(
+                            &mut module,
+                            0,
+                            self.debug,
+                            &mut source,
+                        ) {
                             Ok(_) => Ok(module),
                             Err(err) => Err(err),
                         }

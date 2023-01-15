@@ -117,11 +117,14 @@ impl VM {
     }
 
     /// Execute the given code object's instructions and return the VM's
-    /// state. If a HALT instruction isn't encountered, the VM will go
+    /// state.
+    ///
+    /// When a HALT instruction is encountered, the VM's state will be
+    /// cleared and an `Exit` error will be returned.
+    ///
+    /// If a HALT instruction is *not* encountered, the VM will go
     /// "idle"--it will maintain its internal state and await further
-    /// instructions. When a HALT instruction is encountered, the VM's
-    /// state will be cleared; it can be "restarted" by passing more
-    /// instructions to execute.
+    /// instructions.
     pub fn execute_code(
         &mut self,
         module: Option<&Module>,
@@ -439,45 +442,39 @@ impl VM {
                 }
                 // VM control
                 Halt(return_code) => {
-                    self.halt(*return_code);
-                    break Ok(());
+                    return self.halt(*return_code);
                 }
                 HaltTop => {
                     let obj = self.pop_obj()?;
                     let obj = obj.read().unwrap();
                     let return_code = match obj.get_int_val() {
-                        Some(int) => int.to_u8().unwrap_or(255),
-                        None => 255,
+                        Some(int) => int.to_u8().unwrap_or(0),
+                        None => 0,
                     };
-                    self.halt(return_code);
-                    break Ok(());
+                    return self.halt(return_code);
                 }
                 // Placeholders
                 Placeholder(addr, inst, message) => {
                     eprintln!(
                         "Placeholder at {addr} was not updated: {inst:?}\n{message}"
                     );
-                    self.halt(255);
+                    return self.halt(255);
                 }
                 FreeVarPlaceholder(addr, name) => {
                     eprintln!("Var placeholder at {addr} was not updated: {name}");
-                    self.halt(255);
-                    break Ok(());
+                    return self.halt(255);
                 }
                 BreakPlaceholder(addr, _) => {
                     eprintln!("Break placeholder at {addr} was not updated");
-                    self.halt(255);
-                    break Ok(());
+                    return self.halt(255);
                 }
                 ContinuePlaceholder(addr, _) => {
                     eprintln!("Continue placeholder at {addr} was not updated");
-                    self.halt(255);
-                    break Ok(());
+                    return self.halt(255);
                 }
                 ReturnPlaceholder(addr, _) => {
                     eprintln!("Return placeholder at {addr} was not updated");
-                    self.halt(255);
-                    break Ok(());
+                    return self.halt(255);
                 }
                 // Miscellaneous
                 PrintTop => {
@@ -555,13 +552,10 @@ impl VM {
         self.state = VMState::Idle(obj);
     }
 
-    pub fn halt(&mut self, exit_code: u8) {
-        self.state = VMState::Halted(exit_code);
+    fn halt(&mut self, exit_code: u8) -> VMExeResult {
         self.reset();
-    }
-
-    pub fn is_halted(&self) -> bool {
-        matches!(self.state, VMState::Halted(_))
+        self.state = VMState::Halted(exit_code);
+        Err(RuntimeErr::exit(exit_code))
     }
 
     /// Completely reset internal state.
@@ -759,9 +753,6 @@ impl VM {
 
     // NOTE: Popping a call frame is very similar to exiting a scope.
     fn pop_call_frame(&mut self) -> RuntimeResult {
-        if self.is_halted() {
-            return Ok(());
-        }
         let return_val = self.pop_obj();
         if let Some(frame) = self.call_stack.pop() {
             self.value_stack.truncate(frame.stack_pointer);
