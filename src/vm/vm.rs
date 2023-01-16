@@ -687,8 +687,10 @@ impl VM {
         let result = match op {
             Is => a.is(b),
             IsNot => !a.is(b),
+            IsTypeEqual => a.is_type_equal(b),
+            IsNotTypeEqual => !a.is_type_equal(b),
             IsEqual => a.is_equal(b),
-            NotEqual => a.not_equal(b),
+            NotEqual => !a.is_equal(b),
             And => a.and(b)?,
             Or => a.or(b)?,
             LessThan => a.less_than(b)?,

@@ -9,7 +9,7 @@ fib_if = (n) =>
         1
     else ->
         c = cache.get(n)
-        if c === nil -> cache.push(fib_if(n - 2) + fib_if(n - 1))
+        if c $$ nil -> cache.push(fib_if(n - 2) + fib_if(n - 1))
         else -> c
 
 fib_match = (n) =>

@@ -130,6 +130,8 @@ impl fmt::Debug for BinaryOperator {
 pub enum CompareOperator {
     Is,
     IsNot,
+    IsTypeEqual,
+    IsNotTypeEqual,
     IsEqual,
     NotEqual,
     LessThan,
@@ -143,8 +145,10 @@ pub enum CompareOperator {
 impl CompareOperator {
     pub fn from_token(token: &Token) -> Result<Self, String> {
         let op = match token {
-            Token::EqualEqualEqual => Self::Is,
-            Token::NotEqualEqual => Self::IsNot,
+            Token::DollarDollar => Self::Is,
+            Token::DollarNot => Self::IsNot,
+            Token::EqualEqualEqual => Self::IsTypeEqual,
+            Token::NotEqualEqual => Self::IsNotTypeEqual,
             Token::EqualEqual => Self::IsEqual,
             Token::NotEqual => Self::NotEqual,
             Token::LessThan => Self::LessThan,
@@ -162,8 +166,10 @@ impl CompareOperator {
 impl fmt::Display for CompareOperator {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let string = match self {
-            Self::Is => "===",
-            Self::IsNot => "!==",
+            Self::Is => "$",
+            Self::IsNot => "$!",
+            Self::IsTypeEqual => "===",
+            Self::IsNotTypeEqual => "!==",
             Self::IsEqual => "==",
             Self::NotEqual => "!=",
             Self::LessThan => "<",

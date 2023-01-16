@@ -79,5 +79,5 @@ handle_result = (result) =>
     :err:
     return "err"
 
-assert(handle_result(1) === "ok")
-assert(handle_result(assert(false)) === "err")
+assert(handle_result(1) $$ "ok", true)
+assert(handle_result(assert(false)) $$ "err", true)

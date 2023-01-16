@@ -46,6 +46,8 @@ pub enum Token {
     Dot,   // .
     Comma, // ,
 
+    DollarDollar,       // $$
+    DollarNot,          // $!
     EqualEqualEqual,    // ===
     NotEqualEqual,      // !==
     EqualEqual,         // ==
@@ -148,6 +150,8 @@ impl Token {
             Self::Dot => ".",
             Self::Comma => ",",
 
+            Self::DollarDollar => "$$",
+            Self::DollarNot => "$",
             Self::EqualEqualEqual => "===",
             Self::NotEqualEqual => "!==",
             Self::EqualEqual => "==",

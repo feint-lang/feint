@@ -521,12 +521,21 @@ pub trait ObjectTrait {
         self.id() == other.id()
     }
 
-    fn is_equal(&self, rhs: &dyn ObjectTrait) -> bool {
-        self.is(rhs) || rhs.is_always()
+    /// This requires both objects to have the same type along with
+    /// being equal. This will return `false` when compared with `@`.
+    fn is_type_equal(&self, rhs: &dyn ObjectTrait) -> bool {
+        if self.is(rhs) {
+            return true;
+        }
+        let t = self.type_obj();
+        let t = t.read().unwrap();
+        let u = rhs.type_obj();
+        let u = u.read().unwrap();
+        t.is(&*u) && self.is_equal(rhs)
     }
 
-    fn not_equal(&self, rhs: &dyn ObjectTrait) -> bool {
-        !self.is_equal(rhs)
+    fn is_equal(&self, rhs: &dyn ObjectTrait) -> bool {
+        self.is(rhs) || rhs.is_always()
     }
 
     make_bin_op!(and, "&&", RuntimeBoolResult);

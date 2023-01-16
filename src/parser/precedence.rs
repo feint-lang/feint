@@ -38,8 +38,10 @@ pub fn get_operator_precedence(token: &Token) -> (u8, u8) {
         | Or                 => (0, 2),  // a || b
         | And                => (0, 3),  // a && b
 
-        | EqualEqualEqual                // a === b     (is)
-        | NotEqualEqual                  // a !== b     (is not)
+        | DollarDollar                   // a $$ b      (is)
+        | DollarNot                      // a $! b      (is not)
+        | EqualEqualEqual                // a === b     (type equal)
+        | NotEqualEqual                  // a !== b     (not type equal)
         | EqualEqual                     // a == b
         | NotEqual                       // a != b
         | LessThan                       // a < b

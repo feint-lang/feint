@@ -158,6 +158,10 @@ impl<'a, T: BufRead> Scanner<'a, T> {
             Some(('-', Some('>'), _)) => {
                 return self.handle_scope_start(ScopeKind::Block, start);
             }
+            Some(('$', Some('$'), _)) => {
+                self.consume_char_and_return_token(DollarDollar)
+            }
+            Some(('$', Some('!'), _)) => self.consume_char_and_return_token(DollarNot),
             Some(('=', Some('>'), _)) => {
                 return self.handle_scope_start(ScopeKind::Func, start);
             }
