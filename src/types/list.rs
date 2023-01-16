@@ -19,8 +19,8 @@ use super::seq;
 
 gen::type_and_impls!(ListType, List);
 
-pub static LIST_TYPE: Lazy<new::obj_ref_t!(ListType)> = Lazy::new(|| {
-    let type_ref = new::obj_ref!(ListType::new());
+pub static LIST_TYPE: Lazy<gen::obj_ref_t!(ListType)> = Lazy::new(|| {
+    let type_ref = gen::obj_ref!(ListType::new());
     let mut type_obj = type_ref.write().unwrap();
 
     type_obj.add_attrs(&[

@@ -14,13 +14,13 @@ use super::ns::Namespace;
 
 pub struct CustomType {
     ns: Namespace,
-    module: new::obj_ref_t!(Module),
+    module: gen::obj_ref_t!(Module),
     name: String,
     full_name: String,
 }
 
 impl CustomType {
-    pub fn new(module: new::obj_ref_t!(Module), name: String) -> Self {
+    pub fn new(module: gen::obj_ref_t!(Module), name: String) -> Self {
         let full_name = format!("{}.{name}", module.read().unwrap().name());
         Self {
             ns: Namespace::with_entries(&[
@@ -62,14 +62,14 @@ impl ObjectTrait for CustomType {
 // Custom Object -------------------------------------------------------
 
 pub struct CustomObj {
-    class: new::obj_ref_t!(CustomType),
+    class: gen::obj_ref_t!(CustomType),
     ns: Namespace,
 }
 
 gen::standard_object_impls!(CustomObj);
 
 impl CustomObj {
-    pub fn new(class: new::obj_ref_t!(CustomType), attrs: Namespace) -> Self {
+    pub fn new(class: gen::obj_ref_t!(CustomType), attrs: Namespace) -> Self {
         Self { class, ns: attrs }
     }
 }

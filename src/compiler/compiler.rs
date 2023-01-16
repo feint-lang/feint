@@ -9,7 +9,7 @@ use crate::util::{
     BinaryOperator, CompareOperator, InplaceOperator, Location, Stack,
     UnaryCompareOperator, UnaryOperator,
 };
-use crate::vm::{Code, Inst};
+use crate::vm::{globals, Code, Inst};
 
 use super::result::{CompErr, CompResult};
 use super::scope::{Scope, ScopeKind, ScopeTree};
@@ -570,7 +570,7 @@ impl Visitor {
             Kind::Always => self.push_always(),
             Kind::Ellipsis => self.push_nil(),
             Kind::Int(value) => {
-                if let Some(index) = new::shared_int_global_const_index(&value) {
+                if let Some(index) = globals::shared_int_index(&value) {
                     self.push_global_const(index)
                 } else {
                     self.add_const(new::int(value));

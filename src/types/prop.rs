@@ -17,8 +17,8 @@ use super::ns::Namespace;
 
 gen::type_and_impls!(PropType, Prop);
 
-pub static PROP_TYPE: Lazy<new::obj_ref_t!(PropType)> =
-    Lazy::new(|| new::obj_ref!(PropType::new()));
+pub static PROP_TYPE: Lazy<gen::obj_ref_t!(PropType)> =
+    Lazy::new(|| gen::obj_ref!(PropType::new()));
 
 // Prop Object ---------------------------------------------------------
 

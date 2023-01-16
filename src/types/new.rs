@@ -1,20 +1,21 @@
 //! Type Constructors.
 //!
-//! These constructors simplify the creation system objects.
+//! These constructors simplify the creation of system objects.
 use std::sync::{Arc, RwLock};
 
 use num_bigint::BigInt;
-use num_traits::{FromPrimitive, Num, Signed, ToPrimitive, Zero};
+use num_traits::{FromPrimitive, Num, Signed, ToPrimitive};
 
 use indexmap::IndexMap;
 use once_cell::sync::Lazy;
 
-use super::result::Params;
-use crate::vm::Code;
+use crate::util::format_doc;
+use crate::vm::{globals, Code};
 
-use super::always::Always;
 use super::base::ObjectRef;
-use super::bool::Bool;
+use super::gen::{obj_ref, obj_ref_t};
+use super::result::Params;
+
 use super::bound_func::BoundFunc;
 use super::builtin_func::{BuiltinFn, BuiltinFunc};
 use super::cell::Cell;
@@ -29,103 +30,38 @@ use super::int::Int;
 use super::list::List;
 use super::map::Map;
 use super::module::Module;
-use super::nil::Nil;
 use super::ns::Namespace;
 use super::prop::Prop;
 use super::str::Str;
 use super::tuple::Tuple;
 
-static NIL: Lazy<obj_ref_t!(Nil)> = Lazy::new(|| obj_ref!(Nil::new()));
-static TRUE: Lazy<obj_ref_t!(Bool)> = Lazy::new(|| obj_ref!(Bool::new(true)));
-static FALSE: Lazy<obj_ref_t!(Bool)> = Lazy::new(|| obj_ref!(Bool::new(false)));
-static ALWAYS: Lazy<obj_ref_t!(Always)> = Lazy::new(|| obj_ref!(Always::new()));
-static EMPTY_STR: Lazy<obj_ref_t!(Str)> =
-    Lazy::new(|| obj_ref!(Str::new("".to_owned())));
-static EMPTY_TUPLE: Lazy<obj_ref_t!(Tuple)> =
-    Lazy::new(|| obj_ref!(Tuple::new(vec![])));
-
-static OK_ERR: Lazy<obj_ref_t!(ErrObj)> = Lazy::new(|| {
-    obj_ref!(ErrObj::with_responds_to_bool(ErrKind::Ok, "".to_string(), nil()))
-});
-
-static SHARED_INT_INDEX: usize = 6;
-static SHARED_INT_MAX: usize = 256;
-static SHARED_INT_MAX_BIGINT: Lazy<BigInt> = Lazy::new(|| BigInt::from(SHARED_INT_MAX));
-pub static SHARED_INTS: Lazy<Vec<obj_ref_t!(Int)>> = Lazy::new(|| {
-    (0..=SHARED_INT_MAX).map(|i| obj_ref!(Int::new(BigInt::from(i)))).collect()
-});
-
-/// Get the corresponding global constant index for an int, if the int
-/// is in the shared int range [0, 256].
-pub fn shared_int_global_const_index(int: &BigInt) -> Option<usize> {
-    if int.is_zero() {
-        Some(SHARED_INT_INDEX)
-    } else if int.is_positive() && int <= Lazy::force(&SHARED_INT_MAX_BIGINT) {
-        Some(int.to_usize().unwrap() + SHARED_INT_INDEX)
-    } else {
-        None
-    }
-}
-
-/// Get the corresponding shared int object for the specified global
-/// constant index, if the index is in the shared int range.
-pub fn shared_int_for_global_const_index(index: usize) -> Option<ObjectRef> {
-    let i = SHARED_INT_INDEX;
-    let j = i + SHARED_INT_MAX;
-    if (i..=j).contains(&index) {
-        Some(SHARED_INTS[index - SHARED_INT_INDEX].clone())
-    } else {
-        None
-    }
-}
-
-// Builtin type constructors -------------------------------------------
-
-macro_rules! obj_ref_t {
-    ( $ty:ty ) => {
-        Arc<RwLock<$ty>>
-    };
-}
-
-pub(crate) use obj_ref_t;
-
-macro_rules! obj_ref {
-    ( $obj:expr ) => {
-        Arc::new(RwLock::new($obj))
-    };
-}
-
-use crate::util::format_doc;
-pub(crate) use obj_ref;
+// Global singletons ---------------------------------------------------
 
 #[inline]
 pub fn nil() -> ObjectRef {
-    NIL.clone()
+    globals::NIL.clone()
 }
 
 #[inline]
 pub fn bool(val: bool) -> ObjectRef {
     if val {
-        true_()
+        globals::TRUE.clone()
     } else {
-        false_()
+        globals::FALSE.clone()
     }
 }
 
 #[inline]
-pub fn true_() -> ObjectRef {
-    TRUE.clone()
+pub fn empty_str() -> ObjectRef {
+    globals::EMPTY_STR.clone()
 }
 
 #[inline]
-pub fn false_() -> ObjectRef {
-    FALSE.clone()
+pub fn empty_tuple() -> ObjectRef {
+    globals::EMPTY_TUPLE.clone()
 }
 
-#[inline]
-pub fn always() -> ObjectRef {
-    ALWAYS.clone()
-}
+// Builtin type constructors -------------------------------------------
 
 pub fn bound_func(func: ObjectRef, this: ObjectRef) -> ObjectRef {
     obj_ref!(BoundFunc::new(func, this))
@@ -212,6 +148,10 @@ pub fn string_err<S: Into<String>>(msg: S, obj: ObjectRef) -> ObjectRef {
     err(ErrKind::String, msg, obj)
 }
 
+static OK_ERR: Lazy<obj_ref_t!(ErrObj)> = Lazy::new(|| {
+    obj_ref!(ErrObj::with_responds_to_bool(ErrKind::Ok, "".to_string(), nil()))
+});
+
 pub fn ok_err() -> ObjectRef {
     OK_ERR.clone()
 }
@@ -241,9 +181,9 @@ pub fn func<S: Into<String>>(name: S, params: Params, code: Code) -> ObjectRef {
 
 pub fn int<I: Into<BigInt>>(value: I) -> ObjectRef {
     let value = value.into();
-    if value.is_positive() && &value <= Lazy::force(&SHARED_INT_MAX_BIGINT) {
+    if value.is_positive() && &value <= Lazy::force(&globals::SHARED_INT_MAX_BIGINT) {
         let index = value.to_usize().unwrap();
-        SHARED_INTS[index].clone()
+        globals::SHARED_INTS[index].clone()
     } else {
         obj_ref!(Int::new(value))
     }
@@ -276,26 +216,18 @@ pub fn prop(getter: ObjectRef) -> ObjectRef {
 pub fn str<S: Into<String>>(val: S) -> ObjectRef {
     let val = val.into();
     if val.is_empty() {
-        empty_str()
+        globals::EMPTY_STR.clone()
     } else {
         obj_ref!(Str::new(val))
     }
 }
 
-pub fn empty_str() -> ObjectRef {
-    EMPTY_STR.clone()
-}
-
 pub fn tuple(items: Vec<ObjectRef>) -> ObjectRef {
     if items.is_empty() {
-        EMPTY_TUPLE.clone()
+        globals::EMPTY_TUPLE.clone()
     } else {
         obj_ref!(Tuple::new(items))
     }
-}
-
-pub fn empty_tuple() -> ObjectRef {
-    EMPTY_TUPLE.clone()
 }
 
 // Custom type constructor ---------------------------------------------

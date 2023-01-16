@@ -15,8 +15,8 @@ use super::ns::Namespace;
 
 gen::type_and_impls!(AlwaysType, Always);
 
-pub static ALWAYS_TYPE: Lazy<new::obj_ref_t!(AlwaysType)> =
-    Lazy::new(|| new::obj_ref!(AlwaysType::new()));
+pub static ALWAYS_TYPE: Lazy<gen::obj_ref_t!(AlwaysType)> =
+    Lazy::new(|| gen::obj_ref!(AlwaysType::new()));
 
 // Always Object -------------------------------------------------------
 

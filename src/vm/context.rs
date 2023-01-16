@@ -1,5 +1,3 @@
-use std::slice;
-
 use indexmap;
 
 use crate::modules;
@@ -9,42 +7,12 @@ use crate::vm::RuntimeObjResult;
 use super::result::{RuntimeErr, RuntimeResult};
 
 pub struct RuntimeContext {
-    global_constants: Vec<ObjectRef>,
     ns_stack: Vec<Namespace>,
-    pub nil_index: usize,
-    pub true_index: usize,
-    pub false_index: usize,
-    pub always_index: usize,
-    pub empty_str_index: usize,
-    pub empty_tuple_index: usize,
 }
 
 impl RuntimeContext {
     pub fn new() -> Self {
-        // XXX: When a new global constant is added before the shared
-        //      ints, `SHARED_INT_INDEX` needs to updated in the `new`
-        //      module.
-        let mut global_constants = vec![
-            new::nil(),
-            new::true_(),
-            new::false_(),
-            new::always(),
-            new::empty_str(),
-            new::empty_tuple(),
-        ];
-        for int in new::SHARED_INTS.iter() {
-            global_constants.push(int.clone());
-        }
-        Self {
-            global_constants,
-            ns_stack: vec![Namespace::new()],
-            nil_index: 0,
-            true_index: 1,
-            false_index: 2,
-            always_index: 3,
-            empty_str_index: 4,
-            empty_tuple_index: 5,
-        }
+        Self { ns_stack: vec![Namespace::new()] }
     }
 
     #[inline]
@@ -81,30 +49,6 @@ impl RuntimeContext {
         while self.ns_stack.len() > 1 {
             self.exit_scope();
         }
-    }
-
-    // Global Constants ------------------------------------------------
-    //
-    // Global constants are allocated during compilation, are immutable,
-    // and are never collected. These are shared constants such as the
-    // singleton nil, true, and false objects.
-
-    pub fn add_global_const(&mut self, obj: ObjectRef) -> usize {
-        let index = self.global_constants.len();
-        self.global_constants.push(obj);
-        index
-    }
-
-    pub fn get_global_const(&self, index: usize) -> RuntimeObjResult {
-        if let Some(obj) = self.global_constants.get(index) {
-            Ok(obj.clone())
-        } else {
-            Err(RuntimeErr::constant_not_found(index))
-        }
-    }
-
-    pub fn iter_constants(&self) -> slice::Iter<'_, ObjectRef> {
-        self.global_constants.iter()
     }
 
     // Vars ------------------------------------------------------------

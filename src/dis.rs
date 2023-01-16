@@ -1,7 +1,6 @@
 use std::fmt;
 
-use crate::types::new;
-use crate::vm::{Code, Inst};
+use crate::vm::{globals, Code, Inst};
 
 pub struct Disassembler {
     curr_line_no: usize,
@@ -57,10 +56,13 @@ impl Disassembler {
             LoadGlobalConst(index) => {
                 let op_code = "LOAD_GLOBAL_CONST";
                 let index = *index;
-                if let Some(int) = new::shared_int_for_global_const_index(index) {
-                    self.align(op_code, format!("{index} ({})", int.read().unwrap()))
+                if let Some(obj) = globals::get_global_constant(index) {
+                    self.align(op_code, format!("{index} ({})", obj.read().unwrap()))
                 } else {
-                    self.align(op_code, format!("{index} ([unknown])"))
+                    self.align(
+                        op_code,
+                        format!("{index} ([global constant does not exist])"),
+                    )
                 }
             }
             LoadNil => self.align("LOAD_NIL", "nil"),

@@ -20,8 +20,8 @@ use super::ns::Namespace;
 
 gen::type_and_impls!(FileType, File);
 
-pub static FILE_TYPE: Lazy<new::obj_ref_t!(FileType)> = Lazy::new(|| {
-    let type_ref = new::obj_ref!(FileType::new());
+pub static FILE_TYPE: Lazy<gen::obj_ref_t!(FileType)> = Lazy::new(|| {
+    let type_ref = gen::obj_ref!(FileType::new());
     let mut type_obj = type_ref.write().unwrap();
 
     type_obj.add_attrs(&[

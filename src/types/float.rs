@@ -20,8 +20,8 @@ use super::ns::Namespace;
 
 gen::type_and_impls!(FloatType, Float);
 
-pub static FLOAT_TYPE: Lazy<new::obj_ref_t!(FloatType)> = Lazy::new(|| {
-    let type_ref = new::obj_ref!(FloatType::new());
+pub static FLOAT_TYPE: Lazy<gen::obj_ref_t!(FloatType)> = Lazy::new(|| {
+    let type_ref = gen::obj_ref!(FloatType::new());
     let mut type_obj = type_ref.write().unwrap();
 
     type_obj.add_attrs(&[

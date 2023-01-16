@@ -6,8 +6,7 @@ use once_cell::sync::Lazy;
 
 use crate::vm::RuntimeBoolResult;
 
-use super::gen;
-use super::new;
+use super::gen::{obj_ref, obj_ref_t};
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
 use super::class::TYPE_TYPE;
@@ -17,8 +16,8 @@ use super::ns::Namespace;
 
 gen::type_and_impls!({{ type_name }}, {{ obj_name }});
 
-pub static {{ singleton_type_name }}: Lazy<new::obj_ref_t!({{ type_name }})> =
-    Lazy::new(|| new::obj_ref!({{ type_name }}::new()));
+pub static {{ singleton_type_name }}: Lazy<obj_ref_t!({{ type_name }})> =
+    Lazy::new(|| obj_ref!({{ type_name }}::new()));
 
 // {{ obj_name }} Object {{ obj_rule }}
 

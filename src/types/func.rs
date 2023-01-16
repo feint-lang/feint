@@ -19,8 +19,8 @@ use super::ns::Namespace;
 
 gen::type_and_impls!(FuncType, Func);
 
-pub static FUNC_TYPE: Lazy<new::obj_ref_t!(FuncType)> =
-    Lazy::new(|| new::obj_ref!(FuncType::new()));
+pub static FUNC_TYPE: Lazy<gen::obj_ref_t!(FuncType)> =
+    Lazy::new(|| gen::obj_ref!(FuncType::new()));
 
 // Func Object ----------------------------------------------------------
 

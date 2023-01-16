@@ -17,8 +17,8 @@ use super::ns::Namespace;
 
 gen::type_and_impls!(NilType, Nil);
 
-pub static NIL_TYPE: Lazy<new::obj_ref_t!(NilType)> =
-    Lazy::new(|| new::obj_ref!(NilType::new()));
+pub static NIL_TYPE: Lazy<gen::obj_ref_t!(NilType)> =
+    Lazy::new(|| gen::obj_ref!(NilType::new()));
 
 // Nil Object ----------------------------------------------------------
 

@@ -18,8 +18,8 @@ use super::ns::Namespace;
 
 gen::type_and_impls!(ClosureType, Closure);
 
-pub static CLOSURE_TYPE: Lazy<new::obj_ref_t!(ClosureType)> =
-    Lazy::new(|| new::obj_ref!(ClosureType::new()));
+pub static CLOSURE_TYPE: Lazy<gen::obj_ref_t!(ClosureType)> =
+    Lazy::new(|| gen::obj_ref!(ClosureType::new()));
 
 // Closure Object ------------------------------------------------------
 

@@ -9,6 +9,8 @@ pub(crate) use result::{
     RuntimeBoolResult, RuntimeErrKind, RuntimeObjResult, RuntimeResult, VMExeResult,
 };
 
+pub(crate) mod globals;
+
 mod code;
 mod context;
 mod inst;

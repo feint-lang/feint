@@ -17,8 +17,8 @@ use super::ns::Namespace;
 
 gen::type_and_impls!(CellType, Cell);
 
-pub static CELL_TYPE: Lazy<new::obj_ref_t!(CellType)> =
-    Lazy::new(|| new::obj_ref!(CellType::new()));
+pub static CELL_TYPE: Lazy<gen::obj_ref_t!(CellType)> =
+    Lazy::new(|| gen::obj_ref!(CellType::new()));
 
 // Cell Object ---------------------------------------------------------
 

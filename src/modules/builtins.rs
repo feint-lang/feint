@@ -3,12 +3,13 @@ use std::sync::{Arc, RwLock};
 
 use once_cell::sync::Lazy;
 
-use crate::types::{
-    gen::{use_arg, use_arg_bool},
-    new, Module, Namespace,
-};
 use crate::util::check_args;
 use crate::vm::RuntimeErr;
+
+use crate::types::gen::{obj_ref_t, use_arg, use_arg_bool};
+use crate::types::module::Module;
+use crate::types::new;
+use crate::types::ns::Namespace;
 
 use crate::types::always::ALWAYS_TYPE;
 use crate::types::bool::BOOL_TYPE;
@@ -29,7 +30,7 @@ use crate::types::nil::NIL_TYPE;
 use crate::types::str::STR_TYPE;
 use crate::types::tuple::TUPLE_TYPE;
 
-pub static BUILTINS: Lazy<new::obj_ref_t!(Module)> = Lazy::new(|| {
+pub static BUILTINS: Lazy<obj_ref_t!(Module)> = Lazy::new(|| {
     let ns = Namespace::with_entries(&[
         ("Type", TYPE_TYPE.clone()),
         ("Always", ALWAYS_TYPE.clone()),

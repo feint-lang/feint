@@ -11,6 +11,7 @@ use crate::modules;
 use crate::types::FuncTrait;
 use crate::vm::{RuntimeBoolResult, RuntimeErr, RuntimeObjResult};
 
+use super::gen;
 use super::new;
 use super::ns::Namespace;
 
@@ -36,8 +37,8 @@ use super::prop::{Prop, PropType};
 use super::str::{Str, StrType};
 use super::tuple::{Tuple, TupleType};
 
-pub type TypeRef = new::obj_ref_t!(dyn TypeTrait);
-pub type ObjectRef = new::obj_ref_t!(dyn ObjectTrait);
+pub type TypeRef = gen::obj_ref_t!(dyn TypeTrait);
+pub type ObjectRef = gen::obj_ref_t!(dyn ObjectTrait);
 
 // Type Trait ----------------------------------------------------------
 
@@ -274,7 +275,7 @@ pub trait ObjectTrait {
             return if let Some(err) = this.down_to_err() {
                 new::bool(!err.retrieve_bool_val())
             } else {
-                new::true_()
+                new::bool(true)
             };
         }
 

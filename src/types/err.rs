@@ -34,8 +34,8 @@ use super::ns::Namespace;
 
 gen::type_and_impls!(ErrType, Err);
 
-pub static ERR_TYPE: Lazy<new::obj_ref_t!(ErrType)> = Lazy::new(|| {
-    let type_ref = new::obj_ref!(ErrType::new());
+pub static ERR_TYPE: Lazy<gen::obj_ref_t!(ErrType)> = Lazy::new(|| {
+    let type_ref = gen::obj_ref!(ErrType::new());
     let mut type_obj = type_ref.write().unwrap();
 
     type_obj.add_attrs(&[

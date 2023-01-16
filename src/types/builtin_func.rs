@@ -21,8 +21,8 @@ pub type BuiltinFn = fn(ObjectRef, Args, &mut VM) -> CallResult;
 
 gen::type_and_impls!(BuiltinFuncType, BuiltinFunc);
 
-pub static BUILTIN_FUNC_TYPE: Lazy<new::obj_ref_t!(BuiltinFuncType)> =
-    Lazy::new(|| new::obj_ref!(BuiltinFuncType::new()));
+pub static BUILTIN_FUNC_TYPE: Lazy<gen::obj_ref_t!(BuiltinFuncType)> =
+    Lazy::new(|| gen::obj_ref!(BuiltinFuncType::new()));
 
 // BuiltinFunc Object ----------------------------------------------------------
 

@@ -17,8 +17,8 @@ use super::ns::Namespace;
 
 gen::type_and_impls!(ModuleType, Module);
 
-pub static MODULE_TYPE: Lazy<new::obj_ref_t!(ModuleType)> =
-    Lazy::new(|| new::obj_ref!(ModuleType::new()));
+pub static MODULE_TYPE: Lazy<gen::obj_ref_t!(ModuleType)> =
+    Lazy::new(|| gen::obj_ref!(ModuleType::new()));
 
 // Module Object ----------------------------------------------------------
 

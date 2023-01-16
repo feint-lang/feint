@@ -1,3 +1,18 @@
+macro_rules! obj_ref_t {
+    ( $ty:ty ) => {
+        Arc<RwLock<$ty>>
+    };
+}
+
+macro_rules! obj_ref {
+    ( $obj:expr ) => {
+        Arc::new(RwLock::new($obj))
+    };
+}
+
+pub(crate) use obj_ref;
+pub(crate) use obj_ref_t;
+
 // Types ---------------------------------------------------------------
 
 /// Generate a builtin type definition. This includes the type's

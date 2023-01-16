@@ -19,8 +19,8 @@ use super::seq;
 
 gen::type_and_impls!(TupleType, Tuple);
 
-pub static TUPLE_TYPE: Lazy<new::obj_ref_t!(TupleType)> = Lazy::new(|| {
-    let type_ref = new::obj_ref!(TupleType::new());
+pub static TUPLE_TYPE: Lazy<gen::obj_ref_t!(TupleType)> = Lazy::new(|| {
+    let type_ref = gen::obj_ref!(TupleType::new());
     let mut type_obj = type_ref.write().unwrap();
 
     type_obj.add_attrs(&[

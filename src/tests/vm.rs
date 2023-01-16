@@ -14,22 +14,3 @@ fn execute_simple_program() {
     assert!(matches!(vm.execute_code(None, &code, 0), Ok(())));
     assert!(matches!(vm.state, VMState::Idle(Some(_))));
 }
-
-#[test]
-fn test_add_get_global_const() {
-    let mut ctx = RuntimeContext::new();
-    let int = new::int(0);
-    let int_copy = int.clone();
-    let index = ctx.add_global_const(int.clone());
-    let retrieved = ctx.get_global_const(index).unwrap();
-    let retrieved = retrieved.read().unwrap();
-    assert!(retrieved.class().read().unwrap().is(&*int_copy
-        .read()
-        .unwrap()
-        .class()
-        .read()
-        .unwrap()));
-    assert!(retrieved.is(&*int_copy.read().unwrap()));
-    assert!(retrieved.is_equal(&*int_copy.read().unwrap()));
-    assert_eq!(retrieved.id(), int_copy.read().unwrap().id());
-}

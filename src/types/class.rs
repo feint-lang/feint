@@ -17,8 +17,8 @@ use super::ns::Namespace;
 
 gen::type_and_impls!(TypeType, Type);
 
-pub static TYPE_TYPE: Lazy<new::obj_ref_t!(TypeType)> =
-    Lazy::new(|| new::obj_ref!(TypeType::new()));
+pub static TYPE_TYPE: Lazy<gen::obj_ref_t!(TypeType)> =
+    Lazy::new(|| gen::obj_ref!(TypeType::new()));
 
 // Type Object ---------------------------------------------------------
 

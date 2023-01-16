@@ -6,13 +6,14 @@ use once_cell::sync::Lazy;
 
 use crate::config::CONFIG;
 use crate::exe::Executor;
+use crate::types::gen::{obj_ref, obj_ref_t};
 use crate::types::{new, Module, Namespace, ObjectRef, ObjectTrait};
 use crate::vm::RuntimeErr;
 
 use super::builtins::BUILTINS;
 use super::proc::PROC;
 
-pub static SYSTEM: Lazy<new::obj_ref_t!(Module)> = Lazy::new(|| {
+pub static SYSTEM: Lazy<obj_ref_t!(Module)> = Lazy::new(|| {
     let entries: Vec<(&str, ObjectRef)> = vec![
         ("argv", new::empty_tuple()),
         (
@@ -33,7 +34,7 @@ pub fn _add_module(name: &str, module: Module) -> ObjectRef {
     let modules = system.get_attr("modules", SYSTEM.clone());
     let modules = modules.write().expect("Expected system module to be an object");
     let modules = modules.down_to_map().expect("Expected system.modules to be a Map");
-    let module = new::obj_ref!(module);
+    let module = obj_ref!(module);
     modules.add(name, module.clone());
     module
 }
@@ -83,7 +84,7 @@ pub fn load_fi_module(name: &str) -> Result<ObjectRef, RuntimeErr> {
         let mut executor = Executor::for_add_module();
         let result = executor.load_module(name, path.as_path());
         return match result {
-            Ok(module) => Ok(new::obj_ref!(module)),
+            Ok(module) => Ok(obj_ref!(module)),
             Err(err) => {
                 if let Some(code) = err.exit_code() {
                     Err(RuntimeErr::exit(code))

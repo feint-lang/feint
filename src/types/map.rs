@@ -16,8 +16,8 @@ use super::ns::Namespace;
 
 gen::type_and_impls!(MapType, Map);
 
-pub static MAP_TYPE: Lazy<new::obj_ref_t!(MapType)> =
-    Lazy::new(|| new::obj_ref!(MapType::new()));
+pub static MAP_TYPE: Lazy<gen::obj_ref_t!(MapType)> =
+    Lazy::new(|| gen::obj_ref!(MapType::new()));
 
 // Map Object ----------------------------------------------------------
 

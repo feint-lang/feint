@@ -22,6 +22,7 @@ use crate::util::{
 
 use super::code::Code;
 use super::context::RuntimeContext;
+use super::globals;
 use super::inst::Inst;
 use super::result::{
     CallDepth, PeekObjResult, PeekResult, PopNObjResult, PopNResult, PopObjResult,
@@ -62,6 +63,7 @@ impl CallFrame {
 pub struct VM {
     pub(crate) ctx: RuntimeContext,
     pub(crate) state: VMState,
+    global_constants: Vec<ObjectRef>,
     // The scope stack contains pointers into the value stack. When a
     // scope is entered, the current, pre-scope stack position is
     // recorded. When a scope is exited, its corresponding pointer is
@@ -98,6 +100,7 @@ impl VM {
         VM {
             ctx,
             state: VMState::Idle(None),
+            global_constants: globals::get_global_constants(),
             scope_stack: Stack::with_capacity(max_call_depth),
             value_stack: Stack::with_capacity(max_call_depth * 8),
             call_stack: Stack::with_capacity(max_call_depth),
@@ -161,28 +164,28 @@ impl VM {
                 Pop => {
                     self.pop()?;
                 }
-                // Global constants
-                LoadGlobalConst(index) => {
-                    self.push_global_const(*index)?;
-                }
                 // Well-known global constants
                 LoadNil => {
-                    self.push_global_const(self.ctx.nil_index)?;
+                    self.push_global_const(globals::NIL_INDEX)?;
                 }
                 LoadTrue => {
-                    self.push_global_const(self.ctx.true_index)?;
+                    self.push_global_const(globals::TRUE_INDEX)?;
                 }
                 LoadFalse => {
-                    self.push_global_const(self.ctx.false_index)?;
+                    self.push_global_const(globals::FALSE_INDEX)?;
                 }
                 LoadAlways => {
-                    self.push_global_const(self.ctx.always_index)?;
+                    self.push_global_const(globals::ALWAYS_INDEX)?;
                 }
                 LoadEmptyStr => {
-                    self.push_global_const(self.ctx.empty_str_index)?;
+                    self.push_global_const(globals::EMPTY_STR_INDEX)?;
                 }
                 LoadEmptyTuple => {
-                    self.push_global_const(self.ctx.empty_tuple_index)?;
+                    self.push_global_const(globals::EMPTY_TUPLE_INDEX)?;
+                }
+                // Other global constants (shared ints)
+                LoadGlobalConst(index) => {
+                    self.push_global_const(*index)?;
                 }
                 // Scopes
                 ScopeStart => {
@@ -1016,9 +1019,12 @@ impl VM {
     }
 
     fn push_global_const(&mut self, index: usize) -> RuntimeResult {
-        let obj = self.ctx.get_global_const(index)?;
-        self.push(ValueStackKind::GlobalConstant(obj, index));
-        Ok(())
+        if let Some(obj) = self.global_constants.get(index) {
+            self.push(ValueStackKind::GlobalConstant(obj.clone(), index));
+            Ok(())
+        } else {
+            Err(RuntimeErr::constant_not_found(index))
+        }
     }
 
     fn push_var(&mut self, depth: usize, name: String) -> RuntimeResult {
