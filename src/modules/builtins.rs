@@ -98,5 +98,5 @@ pub static BUILTINS: Lazy<obj_ref_t!(Module)> = Lazy::new(|| {
         ),
     ]);
 
-    new::builtin_module("builtins", ns, "Builtins module")
+    new::builtin_module("builtins", "builtins.fi", ns, "Builtins module")
 });

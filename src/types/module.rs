@@ -24,6 +24,7 @@ pub static MODULE_TYPE: Lazy<gen::obj_ref_t!(ModuleType)> =
 
 pub struct Module {
     name: String,
+    path: String,
     ns: Namespace,
     code: Code,
 }
@@ -36,23 +37,34 @@ impl Module {
     ///       the REPL module. Modules implemented in FeInt will have
     ///       their `$doc` attribute initialized from their module level
     ///       docstring.
-    pub fn new(name: String, mut ns: Namespace, code: Code, doc: Option<&str>) -> Self {
+    pub fn new(
+        name: String,
+        path: String,
+        mut ns: Namespace,
+        code: Code,
+        doc: Option<&str>,
+    ) -> Self {
         ns.add_obj("$name", new::str(name.as_str()));
+        ns.add_obj("$path", new::str(path.as_str()));
         if let Some(doc) = doc {
             ns.add_obj("$doc", new::str(doc));
         } else {
             let doc = code.get_doc();
             ns.add_obj("$doc", doc);
         }
-        Self { ns, name, code }
+        Self { ns, path, name, code }
     }
 
-    pub fn with_name(name: &str, doc: Option<&str>) -> Self {
-        Self::new(name.to_owned(), Namespace::new(), Code::new(), doc)
+    pub fn with_name(name: &str, path: &str, doc: Option<&str>) -> Self {
+        Self::new(name.to_owned(), path.to_owned(), Namespace::new(), Code::new(), doc)
     }
 
     pub fn name(&self) -> &str {
         self.name.as_str()
+    }
+
+    pub fn path(&self) -> &str {
+        self.path.as_str()
     }
 
     pub fn add_global(&mut self, name: &str, val: ObjectRef) {
@@ -92,12 +104,12 @@ impl ObjectTrait for Module {
 
 impl fmt::Display for Module {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "<module {}>", self.name())
+        write!(f, "<module {} from {}>", self.name(), self.path())
     }
 }
 
 impl fmt::Debug for Module {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "<module {} @ {}>", self.name(), self.id())
+        write!(f, "<module {} from {} @ {}>", self.name(), self.path(), self.id())
     }
 }

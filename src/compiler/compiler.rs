@@ -45,6 +45,7 @@ impl Compiler {
     pub fn compile_script(
         &mut self,
         name: &str,
+        file_name: &str,
         ast_module: ast::Module,
         argv: &Vec<String>,
     ) -> CompResult {
@@ -61,9 +62,10 @@ impl Compiler {
         }
         Ok(Module::new(
             name.to_owned(),
-            Namespace::with_entries(&[("$doc", new::str("$main script module"))]),
+            file_name.to_owned(),
+            Namespace::new(),
             code,
-            None,
+            Some("$main script module"),
         ))
     }
 
@@ -71,11 +73,12 @@ impl Compiler {
     pub fn compile_module(
         &mut self,
         name: &str,
+        file_name: &str,
         ast_module: ast::Module,
     ) -> CompResult {
         let code = self.compile_module_to_code(name, ast_module)?;
         let ns = Namespace::new();
-        Ok(Module::new(name.to_owned(), ns, code, None))
+        Ok(Module::new(name.to_owned(), file_name.to_owned(), ns, code, None))
     }
 
     /// Compile AST module node to code object.

@@ -1,4 +1,5 @@
 //! Front end for executing code from a source on a VM.
+use std::fs::canonicalize;
 use std::io::BufRead;
 use std::path::Path;
 
@@ -79,6 +80,15 @@ impl Executor {
         self.vm.install_sigint_handler();
     }
 
+    /// Set current file name from `path` if possible.
+    fn set_current_file_name(&mut self, path: &Path) {
+        self.current_file_name = if let Ok(abs_path) = canonicalize(path) {
+            abs_path.to_str().unwrap_or("<unknown>").to_owned()
+        } else {
+            path.to_str().unwrap_or("<unknown>").to_owned()
+        };
+    }
+
     /// Execute text entered in REPL. REPL execution is different from
     /// the other types of execution where the text or source is
     /// compiled all at once and executed as a script. In the REPL, code
@@ -125,8 +135,7 @@ impl Executor {
     pub fn execute_file(&mut self, file_path: &Path) -> ExeResult {
         match source_from_file(file_path) {
             Ok(mut source) => {
-                self.current_file_name =
-                    file_path.to_str().unwrap_or("<unknown>").to_owned();
+                self.set_current_file_name(file_path);
                 self.execute_script_from_source(&mut source)
             }
             Err(err) => {
@@ -215,8 +224,14 @@ impl Executor {
     ) -> Result<Module, ExeErr> {
         let ast_module = self.parse_source(source)?;
         let mut compiler = Compiler::new(true);
-        let module =
-            compiler.compile_script(name, ast_module, &self.argv).map_err(|err| {
+        let module = compiler
+            .compile_script(
+                name,
+                self.current_file_name.as_str(),
+                ast_module,
+                &self.argv,
+            )
+            .map_err(|err| {
                 self.handle_comp_err(&err, source);
                 ExeErr::new(ExeErrKind::CompErr(err.kind))
             })?;
@@ -230,8 +245,7 @@ impl Executor {
     ) -> Result<Module, ExeErr> {
         match source_from_file(file_path) {
             Ok(mut source) => {
-                self.current_file_name =
-                    file_path.to_str().unwrap_or("<unknown>").to_owned();
+                self.set_current_file_name(file_path);
                 match self.compile_module(name, &mut source) {
                     Ok(mut module) => {
                         match self.execute_module(
@@ -262,10 +276,12 @@ impl Executor {
     ) -> Result<Module, ExeErr> {
         let ast_module = self.parse_source(source)?;
         let mut compiler = Compiler::new(true);
-        let module = compiler.compile_module(name, ast_module).map_err(|err| {
-            self.handle_comp_err(&err, source);
-            ExeErr::new(ExeErrKind::CompErr(err.kind))
-        })?;
+        let module = compiler
+            .compile_module(name, self.current_file_name.as_str(), ast_module)
+            .map_err(|err| {
+                self.handle_comp_err(&err, source);
+                ExeErr::new(ExeErrKind::CompErr(err.kind))
+            })?;
         Ok(module)
     }
 

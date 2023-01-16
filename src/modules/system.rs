@@ -25,7 +25,12 @@ pub static SYSTEM: Lazy<obj_ref_t!(Module)> = Lazy::new(|| {
         ),
     ];
 
-    new::builtin_module("system", Namespace::with_entries(&entries), "System module")
+    new::builtin_module(
+        "system",
+        "system.fi",
+        Namespace::with_entries(&entries),
+        "System module",
+    )
 });
 
 /// Add a module to `system.modules`.

@@ -79,8 +79,13 @@ pub fn builtin_func(
     obj_ref!(BuiltinFunc::new(name.to_owned(), this_type, params, str(doc), func))
 }
 
-pub fn builtin_module(name: &str, ns: Namespace, doc: &str) -> obj_ref_t!(Module) {
-    obj_ref!(Module::new(name.into(), ns, Code::new(), Some(doc)))
+pub fn builtin_module(
+    name: &str,
+    path: &str,
+    ns: Namespace,
+    doc: &str,
+) -> obj_ref_t!(Module) {
+    obj_ref!(Module::new(name.into(), path.into(), ns, Code::new(), Some(doc)))
 }
 
 pub fn cell() -> ObjectRef {

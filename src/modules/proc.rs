@@ -12,5 +12,10 @@ pub static PROC: Lazy<obj_ref_t!(Module)> = Lazy::new(|| {
         // TODO:
     ];
 
-    new::builtin_module("proc", Namespace::with_entries(&entries), "proc module")
+    new::builtin_module(
+        "proc",
+        "proc.fi",
+        Namespace::with_entries(&entries),
+        "proc module",
+    )
 });
