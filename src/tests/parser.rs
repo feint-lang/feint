@@ -2,7 +2,8 @@ use num_bigint::BigInt;
 
 use crate::ast;
 use crate::scanner::Scanner;
-use crate::util::{source_from_text, BinaryOperator, Location};
+use crate::source::{source_from_text, Location};
+use crate::util::BinaryOperator;
 
 use crate::parser::*;
 

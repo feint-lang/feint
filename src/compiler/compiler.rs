@@ -4,10 +4,11 @@ use std::fmt::Formatter;
 
 use crate::ast;
 use crate::modules::BUILTINS;
+use crate::source::Location;
 use crate::types::{new, Module, Namespace, ObjectRef};
 use crate::util::{
-    BinaryOperator, CompareOperator, InplaceOperator, Location, Stack,
-    UnaryCompareOperator, UnaryOperator,
+    BinaryOperator, CompareOperator, InplaceOperator, Stack, UnaryCompareOperator,
+    UnaryOperator,
 };
 use crate::vm::{globals, Code, Inst, PrintFlags};
 

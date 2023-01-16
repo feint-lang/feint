@@ -3,7 +3,7 @@ use std::num::ParseFloatError;
 use num_bigint::ParseBigIntError;
 
 use crate::format::FormatStrErr;
-use crate::util::Location;
+use crate::source::Location;
 
 use super::{Token, TokenWithLocation};
 

@@ -1,6 +1,6 @@
 use crate::scanner::{ScanTokensResult, Scanner, Token, TokenWithLocation as TWL};
+use crate::source::source_from_text;
 use crate::types::{new, ObjectRef};
-use crate::util::source_from_text;
 use crate::vm::RuntimeObjResult;
 
 #[derive(Clone, Debug, PartialEq)]

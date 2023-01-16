@@ -1,8 +1,9 @@
 use std::ops::Index;
 use std::slice::Iter;
 
+use crate::source::Location;
 use crate::types::{new, FuncTrait, ObjectRef};
-use crate::util::{format_doc, Location};
+use crate::util::format_doc;
 
 use super::inst::Inst;
 use super::result::RuntimeErr;

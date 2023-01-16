@@ -4,7 +4,7 @@ use crate::format::FormatStrErr::*;
 use crate::format::FormatStrToken::*;
 use crate::format::*;
 use crate::scanner::{Token, TokenWithLocation};
-use crate::util::Location;
+use crate::source::Location;
 
 fn scan_ok(
     string: &str,

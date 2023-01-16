@@ -1,5 +1,6 @@
+use crate::source::Location;
 use crate::util::{
-    BinaryOperator, CompareOperator, InplaceOperator, Location, UnaryCompareOperator,
+    BinaryOperator, CompareOperator, InplaceOperator, UnaryCompareOperator,
     UnaryOperator,
 };
 

@@ -6,7 +6,7 @@ use crate::ast;
 use crate::format::FormatStrToken;
 use crate::parser::result::StatementResult;
 use crate::scanner::{ScanErr, ScanTokenResult, Token, TokenWithLocation};
-use crate::util::Location;
+use crate::source::Location;
 
 use super::precedence::{
     get_binary_precedence, get_unary_precedence, is_right_associative,

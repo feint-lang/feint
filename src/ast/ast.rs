@@ -3,9 +3,10 @@ use std::fmt;
 use num_bigint::BigInt;
 
 use crate::scanner::Token;
+use crate::source::Location;
 use crate::types::Params;
 use crate::util::{
-    BinaryOperator, CompareOperator, InplaceOperator, Location, UnaryCompareOperator,
+    BinaryOperator, CompareOperator, InplaceOperator, UnaryCompareOperator,
     UnaryOperator,
 };
 

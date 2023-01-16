@@ -12,12 +12,13 @@ use ctrlc;
 use num_traits::ToPrimitive;
 
 use crate::modules;
+use crate::source::Location;
 use crate::types::{
     new, Args, BuiltinFunc, Func, FuncTrait, Module, ObjectRef, ThisOpt,
 };
 use crate::util::{
-    BinaryOperator, CompareOperator, InplaceOperator, Location, Stack,
-    UnaryCompareOperator, UnaryOperator,
+    BinaryOperator, CompareOperator, InplaceOperator, Stack, UnaryCompareOperator,
+    UnaryOperator,
 };
 
 use super::code::Code;

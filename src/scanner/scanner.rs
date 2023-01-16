@@ -8,7 +8,8 @@ use regex::Regex;
 
 use crate::format::scan_format_string;
 use crate::scanner::result::AddTokenResult;
-use crate::util::{Location, Source, Stack};
+use crate::source::{Location, Source};
+use crate::util::Stack;
 
 use super::keywords::KEYWORDS;
 use super::result::ScanErrKind as ErrKind;

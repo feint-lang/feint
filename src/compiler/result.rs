@@ -1,5 +1,5 @@
+use crate::source::Location;
 use crate::types::Module;
-use crate::util::Location;
 
 pub type CompResult = Result<Module, CompErr>;
 

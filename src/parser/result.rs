@@ -1,6 +1,6 @@
 use crate::ast;
 use crate::scanner::{ScanErr, Token, TokenWithLocation};
-use crate::util::Location;
+use crate::source::Location;
 
 pub type BoolResult = Result<bool, ParseErr>;
 pub type ParseResult = Result<ast::Module, ParseErr>;

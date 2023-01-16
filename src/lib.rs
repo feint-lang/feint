@@ -9,6 +9,7 @@ pub mod dis;
 pub mod exe;
 pub mod repl;
 pub mod result;
+pub mod source;
 pub mod vm;
 
 mod ast;

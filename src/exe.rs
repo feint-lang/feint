@@ -9,10 +9,10 @@ use crate::modules;
 use crate::parser::{ParseErr, ParseErrKind, Parser};
 use crate::result::{ExeErr, ExeErrKind, ExeResult};
 use crate::scanner::{ScanErr, ScanErrKind, Scanner, Token, TokenWithLocation};
-use crate::types::Module;
-use crate::util::{
+use crate::source::{
     source_from_file, source_from_stdin, source_from_text, Location, Source,
 };
+use crate::types::Module;
 use crate::vm::{
     CallDepth, Inst, PrintFlags, RuntimeContext, RuntimeErr, RuntimeErrKind,
     VMExeResult, VMState, DEFAULT_MAX_CALL_DEPTH, VM,

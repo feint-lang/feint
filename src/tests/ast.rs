@@ -2,7 +2,7 @@ use num_bigint::BigInt;
 
 use crate::ast::*;
 use crate::scanner::Token;
-use crate::util::Location;
+use crate::source::Location;
 
 #[test]
 #[rustfmt::skip]

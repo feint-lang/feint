@@ -3,7 +3,7 @@ use std::fmt;
 use num_bigint::BigInt;
 
 use crate::format::FormatStrToken;
-use crate::util::Location;
+use crate::source::Location;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Token {
