@@ -70,6 +70,7 @@ impl Disassembler {
             LoadFalse => self.align("LOAD_FALSE", "false"),
             LoadAlways => self.align("LOAD_ALWAYS", "@"),
             LoadEmptyStr => self.align("LOAD_EMPTY_STR", "\"\""),
+            LoadNewline => self.align("LOAD_NEWLINE", "\"\\n\""),
             LoadEmptyTuple => self.align("LOAD_EMPTY_TUPLE", "()"),
             ScopeStart => self.align("SCOPE_START", ""),
             ScopeEnd => self.align("SCOPE_END", ""),
@@ -143,7 +144,7 @@ impl Disassembler {
             ReturnPlaceholder(addr, _) => {
                 self.align("PLACEHOLDER", format!("RETURN @ {addr}"))
             }
-            PrintTop => self.align("PRINT_TOP", ""),
+            Print(flags) => self.align("PRINT_TOP", format!("flags = {flags:?}")),
             DisplayStack(message) => self.align("DISPLAY_STACK", message),
         }
     }

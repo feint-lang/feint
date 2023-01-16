@@ -5,6 +5,7 @@ pub use vm::{DEFAULT_MAX_CALL_DEPTH, VM};
 pub(crate) use code::Code;
 pub(crate) use context::RuntimeContext;
 pub(crate) use inst::Inst;
+pub(crate) use inst::PrintFlags;
 pub(crate) use result::{
     RuntimeBoolResult, RuntimeErrKind, RuntimeObjResult, RuntimeResult, VMExeResult,
 };

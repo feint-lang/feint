@@ -8,7 +8,12 @@ print = (...) =>
        objects?: ObjectRef[]
 
     "
-    $echo($args.join(" "), false, true)
+    i = 0
+    loop i < $args.length ->
+        $print ($args.i, false)
+        $print (" ", false)
+        i += 1
+    $print ("", false, true)
 
 
 print_err = (...) =>
@@ -18,7 +23,12 @@ print_err = (...) =>
        objects?: ObjectRef[]
 
     "
-    $echo($args.join(" "), true, true)
+    i = 0
+    loop i < $args.length ->
+        $print ($args.i, true)
+        $print (" ", true)
+        i += 1
+    $print ("", true, true)
 
 
 type: Type = (obj: Any) =>

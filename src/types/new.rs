@@ -222,6 +222,8 @@ pub fn str<S: Into<String>>(val: S) -> ObjectRef {
     let val = val.into();
     if val.is_empty() {
         globals::EMPTY_STR.clone()
+    } else if val == "\n" {
+        globals::NEWLINE.clone()
     } else {
         obj_ref!(Str::new(val))
     }

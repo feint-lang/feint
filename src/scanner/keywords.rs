@@ -25,6 +25,7 @@ pub static KEYWORDS: Lazy<HashMap<&'static str, Token>> = Lazy::new(|| {
         ("package", Package),
         ("return", Return),
         ("$halt", Halt),
+        ("$print", Print),
     ]
     .iter()
     .cloned()

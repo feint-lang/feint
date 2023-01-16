@@ -86,6 +86,7 @@ pub enum Token {
     Jump,          // jump label
     Label(String), // :label:
     Halt,
+    Print,
 
     // Import/export ---------------------------------------------------
     Import,  // import <module>
@@ -187,6 +188,7 @@ impl Token {
             Self::Jump => "jump",
             Self::Label(_name) => "label",
             Self::Halt => "$halt",
+            Self::Print => "$print",
 
             // Import/export ---------------------------------------------------
             Self::Import => "import",

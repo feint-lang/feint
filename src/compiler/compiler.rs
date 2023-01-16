@@ -9,7 +9,7 @@ use crate::util::{
     BinaryOperator, CompareOperator, InplaceOperator, Location, Stack,
     UnaryCompareOperator, UnaryOperator,
 };
-use crate::vm::{globals, Code, Inst};
+use crate::vm::{globals, Code, Inst, PrintFlags};
 
 use super::result::{CompErr, CompResult};
 use super::scope::{Scope, ScopeKind, ScopeTree};
@@ -447,6 +447,7 @@ impl Visitor {
             }
             Kind::Return(expr) => self.visit_return(expr)?,
             Kind::Halt(expr) => self.visit_halt(expr)?,
+            Kind::Print(expr) => self.visit_print(expr)?,
             Kind::Expr(expr) => self.visit_expr(expr, None)?,
         }
         Ok(())
@@ -475,6 +476,38 @@ impl Visitor {
         self.visit_expr(expr, None)?;
         self.push(Inst::HaltTop);
         Ok(())
+    }
+
+    fn visit_print(&mut self, expr: ast::Expr) -> VisitResult {
+        if let Some(args) = expr.tuple_items() {
+            let mut flags = PrintFlags::default();
+            let n_args = args.len();
+            if n_args > 0 && n_args <= 5 {
+                let obj = args[0].clone();
+                // XXX: This is kinda gnarly.
+                if n_args > 1 && args[1].is_true() {
+                    flags.insert(PrintFlags::ERR);
+                }
+                if n_args > 2 && args[2].is_true() {
+                    flags.insert(PrintFlags::NL);
+                }
+                if n_args > 3 && args[3].is_true() {
+                    flags.insert(PrintFlags::REPR);
+                }
+                if n_args > 4 && args[4].is_true() {
+                    flags.insert(PrintFlags::NO_NIL);
+                }
+                self.visit_expr(obj, None)?;
+                self.push(Inst::Print(flags));
+                self.push_nil();
+                return Ok(());
+            }
+        }
+        let msg = concat!(
+            "$print expects to receive at least 1 arg and no more ",
+            "than 5 args: (object, ...flags)"
+        );
+        Err(CompErr::print(msg, expr.start, expr.end))
     }
 
     fn visit_return(&mut self, expr: ast::Expr) -> VisitResult {
@@ -585,6 +618,8 @@ impl Visitor {
             Kind::String(value) => {
                 if value.is_empty() {
                     self.push_empty_str();
+                } else if value == "\n" {
+                    self.push_newline();
                 } else {
                     self.add_const(new::str(value));
                 }
@@ -1006,6 +1041,10 @@ impl Visitor {
 
     fn push_empty_str(&mut self) {
         self.push(Inst::LoadEmptyStr)
+    }
+
+    fn push_newline(&mut self) {
+        self.push(Inst::LoadNewline)
     }
 
     fn push_empty_tuple(&mut self) {

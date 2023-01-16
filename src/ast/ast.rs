@@ -49,6 +49,7 @@ pub enum StatementKind {
     Label(String, Expr),
     Return(Expr),
     Halt(Expr),
+    Print(Expr),
     Expr(Expr),
 }
 
@@ -85,6 +86,10 @@ impl Statement {
         Self::new(StatementKind::Halt(expr), start, end)
     }
 
+    pub fn new_print(expr: Expr, start: Location, end: Location) -> Self {
+        Self::new(StatementKind::Print(expr), start, end)
+    }
+
     pub fn new_expr(expr: Expr, start: Location, end: Location) -> Self {
         Self::new(StatementKind::Expr(expr), start, end)
     }
@@ -107,7 +112,8 @@ impl fmt::Debug for StatementKind {
                 write!(f, "label: {label_index} {expr:?}")
             }
             Self::Return(expr) => write!(f, "return {expr:?}"),
-            Self::Halt(expr) => write!(f, "halt {expr:?}"),
+            Self::Halt(expr) => write!(f, "$halt {expr:?}"),
+            Self::Print(expr) => write!(f, "$print {expr:?}"),
             Self::Expr(expr) => write!(f, "{:?}", expr),
         }
     }
@@ -317,7 +323,15 @@ impl Expr {
         matches!(&self.kind, ExprKind::Literal(Literal { kind: LiteralKind::Ellipsis }))
     }
 
-    /// Check if expression is `false`.
+    /// Check if expression is literal `true`.
+    pub fn is_true(&self) -> bool {
+        matches!(
+            &self.kind,
+            ExprKind::Literal(Literal { kind: LiteralKind::Bool(true) })
+        )
+    }
+
+    /// Check if expression is literal `false`.
     pub fn is_false(&self) -> bool {
         matches!(
             &self.kind,
@@ -368,6 +382,14 @@ impl Expr {
     /// Check if expression is a function.
     pub fn is_func(&self) -> bool {
         matches!(self.kind, ExprKind::Func(_))
+    }
+
+    pub fn tuple_items(&self) -> Option<&Vec<Expr>> {
+        if let ExprKind::Tuple(items) = &self.kind {
+            Some(items)
+        } else {
+            None
+        }
     }
 }
 

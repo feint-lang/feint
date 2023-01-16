@@ -23,7 +23,7 @@ use crate::util::{
 use super::code::Code;
 use super::context::RuntimeContext;
 use super::globals;
-use super::inst::Inst;
+use super::inst::{Inst, PrintFlags};
 use super::result::{
     CallDepth, PeekObjResult, PeekResult, PopNObjResult, PopNResult, PopObjResult,
     PopResult, RuntimeErr, RuntimeObjResult, RuntimeResult, VMExeResult, VMState,
@@ -179,6 +179,9 @@ impl VM {
                 }
                 LoadEmptyStr => {
                     self.push_global_const(globals::EMPTY_STR_INDEX)?;
+                }
+                LoadNewline => {
+                    self.push_global_const(globals::NEWLINE_INDEX)?;
                 }
                 LoadEmptyTuple => {
                     self.push_global_const(globals::EMPTY_TUPLE_INDEX)?;
@@ -480,15 +483,8 @@ impl VM {
                     return self.halt(255);
                 }
                 // Miscellaneous
-                PrintTop => {
-                    if let Ok(obj) = self.pop_obj() {
-                        let obj = obj.read().unwrap();
-                        if !obj.is_nil() {
-                            println!("{:?}", &*obj);
-                        }
-                    } else {
-                        return Err(RuntimeErr::empty_stack());
-                    }
+                Print(flags) => {
+                    self.handle_print(flags)?;
                 }
                 DisplayStack(message) => {
                     eprintln!("\nSTACK: {message}\n");
@@ -733,6 +729,36 @@ impl VM {
             return Err(RuntimeErr::expected_var(format!("Binary op: {}", op)));
         }
         Ok(())
+    }
+
+    fn handle_print(&mut self, flags: &PrintFlags) -> RuntimeResult {
+        if let Ok(obj) = self.pop_obj() {
+            let obj = obj.read().unwrap();
+            if flags.contains(PrintFlags::NO_NIL) && obj.is_nil() {
+                // do nothing
+            } else if flags.contains(PrintFlags::ERR) {
+                if flags.contains(PrintFlags::REPR) {
+                    eprint!("{:?}", &*obj);
+                } else {
+                    eprint!("{obj}");
+                }
+                if flags.contains(PrintFlags::NL) {
+                    eprintln!();
+                }
+            } else {
+                if flags.contains(PrintFlags::REPR) {
+                    print!("{:?}", &*obj);
+                } else {
+                    print!("{obj}");
+                }
+                if flags.contains(PrintFlags::NL) {
+                    println!();
+                }
+            }
+            Ok(())
+        } else {
+            Err(RuntimeErr::empty_stack())
+        }
     }
 
     // Call Stack ------------------------------------------------------

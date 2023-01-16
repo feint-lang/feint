@@ -14,8 +14,8 @@ use crate::util::{
     source_from_file, source_from_stdin, source_from_text, Location, Source,
 };
 use crate::vm::{
-    CallDepth, Inst, RuntimeContext, RuntimeErr, RuntimeErrKind, VMExeResult, VMState,
-    DEFAULT_MAX_CALL_DEPTH, VM,
+    CallDepth, Inst, PrintFlags, RuntimeContext, RuntimeErr, RuntimeErrKind,
+    VMExeResult, VMState, DEFAULT_MAX_CALL_DEPTH, VM,
 };
 use crate::{ast, dis};
 
@@ -110,9 +110,13 @@ impl Executor {
         // Assign TOS to _, print it, then pop it to clear the stack
         let last_inst = code.pop_inst();
         if let Some(Inst::Pop) = last_inst {
+            let print_flags = PrintFlags::ERR
+                | PrintFlags::NL
+                | PrintFlags::REPR
+                | PrintFlags::NO_NIL;
             code.push_inst(Inst::DeclareVar("_".to_owned()));
             code.push_inst(Inst::AssignVar("_".to_owned()));
-            code.push_inst(Inst::PrintTop);
+            code.push_inst(Inst::Print(print_flags));
         } else {
             let last_inst = match last_inst {
                 Some(inst) => format!("{inst:?}"),
@@ -495,6 +499,9 @@ impl Executor {
             }
             VarArgsMustBeLast(..) => {
                 "var args must be last in parameter list".to_owned()
+            }
+            Print(msg, ..) => {
+                format!("$print error: {msg}")
             }
         };
         let message = format!("COMPILATION ERROR: {message}");

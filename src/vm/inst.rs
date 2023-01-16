@@ -21,7 +21,8 @@ pub enum Inst {
     LoadFalse,      // 2
     LoadAlways,     // 3
     LoadEmptyStr,   // 4
-    LoadEmptyTuple, // 5
+    LoadNewline,    // 5
+    LoadEmptyTuple, // 6
 
     ScopeStart,
     ScopeEnd,
@@ -120,10 +121,22 @@ pub enum Inst {
 
     // Miscellaneous ---------------------------------------------------
 
-    // Pop TOS and print it.
-    PrintTop,
+    // Pop TOS and print it to stdout or stderr. Behavior is controlled
+    // by passing in flags. Pass `PrintFlags::default()` for the default
+    // behavior, which is to print to stdout with no newline.
+    Print(PrintFlags),
 
     DisplayStack(String),
+}
+
+bitflags! {
+    #[derive(Default)]
+    pub struct PrintFlags: u32 {
+        const ERR  =   0b00000001; // print to stderr
+        const NL   =   0b00000010; // print a trailing newline.
+        const REPR =   0b00000100; // print repr using fmt::Debug
+        const NO_NIL = 0b00001000; // don't print obj if it's nil
+    }
 }
 
 impl PartialEq for Inst {
@@ -170,6 +183,7 @@ impl PartialEq for Inst {
             (LoadModule(a), LoadModule(b)) => a == b,
             (Halt(a), Halt(b)) => a == b,
             (HaltTop, HaltTop) => true,
+            (Print(a), Print(b)) => a == b,
             _ => false,
         }
     }

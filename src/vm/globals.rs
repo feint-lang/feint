@@ -27,6 +27,9 @@ pub static ALWAYS: Lazy<obj_ref_t!(Always)> = Lazy::new(|| obj_ref!(Always::new(
 pub static EMPTY_STR: Lazy<obj_ref_t!(Str)> =
     Lazy::new(|| obj_ref!(Str::new("".to_owned())));
 
+pub static NEWLINE: Lazy<obj_ref_t!(Str)> =
+    Lazy::new(|| obj_ref!(Str::new("\n".to_owned())));
+
 pub static EMPTY_TUPLE: Lazy<obj_ref_t!(Tuple)> =
     Lazy::new(|| obj_ref!(Tuple::new(vec![])));
 
@@ -42,8 +45,9 @@ pub const TRUE_INDEX: usize = 1;
 pub const FALSE_INDEX: usize = 2;
 pub const ALWAYS_INDEX: usize = 3;
 pub const EMPTY_STR_INDEX: usize = 4;
-pub const EMPTY_TUPLE_INDEX: usize = 5;
-pub const SHARED_INT_INDEX: usize = 6;
+pub const NEWLINE_INDEX: usize = 5;
+pub const EMPTY_TUPLE_INDEX: usize = 6;
+pub const SHARED_INT_INDEX: usize = 7;
 
 /// Get the global constants.
 ///
@@ -55,6 +59,7 @@ pub fn get_global_constants() -> Vec<ObjectRef> {
         FALSE.clone(),
         ALWAYS.clone(),
         EMPTY_STR.clone(),
+        NEWLINE.clone(),
         EMPTY_TUPLE.clone(),
     ];
     for int in SHARED_INTS.iter() {

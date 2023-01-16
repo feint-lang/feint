@@ -68,6 +68,10 @@ impl CompErr {
         Self::new(CompErrKind::VarArgsMustBeLast(start, end))
     }
 
+    pub fn print<S: Into<String>>(msg: S, start: Location, end: Location) -> Self {
+        Self::new(CompErrKind::Print(msg.into(), start, end))
+    }
+
     pub fn loc(&self) -> (Location, Location) {
         use CompErrKind::*;
         let (start, end) = match &self.kind {
@@ -80,6 +84,7 @@ impl CompErr {
             MainMustBeFunc(start, end) => (start, end),
             GlobalNotFound(_, start, end) => (start, end),
             VarArgsMustBeLast(start, end) => (start, end),
+            Print(_, start, end) => (start, end),
         };
         (*start, *end)
     }
@@ -97,4 +102,5 @@ pub enum CompErrKind {
     MainMustBeFunc(Location, Location),
     GlobalNotFound(String, Location, Location),
     VarArgsMustBeLast(Location, Location),
+    Print(String, Location, Location),
 }

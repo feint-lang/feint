@@ -3,10 +3,7 @@ use std::sync::{Arc, RwLock};
 
 use once_cell::sync::Lazy;
 
-use crate::util::check_args;
-use crate::vm::RuntimeErr;
-
-use crate::types::gen::{obj_ref_t, use_arg, use_arg_bool};
+use crate::types::gen::obj_ref_t;
 use crate::types::module::Module;
 use crate::types::new;
 use crate::types::ns::Namespace;
@@ -50,52 +47,6 @@ pub static BUILTINS: Lazy<obj_ref_t!(Module)> = Lazy::new(|| {
         ("Nil", NIL_TYPE.clone()),
         ("Str", STR_TYPE.clone()),
         ("Tuple", TUPLE_TYPE.clone()),
-        (
-            "$echo",
-            new::builtin_func(
-                "$echo",
-                None,
-                &["obj", "stderr", "newline"],
-                "Echo object to stdout or stderr w/ optional newline.
-
-                This is a low level output function that isn't intended
-                for use in most code. Typically, you'll want to use
-                `print` or `print_err` instead.
-
-                TODO: Maybe implement this as a pair of instructions?
-
-                Args:
-                    obj: ObjectRef
-                    stderr: Bool
-                    newline: Bool
-
-                ",
-                |_, args, _| {
-                    let result = check_args("$echo", &args, false, 3, Some(3));
-                    if let Err(err) = result {
-                        return Ok(err);
-                    }
-
-                    let obj = use_arg!(args, 0);
-                    let stderr = use_arg_bool!(echo, stderr, args, 1);
-                    let newline = use_arg_bool!(echo, newline, args, 2);
-
-                    if newline {
-                        if stderr {
-                            eprintln!("{obj}")
-                        } else {
-                            println!("{obj}")
-                        };
-                    } else if stderr {
-                        eprint!("{obj}")
-                    } else {
-                        print!("{obj}")
-                    }
-
-                    Ok(new::nil())
-                },
-            ),
-        ),
     ]);
 
     new::builtin_module("builtins", "builtins.fi", ns, "Builtins module")
