@@ -113,6 +113,7 @@ impl VM {
     }
 
     pub fn execute_module(&mut self, module: &mut Module, start: usize) -> VMExeResult {
+        self.reset();
         self.execute_code(Some(module), module.code(), start)
     }
 
