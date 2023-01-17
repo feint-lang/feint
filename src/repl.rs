@@ -112,7 +112,8 @@ impl Repl {
                 // If there's an error executing the current input, try
                 // to add more lines *if* the error can potentially be
                 // recovered from by adding more input.
-                if !(continue_on_err && self.continue_on_err(err)) {
+                if !(continue_on_err && self.continue_on_err(&err)) {
+                    eprintln!("ERROR: {err}");
                     return None;
                 }
             }
@@ -194,8 +195,8 @@ impl Repl {
         true
     }
 
-    fn continue_on_err(&self, err: ExeErr) -> bool {
-        if let ExeErrKind::ScanErr(kind) = err.kind {
+    fn continue_on_err(&self, err: &ExeErr) -> bool {
+        if let ExeErrKind::ScanErr(kind) = &err.kind {
             use ScanErrKind::*;
             if let ExpectedBlock
             | ExpectedIndentedBlock(_)
@@ -204,7 +205,7 @@ impl Repl {
             {
                 return true;
             }
-        } else if let ExeErrKind::ParseErr(kind) = err.kind {
+        } else if let ExeErrKind::ParseErr(kind) = &err.kind {
             use ParseErrKind::*;
             if let ExpectedBlock(_) = kind {
                 return true;

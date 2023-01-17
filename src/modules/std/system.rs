@@ -7,18 +7,19 @@ use crate::types::gen::obj_ref_t;
 use crate::types::{new, Module, Namespace, ObjectRef, ObjectTrait};
 use crate::vm::RuntimeErr;
 
-use super::builtins::BUILTINS;
-use super::proc::PROC;
-
 pub static SYSTEM: Lazy<obj_ref_t!(Module)> = Lazy::new(|| {
     let entries: Vec<(&str, ObjectRef)> = vec![
         ("argv", new::empty_tuple()),
         (
             "modules",
             new::map(vec![
-                ("std.builtins".to_owned(), BUILTINS.clone()),
+                (
+                    "std".to_owned(),
+                    new::builtin_module("std", "std", Namespace::new(), "std module"),
+                ),
+                ("std.builtins".to_owned(), super::builtins::BUILTINS.clone()),
                 ("std.system".to_owned(), new::nil()),
-                ("std.proc".to_owned(), PROC.clone()),
+                ("std.proc".to_owned(), super::proc::PROC.clone()),
             ]),
         ),
     ];
@@ -27,7 +28,7 @@ pub static SYSTEM: Lazy<obj_ref_t!(Module)> = Lazy::new(|| {
         "std.system",
         "std.system",
         Namespace::with_entries(&entries),
-        "System module",
+        "std.system module",
     )
 });
 

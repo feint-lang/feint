@@ -3,7 +3,7 @@ use std::fmt;
 use std::fmt::Formatter;
 
 use crate::ast;
-use crate::modules::BUILTINS;
+use crate::modules::std::BUILTINS;
 use crate::source::Location;
 use crate::types::{new, Module, Namespace, ObjectRef};
 use crate::util::{

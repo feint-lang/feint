@@ -1,6 +1,6 @@
 use indexmap;
 
-use crate::modules;
+use crate::modules::std::BUILTINS;
 use crate::types::{new, Namespace, ObjectRef, ObjectTrait};
 use crate::vm::RuntimeObjResult;
 
@@ -176,9 +176,9 @@ impl RuntimeContext {
     /// Get builtin object. This is used as a fallback when a name isn't
     /// found in the current scope.
     pub fn get_builtin(&self, name: &str) -> ObjectRef {
-        let builtins = modules::BUILTINS.read().unwrap();
+        let builtins = BUILTINS.read().unwrap();
         let builtins = builtins.down_to_mod().unwrap();
-        builtins.get_attr(name, modules::BUILTINS.clone())
+        builtins.get_attr(name, BUILTINS.clone())
     }
 
     pub fn iter_vars(&self) -> indexmap::map::Iter<'_, String, ObjectRef> {

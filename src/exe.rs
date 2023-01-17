@@ -6,7 +6,7 @@ use std::path::Path;
 use std::sync::{Arc, RwLock};
 
 use crate::compiler::{CompErr, CompErrKind, Compiler};
-use crate::modules::{BUILTINS, SYSTEM};
+use crate::modules::std::{BUILTINS, SYSTEM};
 use crate::parser::{ParseErr, ParseErrKind, Parser};
 use crate::result::{ExeErr, ExeErrKind, ExeResult};
 use crate::scanner::{ScanErr, ScanErrKind, Scanner, Token, TokenWithLocation};
@@ -337,12 +337,16 @@ impl Executor {
     fn load_module(&mut self, name: &str, check_names: bool) -> Result<Module, ExeErr> {
         let mut segments = name.split('.');
 
-        let mut module_path = if let Some(first_segment) = segments.next() {
-            if first_segment == "std" {
-                Path::new(self.builtin_module_search_path.as_str()).to_path_buf()
+        let mut module_path = if let Some(first) = segments.next() {
+            let start = if first == "std" {
+                self.builtin_module_search_path.as_str()
             } else {
-                panic!("Only std modules are supported currently");
-            }
+                return Err(ExeErr::new(ExeErrKind::ModuleNotFound(
+                    format!("{name}: Only std modules are supported currently"),
+                    None,
+                )));
+            };
+            Path::new(start).to_path_buf().join(first)
         } else {
             unreachable!("Empty module name should not be possible");
         };

@@ -11,7 +11,7 @@ use std::sync::{
 use ctrlc;
 use num_traits::ToPrimitive;
 
-use crate::modules;
+use crate::modules::get_module;
 use crate::source::Location;
 use crate::types::{
     new, Args, BuiltinFunc, Func, FuncTrait, Module, ObjectRef, ThisOpt,
@@ -208,7 +208,7 @@ impl VM {
                 }
                 // Modules
                 LoadModule(name) => {
-                    let module = modules::get_module(name.as_str())?;
+                    let module = get_module(name.as_str())?;
                     self.push_temp(module);
                 }
                 // Vars
