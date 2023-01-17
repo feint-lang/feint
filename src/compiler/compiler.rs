@@ -431,7 +431,7 @@ impl Visitor {
         match node.kind {
             Kind::Break(expr) => self.visit_break(expr)?,
             Kind::Continue => self.visit_continue()?,
-            Kind::Import(name) => self.visit_import(name)?,
+            Kind::Import(path) => self.visit_import(path)?,
             Kind::Jump(name) => {
                 let jump_addr = self.len();
                 self.push(Inst::Placeholder(
@@ -469,11 +469,15 @@ impl Visitor {
         Ok(())
     }
 
-    fn visit_import(&mut self, name: String) -> VisitResult {
-        self.scope_tree.add_var(self.len(), name.as_str(), true);
-        self.push(Inst::DeclareVar(name.clone()));
-        self.push(Inst::LoadModule(name.clone()));
-        self.push(Inst::AssignVar(name));
+    fn visit_import(&mut self, path: String) -> VisitResult {
+        let var_name = path
+            .split('.')
+            .last()
+            .expect("Import path should have at least one segment");
+        self.scope_tree.add_var(self.len(), var_name, true);
+        self.push(Inst::DeclareVar(var_name.to_owned()));
+        self.push(Inst::LoadModule(path.to_owned()));
+        self.push(Inst::AssignVar(var_name.to_owned()));
         Ok(())
     }
 

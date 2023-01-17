@@ -1,12 +1,14 @@
 #!./target/release/feint
 "Script to generate a new builtin type definition."
 
-import args
-import system
+import std.args
+import std.system
 
 
 if args.err || system.err ->
-    print_err($"Import error")
+    print_err($"Exiting due to import error:")
+    print("args:", args.err)
+    print("system:", system.err)
     system.exit(1)
 
 

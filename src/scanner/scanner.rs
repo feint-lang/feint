@@ -403,6 +403,14 @@ impl<'a, T: BufRead> Scanner<'a, T> {
                     self.add_token_to_queue(Token::EndOfStatement, start, start);
                 }
                 self.if_stack.pop();
+            } else if token == &Token::Import {
+                self.add_token_to_queue(Token::Import, start, start);
+                self.consume_whitespace();
+                let path = self.read_import_path();
+                if !IMPORT_PATH_REGEX.is_match(&path) {
+                    return Err(ScanErr::new(ErrKind::InvalidImportPath(path), start));
+                }
+                return Ok(Token::ImportPath(path));
             }
             return Ok(token.clone());
         }
@@ -922,6 +930,17 @@ impl<'a, T: BufRead> Scanner<'a, T> {
         string
     }
 
+    fn read_import_path(&mut self) -> String {
+        let mut string = String::new();
+        let test = |&c: &char| {
+            c.is_ascii_alphabetic() || c.is_ascii_digit() || c == '_' || c == '.'
+        };
+        while let Some((c, _, _)) = self.next_char_if(test) {
+            string.push(c)
+        }
+        string
+    }
+
     fn check_ident(
         &self,
         ident: &str,
@@ -1039,3 +1058,16 @@ static TYPE_IDENT_REGEX: Lazy<Regex> =
 
 static PLACEHOLDER_IDENT_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^_+$").unwrap());
+
+static IMPORT_PATH_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
+        r"(?x)
+        ^
+        # required first segment
+        ([a-z]|[a-z][a-z0-9_]*[a-z0-9])
+        # optional additional segments
+        (\.([a-z]|[a-z][a-z0-9_]*[a-z0-9]))*
+        $",
+    )
+    .unwrap()
+});

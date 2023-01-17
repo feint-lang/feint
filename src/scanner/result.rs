@@ -47,6 +47,8 @@ pub enum ScanErrKind {
 
     InvalidLabel(String),
 
+    InvalidImportPath(String),
+
     InvalidIdent(String),
     InvalidConstIdent(String),
     InvalidTypeIdent(String),

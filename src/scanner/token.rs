@@ -91,11 +91,12 @@ pub enum Token {
     Print,
 
     // Import/export ---------------------------------------------------
-    Import,  // import <module>
-    From,    // import from <module>: x, y, z
-    Package, // import from package.<module>: x, y, z
-    Export,  // export <object>
-    As,      // import <module> as <name>
+    Import,             // import <path>
+    ImportPath(String), // import <path>
+    From,               // import from <module>: x, y, z
+    Package,            // import from package.<module>: x, y, z
+    Export,             // export <object>
+    As,                 // import <path> as <name>
 
     // Identifiers -----------------------------------------------------
     Ident(String),         // ident_name
@@ -196,6 +197,7 @@ impl Token {
 
             // Import/export ---------------------------------------------------
             Self::Import => "import",
+            Self::ImportPath(path) => path.as_str(),
             Self::From => "from",
             Self::Package => "package",
             Self::Export => "export",

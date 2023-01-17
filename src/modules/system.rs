@@ -16,16 +16,16 @@ pub static SYSTEM: Lazy<obj_ref_t!(Module)> = Lazy::new(|| {
         (
             "modules",
             new::map(vec![
-                ("builtins".to_owned(), BUILTINS.clone()),
-                ("system".to_owned(), new::nil()),
-                ("proc".to_owned(), PROC.clone()),
+                ("std.builtins".to_owned(), BUILTINS.clone()),
+                ("std.system".to_owned(), new::nil()),
+                ("std.proc".to_owned(), PROC.clone()),
             ]),
         ),
     ];
 
     new::builtin_module(
-        "system",
-        "system.fi",
+        "std.system",
+        "std.system",
         Namespace::with_entries(&entries),
         "System module",
     )

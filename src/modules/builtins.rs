@@ -49,5 +49,5 @@ pub static BUILTINS: Lazy<obj_ref_t!(Module)> = Lazy::new(|| {
         ("Tuple", TUPLE_TYPE.clone()),
     ]);
 
-    new::builtin_module("builtins", "builtins.fi", ns, "Builtins module")
+    new::builtin_module("std.builtins", "std.builtins", ns, "Builtins module")
 });

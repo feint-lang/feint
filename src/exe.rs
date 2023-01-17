@@ -97,8 +97,8 @@ impl Executor {
             }
         }
 
-        self.extend_base_module("builtins", BUILTINS.clone())?;
-        self.extend_base_module("system", SYSTEM.clone())?;
+        self.extend_base_module("std.builtins", BUILTINS.clone())?;
+        self.extend_base_module("std.system", SYSTEM.clone())?;
 
         Ok(())
     }
@@ -335,12 +335,22 @@ impl Executor {
 
     /// Load FeInt module from file system.
     fn load_module(&mut self, name: &str, check_names: bool) -> Result<Module, ExeErr> {
-        let search_path = self.builtin_module_search_path.as_str();
+        let mut segments = name.split('.');
 
-        let mut module_path = Path::new(search_path).to_path_buf();
-        for segment in name.split('.') {
+        let mut module_path = if let Some(first_segment) = segments.next() {
+            if first_segment == "std" {
+                Path::new(self.builtin_module_search_path.as_str()).to_path_buf()
+            } else {
+                panic!("Only std modules are supported currently");
+            }
+        } else {
+            unreachable!("Empty module name should not be possible");
+        };
+
+        for segment in segments {
             module_path = module_path.join(segment);
         }
+
         module_path.set_extension("fi");
 
         if !module_path.is_file() {
