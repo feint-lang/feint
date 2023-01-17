@@ -1,5 +1,0 @@
-# Corresponding import in external package: `import <name>.type.Type`
-export package.type.Type
-
-# Corresponding import in external package: `import <name>.Type`
-export from package.type: Type
