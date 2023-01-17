@@ -5,11 +5,10 @@ use std::process::ExitCode;
 use clap::builder::FalseyValueParser;
 use clap::{parser::ValueSource, value_parser, Arg, ArgAction, ArgMatches, Command};
 
-use feint::config::CONFIG;
 use feint::exe::Executor;
 use feint::repl::Repl;
 use feint::result::ExeErrKind;
-use feint::vm::{CallDepth, RuntimeErr, VMState, DEFAULT_MAX_CALL_DEPTH};
+use feint::vm::{CallDepth, VMState, DEFAULT_MAX_CALL_DEPTH};
 
 /// Interpret a file if one is specified. Otherwise, run the REPL.
 fn main() -> ExitCode {
@@ -63,7 +62,7 @@ fn main() -> ExitCode {
             Arg::new("builtin_module_search_path")
                 .short('b')
                 .long("builtin-module-search-path")
-                .default_value("./src/modules")
+                .required(false)
                 .env("FEINT_BUILTIN_MODULE_SEARCH_PATH")
                 .help("Search path for builtin modules"),
         )
@@ -114,7 +113,7 @@ fn main() -> ExitCode {
 
     let matches = app.get_matches();
     let builtin_module_search_path =
-        matches.get_one::<String>("builtin_module_search_path").unwrap();
+        matches.get_one::<String>("builtin_module_search_path");
     let max_call_depth = *matches.get_one("max_call_depth").unwrap();
     let debug = *matches.get_one::<bool>("debug").unwrap();
 
@@ -123,28 +122,12 @@ fn main() -> ExitCode {
         _ => max_call_depth,
     };
 
-    let mut config = CONFIG.write().unwrap();
-
-    let config_results = vec![
-        config.set_str("builtin_module_search_path", builtin_module_search_path),
-        config.set_usize("max_call_depth", max_call_depth),
-        config.set_bool("debug", debug),
-    ];
-
-    if let Some((exit_code, messages)) = check_config_results(config_results) {
-        eprintln!("Aborting due to invalid config:\n");
-        for message in messages {
-            eprintln!("{message}")
-        }
-        return ExitCode::from(exit_code);
-    }
-
-    drop(config);
-
     let return_code = match matches.subcommand() {
-        Some(("run", matches)) => handle_run(matches, max_call_depth, debug),
+        Some(("run", matches)) => {
+            handle_run(matches, builtin_module_search_path, max_call_depth, debug)
+        }
         Some(("test", matches)) => handle_test(matches, max_call_depth, debug),
-        None => handle_run(&matches, max_call_depth, debug),
+        None => handle_run(&matches, builtin_module_search_path, max_call_depth, debug),
         Some((name, _)) => {
             unreachable!("Subcommand not defined: {}", name);
         }
@@ -153,26 +136,13 @@ fn main() -> ExitCode {
     ExitCode::from(return_code)
 }
 
-fn check_config_results(
-    results: Vec<Result<(), RuntimeErr>>,
-) -> Option<(u8, Vec<String>)> {
-    let mut has_err = false;
-    let mut messages = vec![];
-    for result in results.iter() {
-        if let Err(err) = result {
-            has_err = true;
-            messages.push(format!("{}", err));
-        }
-    }
-    if has_err {
-        Some((1, messages))
-    } else {
-        None
-    }
-}
-
 /// Subcommand: run
-fn handle_run(matches: &ArgMatches, max_call_depth: CallDepth, debug: bool) -> u8 {
+fn handle_run(
+    matches: &ArgMatches,
+    builtin_module_search_path: Option<&String>,
+    max_call_depth: CallDepth,
+    debug: bool,
+) -> u8 {
     let file_name = matches.get_one::<String>("FILE_NAME");
     let code = matches.get_one::<String>("code");
     let dis = *matches.get_one::<bool>("dis").unwrap();
@@ -192,7 +162,14 @@ fn handle_run(matches: &ArgMatches, max_call_depth: CallDepth, debug: bool) -> u
         }
     }
 
-    let mut exe = Executor::new(max_call_depth, argv, false, dis, debug);
+    let mut exe = Executor::new(
+        builtin_module_search_path.map(|x| x.to_owned()),
+        max_call_depth,
+        argv,
+        false,
+        dis,
+        debug,
+    );
 
     // XXX: Stop clippy from erroneously suggesting `exe.bootstrap()?`.
     #[allow(clippy::question_mark)]

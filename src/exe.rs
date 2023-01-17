@@ -1,35 +1,40 @@
 //! Front end for executing code from a source on a VM.
+use std::collections::VecDeque;
 use std::fs::canonicalize;
 use std::io::BufRead;
 use std::path::Path;
+use std::sync::{Arc, RwLock};
 
 use crate::compiler::{CompErr, CompErrKind, Compiler};
-use crate::config::CONFIG;
-use crate::modules;
+use crate::modules::{BUILTINS, SYSTEM};
 use crate::parser::{ParseErr, ParseErrKind, Parser};
 use crate::result::{ExeErr, ExeErrKind, ExeResult};
 use crate::scanner::{ScanErr, ScanErrKind, Scanner, Token, TokenWithLocation};
 use crate::source::{
     source_from_file, source_from_stdin, source_from_text, Location, Source,
 };
-use crate::types::Module;
+use crate::types::gen::obj_ref;
+use crate::types::{new, Module, ObjectRef, ObjectTrait};
 use crate::vm::{
     CallDepth, Inst, PrintFlags, RuntimeContext, RuntimeErr, RuntimeErrKind,
-    VMExeResult, VMState, DEFAULT_MAX_CALL_DEPTH, VM,
+    VMExeResult, VMState, VM,
 };
 use crate::{ast, dis};
 
 pub struct Executor {
     vm: VM,
     argv: Vec<String>,
+    builtin_module_search_path: String,
     incremental: bool,
     dis: bool,
     debug: bool,
     current_file_name: String,
+    imports: VecDeque<String>,
 }
 
 impl Executor {
     pub fn new(
+        builtin_module_search_path: Option<String>,
         max_call_depth: CallDepth,
         argv: Vec<String>,
         incremental: bool,
@@ -37,47 +42,24 @@ impl Executor {
         debug: bool,
     ) -> Self {
         let vm = VM::new(RuntimeContext::new(), max_call_depth);
-        let current_file_name = "<none>".to_owned();
-        Self { vm, argv, incremental, dis, debug, current_file_name }
-    }
 
-    pub fn for_add_module() -> Self {
-        let config = CONFIG.read().unwrap();
-        let max_call_depth = match config.get_usize("max_call_depth") {
-            Ok(depth) => depth,
-            Err(err) => {
-                log::warn!("{err}");
-                DEFAULT_MAX_CALL_DEPTH
-            }
-        };
-        drop(config);
-        let vm = VM::new(RuntimeContext::new(), max_call_depth);
-        let current_file_name = "<none>".to_owned();
+        let builtin_module_search_path =
+            if let Some(builtin_module_search_path) = builtin_module_search_path {
+                builtin_module_search_path
+            } else {
+                "./src/modules".to_owned()
+            };
+
         Self {
             vm,
-            argv: vec![],
-            incremental: false,
-            dis: false,
-            debug: false,
-            current_file_name,
+            argv,
+            builtin_module_search_path,
+            incremental,
+            dis,
+            debug,
+            current_file_name: "<none>".to_owned(),
+            imports: VecDeque::new(),
         }
-    }
-
-    /// Bootstrap and return error on failure.
-    pub fn bootstrap(&self) -> Result<(), ExeErr> {
-        modules::bootstrap(&self.argv)
-    }
-
-    /// Bootstrap and panic on failure. This is intended for use in,
-    /// e.g., tests.
-    pub fn bootstrap_panic(&self) {
-        if let Err(err) = self.bootstrap() {
-            panic!("{err}");
-        }
-    }
-
-    pub fn install_sigint_handler(&mut self) {
-        self.vm.install_sigint_handler();
     }
 
     /// Set current file name from `path` if possible.
@@ -88,6 +70,55 @@ impl Executor {
             path.to_str().unwrap_or("<unknown>").to_owned()
         };
     }
+
+    pub fn install_sigint_handler(&mut self) {
+        self.vm.install_sigint_handler();
+    }
+
+    // Bootstrap -------------------------------------------------------
+
+    /// Bootstrap and return error on failure.
+    pub fn bootstrap(&mut self) -> Result<(), ExeErr> {
+        {
+            let mut system = SYSTEM.write().unwrap();
+            let argv = new::tuple(self.argv.iter().map(new::str).collect());
+            system.ns_mut().add_obj("argv", argv);
+        }
+
+        {
+            let system = SYSTEM.read().unwrap();
+            let modules = system.get_attr("modules", SYSTEM.clone());
+            let modules = modules.write().unwrap();
+            if let Some(modules) = modules.down_to_map() {
+                modules.add("system", SYSTEM.clone());
+            } else {
+                let msg = format!("Expected system.modules to be a Map; got {modules}");
+                return Err(ExeErr::new(ExeErrKind::Bootstrap(msg)));
+            }
+        }
+
+        self.extend_base_module("builtins", BUILTINS.clone())?;
+        self.extend_base_module("system", SYSTEM.clone())?;
+
+        Ok(())
+    }
+
+    /// Extend module implemented in Rust with module implemented in
+    /// FeInt.
+    fn extend_base_module(
+        &mut self,
+        name: &str,
+        base_module_ref: ObjectRef,
+    ) -> Result<(), ExeErr> {
+        let module = self.load_module(name, true)?;
+        let mut base_module = base_module_ref.write().unwrap();
+        for (name, val) in module.iter_globals() {
+            base_module.ns_mut().add_obj(name, val.clone());
+        }
+        Ok(())
+    }
+
+    // Execute ---------------------------------------------------------
 
     /// Execute text entered in REPL. REPL execution is different from
     /// the other types of execution where the text or source is
@@ -192,6 +223,7 @@ impl Executor {
         debug: bool,
         source: &mut Source<T>,
     ) -> ExeResult {
+        self.load_imported_modules()?;
         let result = self.vm.execute_module(module, start);
         if debug {
             self.display_stack();
@@ -220,9 +252,37 @@ impl Executor {
         }
     }
 
-    /// Compile AST module node into module object.
+    // Parsing ---------------------------------------------------------
+
+    /// Parse source text, file, etc into AST module node.
+    fn parse_source<T: BufRead>(
+        &mut self,
+        source: &mut Source<T>,
+    ) -> Result<ast::Module, ExeErr> {
+        let scanner = Scanner::new(source);
+        let mut parser = Parser::new(scanner);
+        match parser.parse() {
+            Ok(ast_module) => {
+                self.find_imports(&ast_module);
+                Ok(ast_module)
+            }
+            Err(err) => {
+                if let ParseErrKind::ScanErr(scan_err) = err.kind {
+                    self.handle_scan_err(&scan_err, source);
+                    Err(ExeErr::new(ExeErrKind::ScanErr(scan_err.kind)))
+                } else {
+                    self.handle_parse_err(&err, source);
+                    Err(ExeErr::new(ExeErrKind::ParseErr(err.kind)))
+                }
+            }
+        }
+    }
+
+    // Compilation -----------------------------------------------------
+
+    /// Compile AST module node into script module object.
     fn compile_script<T: BufRead>(
-        &self,
+        &mut self,
         name: &str,
         source: &mut Source<T>,
     ) -> Result<Module, ExeErr> {
@@ -242,44 +302,15 @@ impl Executor {
         Ok(module)
     }
 
-    pub fn load_module(
-        &mut self,
-        name: &str,
-        file_path: &Path,
-    ) -> Result<Module, ExeErr> {
-        match source_from_file(file_path) {
-            Ok(mut source) => {
-                self.set_current_file_name(file_path);
-                match self.compile_module(name, &mut source) {
-                    Ok(mut module) => {
-                        match self.execute_module(
-                            &mut module,
-                            0,
-                            self.debug,
-                            &mut source,
-                        ) {
-                            Ok(_) => Ok(module),
-                            Err(err) => Err(err),
-                        }
-                    }
-                    Err(err) => Err(err),
-                }
-            }
-            Err(err) => {
-                let message = format!("{}: {err}", file_path.display());
-                Err(ExeErr::new(ExeErrKind::CouldNotReadSourceFile(message)))
-            }
-        }
-    }
-
     /// Compile AST module node into module object.
     fn compile_module<T: BufRead>(
-        &self,
+        &mut self,
         name: &str,
         source: &mut Source<T>,
+        check_names: bool,
     ) -> Result<Module, ExeErr> {
         let ast_module = self.parse_source(source)?;
-        let mut compiler = Compiler::new(true);
+        let mut compiler = Compiler::new(check_names);
         let module = compiler
             .compile_module(name, self.current_file_name.as_str(), ast_module)
             .map_err(|err| {
@@ -289,34 +320,69 @@ impl Executor {
         Ok(module)
     }
 
-    /// Parse source text, file, etc into AST module node.
-    fn parse_source<T: BufRead>(
-        &self,
-        source: &mut Source<T>,
-    ) -> Result<ast::Module, ExeErr> {
-        let scanner = Scanner::new(source);
-        let mut parser = Parser::new(scanner);
-        let parse_result = parser.parse();
-        parse_result.map_err(|err| {
-            if let ParseErrKind::ScanErr(scan_err) = err.kind {
-                self.handle_scan_err(&scan_err, source);
-                ExeErr::new(ExeErrKind::ScanErr(scan_err.kind))
-            } else {
-                self.handle_parse_err(&err, source);
-                ExeErr::new(ExeErrKind::ParseErr(err.kind))
+    // Modules/Imports -------------------------------------------------
+
+    /// Find imports at the top level of the specified AST module.
+    fn find_imports(&mut self, ast_module: &ast::Module) {
+        let mut visitor = ImportVisitor::new();
+        visitor.visit_module(ast_module);
+        for name in visitor.imports {
+            if !self.imports.contains(&name) {
+                self.imports.push_back(name);
             }
-        })
+        }
     }
 
-    pub(crate) fn display_stack(&self) {
-        eprintln!("{:=<79}", "STACK ");
-        self.vm.display_stack();
+    /// Load FeInt module from file system.
+    fn load_module(&mut self, name: &str, check_names: bool) -> Result<Module, ExeErr> {
+        let search_path = self.builtin_module_search_path.as_str();
+
+        let mut module_path = Path::new(search_path).to_path_buf();
+        for segment in name.split('.') {
+            module_path = module_path.join(segment);
+        }
+        module_path.set_extension("fi");
+
+        if !module_path.is_file() {
+            return Err(ExeErr::new(ExeErrKind::ModuleNotFound(
+                name.to_owned(),
+                module_path.to_str().map(|p| p.to_owned()),
+            )));
+        }
+
+        self.set_current_file_name(module_path.as_path());
+
+        match source_from_file(module_path.as_path()) {
+            Ok(mut source) => {
+                let mut module = self.compile_module(name, &mut source, check_names)?;
+                self.execute_module(&mut module, 0, self.debug, &mut source)
+                    .map(|_| module)
+            }
+            Err(err) => {
+                let message = format!("{}: {err}", module_path.display());
+                Err(ExeErr::new(ExeErrKind::CouldNotReadSourceFile(message)))
+            }
+        }
     }
 
-    fn display_vm_state(&self, result: &VMExeResult) {
-        eprintln!("\n{:=<79}", "VM STATE ");
-        eprintln!("{:?}", result);
+    fn load_imported_modules(&mut self) -> Result<(), ExeErr> {
+        let system = SYSTEM.read().unwrap();
+        let modules_ref = system.get_attr("modules", SYSTEM.clone());
+        while let Some(name) = self.imports.pop_front() {
+            let modules_guard = modules_ref.read().unwrap();
+            let modules = modules_guard.down_to_map().unwrap();
+            if !modules.contains_key(&name) {
+                drop(modules_guard); // XXX: Prevent deadlock in recursive calls
+                let module = self.load_module(&name, true)?;
+                let modules_write = modules_ref.write().unwrap();
+                let modules_write = modules_write.down_to_map().unwrap();
+                modules_write.add(&name, obj_ref!(module));
+            }
+        }
+        Ok(())
     }
+
+    // Error Handling --------------------------------------------------
 
     fn print_err_line(&self, line_no: usize, line: &str) {
         let file_name = self.current_file_name.as_str();
@@ -534,5 +600,47 @@ impl Executor {
             message = format!("RUNTIME ERROR: {message}");
         }
         self.print_err_message(message, start, end);
+    }
+
+    // Miscellaneous ---------------------------------------------------
+
+    pub(crate) fn display_stack(&self) {
+        eprintln!("{:=<79}", "STACK ");
+        self.vm.display_stack();
+    }
+
+    fn display_vm_state(&self, result: &VMExeResult) {
+        eprintln!("\n{:=<79}", "VM STATE ");
+        eprintln!("{:?}", result);
+    }
+}
+
+/// Find import statements in module AST.
+///
+/// XXX: Currently, this only looks at top level statements... but
+///      perhaps import should only be allowed at the top level anyway?
+struct ImportVisitor {
+    imports: Vec<String>,
+}
+
+impl ImportVisitor {
+    fn new() -> Self {
+        Self { imports: vec![] }
+    }
+
+    fn visit_module(&mut self, node: &ast::Module) {
+        self.visit_statements(&node.statements)
+    }
+
+    fn visit_statements(&mut self, statements: &[ast::Statement]) {
+        statements.iter().for_each(|s| self.visit_statement(s));
+    }
+
+    fn visit_statement(&mut self, statement: &ast::Statement) {
+        if let ast::StatementKind::Import(name) = &statement.kind {
+            if !self.imports.contains(name) {
+                self.imports.push(name.to_owned());
+            }
+        }
     }
 }

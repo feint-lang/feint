@@ -132,7 +132,6 @@ impl Compiler {
         visitor.visit_func(node)?;
 
         // Unresolved names are assumed to be builtins.
-        let builtins = BUILTINS.read().unwrap();
         let mut presumed_globals = vec![];
 
         // Captured vars in current function. These are free vars in the
@@ -204,14 +203,19 @@ impl Compiler {
             }
         }
 
-        for (addr, name, start, end) in presumed_globals.into_iter() {
-            if !self.check_names
-                || global_names.contains(&name)
-                || builtins.has_global(name.as_str())
-            {
+        // XXX: Avoid lock on BUILTINS when not checking names.
+        if self.check_names {
+            let builtins = BUILTINS.read().unwrap();
+            for (addr, name, start, end) in presumed_globals.into_iter() {
+                if global_names.contains(&name) || builtins.has_global(name.as_str()) {
+                    visitor.replace(addr, Inst::LoadOuterVar(name.to_owned()));
+                } else {
+                    return Err(CompErr::name_not_found(name, start, end));
+                }
+            }
+        } else {
+            for (addr, name, ..) in presumed_globals.into_iter() {
                 visitor.replace(addr, Inst::LoadOuterVar(name.to_owned()));
-            } else {
-                return Err(CompErr::name_not_found(name, start, end));
             }
         }
 

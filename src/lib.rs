@@ -4,7 +4,6 @@
 #[macro_use]
 extern crate bitflags;
 
-pub mod config;
 pub mod dis;
 pub mod exe;
 pub mod repl;

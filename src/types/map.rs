@@ -57,6 +57,15 @@ impl Map {
         }
     }
 
+    pub fn contains_key(&self, key: &str) -> bool {
+        let entries = self.entries.read().unwrap();
+        entries.contains_key(key)
+    }
+
+    pub fn entries(&self) -> &RwLock<IndexMap<String, ObjectRef>> {
+        &self.entries
+    }
+
     pub fn to_hash_map(&self) -> IndexMap<String, ObjectRef> {
         self.entries.read().unwrap().clone()
     }
