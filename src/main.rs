@@ -162,11 +162,16 @@ fn handle_run(
         }
     }
 
+    // When running the REPL, use incremental mode. This keeps certain
+    // errors from being printed in cases where more input might fix the
+    // error.
+    let incremental = !(code.is_some() || file_name.is_some());
+
     let mut exe = Executor::new(
         builtin_module_search_path.map(|x| x.to_owned()),
         max_call_depth,
         argv,
-        false,
+        incremental,
         dis,
         debug,
     );
