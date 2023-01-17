@@ -7,7 +7,6 @@ use clap::{parser::ValueSource, value_parser, Arg, ArgAction, ArgMatches, Comman
 
 use feint::exe::Executor;
 use feint::repl::Repl;
-use feint::result::ExeErrKind;
 use feint::vm::{CallDepth, VMState, DEFAULT_MAX_CALL_DEPTH};
 
 /// Interpret a file if one is specified. Otherwise, run the REPL.
@@ -207,14 +206,12 @@ fn handle_run(
             VMState::Halted(code) => code,
         },
         Err(err) => {
-            let exit_code = err.exit_code().unwrap_or(255);
-            match err.kind {
-                ExeErrKind::Bootstrap(message) => eprintln!("{message}"),
-                ExeErrKind::CouldNotReadSourceFile(message) => eprintln!("{message}"),
-                ExeErrKind::ReplErr(message) => eprintln!("{message}"),
-                _ => (),
+            if let Some(exit_code) = err.exit_code() {
+                exit_code
+            } else {
+                eprintln!("{err}");
+                255
             }
-            exit_code
         }
     }
 }

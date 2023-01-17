@@ -346,7 +346,16 @@ impl Executor {
                     None,
                 )));
             };
-            Path::new(start).to_path_buf().join(first)
+
+            let start_path = Path::new(start);
+
+            if !start_path.is_dir() {
+                return Err(ExeErr::new(ExeErrKind::ModuleDirNotFound(
+                    start_path.display().to_string(),
+                )));
+            }
+
+            start_path.join(first)
         } else {
             unreachable!("Empty module name should not be possible");
         };

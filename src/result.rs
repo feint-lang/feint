@@ -31,6 +31,7 @@ impl ExeErr {
 #[derive(Debug)]
 pub enum ExeErrKind {
     Bootstrap(String),
+    ModuleDirNotFound(String),
     ModuleNotFound(String, Option<String>), // name, optional path
     CouldNotReadSourceFile(String),
     ScanErr(ScanErrKind),
@@ -51,11 +52,18 @@ impl fmt::Display for ExeErrKind {
         use ExeErrKind::*;
         let msg = match self {
             Bootstrap(msg) => format!("Bootstrap process failed: {msg}"),
+            ModuleDirNotFound(path) => format!(
+                concat!(
+                    "Module directory not found: {}\n",
+                    "Please double check your module search path."
+                ),
+                path
+            ),
             ModuleNotFound(name, maybe_path) => {
                 if let Some(path) = maybe_path {
-                    format!("{name} @ {path}")
+                    format!("Module not found: {name} @ {path}")
                 } else {
-                    format!("{name}")
+                    format!("Module not found: {name}")
                 }
             }
             CouldNotReadSourceFile(file_name) => {
