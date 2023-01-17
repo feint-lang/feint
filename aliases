@@ -9,14 +9,8 @@ alias br="cargo build --release"
 alias t='cargo test --'
 
 # lint
-function lint
-    cargo clippy -- \
-        -A clippy::module_inception \
-        -A clippy::new_without_default
-end
-
-alias lint-out='lint 2>lint.out'
-alias lint-all='cargo clippy --'
+alias lint="cargo clippy --"
+alias lint-out='cargo clippy 2>lint.out'
 
 # run
 alias r="cargo run --"

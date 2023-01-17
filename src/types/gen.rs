@@ -35,6 +35,7 @@ macro_rules! type_and_impls {
         unsafe impl Sync for $type_name {}
 
         impl $type_name {
+            #[allow(clippy::new_without_default)]
             pub fn new() -> Self {
                 let name = new::str(stringify!($name));
                 let full_name = new::str(concat!("builtins.", stringify!($name)));

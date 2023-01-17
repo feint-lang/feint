@@ -16,6 +16,7 @@ unsafe impl Send for Namespace {}
 unsafe impl Sync for Namespace {}
 
 impl Namespace {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self { objects: IndexMap::new() }
     }

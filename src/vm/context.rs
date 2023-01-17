@@ -11,6 +11,7 @@ pub struct RuntimeContext {
 }
 
 impl RuntimeContext {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self { ns_stack: vec![Namespace::new()] }
     }

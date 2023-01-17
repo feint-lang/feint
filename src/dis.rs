@@ -8,6 +8,7 @@ pub struct Disassembler {
 }
 
 impl Disassembler {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self { curr_line_no: 0, new_line: false }
     }

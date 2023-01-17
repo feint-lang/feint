@@ -29,6 +29,7 @@ pub struct Type {
 gen::standard_object_impls!(Type);
 
 impl Type {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self { ns: Namespace::new() }
     }

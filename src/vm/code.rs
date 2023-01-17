@@ -55,6 +55,7 @@ impl PartialEq for Code {
 }
 
 impl Code {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self { chunk: vec![], constants: vec![], free_vars: vec![] }
     }

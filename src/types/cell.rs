@@ -30,6 +30,7 @@ pub struct Cell {
 gen::standard_object_impls!(Cell);
 
 impl Cell {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self { ns: Namespace::new(), value: new::nil() }
     }
