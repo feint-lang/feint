@@ -1,8 +1,9 @@
 //! Front end for executing code from a source on a VM.
 use std::collections::VecDeque;
+use std::env::current_exe;
 use std::fs::canonicalize;
 use std::io::BufRead;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 
 use crate::compiler::{CompErr, CompErrKind, Compiler};
@@ -24,7 +25,7 @@ use crate::{ast, dis};
 pub struct Executor {
     vm: VM,
     argv: Vec<String>,
-    builtin_module_search_path: String,
+    builtin_module_search_path: PathBuf,
     incremental: bool,
     dis: bool,
     debug: bool,
@@ -34,7 +35,7 @@ pub struct Executor {
 
 impl Executor {
     pub fn new(
-        builtin_module_search_path: Option<String>,
+        builtin_module_search_path: Option<&String>,
         max_call_depth: CallDepth,
         argv: Vec<String>,
         incremental: bool,
@@ -45,9 +46,16 @@ impl Executor {
 
         let builtin_module_search_path =
             if let Some(builtin_module_search_path) = builtin_module_search_path {
-                builtin_module_search_path
+                Path::new(builtin_module_search_path).to_path_buf()
             } else {
-                "./src/modules".to_owned()
+                let root = find_root();
+                if cfg!(debug_assertions) {
+                    // Executable path is <project>/target/debug/feint
+                    root.join("src").join("modules")
+                } else {
+                    // Executable path is ~/.cargo/bin
+                    root.join(".local").join("lib").join("feint").join("modules")
+                }
             };
 
         Self {
@@ -339,7 +347,7 @@ impl Executor {
 
         let mut module_path = if let Some(first) = segments.next() {
             let start = if first == "std" {
-                self.builtin_module_search_path.as_str()
+                &self.builtin_module_search_path
             } else {
                 return Err(ExeErr::new(ExeErrKind::ModuleNotFound(
                     format!("{name}: Only std modules are supported currently"),
@@ -347,7 +355,7 @@ impl Executor {
                 )));
             };
 
-            let start_path = Path::new(start);
+            let start_path = start.as_path();
 
             if !start_path.is_dir() {
                 return Err(ExeErr::new(ExeErrKind::ModuleDirNotFound(
@@ -636,6 +644,55 @@ impl Executor {
         eprintln!("\n{:=<79}", "VM STATE ");
         eprintln!("{:?}", result);
     }
+}
+
+/// Based on the current executable's path, find the root directory,
+/// which can be used to find the builtin module directory, etc.
+///
+/// In debug builds (e.g., when running `cargo run` or `cargo test`),
+/// the root directory is the project root directory.
+///
+/// In release builds (e.g., when running `make install` and then
+/// `feint`), the root directory is two levels up from where the `feint`
+/// binary is installed. So, if `feint` is installed to `~/.cargo/bin`,
+/// the root directory will be `~`.
+fn find_root() -> PathBuf {
+    let exe_path = match current_exe() {
+        Ok(path) => path,
+        Err(err) => {
+            panic!("Could not get current executable path: {err}");
+        }
+    };
+
+    let mut ancestors = exe_path.ancestors();
+
+    if cfg!(debug_assertions) {
+        // Executable path is <project>/target/debug/feint or
+        // <project>/target/debug/deps/feint-<hash>
+        loop {
+            if let Some(path) = ancestors.next() {
+                if let Some(name) = path.file_name() {
+                    if name == "target" {
+                        if let Some(root) = ancestors.next() {
+                            return root.to_path_buf();
+                        }
+                    }
+                }
+            } else {
+                break;
+            }
+        }
+    } else {
+        // Executable path is ~/.cargo/bin/feint
+        ancestors.next(); // ~/.cargo/bin/feint
+        ancestors.next(); // ~/.cargo/bin
+        ancestors.next(); // ~/.cargo
+        if let Some(root) = ancestors.next() {
+            return root.to_path_buf();
+        }
+    }
+
+    panic!("Could not find root directory for executable path {}.", exe_path.display());
 }
 
 /// Find import statements in module AST.
