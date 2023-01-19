@@ -1,9 +1,13 @@
 [package]
 name = "feint"
 version = "0.0.0"
-authors = ["Wyatt Baldwin"]
+authors = ["Wyatt Baldwin <code@wyattbaldwin.com>"]
+description = "Programming language, bytecode-esque compiler, and stack-based VM"
 edition = "2021"
+readme = "README.md"
 license-file = "LICENSE"
+homepage = "https://github.com/feint-lang/"
+repository = "https://github.com/feint-lang/feint"
 
 [dependencies]
 bitflags = "1.3.2"
