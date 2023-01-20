@@ -2,7 +2,7 @@ use crate::exe::Executor;
 use crate::result::ExeResult;
 
 fn run_text(text: &str) -> ExeResult {
-    let mut exe = Executor::new(None, 16, vec![], false, false, false);
+    let mut exe = Executor::new(16, vec![], false, false, false);
     exe.bootstrap()?;
     exe.execute_text(text)
 }

@@ -8,6 +8,11 @@
 
        make install
 
-   This runs `cargo install` and copies the standard library modules
-   into place. Currently, the installation paths are hard coded as
-   `~/.cargo/bin/feint` and `~/.local/lib/feint/modules`.
+   > NOTE: `make install` is currently just a wrapper around
+   > `cargo install --path .`, but it could evolve to handle a more
+   > complex installation process.
+
+3. Optionally, install shell completion files:
+
+       make install-bash-completion
+       make install-fish-completion

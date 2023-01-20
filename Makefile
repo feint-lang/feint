@@ -6,15 +6,6 @@ fish_completions_dir = ~/.config/fish/completions
 install:
 	@echo "Building FeInt and installing to ~/.cargo..."
 	cargo install --root ~/.cargo --path .
-	@echo
-	@echo "Copying FeInt modules to ~/.local/lib/feint/modules..."
-	mkdir -p ~/.local/lib/feint/modules
-	rsync -rltvz \
-	  --include '*/' \
-	  --include '*.fi' \
-	  --exclude '*' \
-	  --delete \
-	  ./src/modules/ ~/.local/lib/feint/modules/
 
 .PHONY = install-bash-completion
 install-bash-completion:

@@ -1,10 +1,14 @@
 //! Front end for executing code from a source on a VM.
-use std::collections::VecDeque;
-use std::env::current_exe;
+use std::borrow::Cow;
+use std::collections::{HashMap, VecDeque};
 use std::fs::canonicalize;
-use std::io::BufRead;
-use std::path::{Path, PathBuf};
+use std::io::{BufRead, Read};
+use std::path::Path;
 use std::sync::{Arc, RwLock};
+
+use flate2::read::GzDecoder;
+use once_cell::sync::Lazy;
+use tar::Archive as TarArchive;
 
 use crate::compiler::{CompErr, CompErrKind, Compiler};
 use crate::modules::std::{BUILTINS, SYSTEM};
@@ -12,7 +16,8 @@ use crate::parser::{ParseErr, ParseErrKind, Parser};
 use crate::result::{ExeErr, ExeErrKind, ExeResult};
 use crate::scanner::{ScanErr, ScanErrKind, Scanner, Token, TokenWithLocation};
 use crate::source::{
-    source_from_file, source_from_stdin, source_from_text, Location, Source,
+    source_from_bytes, source_from_file, source_from_stdin, source_from_text, Location,
+    Source,
 };
 use crate::types::gen::obj_ref;
 use crate::types::{new, Module, ObjectRef, ObjectTrait};
@@ -22,10 +27,36 @@ use crate::vm::{
 };
 use crate::{ast, dis};
 
+/// At build time, a compressed archive is created containing the
+/// builtin module files (see `build.rs`).
+///
+/// At runtime, the module file data is read out and stored in a map
+/// (lazily). When a builtin module is imported, the file data is read
+/// from this map rather than reading from disk.
+///
+/// The utility of this is that we don't need an install process that
+/// copies the builtin module files into some location on the file
+/// system based on the location of the current executable or anything
+/// like that.
+static BUILTIN_MODULES: Lazy<HashMap<String, Vec<u8>>> = Lazy::new(|| {
+    let archive_bytes: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/modules.tgz"));
+    let decoder = GzDecoder::new(archive_bytes);
+    let mut archive = TarArchive::new(decoder);
+    let mut modules = HashMap::new();
+    for entry in archive.entries().unwrap() {
+        let mut entry = entry.unwrap();
+        let path: Cow<'_, Path> = entry.path().unwrap();
+        let path = path.to_str().unwrap().to_owned();
+        let mut result = Vec::new();
+        entry.read_to_end(&mut result).unwrap();
+        modules.insert(path, result);
+    }
+    modules
+});
+
 pub struct Executor {
     vm: VM,
     argv: Vec<String>,
-    builtin_module_search_path: PathBuf,
     incremental: bool,
     dis: bool,
     debug: bool,
@@ -35,7 +66,6 @@ pub struct Executor {
 
 impl Executor {
     pub fn new(
-        builtin_module_search_path: Option<&String>,
         max_call_depth: CallDepth,
         argv: Vec<String>,
         incremental: bool,
@@ -44,24 +74,9 @@ impl Executor {
     ) -> Self {
         let vm = VM::new(RuntimeContext::new(), max_call_depth);
 
-        let builtin_module_search_path =
-            if let Some(builtin_module_search_path) = builtin_module_search_path {
-                Path::new(builtin_module_search_path).to_path_buf()
-            } else {
-                let root = find_root();
-                if cfg!(debug_assertions) {
-                    // Executable path is <project>/target/debug/feint
-                    root.join("src").join("modules")
-                } else {
-                    // Executable path is ~/.cargo/bin
-                    root.join(".local").join("lib").join("feint").join("modules")
-                }
-            };
-
         Self {
             vm,
             argv,
-            builtin_module_search_path,
             incremental,
             dis,
             debug,
@@ -345,54 +360,34 @@ impl Executor {
     fn load_module(&mut self, name: &str, check_names: bool) -> Result<Module, ExeErr> {
         let mut segments = name.split('.');
 
-        let mut module_path = if let Some(first) = segments.next() {
-            let start = if first == "std" {
-                &self.builtin_module_search_path
+        if let Some(first) = segments.next() {
+            return if first == "std" {
+                self.load_builtin_module(name, check_names)
             } else {
-                return Err(ExeErr::new(ExeErrKind::ModuleNotFound(
+                Err(ExeErr::new(ExeErrKind::ModuleNotFound(
                     format!("{name}: Only std modules are supported currently"),
                     None,
-                )));
+                )))
             };
-
-            let start_path = start.as_path();
-
-            if !start_path.is_dir() {
-                return Err(ExeErr::new(ExeErrKind::ModuleDirNotFound(
-                    start_path.display().to_string(),
-                )));
-            }
-
-            start_path.join(first)
         } else {
             unreachable!("Empty module name should not be possible");
         };
 
-        for segment in segments {
-            module_path = module_path.join(segment);
-        }
+        // TODO: Load site or user module
+    }
 
-        module_path.set_extension("fi");
-
-        if !module_path.is_file() {
-            return Err(ExeErr::new(ExeErrKind::ModuleNotFound(
-                name.to_owned(),
-                module_path.to_str().map(|p| p.to_owned()),
-            )));
-        }
-
-        self.set_current_file_name(module_path.as_path());
-
-        match source_from_file(module_path.as_path()) {
-            Ok(mut source) => {
-                let mut module = self.compile_module(name, &mut source, check_names)?;
-                self.execute_module(&mut module, 0, self.debug, &mut source)
-                    .map(|_| module)
-            }
-            Err(err) => {
-                let message = format!("{}: {err}", module_path.display());
-                Err(ExeErr::new(ExeErrKind::CouldNotReadSourceFile(message)))
-            }
+    fn load_builtin_module(
+        &mut self,
+        name: &str,
+        check_names: bool,
+    ) -> Result<Module, ExeErr> {
+        if let Some(bytes) = BUILTIN_MODULES.get(name) {
+            self.set_current_file_name(Path::new(name));
+            let mut source = source_from_bytes(bytes);
+            let mut module = self.compile_module(name, &mut source, check_names)?;
+            self.execute_module(&mut module, 0, self.debug, &mut source).map(|_| module)
+        } else {
+            panic!("")
         }
     }
 
@@ -644,55 +639,6 @@ impl Executor {
         eprintln!("\n{:=<79}", "VM STATE ");
         eprintln!("{:?}", result);
     }
-}
-
-/// Based on the current executable's path, find the root directory,
-/// which can be used to find the builtin module directory, etc.
-///
-/// In debug builds (e.g., when running `cargo run` or `cargo test`),
-/// the root directory is the project root directory.
-///
-/// In release builds (e.g., when running `make install` and then
-/// `feint`), the root directory is two levels up from where the `feint`
-/// binary is installed. So, if `feint` is installed to `~/.cargo/bin`,
-/// the root directory will be `~`.
-fn find_root() -> PathBuf {
-    let exe_path = match current_exe() {
-        Ok(path) => path,
-        Err(err) => {
-            panic!("Could not get current executable path: {err}");
-        }
-    };
-
-    let mut ancestors = exe_path.ancestors();
-
-    if cfg!(debug_assertions) {
-        // Executable path is <project>/target/debug/feint or
-        // <project>/target/debug/deps/feint-<hash>
-        loop {
-            if let Some(path) = ancestors.next() {
-                if let Some(name) = path.file_name() {
-                    if name == "target" {
-                        if let Some(root) = ancestors.next() {
-                            return root.to_path_buf();
-                        }
-                    }
-                }
-            } else {
-                break;
-            }
-        }
-    } else {
-        // Executable path is ~/.cargo/bin/feint
-        ancestors.next(); // ~/.cargo/bin/feint
-        ancestors.next(); // ~/.cargo/bin
-        ancestors.next(); // ~/.cargo
-        if let Some(root) = ancestors.next() {
-            return root.to_path_buf();
-        }
-    }
-
-    panic!("Could not find root directory for executable path {}.", exe_path.display());
 }
 
 /// Find import statements in module AST.

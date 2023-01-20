@@ -32,6 +32,12 @@ pub fn source_from_file(
     Ok(source)
 }
 
+/// Create source from the specified bytes.
+pub fn source_from_bytes(bytes: &Vec<u8>) -> Source<Cursor<&Vec<u8>>> {
+    let cursor = Cursor::new(bytes);
+    Source::new(cursor)
+}
+
 /// Create source from the specified text.
 pub fn source_from_text(text: &str) -> Source<Cursor<&str>> {
     let cursor = Cursor::new(text);

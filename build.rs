@@ -1,10 +1,13 @@
 use std::env;
-use std::fs::File;
+use std::ffi::OsStr;
+use std::fs::{self, File};
 use std::io::Error;
 use std::path::Path;
 use std::process;
 
-use clap_complete::{generate_to, shells};
+use clap_complete::{self, shells};
+use flate2::{Compression, GzBuilder};
+use tar::Builder as TarBuilder;
 
 include!("src/cli.rs");
 
@@ -19,18 +22,73 @@ fn main() -> Result<(), Error> {
         }
     };
 
-    let stamp_path = Path::new(&out_dir).join("feint.stamp");
-    if let Err(err) = File::create(&stamp_path) {
-        panic!("Failed to write stamp file: {}\n{err}", stamp_path.display());
-    }
+    let out_dir = Path::new(&out_dir);
 
+    stamp(out_dir)?;
+    make_shell_completion_scripts(out_dir)?;
+    make_module_archive(out_dir)?;
+
+    Ok(())
+}
+
+/// Adds a stamp file to the build output directory so that the latest
+/// build can be found by other tools.
+fn stamp(out_dir: &Path) -> Result<(), Error> {
+    let stamp_path = Path::new(out_dir).join("feint.stamp");
+    File::create(stamp_path)?;
+    Ok(())
+}
+
+fn make_shell_completion_scripts(out_dir: &Path) -> Result<(), Error> {
     let mut cmd = build_cli();
+    let path = clap_complete::generate_to(shells::Bash, &mut cmd, "feint", out_dir)?;
+    println!("cargo:warning=bash completion script generated: {:?}", path);
+    let path = clap_complete::generate_to(shells::Fish, &mut cmd, "feint", out_dir)?;
+    println!("cargo:warning=fish completion script generated: {:?}", path);
+    Ok(())
+}
 
-    let path = generate_to(shells::Bash, &mut cmd, "feint", &out_dir)?;
-    println!("cargo:warning=completion file generated: {:?}", path);
+fn make_module_archive(out_dir: &Path) -> Result<(), Error> {
+    let archive_path = out_dir.join("modules.tgz");
+    let archive_file = File::create(archive_path)?;
 
-    let path = generate_to(shells::Fish, &mut cmd, "feint", &out_dir)?;
-    println!("cargo:warning=completion file generated: {:?}", path);
+    let mut archive = TarBuilder::new(
+        GzBuilder::new()
+            .filename("modules.tar")
+            .write(archive_file, Compression::best()),
+    );
+
+    let mut add_modules = |dir_name| {
+        let dir_path = Path::new("src").join("modules").join(dir_name);
+
+        let mut files = fs::read_dir(dir_path)
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .collect::<Vec<_>>();
+
+        files.sort();
+
+        for file in files {
+            if file.extension() == Some(OsStr::new("fi")) {
+                let file_name = file.file_name().unwrap().to_str().unwrap();
+                let file_name = file_name.strip_suffix(".fi").unwrap();
+                let name = format!("{dir_name}.{file_name}");
+
+                println!(
+                    "cargo:warning=adding {:?} to module archive as {:?}",
+                    file, name
+                );
+                println!("cargo:rerun-if-changed={}", file.display());
+
+                archive.append_path_with_name(&file, name).unwrap();
+            }
+        }
+    };
+
+    add_modules("std");
+
+    let encoder = archive.into_inner().unwrap();
+    encoder.finish().unwrap();
 
     Ok(())
 }

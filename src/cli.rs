@@ -47,14 +47,6 @@ pub fn build_cli() -> Command {
     Command::new("FeInt")
         .version("0.0.0")
         .arg(
-            Arg::new("builtin_module_search_path")
-                .short('b')
-                .long("builtin-module-search-path")
-                .required(false)
-                .env("FEINT_BUILTIN_MODULE_SEARCH_PATH")
-                .help("Search path for builtin modules"),
-        )
-        .arg(
             Arg::new("max_call_depth")
                 .short('x')
                 .long("max-call-depth")

@@ -15,8 +15,6 @@ fn main() -> ExitCode {
 
     let app = cli::build_cli();
     let matches = app.get_matches();
-    let builtin_module_search_path =
-        matches.get_one::<String>("builtin_module_search_path");
     let max_call_depth = *matches.get_one("max_call_depth").unwrap();
     let debug = *matches.get_one::<bool>("debug").unwrap();
 
@@ -26,11 +24,9 @@ fn main() -> ExitCode {
     };
 
     let return_code = match matches.subcommand() {
-        Some(("run", matches)) => {
-            handle_run(matches, builtin_module_search_path, max_call_depth, debug)
-        }
+        Some(("run", matches)) => handle_run(matches, max_call_depth, debug),
         Some(("test", matches)) => handle_test(matches, max_call_depth, debug),
-        None => handle_run(&matches, builtin_module_search_path, max_call_depth, debug),
+        None => handle_run(&matches, max_call_depth, debug),
         Some((name, _)) => {
             unreachable!("Subcommand not defined: {}", name);
         }
@@ -40,12 +36,7 @@ fn main() -> ExitCode {
 }
 
 /// Subcommand: run
-fn handle_run(
-    matches: &ArgMatches,
-    builtin_module_search_path: Option<&String>,
-    max_call_depth: CallDepth,
-    debug: bool,
-) -> u8 {
+fn handle_run(matches: &ArgMatches, max_call_depth: CallDepth, debug: bool) -> u8 {
     let file_name = matches.get_one::<String>("FILE_NAME");
     let code = matches.get_one::<String>("code");
     let dis = *matches.get_one::<bool>("dis").unwrap();
@@ -70,14 +61,7 @@ fn handle_run(
     // error.
     let incremental = !(code.is_some() || file_name.is_some());
 
-    let mut exe = Executor::new(
-        builtin_module_search_path,
-        max_call_depth,
-        argv,
-        incremental,
-        dis,
-        debug,
-    );
+    let mut exe = Executor::new(max_call_depth, argv, incremental, dis, debug);
 
     // XXX: Stop clippy from erroneously suggesting `exe.bootstrap()?`.
     #[allow(clippy::question_mark)]

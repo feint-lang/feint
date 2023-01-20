@@ -36,7 +36,7 @@ fn eval_if_with_no_block() {
 // Utilities -----------------------------------------------------------
 
 fn eval(input: &str) {
-    let mut exe = Executor::new(None, 16, vec![], false, false, false);
+    let mut exe = Executor::new(16, vec![], false, false, false);
     if let Err(err) = exe.bootstrap() {
         panic!("{err}");
     }
