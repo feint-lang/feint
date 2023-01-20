@@ -108,18 +108,7 @@ impl Executor {
             system.ns_mut().add_obj("argv", argv);
         }
 
-        {
-            let system = SYSTEM.read().unwrap();
-            let modules = system.get_attr("modules", SYSTEM.clone());
-            let modules = modules.write().unwrap();
-            if let Some(modules) = modules.down_to_map() {
-                modules.add("std.system", SYSTEM.clone());
-            } else {
-                let msg = format!("Expected system.modules to be a Map; got {modules}");
-                return Err(ExeErr::new(ExeErrKind::Bootstrap(msg)));
-            }
-        }
-
+        self.add_module("std.system", SYSTEM.clone())?;
         self.extend_base_module("std.builtins", BUILTINS.clone())?;
         self.extend_base_module("std.system", SYSTEM.clone())?;
 
@@ -148,13 +137,21 @@ impl Executor {
     /// compiled all at once and executed as a script. In the REPL, code
     /// is compiled incrementally as it's entered, which makes it
     /// somewhat more complex to deal with.
-    pub fn execute_repl(&mut self, text: &str, module: &mut Module) -> ExeResult {
+    pub fn execute_repl(&mut self, text: &str, module_ref: ObjectRef) -> ExeResult {
         self.current_file_name = "<repl>".to_owned();
         let source = &mut source_from_text(text);
         let ast_module = self.parse_source(source)?;
         let mut compiler = Compiler::new(false);
 
-        let comp_result = compiler.compile_module_to_code(module.name(), ast_module);
+        // XXX: Nested scopes are necessary to avoid deadlock.
+        let (start, comp_result) = {
+            let module_read_guard = module_ref.read().unwrap();
+            let module_read = module_read_guard.down_to_mod().unwrap();
+            (
+                module_read.code().len_chunk(),
+                compiler.compile_module_to_code(module_read.name(), ast_module),
+            )
+        };
 
         let mut code = comp_result.map_err(|err| {
             self.handle_comp_err(&err, source);
@@ -176,17 +173,22 @@ impl Executor {
                 Some(inst) => format!("{inst:?}"),
                 None => "[EMPTY CHUNK]".to_owned(),
             };
-            panic!("Expected module chunk to end with POP; got {last_inst}");
+            panic!("Expected module chunk to end with POP; got {}", last_inst);
         }
 
         // XXX: Rather than extending the module's code object, perhaps
         //      it would be better to compile INTO the existing module.
         //      This would required passing the module or its code obj
         //      into the compiler.
-        let start = module.code().len_chunk();
-        module.code_mut().extend(code);
+        {
+            let mut module_write = module_ref.write().unwrap();
+            let module_write = module_write.down_to_mod_mut().unwrap();
+            module_write.code_mut().extend(code);
+        }
 
-        self.execute_module(module, start, self.debug, source)
+        let module_read_guard = module_ref.read().unwrap();
+        let module_read = module_read_guard.down_to_mod().unwrap();
+        self.execute_module(module_read, start, self.debug, source)
     }
 
     /// Execute source from file as script.
@@ -224,24 +226,31 @@ impl Executor {
         &mut self,
         source: &mut Source<T>,
     ) -> ExeResult {
-        let mut main_module = self.compile_script("$main", source)?;
+        let module = self.compile_script("$main", source)?;
+        let module_ref = obj_ref!(module);
+
+        self.add_module("$main", module_ref.clone())?;
+
+        let module = module_ref.read().unwrap();
+        let module = module.down_to_mod().unwrap();
+
         if self.dis {
             let mut disassembler = dis::Disassembler::new();
-            disassembler.disassemble(main_module.code());
+            disassembler.disassemble(module.code());
             if self.debug {
                 println!();
                 self.display_stack();
             }
             Ok(VMState::Halted(0))
         } else {
-            self.execute_module(&mut main_module, 0, self.debug, source)
+            self.execute_module(module, 0, self.debug, source)
         }
     }
 
     /// Execute a module.
     pub fn execute_module<T: BufRead>(
         &mut self,
-        module: &mut Module,
+        module: &Module,
         start: usize,
         debug: bool,
         source: &mut Source<T>,
@@ -253,12 +262,7 @@ impl Executor {
             self.display_vm_state(&result);
         }
         match result {
-            Ok(()) => {
-                for (name, obj) in self.vm.ctx.globals().iter() {
-                    module.add_global(name, obj.clone());
-                }
-                Ok(self.vm.state.clone())
-            }
+            Ok(()) => Ok(self.vm.state.clone()),
             Err(err) => {
                 if let RuntimeErrKind::Exit(_) = err.kind {
                     Err(ExeErr::new(ExeErrKind::RuntimeErr(err.kind)))
@@ -345,6 +349,20 @@ impl Executor {
 
     // Modules/Imports -------------------------------------------------
 
+    /// Add a module to `system.modules`.
+    pub fn add_module(&mut self, name: &str, module: ObjectRef) -> Result<(), ExeErr> {
+        let system = SYSTEM.read().unwrap();
+        let modules = system.get_attr("modules", SYSTEM.clone());
+        let modules = modules.write().unwrap();
+        if let Some(modules) = modules.down_to_map() {
+            modules.add(name, module);
+            Ok(())
+        } else {
+            let msg = format!("Expected system.modules to be a Map; got {modules}");
+            Err(ExeErr::new(ExeErrKind::Bootstrap(msg)))
+        }
+    }
+
     /// Find imports at the top level of the specified AST module.
     fn find_imports(&mut self, ast_module: &ast::Module) {
         let mut visitor = ImportVisitor::new();
@@ -385,7 +403,11 @@ impl Executor {
             self.set_current_file_name(Path::new(name));
             let mut source = source_from_bytes(bytes);
             let mut module = self.compile_module(name, &mut source, check_names)?;
-            self.execute_module(&mut module, 0, self.debug, &mut source).map(|_| module)
+            self.execute_module(&module, 0, self.debug, &mut source)?;
+            for (name, obj) in self.vm.ctx.globals().iter() {
+                module.add_global(name, obj.clone());
+            }
+            Ok(module)
         } else {
             panic!("")
         }

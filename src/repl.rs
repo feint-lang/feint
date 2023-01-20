@@ -9,11 +9,11 @@ use crate::exe::Executor;
 use crate::parser::ParseErrKind;
 use crate::result::{ExeErr, ExeErrKind, ExeResult};
 use crate::scanner::ScanErrKind;
-use crate::types::{Module, ObjectTrait};
+use crate::types::{new, Namespace, ObjectRef, ObjectTrait};
 use crate::vm::VMState;
 
 pub struct Repl {
-    module: Module,
+    module: ObjectRef,
     reader: rustyline::Editor<()>,
     history_path: Option<PathBuf>,
     executor: Executor,
@@ -21,7 +21,12 @@ pub struct Repl {
 
 impl Repl {
     pub fn new(history_path: Option<PathBuf>, executor: Executor) -> Self {
-        let module = Module::with_name("$repl", "<repl>", Some("FeInt REPL module"));
+        let module = new::builtin_module(
+            "$repl",
+            "$repl",
+            Namespace::new(),
+            "FeInt REPL module",
+        );
         let mut reader =
             rustyline::Editor::<()>::new().expect("Could initialize readline");
         reader.set_indent_size(4);
@@ -34,6 +39,9 @@ impl Repl {
         println!("Type a line of code, then hit Enter to evaluate it");
         self.load_history();
         println!("Type .exit or .quit to exit");
+
+        self.executor.add_module("$repl", self.module.clone())?;
+
         let result = loop {
             match self.read_line("→ ", true) {
                 Ok(None) => {
@@ -92,7 +100,7 @@ impl Repl {
             return None;
         }
 
-        let result = self.executor.execute_repl(text, &mut self.module);
+        let result = self.executor.execute_repl(text, self.module.clone());
 
         match result {
             Ok(vm_state) => {
@@ -164,22 +172,28 @@ impl Repl {
                 eprintln!("{:=>72}", "");
             }
             ".globals" => {
+                let module = self.module.read().unwrap();
+                let module = module.down_to_mod().unwrap();
                 eprintln!("{:=>72}", "");
-                eprintln!("GLOBALS for module {:?} ", self.module.name());
+                eprintln!("GLOBALS for module {:?} ", module.name());
                 eprintln!("{:->72}", "");
-                for (name, val) in self.module.ns().iter() {
+                for (name, val) in module.ns().iter() {
                     println!("{name} = {:?}", &*val.read().unwrap());
                 }
                 eprintln!("{:=>72}", "");
             }
             ".constants" => {
-                for (i, val) in self.module.code().iter_constants().enumerate() {
+                let module = self.module.read().unwrap();
+                let module = module.down_to_mod().unwrap();
+                for (i, val) in module.code().iter_constants().enumerate() {
                     println!("{i} = {:?}", &*val.read().unwrap());
                 }
             }
             ".dis" => {
+                let module = self.module.read().unwrap();
+                let module = module.down_to_mod().unwrap();
                 let mut disassembler = dis::Disassembler::new();
-                disassembler.disassemble(self.module.code());
+                disassembler.disassemble(module.code());
             }
             ".stack" => {
                 self.executor.display_stack();

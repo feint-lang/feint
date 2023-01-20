@@ -66,7 +66,7 @@ impl Compiler {
             file_name.to_owned(),
             Namespace::new(),
             code,
-            Some("$main script module"),
+            None,
         ))
     }
 
