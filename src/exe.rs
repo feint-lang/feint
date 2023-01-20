@@ -409,7 +409,7 @@ impl Executor {
             }
             Ok(module)
         } else {
-            panic!("")
+            Err(ExeErr::new(ExeErrKind::ModuleNotFound(name.to_owned(), None)))
         }
     }
 
