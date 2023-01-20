@@ -8,11 +8,12 @@ parse: List<Str> = (
 ) =>
     "Parse args, such as `argv` from the command line.
 
-    Args:
-        program_name: The executable program name
-        argv: The args that were passed on the command line
-        min_args: The required minimum number of args
-        max_args: The required maximum number of args
+    # Args
+
+    - program_name: The executable program name
+    - argv: The args that were passed on the command line
+    - min_args: The required minimum number of args
+    - max_args: The required maximum number of args
 
     "
     n_args = argv.length

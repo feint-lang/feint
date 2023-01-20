@@ -5,8 +5,9 @@
 /// f = (x: Int) =>
 ///     "This is a function that does stuff.
 ///
-///     Args:
-///         x: A number for controlling how the stuff is done
+///     # Args
+///
+///     - x: A number for controlling how the stuff is done
 ///
 ///     "
 /// ```
@@ -17,8 +18,9 @@
 /// ```ignore
 /// This is a function that does stuff.
 ///
-/// Args:
-///     x: A number for controlling how the stuff is done
+/// # Args
+///
+/// - x: A number for controlling how the stuff is done
 /// ```
 pub fn format_doc(string: &str) -> String {
     let string = string.trim();

@@ -68,10 +68,12 @@ pub static STR_TYPE: Lazy<gen::obj_ref_t!(StrType)> = Lazy::new(|| {
             Templates may contain `{{ name }}` vars which will be replaced with the
             values provided in the context map.
 
-            Args:
-                context:
-                    Map<Str, Str> A map containing values to be rendered
-                    into the template",
+            # Args
+
+            - context: Map<Str, Str> A map containing values to be rendered into the
+              template.
+
+            ",
             |this, args, _| {
                 let context = args[0].clone();
                 let result = render_template(this.clone(), context)?;

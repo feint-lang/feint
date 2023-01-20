@@ -4,8 +4,9 @@
 print = (...) =>
     "Print representation of zero or more objects to stdout.
 
-    Args:
-       objects?: ObjectRef[]
+    # Args
+
+    - objects?: Any[]
 
     "
     i = 0
@@ -19,8 +20,9 @@ print = (...) =>
 print_err = (...) =>
     "Print representation of zero or more objects to stderr.
 
-    Args:
-       objects?: ObjectRef[]
+    # Args
+
+    - objects?: Any[]
 
     "
     i = 0
@@ -61,17 +63,19 @@ help = (obj: Any) =>
 assert: Bool | Err = (condition: Bool, ...) =>
     "Check condition and return error if false.
 
-    Args:
-        condition: Bool
-        message?: Any
-        halt?: Bool = false
+    # Args
 
-    Returns:
-        true: if the assertion succeeded
-        Err: if the assertion failed and `halt` is unset
+    - condition
+    - message?: Any
+    - halt?: Bool = false
 
-    NOTE: If `halt` is set, the program will be exit immediately with
-          an error code.
+    # Returns
+
+    true: if the assertion succeeded
+    Err: if the assertion failed and `halt` is unset
+
+    > NOTE: If `halt` is set, the program will exit immediately with an
+    > error code.
 
     "
     if condition ->
