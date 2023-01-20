@@ -5,6 +5,8 @@ use std::sync::{Arc, RwLock};
 use indexmap::IndexMap;
 use once_cell::sync::Lazy;
 
+use crate::vm::RuntimeErr;
+
 use super::gen;
 use super::new;
 
@@ -16,8 +18,97 @@ use super::ns::Namespace;
 
 gen::type_and_impls!(MapType, Map);
 
-pub static MAP_TYPE: Lazy<gen::obj_ref_t!(MapType)> =
-    Lazy::new(|| gen::obj_ref!(MapType::new()));
+pub static MAP_TYPE: Lazy<gen::obj_ref_t!(MapType)> = Lazy::new(|| {
+    let type_ref = gen::obj_ref!(MapType::new());
+    let mut type_obj = type_ref.write().unwrap();
+
+    type_obj.add_attrs(&[
+        gen::meth!(
+            "each",
+            type_ref,
+            &["each_fn"],
+            "Apply function to each Map entry.
+
+            # Args
+            
+            - func: Func
+
+              A function that will be passed the key and value of each entry in
+              turn.
+
+            ```
+            → map = {'a': 'a', 'b': 'b'}
+            {'a' => 'a', 'b' => 'b'}
+            → fn = (k, v) => print($'{k} = {v}')
+            function fn/2 @ <id>
+            → map.each(fn)
+            a = a
+            b = b
+            ```
+
+            ",
+            |this_obj, args, vm| {
+                let this = this_obj.read().unwrap();
+                let this = this.down_to_map().unwrap();
+                let entries = &this.entries.read().unwrap();
+
+                if entries.is_empty() {
+                    return Ok(new::nil());
+                }
+
+                let each_fn = &args[0];
+                if let Some(f) = each_fn.read().unwrap().as_func() {
+                    f
+                } else {
+                    return Ok(new::arg_err(
+                        "each/1 expects a function",
+                        this_obj.clone(),
+                    ));
+                };
+
+                for (key, val) in entries.iter() {
+                    vm.call(each_fn.clone(), vec![new::str(key), val.clone()])?;
+                }
+
+                Ok(new::nil())
+            }
+        ),
+        gen::meth!(
+            "get",
+            type_ref,
+            &["key"],
+            "Get value for key from Map.
+
+        # Args
+
+        - key: Key
+
+        # Returns
+
+        - Any: If key is present
+        - nil: If key is not present
+
+        > NOTE: There's no way to distinguish between a key that isn't present
+        > versus a key that has `nil` as its value. To avoid ambiguity, don't
+        > store `nil` values.
+
+        ",
+            |this, args, _| {
+                let this = this.read().unwrap();
+                let this = this.down_to_map().unwrap();
+                let arg = gen::use_arg!(args, 0);
+                let key = gen::use_arg_str!(get, key, arg);
+                let result = match this.get(key) {
+                    Some(obj) => obj,
+                    None => new::nil(),
+                };
+                Ok(result)
+            }
+        ),
+    ]);
+
+    type_ref.clone()
+});
 
 // Map Object ----------------------------------------------------------
 
