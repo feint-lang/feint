@@ -113,7 +113,7 @@ impl Executor {
             let modules = system.get_attr("modules", SYSTEM.clone());
             let modules = modules.write().unwrap();
             if let Some(modules) = modules.down_to_map() {
-                modules.add("system", SYSTEM.clone());
+                modules.add("std.system", SYSTEM.clone());
             } else {
                 let msg = format!("Expected system.modules to be a Map; got {modules}");
                 return Err(ExeErr::new(ExeErrKind::Bootstrap(msg)));
