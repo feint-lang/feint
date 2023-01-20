@@ -1,10 +1,9 @@
 "Args module"
 
-parse: List<Str> = (
+parse: Map = (
     program_name: Str,
     argv: List<Str>,
-    min_args: Int,
-    max_args: Int | nil,
+    spec: Map,
 ) =>
     "Parse args, such as `argv` from the command line.
 
@@ -12,29 +11,40 @@ parse: List<Str> = (
 
     - program_name: The executable program name
     - argv: The args that were passed on the command line
-    - min_args: The required minimum number of args
-    - max_args: The required maximum number of args
+    - spec: The arg spec
+
+    # Returns
+
+    A Map containing args or errors.
 
     "
-    n_args = argv.length
-
     # NOTE: This version causes an error because the parenthesized
     #       expression followed by -> looks like a function.
-    if n_args < min_args || (max_args !== nil && n_args > max_args) ->
-        min_args_s = if min_args == 1 -> "" else -> "s"
-        max_args_s = if max_args == 1 -> "" else -> "s"
-        msg = if min_args == max_args ->
-            $"requires exactly {min_args} arg{min_args_s}"
+    help = spec.get("help")
+    args = spec.get("args")
+    flags = spec.get("flags")
+    options = spec.get("options")
+
+    positionals = []
+    optionals = []
+
+    errors = {}
+    result = {}
+
+    each_fn = (name, opts, i) =>
+        val = argv.get(i)
+        if opts.get("required") && val == nil ->
+            errors.add(name, Err.new(ErrType.arg, $"Arg is required"))
         else ->
-            msg = (
-                $"requires at least {min_args} arg{min_args_s} and ",
-                $"no more than {max_args} arg{max_args_s}"
-            ).join(" ")
-        Err.new(ErrType.arg, $"{program_name} {msg}")
+            result.add(name, val)
+
+    args.each(each_fn)
+
+    if errors.is_empty ->
+        result
     else ->
-        args = []
-        i = 0
-        loop i < argv.length ->
-            args.push(argv.i)
-            i += 1
-        args
+        ess = if errors.length == 1 -> "" else -> "s"
+        print_err($"{errors.length} error{ess} encountered while parsing args\n")
+        argv.each((arg) => print_err(arg))
+        errors.each((name, err) => print_err($"{name}: {err.message}"))
+        Err.new(ErrType.arg, "")

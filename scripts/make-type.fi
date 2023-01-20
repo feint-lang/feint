@@ -1,5 +1,20 @@
 #!./target/release/feint
-"Script to generate a new builtin type definition."
+"Script to generate a new builtin type definition.
+
+# Args
+
+- name: Str
+
+  The name of the new type. Should be camel case, e.g. 'Int'.
+
+- repr?: Str
+
+  The string representation of the type. E.g., for the builtin `Nil`
+  type, this would be `nil`. If the type has a complex or dynamic
+  representation, the `fmt::Debug` and `fmt::Display` will need a
+  custom implementation.
+
+"
 
 import std.args
 import std.system
@@ -30,23 +45,28 @@ $main = (...) =>
     p = print
     e = print_err
 
-    args = args.parse("make-type", $args, 1, 2)
+    args = args.parse("make-type", $args, {
+        "help": "Generate a new type",
+        "args": {
+            "name": {"required": true},
+            "repr": {"required": false},
+        },
+        "flags": ("--help",)
+    })
 
     if args.err ->
-        exit(args.err)
-
-    name = args.0
-    repr = args.get(1)
-
-    if name.err || repr.err ->
-        if name.err -> e(name.err)
-        if repr.err -> e(repr.err)
         exit()
+
+    name = args.get("name")
+    repr = args.get("repr")
+
+    if name.err -> exit(name.err)
+    if repr.err -> exit(repr.err)
 
     singleton_type_name = $"{name.upper()}_TYPE"
     type_name = $"{name}Type"
     obj_name = name
-    repr = if repr -> repr else -> obj_name.lower()
+    repr = if repr == nil -> obj_name.lower() else -> repr
 
     rule = "-".repeat(80)
     e(rule)
