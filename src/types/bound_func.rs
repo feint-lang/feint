@@ -35,16 +35,22 @@ gen::standard_object_impls!(BoundFunc);
 impl BoundFunc {
     pub fn new(func: ObjectRef, this: ObjectRef) -> Self {
         let f = func.read().unwrap();
+
         let (name, params, doc) = if let Some(f) = f.down_to_builtin_func() {
-            (f.name().to_string(), f.params().clone(), f.get_doc())
+            (f.name(), f.params(), f.get_doc())
         } else if let Some(f) = f.down_to_func() {
-            (f.name().to_string(), f.params().clone(), f.get_doc())
+            (f.name(), f.params(), f.get_doc())
         } else if let Some(f) = f.down_to_closure() {
-            (f.name().to_string(), f.params().clone(), f.get_doc())
+            (f.name(), f.params(), f.get_doc())
         } else {
             panic!("Unexpected bound func type: {f}")
         };
+
+        let name = name.to_owned();
+        let params = params.clone();
+
         drop(f);
+
         Self { ns: Namespace::with_entries(&[("$doc", doc)]), func, this, name, params }
     }
 
@@ -62,6 +68,10 @@ impl FuncTrait for BoundFunc {
         &self.ns
     }
 
+    fn module(&self) -> ObjectRef {
+        (self as &dyn ObjectTrait).module()
+    }
+
     fn name(&self) -> &str {
         self.name.as_str()
     }
@@ -73,6 +83,10 @@ impl FuncTrait for BoundFunc {
 
 impl ObjectTrait for BoundFunc {
     gen::object_trait_header!(BOUND_FUNC_TYPE);
+
+    fn module(&self) -> ObjectRef {
+        self.func().read().unwrap().module()
+    }
 }
 
 // Display -------------------------------------------------------------

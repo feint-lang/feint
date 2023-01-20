@@ -85,10 +85,10 @@ impl Compiler {
     /// Compile AST module node to code object.
     pub fn compile_module_to_code(
         &mut self,
-        name: &str,
+        module_name: &str,
         module: ast::Module,
     ) -> Result<Code, CompErr> {
-        let mut visitor = Visitor::for_module(name, self.check_names);
+        let mut visitor = Visitor::for_module(module_name, self.check_names);
         visitor.visit_module(module)?;
         let global_names = visitor.scope_tree.global_names();
         assert!(
@@ -98,8 +98,15 @@ impl Compiler {
         // Compile global functions
         let func_nodes = visitor.func_nodes.to_vec();
         self.visitor_stack.push((visitor, 0));
-        for (addr, scope_tree_pointer, name, node) in func_nodes {
-            self.compile_func(addr, scope_tree_pointer, name, node, &global_names)?;
+        for (func_name, addr, scope_tree_pointer, node) in func_nodes {
+            self.compile_func(
+                module_name,
+                func_name.as_str(),
+                addr,
+                scope_tree_pointer,
+                node,
+                &global_names,
+            )?;
         }
         let mut visitor = self.visitor_stack.pop().unwrap().0;
         // XXX: This keeps the stack clean and ensures there's always a
@@ -112,13 +119,14 @@ impl Compiler {
     /// visitor at the specified address.
     fn compile_func(
         &mut self,
+        module_name: &str,
+        func_name: &str,
         // Address in parent visitor's code where function was defined.
         func_addr: usize,
         // Pointer to scope in parent where function was defined. This
         // is needed so that we can start the search for cell vars in
         // the correct scope in the parent visitor.
         parent_scope_pointer: usize,
-        func_name: String,
         node: ast::Func,
         // Global names in the module containing the function used for
         // name-checking free vars that aren't found in an outer
@@ -128,7 +136,7 @@ impl Compiler {
         let stack = &mut self.visitor_stack;
         let params = node.params.clone();
 
-        let mut visitor = Visitor::for_func(func_name.as_str(), self.check_names);
+        let mut visitor = Visitor::for_func(func_name, self.check_names);
         visitor.visit_func(node)?;
 
         // Unresolved names are assumed to be builtins.
@@ -266,14 +274,21 @@ impl Compiler {
 
         let inner_func_nodes = visitor.func_nodes.to_vec();
         self.visitor_stack.push((visitor, parent_scope_pointer));
-        for (addr, scope_tree_pointer, name, node) in inner_func_nodes {
-            self.compile_func(addr, scope_tree_pointer, name, node, global_names)?;
+        for (func_name, addr, scope_tree_pointer, node) in inner_func_nodes {
+            self.compile_func(
+                module_name,
+                func_name.as_str(),
+                addr,
+                scope_tree_pointer,
+                node,
+                global_names,
+            )?;
         }
         let visitor = self.visitor_stack.pop().unwrap().0;
 
         // END Inner Functions -----------------------------------------
 
-        let func = new::func(func_name, params, visitor.code);
+        let func = new::func(module_name, func_name, params, visitor.code);
         let parent_visitor = &mut self.visitor_stack.peek_mut().unwrap().0;
         let const_index = parent_visitor.code.add_const(func);
 
@@ -295,9 +310,9 @@ pub struct Visitor {
     scope_tree: ScopeTree,
     scope_depth: usize,
     func_nodes: Vec<(
+        String, // name
         usize,  // address
         usize,  // scope tree pointer
-        String, // name
         ast::Func,
     )>,
 }
@@ -559,7 +574,7 @@ impl Visitor {
                 let name = name.map_or_else(|| "<anonymous>".to_owned(), |name| name);
                 let addr = self.len();
                 let pointer = self.scope_tree.pointer();
-                self.func_nodes.push((addr, pointer, name, func));
+                self.func_nodes.push((name, addr, pointer, func));
                 self.push(Inst::Placeholder(
                     addr,
                     Box::new(Inst::LoadConst(0)),

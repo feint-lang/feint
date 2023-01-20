@@ -164,6 +164,7 @@ pub trait ObjectTrait {
         new::int(self.id())
     }
 
+    /// XXX: This resolves to `std.builtins` unless overridden.
     fn module(&self) -> ObjectRef {
         let class = self.class();
         let class = class.read().unwrap();
@@ -185,18 +186,16 @@ pub trait ObjectTrait {
     ///          might require a bit of re-architecting.
     fn get_attr(&self, name: &str, this: ObjectRef) -> ObjectRef {
         // Special attributes that *cannot* be overridden --------------
-
         if name == "$id" {
             return self.id_obj();
         }
 
-        if name == "$type" {
-            return self.type_obj();
+        if name == "$module" {
+            return self.module();
         }
 
-        if name == "$module" {
-            let module = self.class().read().unwrap().module().clone();
-            return module;
+        if name == "$type" {
+            return self.type_obj();
         }
 
         if name == "$names" {

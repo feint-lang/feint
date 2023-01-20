@@ -193,7 +193,14 @@ macro_rules! meth {
     ( $name:literal, $this_type:expr, $params:expr, $doc:literal, $func:expr ) => {
         (
             $name,
-            new::builtin_func($name, Some($this_type.clone()), $params, $doc, $func),
+            new::builtin_func(
+                "std.builtins",
+                $name,
+                Some($this_type.clone()),
+                $params,
+                $doc,
+                $func,
+            ),
         )
     };
 }
@@ -205,6 +212,7 @@ macro_rules! prop {
         (
             $name,
             new::prop(new::builtin_func(
+                "std.builtins",
                 $name,
                 Some($this_type.clone()),
                 &[],

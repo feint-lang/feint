@@ -2,8 +2,10 @@ use std::any::Any;
 use std::fmt;
 use std::sync::{Arc, RwLock};
 
-use once_cell::sync::Lazy;
+use once_cell::sync::{Lazy, OnceCell};
 
+use crate::modules::get_module;
+use crate::modules::std::SYSTEM;
 use crate::vm::Code;
 
 use super::gen;
@@ -26,6 +28,8 @@ pub static FUNC_TYPE: Lazy<gen::obj_ref_t!(FuncType)> =
 
 pub struct Func {
     ns: Namespace,
+    module_name: String,
+    module: OnceCell<ObjectRef>,
     name: String,
     params: Params,
     code: Code,
@@ -34,13 +38,16 @@ pub struct Func {
 gen::standard_object_impls!(Func);
 
 impl Func {
-    pub fn new(name: String, params: Params, code: Code) -> Self {
+    pub fn new(module_name: String, name: String, params: Params, code: Code) -> Self {
         Self {
             ns: Namespace::with_entries(&[
                 // Instance Attributes
+                ("$module_name", new::str(module_name.as_str())),
                 ("$name", new::str(name.as_str())),
                 ("$doc", code.get_doc()),
             ]),
+            module_name,
+            module: OnceCell::default(),
             name,
             params,
             code,
@@ -69,6 +76,10 @@ impl FuncTrait for Func {
         &self.ns
     }
 
+    fn module(&self) -> ObjectRef {
+        (self as &dyn ObjectTrait).module()
+    }
+
     fn name(&self) -> &str {
         self.name.as_str()
     }
@@ -80,6 +91,17 @@ impl FuncTrait for Func {
 
 impl ObjectTrait for Func {
     gen::object_trait_header!(FUNC_TYPE);
+
+    fn module(&self) -> ObjectRef {
+        let result = self.module.get_or_try_init(|| get_module(&self.module_name));
+        match result {
+            Ok(module) => module.clone(),
+            Err(err) => new::module_could_not_be_loaded(
+                format!("{}: {err}", self.module_name),
+                SYSTEM.clone(),
+            ),
+        }
+    }
 
     fn is_equal(&self, rhs: &dyn ObjectTrait) -> bool {
         if self.is(rhs) || rhs.is_always() {

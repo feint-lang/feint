@@ -68,6 +68,7 @@ pub fn bound_func(func: ObjectRef, this: ObjectRef) -> ObjectRef {
 }
 
 pub fn builtin_func(
+    module_name: &str,
     name: &str,
     this_type: Option<ObjectRef>,
     params: &[&str],
@@ -76,7 +77,14 @@ pub fn builtin_func(
 ) -> ObjectRef {
     let params = params.iter().map(|n| n.to_string()).collect();
     let doc = format_doc(doc);
-    obj_ref!(BuiltinFunc::new(name.to_owned(), this_type, params, str(doc), func))
+    obj_ref!(BuiltinFunc::new(
+        module_name.to_owned(),
+        name.to_owned(),
+        this_type,
+        params,
+        str(doc),
+        func
+    ))
 }
 
 pub fn builtin_module(
@@ -142,6 +150,13 @@ pub fn module_not_found_err<S: Into<String>>(msg: S, obj: ObjectRef) -> ObjectRe
     err(ErrKind::ModuleNotFound, msg, obj)
 }
 
+pub fn module_could_not_be_loaded<S: Into<String>>(
+    msg: S,
+    obj: ObjectRef,
+) -> ObjectRef {
+    err(ErrKind::ModuleCouldNotBeLoaded, msg, obj)
+}
+
 pub fn string_err<S: Into<String>>(msg: S, obj: ObjectRef) -> ObjectRef {
     err(ErrKind::String, msg, obj)
 }
@@ -170,11 +185,13 @@ pub fn float_from_string<S: Into<String>>(value: S) -> ObjectRef {
     float(value)
 }
 
-/// NOTE: User functions are created in the compiler where name and
-///       params are already owned, so we don't do any conversion here
-///       like with builtin functions above.
-pub fn func<S: Into<String>>(name: S, params: Params, code: Code) -> ObjectRef {
-    obj_ref!(Func::new(name.into(), params, code))
+pub fn func<S: Into<String>>(
+    module_name: S,
+    func_name: S,
+    params: Params,
+    code: Code,
+) -> ObjectRef {
+    obj_ref!(Func::new(module_name.into(), func_name.into(), params, code))
 }
 
 pub fn int<I: Into<BigInt>>(value: I) -> ObjectRef {

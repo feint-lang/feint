@@ -1,5 +1,6 @@
-use crate::types::{Namespace, ObjectRef};
 use std::fmt;
+
+use crate::types::{Namespace, ObjectRef};
 
 use super::result::Params;
 
@@ -7,6 +8,7 @@ use super::result::Params;
 
 pub trait FuncTrait {
     fn ns(&self) -> &Namespace;
+    fn module(&self) -> ObjectRef;
     fn name(&self) -> &str;
     fn params(&self) -> &Params;
 

@@ -2,8 +2,10 @@ use std::any::Any;
 use std::fmt;
 use std::sync::{Arc, RwLock};
 
-use once_cell::sync::Lazy;
+use once_cell::sync::{Lazy, OnceCell};
 
+use crate::modules::get_module;
+use crate::modules::std::SYSTEM;
 use crate::vm::VM;
 
 use super::gen;
@@ -28,6 +30,8 @@ pub static BUILTIN_FUNC_TYPE: Lazy<gen::obj_ref_t!(BuiltinFuncType)> =
 
 pub struct BuiltinFunc {
     ns: Namespace,
+    module_name: String,
+    module: OnceCell<ObjectRef>,
     name: String,
     this_type: Option<ObjectRef>,
     params: Params,
@@ -38,6 +42,7 @@ gen::standard_object_impls!(BuiltinFunc);
 
 impl BuiltinFunc {
     pub fn new(
+        module_name: String,
         name: String,
         this_type: Option<ObjectRef>,
         params: Params,
@@ -47,9 +52,12 @@ impl BuiltinFunc {
         Self {
             ns: Namespace::with_entries(&[
                 // Instance Attributes
+                ("$module_name", new::str(module_name.as_str())),
                 ("$name", new::str(name.as_str())),
                 ("$doc", doc),
             ]),
+            module_name,
+            module: OnceCell::default(),
             name,
             this_type,
             params,
@@ -71,6 +79,10 @@ impl FuncTrait for BuiltinFunc {
         &self.ns
     }
 
+    fn module(&self) -> ObjectRef {
+        (self as &dyn ObjectTrait).module()
+    }
+
     fn name(&self) -> &str {
         self.name.as_str()
     }
@@ -82,6 +94,17 @@ impl FuncTrait for BuiltinFunc {
 
 impl ObjectTrait for BuiltinFunc {
     gen::object_trait_header!(BUILTIN_FUNC_TYPE);
+
+    fn module(&self) -> ObjectRef {
+        let result = self.module.get_or_try_init(|| get_module(&self.module_name));
+        match result {
+            Ok(module) => module.clone(),
+            Err(err) => new::module_could_not_be_loaded(
+                format!("{}: {err}", self.module_name),
+                SYSTEM.clone(),
+            ),
+        }
+    }
 }
 
 // Display -------------------------------------------------------------

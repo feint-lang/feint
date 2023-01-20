@@ -60,6 +60,10 @@ impl FuncTrait for Closure {
         &self.ns
     }
 
+    fn module(&self) -> ObjectRef {
+        self.func().read().unwrap().module()
+    }
+
     fn name(&self) -> &str {
         self.name.as_str()
     }
