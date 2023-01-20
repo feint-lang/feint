@@ -118,7 +118,9 @@ impl VM {
     }
 
     pub fn execute_func(&mut self, func: &Func, start: usize) -> VMExeResult {
-        self.execute_code(None, func.code(), start)
+        let module = func.module();
+        let module = module.read().unwrap();
+        self.execute_code(module.down_to_mod(), func.code(), start)
     }
 
     /// Execute the given code object's instructions and return the VM's
