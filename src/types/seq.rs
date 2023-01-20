@@ -22,18 +22,23 @@ pub fn each(
 
     let each_fn = &args[0];
     let f = each_fn.read().unwrap();
-    let f = if let Some(f) = f.as_func() {
-        f
+    let n_args = if let Some(f) = f.as_func() {
+        if f.has_var_args() {
+            2
+        } else {
+            f.arity()
+        }
     } else {
         return Ok(new::arg_err("each/1 expects a function", this.clone()));
     };
-    let n_args = if f.has_var_args() { 2 } else { f.arity() };
 
     for (i, item) in items.iter().enumerate() {
+        let each = each_fn.clone();
+        let item = item.clone();
         if n_args == 1 {
-            vm.call(each_fn.clone(), vec![item.clone()])?;
+            vm.call(each, vec![item])?;
         } else {
-            vm.call(each_fn.clone(), vec![item.clone(), new::int(i)])?;
+            vm.call(each, vec![item, new::int(i)])?;
         }
     }
 
@@ -78,19 +83,24 @@ pub fn map(
 
     let map_fn = &args[0];
     let f = map_fn.read().unwrap();
-    let f = if let Some(f) = f.as_func() {
-        f
+    let n_args = if let Some(f) = f.as_func() {
+        if f.has_var_args() {
+            2
+        } else {
+            f.arity()
+        }
     } else {
         return Ok(new::arg_err("map/1 expects a function", this.clone()));
     };
-    let n_args = if f.has_var_args() { 2 } else { f.arity() };
 
     let mut results = vec![];
     for (i, item) in items.iter().enumerate() {
+        let map = map_fn.clone();
+        let item = item.clone();
         if n_args == 1 {
-            vm.call(map_fn.clone(), vec![item.clone()])?;
+            vm.call(map, vec![item])?;
         } else {
-            vm.call(map_fn.clone(), vec![item.clone(), new::int(i)])?;
+            vm.call(map, vec![item, new::int(i)])?;
         }
         results.push(vm.pop_obj()?);
     }

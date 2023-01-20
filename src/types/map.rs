@@ -23,6 +23,40 @@ pub static MAP_TYPE: Lazy<gen::obj_ref_t!(MapType)> = Lazy::new(|| {
     let mut type_obj = type_ref.write().unwrap();
 
     type_obj.add_attrs(&[
+        // Instance Attributes -----------------------------------------
+        gen::prop!("length", type_ref, "", |this, _, _| {
+            let this = this.read().unwrap();
+            let this = this.down_to_map().unwrap();
+            Ok(new::int(this.len()))
+        }),
+        gen::prop!("is_empty", type_ref, "", |this, _, _| {
+            let this = this.read().unwrap();
+            let this = this.down_to_map().unwrap();
+            Ok(new::bool(this.is_empty()))
+        }),
+        // Instance Methods --------------------------------------------
+        gen::meth!(
+            "add",
+            type_ref,
+            &["key", "val"],
+            "Add entry to Map.
+
+            # Args
+
+            - key: Str
+            - value: Any
+
+            ",
+            |this, args, _| {
+                let this = this.read().unwrap();
+                let this = this.down_to_map().unwrap();
+                let arg = gen::use_arg!(args, 0);
+                let key = gen::use_arg_str!(get, key, arg);
+                let val = args[1].clone();
+                this.add(key, val);
+                Ok(new::nil())
+            }
+        ),
         gen::meth!(
             "each",
             type_ref,
@@ -57,8 +91,12 @@ pub static MAP_TYPE: Lazy<gen::obj_ref_t!(MapType)> = Lazy::new(|| {
                 }
 
                 let each_fn = &args[0];
-                if let Some(f) = each_fn.read().unwrap().as_func() {
-                    f
+                let n_args = if let Some(f) = each_fn.read().unwrap().as_func() {
+                    if f.has_var_args() {
+                        3
+                    } else {
+                        f.arity()
+                    }
                 } else {
                     return Ok(new::arg_err(
                         "each/1 expects a function",
@@ -66,8 +104,16 @@ pub static MAP_TYPE: Lazy<gen::obj_ref_t!(MapType)> = Lazy::new(|| {
                     ));
                 };
 
-                for (key, val) in entries.iter() {
-                    vm.call(each_fn.clone(), vec![new::str(key), val.clone()])?;
+                for (i, (key, val)) in entries.iter().enumerate() {
+                    let each = each_fn.clone();
+                    let key = new::str(key);
+                    if n_args == 1 {
+                        vm.call(each, vec![key])?;
+                    } else if n_args == 2 {
+                        vm.call(each, vec![key, val.clone()])?;
+                    } else {
+                        vm.call(each, vec![key, val.clone(), new::int(i)])?;
+                    }
                 }
 
                 Ok(new::nil())
@@ -79,20 +125,20 @@ pub static MAP_TYPE: Lazy<gen::obj_ref_t!(MapType)> = Lazy::new(|| {
             &["key"],
             "Get value for key from Map.
 
-        # Args
+            # Args
 
-        - key: Key
+            - key: Key
 
-        # Returns
+            # Returns
 
-        - Any: If key is present
-        - nil: If key is not present
+            - Any: If key is present
+            - nil: If key is not present
 
-        > NOTE: There's no way to distinguish between a key that isn't present
-        > versus a key that has `nil` as its value. To avoid ambiguity, don't
-        > store `nil` values.
+            > NOTE: There's no way to distinguish between a key that isn't present
+            > versus a key that has `nil` as its value. To avoid ambiguity, don't
+            > store `nil` values.
 
-        ",
+            ",
             |this, args, _| {
                 let this = this.read().unwrap();
                 let this = this.down_to_map().unwrap();
