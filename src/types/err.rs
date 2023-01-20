@@ -84,6 +84,11 @@ pub static ERR_TYPE: Lazy<gen::obj_ref_t!(ErrType)> = Lazy::new(|| {
             let this = this.down_to_err().unwrap();
             Ok(this.kind.get_obj().unwrap())
         }),
+        gen::prop!("message", type_ref, "", |this, _, _| {
+            let this = this.read().unwrap();
+            let this = this.down_to_err().unwrap();
+            Ok(new::str(&this.message))
+        }),
     ]);
 
     type_ref.clone()
