@@ -24,6 +24,7 @@ pub static BOUND_FUNC_TYPE: Lazy<gen::obj_ref_t!(BoundFuncType)> =
 
 pub struct BoundFunc {
     ns: Namespace,
+    module_name: String,
     func: ObjectRef,
     this: ObjectRef,
     name: String,
@@ -36,22 +37,36 @@ impl BoundFunc {
     pub fn new(func: ObjectRef, this: ObjectRef) -> Self {
         let f = func.read().unwrap();
 
-        let (name, params, doc) = if let Some(f) = f.down_to_builtin_func() {
-            (f.name(), f.params(), f.get_doc())
+        let (module_name, name, params, doc) = if let Some(f) = f.down_to_builtin_func()
+        {
+            (f.module_name(), f.name(), f.params(), f.get_doc())
         } else if let Some(f) = f.down_to_func() {
-            (f.name(), f.params(), f.get_doc())
+            (f.module_name(), f.name(), f.params(), f.get_doc())
         } else if let Some(f) = f.down_to_closure() {
-            (f.name(), f.params(), f.get_doc())
+            (f.module_name(), f.name(), f.params(), f.get_doc())
         } else {
             panic!("Unexpected bound func type: {f}")
         };
 
+        let module_name = module_name.to_owned();
         let name = name.to_owned();
         let params = params.clone();
 
         drop(f);
 
-        Self { ns: Namespace::with_entries(&[("$doc", doc)]), func, this, name, params }
+        Self {
+            ns: Namespace::with_entries(&[
+                ("$module_name", new::str(&module_name)),
+                ("$full_name", new::str(format!("{module_name}.{name}"))),
+                ("$name", new::str(&name)),
+                ("$doc", doc),
+            ]),
+            module_name,
+            func,
+            this,
+            name,
+            params,
+        }
     }
 
     pub fn func(&self) -> ObjectRef {
@@ -68,12 +83,16 @@ impl FuncTrait for BoundFunc {
         &self.ns
     }
 
+    fn module_name(&self) -> &String {
+        &self.module_name
+    }
+
     fn module(&self) -> ObjectRef {
         (self as &dyn ObjectTrait).module()
     }
 
-    fn name(&self) -> &str {
-        self.name.as_str()
+    fn name(&self) -> &String {
+        &self.name
     }
 
     fn params(&self) -> &Params {

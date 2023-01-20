@@ -53,6 +53,7 @@ impl BuiltinFunc {
             ns: Namespace::with_entries(&[
                 // Instance Attributes
                 ("$module_name", new::str(module_name.as_str())),
+                ("$full_name", new::str(format!("{module_name}.{name}"))),
                 ("$name", new::str(name.as_str())),
                 ("$doc", doc),
             ]),
@@ -79,12 +80,16 @@ impl FuncTrait for BuiltinFunc {
         &self.ns
     }
 
+    fn module_name(&self) -> &String {
+        &self.module_name
+    }
+
     fn module(&self) -> ObjectRef {
         (self as &dyn ObjectTrait).module()
     }
 
-    fn name(&self) -> &str {
-        self.name.as_str()
+    fn name(&self) -> &String {
+        &self.name
     }
 
     fn params(&self) -> &Params {

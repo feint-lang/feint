@@ -25,6 +25,7 @@ pub static CLOSURE_TYPE: Lazy<gen::obj_ref_t!(ClosureType)> =
 
 pub struct Closure {
     ns: Namespace,
+    module_name: String,
     name: String,
     params: Params,
     func: ObjectRef,
@@ -39,6 +40,7 @@ impl Closure {
         let func = func.down_to_func().unwrap();
         Self {
             ns: Namespace::with_entries(&[("$doc", func.get_doc())]),
+            module_name: func.module_name().to_owned(),
             name: func.name().to_owned(),
             params: func.params().clone(),
             func: func_ref.clone(),
@@ -60,12 +62,16 @@ impl FuncTrait for Closure {
         &self.ns
     }
 
+    fn module_name(&self) -> &String {
+        &self.module_name
+    }
+
     fn module(&self) -> ObjectRef {
         self.func().read().unwrap().module()
     }
 
-    fn name(&self) -> &str {
-        self.name.as_str()
+    fn name(&self) -> &String {
+        &self.name
     }
 
     fn params(&self) -> &Params {

@@ -42,8 +42,9 @@ impl Func {
         Self {
             ns: Namespace::with_entries(&[
                 // Instance Attributes
-                ("$module_name", new::str(module_name.as_str())),
-                ("$name", new::str(name.as_str())),
+                ("$module_name", new::str(&module_name)),
+                ("$full_name", new::str(format!("{module_name}.{name}"))),
+                ("$name", new::str(&name)),
                 ("$doc", code.get_doc()),
             ]),
             module_name,
@@ -76,12 +77,16 @@ impl FuncTrait for Func {
         &self.ns
     }
 
+    fn module_name(&self) -> &String {
+        &self.module_name
+    }
+
     fn module(&self) -> ObjectRef {
         (self as &dyn ObjectTrait).module()
     }
 
-    fn name(&self) -> &str {
-        self.name.as_str()
+    fn name(&self) -> &String {
+        &self.name
     }
 
     fn params(&self) -> &Params {

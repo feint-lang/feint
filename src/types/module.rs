@@ -44,6 +44,7 @@ impl Module {
         code: Code,
         doc: Option<&str>,
     ) -> Self {
+        ns.add_obj("$full_name", new::str(name.as_str()));
         ns.add_obj("$name", new::str(name.as_str()));
         ns.add_obj("$path", new::str(path.as_str()));
         if let Some(doc) = doc {

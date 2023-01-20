@@ -8,8 +8,9 @@ use super::result::Params;
 
 pub trait FuncTrait {
     fn ns(&self) -> &Namespace;
+    fn module_name(&self) -> &String;
     fn module(&self) -> ObjectRef;
-    fn name(&self) -> &str;
+    fn name(&self) -> &String;
     fn params(&self) -> &Params;
 
     fn get_doc(&self) -> ObjectRef {
