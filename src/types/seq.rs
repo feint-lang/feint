@@ -10,16 +10,45 @@ use super::new;
 use super::base::ObjectRef;
 use super::result::Args;
 
-pub fn join(items: &[ObjectRef], args: &Args) -> RuntimeObjResult {
-    let arg = use_arg!(args, 0);
-    let sep = use_arg_str!(join, sep, arg);
+pub fn each(
+    this: &ObjectRef,
+    items: &[ObjectRef],
+    args: &Args,
+    vm: &mut VM,
+) -> RuntimeObjResult {
+    if items.is_empty() {
+        return Ok(new::nil());
+    }
 
+    let each_fn = &args[0];
+    let f = each_fn.read().unwrap();
+    let f = if let Some(f) = f.as_func() {
+        f
+    } else {
+        return Ok(new::arg_err("each/1 expects a function", this.clone()));
+    };
+    let n_args = if f.has_var_args() { 2 } else { f.arity() };
+
+    for (i, item) in items.iter().enumerate() {
+        if n_args == 1 {
+            vm.call(each_fn.clone(), vec![item.clone()])?;
+        } else {
+            vm.call(each_fn.clone(), vec![item.clone(), new::int(i)])?;
+        }
+    }
+
+    Ok(new::nil())
+}
+
+pub fn join(items: &[ObjectRef], args: &Args) -> RuntimeObjResult {
     if items.is_empty() {
         return Ok(new::empty_str());
     }
 
     let n_items = items.len();
     let last_i = n_items - 1;
+    let arg = use_arg!(args, 0);
+    let sep = use_arg_str!(join, sep, arg);
 
     // XXX: Guessing at average word length
     let capacity = n_items * 5 + ((last_i) * sep.len());
@@ -43,18 +72,20 @@ pub fn map(
     args: &Args,
     vm: &mut VM,
 ) -> RuntimeObjResult {
-    let map_fn = &args[0];
-    let mut results = vec![];
+    if items.is_empty() {
+        return Ok(new::empty_tuple());
+    }
 
+    let map_fn = &args[0];
     let f = map_fn.read().unwrap();
     let f = if let Some(f) = f.as_func() {
         f
     } else {
         return Ok(new::arg_err("map/1 expects a function", this.clone()));
     };
-
     let n_args = if f.has_var_args() { 2 } else { f.arity() };
 
+    let mut results = vec![];
     for (i, item) in items.iter().enumerate() {
         if n_args == 1 {
             vm.call(map_fn.clone(), vec![item.clone()])?;

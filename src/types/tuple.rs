@@ -41,6 +41,26 @@ pub static TUPLE_TYPE: Lazy<gen::obj_ref_t!(TupleType)> = Lazy::new(|| {
             seq::sum(&this.items)
         }),
         // Instance Methods --------------------------------------------
+        gen::meth!(
+            "each",
+            type_ref,
+            &["each_fn"],
+            "Apply function to each Tuple item.
+
+            # Args
+
+            - func: Func
+
+              A function that will be passed each item in turn and, optionally, the
+              index of the item.
+
+            ",
+            |this_obj, args, vm| {
+                let this = this_obj.read().unwrap();
+                let this = this.down_to_tuple().unwrap();
+                seq::each(&this_obj, &this.items, &args, vm)
+            }
+        ),
         gen::meth!("get", type_ref, &["index"], "", |this, args, _| {
             let this = this.read().unwrap();
             let this = this.down_to_tuple().unwrap();
@@ -51,15 +71,15 @@ pub static TUPLE_TYPE: Lazy<gen::obj_ref_t!(TupleType)> = Lazy::new(|| {
             };
             Ok(result)
         }),
-        gen::meth!("map", type_ref, &["map_fn"], "", |this_obj, args, vm| {
-            let this = this_obj.read().unwrap();
-            let this = this.down_to_tuple().unwrap();
-            seq::map(&this_obj, &this.items, &args, vm)
-        }),
         gen::meth!("join", type_ref, &["sep"], "", |this, args, _| {
             let this = this.read().unwrap();
             let this = this.down_to_tuple().unwrap();
             seq::join(&this.items, &args)
+        }),
+        gen::meth!("map", type_ref, &["map_fn"], "", |this_obj, args, vm| {
+            let this = this_obj.read().unwrap();
+            let this = this.down_to_tuple().unwrap();
+            seq::map(&this_obj, &this.items, &args, vm)
         }),
     ]);
 

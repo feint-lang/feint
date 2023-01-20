@@ -42,31 +42,40 @@ pub static LIST_TYPE: Lazy<gen::obj_ref_t!(ListType)> = Lazy::new(|| {
             seq::sum(items)
         }),
         // Instance Methods --------------------------------------------
-        // Push item and return it.
-        gen::meth!("push", type_ref, &["item"], "", |this, args, _| {
-            let this = this.read().unwrap();
-            let this = this.down_to_list().unwrap();
-            let arg = args[0].clone();
-            this.push(arg.clone());
-            Ok(arg)
-        }),
-        // Push items and return this.
-        gen::meth!("extend", type_ref, &["items"], "", |this, args, _| {
-            let return_val = this.clone();
-            let this = this.read().unwrap();
-            let this = this.down_to_list().unwrap();
-            this.extend(args[0].clone())?;
-            Ok(return_val)
-        }),
-        gen::meth!("pop", type_ref, &[], "", |this, _, _| {
-            let this = this.read().unwrap();
-            let this = this.down_to_list().unwrap();
-            let result = match this.pop() {
-                Some(obj) => obj,
-                None => new::nil(),
-            };
-            Ok(result)
-        }),
+        gen::meth!(
+            "each",
+            type_ref,
+            &["each_fn"],
+            "Apply function to each List item.
+
+            # Args
+
+            - func: Func
+
+              A function that will be passed each item in turn and, optionally, the
+              index of the item.
+
+            ",
+            |this_obj, args, vm| {
+                let this = this_obj.read().unwrap();
+                let this = this.down_to_list().unwrap();
+                let items = &this.items.read().unwrap();
+                seq::each(&this_obj, items, &args, vm)
+            }
+        ),
+        gen::meth!(
+            "extend",
+            type_ref,
+            &["items"],
+            "Push items and return this.",
+            |this, args, _| {
+                let return_val = this.clone();
+                let this = this.read().unwrap();
+                let this = this.down_to_list().unwrap();
+                this.extend(args[0].clone())?;
+                Ok(return_val)
+            }
+        ),
         gen::meth!("get", type_ref, &["index"], "", |this, args, _| {
             let this = this.read().unwrap();
             let this = this.down_to_list().unwrap();
@@ -77,18 +86,40 @@ pub static LIST_TYPE: Lazy<gen::obj_ref_t!(ListType)> = Lazy::new(|| {
             };
             Ok(result)
         }),
-        gen::meth!("map", type_ref, &["map_fn"], "", |this_obj, args, vm| {
-            let this = this_obj.read().unwrap();
-            let this = this.down_to_list().unwrap();
-            let items = &this.items.read().unwrap();
-            seq::map(&this_obj, items, &args, vm)
-        }),
         gen::meth!("join", type_ref, &["sep"], "", |this, args, _| {
             let this = this.read().unwrap();
             let this = this.down_to_list().unwrap();
             let items = &this.items.read().unwrap();
             seq::join(items, &args)
         }),
+        gen::meth!("map", type_ref, &["map_fn"], "", |this_obj, args, vm| {
+            let this = this_obj.read().unwrap();
+            let this = this.down_to_list().unwrap();
+            let items = &this.items.read().unwrap();
+            seq::map(&this_obj, items, &args, vm)
+        }),
+        gen::meth!("pop", type_ref, &[], "", |this, _, _| {
+            let this = this.read().unwrap();
+            let this = this.down_to_list().unwrap();
+            let result = match this.pop() {
+                Some(obj) => obj,
+                None => new::nil(),
+            };
+            Ok(result)
+        }),
+        gen::meth!(
+            "push",
+            type_ref,
+            &["item"],
+            "Push item and return it.",
+            |this, args, _| {
+                let this = this.read().unwrap();
+                let this = this.down_to_list().unwrap();
+                let arg = args[0].clone();
+                this.push(arg.clone());
+                Ok(arg)
+            }
+        ),
     ]);
 
     type_ref.clone()
