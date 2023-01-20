@@ -27,6 +27,7 @@ use super::file::File;
 use super::float::Float;
 use super::func::Func;
 use super::int::Int;
+use super::iterator::FIIterator;
 use super::list::List;
 use super::map::Map;
 use super::module::Module;
@@ -213,6 +214,10 @@ pub fn int_from_string<S: Into<String>>(value: S) -> ObjectRef {
         let value = BigInt::from_f64(value).unwrap();
         int(value)
     }
+}
+
+pub fn iterator(wrapped: Vec<ObjectRef>) -> ObjectRef {
+    obj_ref!(FIIterator::new(wrapped))
 }
 
 pub fn list(items: Vec<ObjectRef>) -> ObjectRef {

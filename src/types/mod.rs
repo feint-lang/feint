@@ -35,6 +35,7 @@ pub(crate) mod float;
 pub(crate) mod func;
 pub(crate) mod gen;
 pub(crate) mod int;
+pub(crate) mod iterator;
 pub(crate) mod list;
 pub(crate) mod map;
 pub(crate) mod module;

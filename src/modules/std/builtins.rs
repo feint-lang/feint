@@ -23,6 +23,7 @@ pub static BUILTINS: Lazy<types::gen::obj_ref_t!(types::module::Module)> =
                 ("Func", types::func::FUNC_TYPE.clone()),
                 ("Float", types::float::FLOAT_TYPE.clone()),
                 ("Int", types::int::INT_TYPE.clone()),
+                ("Iterator", types::iterator::ITERATOR_TYPE.clone()),
                 ("List", types::list::LIST_TYPE.clone()),
                 ("Map", types::map::MAP_TYPE.clone()),
                 ("Module", types::module::MODULE_TYPE.clone()),

@@ -1,0 +1,4 @@
+items = ("a", "b", "c", "d")
+it = items.iter()
+loop (item = it.next()) != nil ->
+    print(item)

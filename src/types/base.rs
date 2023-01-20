@@ -29,6 +29,7 @@ use super::file::{File, FileType};
 use super::float::{Float, FloatType};
 use super::func::{Func, FuncType};
 use super::int::{Int, IntType};
+use super::iterator::{FIIterator, IteratorType};
 use super::list::{List, ListType};
 use super::map::{Map, MapType};
 use super::module::{Module, ModuleType};
@@ -366,6 +367,7 @@ pub trait ObjectTrait {
     make_type_checker!(is_float_type, FloatType);
     make_type_checker!(is_func_type, FuncType);
     make_type_checker!(is_int_type, IntType);
+    make_type_checker!(is_iterator_type, IteratorType);
     make_type_checker!(is_list_type, ListType);
     make_type_checker!(is_map_type, MapType);
     make_type_checker!(is_mod_type, ModuleType);
@@ -387,6 +389,7 @@ pub trait ObjectTrait {
     make_type_checker!(is_float, Float);
     make_type_checker!(is_func, Func);
     make_type_checker!(is_int, Int);
+    make_type_checker!(is_iterator, FIIterator);
     make_type_checker!(is_list, List);
     make_type_checker!(is_map, Map);
     make_type_checker!(is_mod, Module);
@@ -429,6 +432,7 @@ pub trait ObjectTrait {
     make_down_to!(down_to_func_type, FuncType);
     make_down_to!(down_to_list_type, ListType);
     make_down_to!(down_to_int_type, IntType);
+    make_down_to!(down_to_iterator_type, IteratorType);
     make_down_to!(down_to_map_type, MapType);
     make_down_to!(down_to_mod_type, ModuleType);
     make_down_to!(down_to_nil_type, NilType);
@@ -451,6 +455,8 @@ pub trait ObjectTrait {
     make_down_to!(down_to_float, Float);
     make_down_to!(down_to_func, Func);
     make_down_to!(down_to_int, Int);
+    make_down_to!(down_to_iterator, FIIterator);
+    make_down_to_mut!(down_to_iterator_mut, FIIterator);
     make_down_to!(down_to_list, List);
     make_down_to!(down_to_map, Map);
     make_down_to!(down_to_mod, Module);
@@ -622,6 +628,7 @@ impl fmt::Display for dyn ObjectTrait {
             FloatType,
             FuncType,
             IntType,
+            IteratorType,
             ListType,
             MapType,
             ModuleType,
@@ -647,6 +654,7 @@ impl fmt::Display for dyn ObjectTrait {
             Float,
             Func,
             Int,
+            FIIterator,
             List,
             Map,
             Module,
@@ -678,6 +686,7 @@ impl fmt::Debug for dyn ObjectTrait {
             FloatType,
             FuncType,
             IntType,
+            IteratorType,
             ListType,
             MapType,
             ModuleType,
@@ -703,6 +712,7 @@ impl fmt::Debug for dyn ObjectTrait {
             Float,
             Func,
             Int,
+            FIIterator,
             List,
             Map,
             Module,
