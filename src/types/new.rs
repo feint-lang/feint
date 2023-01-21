@@ -205,14 +205,14 @@ pub fn int<I: Into<BigInt>>(value: I) -> ObjectRef {
     }
 }
 
-pub fn int_from_string<S: Into<String>>(value: S) -> ObjectRef {
-    let value = value.into();
-    if let Ok(value) = BigInt::from_str_radix(value.as_ref(), 10) {
-        int(value)
+pub fn int_from_string<S: Into<String>>(val: S) -> ObjectRef {
+    let val = val.into();
+    if let Ok(val) = BigInt::from_str_radix(val.as_ref(), 10) {
+        int(val)
+    } else if let Ok(val) = val.parse::<f64>() {
+        int(BigInt::from_f64(val).unwrap())
     } else {
-        let value = value.parse::<f64>().unwrap();
-        let value = BigInt::from_f64(value).unwrap();
-        int(value)
+        nil()
     }
 }
 
