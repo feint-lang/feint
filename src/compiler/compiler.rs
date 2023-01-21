@@ -7,8 +7,8 @@ use crate::modules::std::BUILTINS;
 use crate::source::Location;
 use crate::types::{new, Module, Namespace, ObjectRef};
 use crate::util::{
-    BinaryOperator, CompareOperator, InplaceOperator, Stack, UnaryCompareOperator,
-    UnaryOperator,
+    BinaryOperator, CompareOperator, InplaceOperator, ShortCircuitCompareOperator,
+    Stack, UnaryCompareOperator, UnaryOperator,
 };
 use crate::vm::{globals, Code, Inst, PrintFlags};
 
@@ -588,6 +588,9 @@ impl Visitor {
             Kind::UnaryCompareOp(op, b) => self.visit_unary_compare_op(op, *b)?,
             Kind::BinaryOp(a, op, b) => self.visit_binary_op(*a, op, *b)?,
             Kind::CompareOp(a, op, b) => self.visit_compare_op(*a, op, *b)?,
+            Kind::ShortCircuitCompareOp(a, op, b) => {
+                self.visit_short_circuit_compare_op(*a, op, *b)?
+            }
             Kind::InplaceOp(a, op, b) => self.visit_inplace_op(*a, op, *b)?,
         }
         Ok(())
@@ -996,6 +999,18 @@ impl Visitor {
         self.visit_expr(expr_a, None)?;
         self.visit_expr(expr_b, None)?;
         self.push(Inst::CompareOp(op));
+        Ok(())
+    }
+
+    fn visit_short_circuit_compare_op(
+        &mut self,
+        expr_a: ast::Expr,
+        op: ShortCircuitCompareOperator,
+        expr_b: ast::Expr,
+    ) -> VisitResult {
+        self.visit_expr(expr_a, None)?;
+        self.visit_expr(expr_b, None)?;
+        self.push(Inst::ShortCircuitCompareOp(op));
         Ok(())
     }
 

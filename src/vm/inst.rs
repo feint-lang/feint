@@ -1,7 +1,7 @@
 use crate::source::Location;
 use crate::util::{
-    BinaryOperator, CompareOperator, InplaceOperator, UnaryCompareOperator,
-    UnaryOperator,
+    BinaryOperator, CompareOperator, InplaceOperator, ShortCircuitCompareOperator,
+    UnaryCompareOperator, UnaryOperator,
 };
 
 /// NOTE: When adding or removing instructions, the PartialEq impl
@@ -73,6 +73,7 @@ pub enum Inst {
 
     BinaryOp(BinaryOperator),
     CompareOp(CompareOperator),
+    ShortCircuitCompareOp(ShortCircuitCompareOperator),
     InplaceOp(InplaceOperator),
 
     // Call function with N values from top of stack. The args are

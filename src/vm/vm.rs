@@ -17,8 +17,8 @@ use crate::types::{
     new, Args, BuiltinFunc, Func, FuncTrait, Module, ObjectRef, ThisOpt,
 };
 use crate::util::{
-    BinaryOperator, CompareOperator, InplaceOperator, Stack, UnaryCompareOperator,
-    UnaryOperator,
+    BinaryOperator, CompareOperator, InplaceOperator, ShortCircuitCompareOperator,
+    Stack, UnaryCompareOperator, UnaryOperator,
 };
 
 use super::code::Code;
@@ -331,6 +331,9 @@ impl VM {
                 }
                 CompareOp(op) => {
                     self.handle_compare_op(op)?;
+                }
+                ShortCircuitCompareOp(op) => {
+                    self.handle_short_circuit_compare_op(op)?;
                 }
                 InplaceOp(op) => {
                     self.handle_inplace_op(op)?;
@@ -681,7 +684,6 @@ impl VM {
     /// temp value onto stack.
     fn handle_compare_op(&mut self, op: &CompareOperator) -> RuntimeResult {
         use CompareOperator::*;
-        // Get RHS (b) first because we need to know if LHS (a) is a local
         let b_ref = self.pop_obj()?;
         let a_kind = self.pop()?;
         let a_ref = self.get_obj(&a_kind);
@@ -695,12 +697,43 @@ impl VM {
             IsNotTypeEqual => !a.is_type_equal(b),
             IsEqual => a.is_equal(b),
             NotEqual => !a.is_equal(b),
-            And => a.and(b)?,
-            Or => a.or(b)?,
             LessThan => a.less_than(b)?,
             LessThanOrEqual => a.less_than(b)? || a.is_equal(b),
             GreaterThan => a.greater_than(b)?,
             GreaterThanOrEqual => a.greater_than(b)? || a.is_equal(b),
+        };
+        self.push_temp(new::bool(result));
+        Ok(())
+    }
+
+    fn handle_short_circuit_compare_op(
+        &mut self,
+        op: &ShortCircuitCompareOperator,
+    ) -> RuntimeResult {
+        // TODO: This provides a place to handle short-circuiting ops,
+        //       but currently short-circuiting is NOT implemented.
+        use ShortCircuitCompareOperator::*;
+        let b_ref = self.pop_obj()?;
+        let a_kind = self.pop()?;
+        let a_ref = self.get_obj(&a_kind);
+        let a = a_ref.read().unwrap();
+        let b = b_ref.read().unwrap();
+        let b = &*b;
+        let result = match op {
+            And => {
+                if a.bool_val()? {
+                    a.and(b)?
+                } else {
+                    false
+                }
+            }
+            Or => {
+                if a.bool_val()? {
+                    true
+                } else {
+                    a.or(b)?
+                }
+            }
         };
         self.push_temp(new::bool(result));
         Ok(())

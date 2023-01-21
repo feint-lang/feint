@@ -138,8 +138,6 @@ pub enum CompareOperator {
     LessThanOrEqual,
     GreaterThan,
     GreaterThanOrEqual,
-    And,
-    Or,
 }
 
 impl CompareOperator {
@@ -155,8 +153,6 @@ impl CompareOperator {
             Token::LessThanOrEqual => Self::LessThanOrEqual,
             Token::GreaterThan => Self::GreaterThan,
             Token::GreaterThanOrEqual => Self::GreaterThanOrEqual,
-            Token::And => Self::And,
-            Token::Or => Self::Or,
             _ => return Err(format!("Unknown comparison operator: {token}")),
         };
         Ok(op)
@@ -176,6 +172,42 @@ impl fmt::Display for CompareOperator {
             Self::LessThanOrEqual => "<=",
             Self::GreaterThan => ">",
             Self::GreaterThanOrEqual => ">=",
+        };
+        write!(f, "{string}")
+    }
+}
+
+impl fmt::Debug for CompareOperator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{self}")
+    }
+}
+
+/// Short-circuiting binary comparison operators (operators that return bool).
+#[derive(Clone, Eq, PartialEq)]
+pub enum ShortCircuitCompareOperator {
+    And,
+    Or,
+}
+
+impl ShortCircuitCompareOperator {
+    pub fn from_token(token: &Token) -> Result<Self, String> {
+        let op = match token {
+            Token::And => Self::And,
+            Token::Or => Self::Or,
+            _ => {
+                return Err(format!(
+                    "Unknown short-circuiting comparison operator: {token}"
+                ))
+            }
+        };
+        Ok(op)
+    }
+}
+
+impl fmt::Display for ShortCircuitCompareOperator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let string = match self {
             Self::And => "&&",
             Self::Or => "||",
         };
@@ -183,7 +215,7 @@ impl fmt::Display for CompareOperator {
     }
 }
 
-impl fmt::Debug for CompareOperator {
+impl fmt::Debug for ShortCircuitCompareOperator {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{self}")
     }

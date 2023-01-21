@@ -6,8 +6,8 @@ use crate::scanner::Token;
 use crate::source::Location;
 use crate::types::Params;
 use crate::util::{
-    BinaryOperator, CompareOperator, InplaceOperator, UnaryCompareOperator,
-    UnaryOperator,
+    BinaryOperator, CompareOperator, InplaceOperator, ShortCircuitCompareOperator,
+    UnaryCompareOperator, UnaryOperator,
 };
 
 /// Module - A self-contained list of statements.
@@ -147,6 +147,7 @@ pub enum ExprKind {
     UnaryCompareOp(UnaryCompareOperator, Box<Expr>),
     BinaryOp(Box<Expr>, BinaryOperator, Box<Expr>),
     CompareOp(Box<Expr>, CompareOperator, Box<Expr>),
+    ShortCircuitCompareOp(Box<Expr>, ShortCircuitCompareOperator, Box<Expr>),
     InplaceOp(Box<Expr>, InplaceOperator, Box<Expr>),
 }
 
@@ -304,11 +305,13 @@ impl Expr {
         start: Location,
         end: Location,
     ) -> Self {
-        use ExprKind::{BinaryOp, CompareOp, InplaceOp};
+        use ExprKind::{BinaryOp, CompareOp, InplaceOp, ShortCircuitCompareOp};
         let kind = if let Ok(op) = BinaryOperator::from_token(op_token) {
             BinaryOp(Box::new(a), op, Box::new(b))
         } else if let Ok(op) = CompareOperator::from_token(op_token) {
             CompareOp(Box::new(a), op, Box::new(b))
+        } else if let Ok(op) = ShortCircuitCompareOperator::from_token(op_token) {
+            ShortCircuitCompareOp(Box::new(a), op, Box::new(b))
         } else if let Ok(op) = InplaceOperator::from_token(op_token) {
             InplaceOp(Box::new(a), op, Box::new(b))
         } else {
@@ -424,6 +427,7 @@ impl fmt::Debug for ExprKind {
             Self::UnaryCompareOp(op, a) => write!(f, "({op:?}{a:?})"),
             Self::BinaryOp(a, op, b) => write!(f, "({a:?} {op:?} {b:?})"),
             Self::CompareOp(a, op, b) => write!(f, "({a:?} {op:?} {b:?})"),
+            Self::ShortCircuitCompareOp(a, op, b) => write!(f, "({a:?} {op:?} {b:?})"),
             Self::InplaceOp(a, op, b) => write!(f, "({a:?} {op:?} {b:?})"),
         }
     }

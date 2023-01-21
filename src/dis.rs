@@ -110,6 +110,7 @@ impl Disassembler {
             UnaryCompareOp(op) => self.align("UNARY_COMPARE_OP", op),
             BinaryOp(op) => self.align("BINARY_OP", op),
             CompareOp(op) => self.align("COMPARE_OP", op),
+            ShortCircuitCompareOp(op) => self.align("SHORT_CIRCUIT_COMPARE_OP", op),
             InplaceOp(op) => self.align("INPLACE_OP", op),
             Call(num_args) => self.align("CALL", num_args),
             Return => self.align("RETURN", ""),
