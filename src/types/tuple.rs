@@ -71,6 +71,11 @@ pub static TUPLE_TYPE: Lazy<gen::obj_ref_t!(TupleType)> = Lazy::new(|| {
             };
             Ok(result)
         }),
+        gen::meth!("has", type_ref, &["member"], "", |this, args, _| {
+            let this = this.read().unwrap();
+            let this = this.down_to_tuple().unwrap();
+            seq::has(&this.items, &args)
+        }),
         gen::meth!("iter", type_ref, &[], "", |this_ref, _, _| {
             let this = this_ref.read().unwrap();
             let this = this.down_to_tuple().unwrap();

@@ -86,6 +86,12 @@ pub static LIST_TYPE: Lazy<gen::obj_ref_t!(ListType)> = Lazy::new(|| {
             };
             Ok(result)
         }),
+        gen::meth!("has", type_ref, &["member"], "", |this, args, _| {
+            let this = this.read().unwrap();
+            let this = this.down_to_list().unwrap();
+            let items = &this.items.read().unwrap();
+            seq::has(items, &args)
+        }),
         gen::meth!("join", type_ref, &["sep"], "", |this, args, _| {
             let this = this.read().unwrap();
             let this = this.down_to_list().unwrap();

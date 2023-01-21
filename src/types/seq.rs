@@ -45,6 +45,19 @@ pub fn each(
     Ok(new::nil())
 }
 
+pub fn has(items: &[ObjectRef], args: &Args) -> RuntimeObjResult {
+    if items.is_empty() {
+        return Ok(new::bool(false));
+    }
+    let member = use_arg!(args, 0);
+    for item in items.iter() {
+        if member.is_equal(&*item.read().unwrap()) {
+            return Ok(new::bool(true));
+        }
+    }
+    Ok(new::bool(false))
+}
+
 pub fn join(items: &[ObjectRef], args: &Args) -> RuntimeObjResult {
     if items.is_empty() {
         return Ok(new::empty_str());
