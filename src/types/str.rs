@@ -96,6 +96,18 @@ pub static STR_TYPE: Lazy<gen::obj_ref_t!(StrType)> = Lazy::new(|| {
             let result = value.replace(old, new);
             Ok(new::str(result))
         }),
+        gen::meth!("remove_prefix", type_ref, &["prefix"], "", |this_ref, args, _| {
+            let this = this_ref.read().unwrap();
+            let val = this.get_str_val().unwrap();
+            let arg = use_arg!(args, 0);
+            let prefix = use_arg_str!(starts_with, prefix, arg);
+            Ok(if let Some(new_val) = val.strip_prefix(prefix) {
+                new::str(new_val)
+            } else {
+                drop(this);
+                this_ref
+            })
+        }),
     ]);
 
     type_ref.clone()
