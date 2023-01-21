@@ -1,3 +1,6 @@
+import std.args
+import std.system
+
 # NOTE: The extra 0 is so that the Nth Fibonacci corresponds to the Nth
 #       cache entry.
 cache = [0, 0, 1]
@@ -30,5 +33,28 @@ fib_match_slow = (n) =>
         * -> fib_match_slow(n - 1) + fib_match_slow(n - 2)
 
 $main = (...) =>
-    n = if $args.is_empty -> 50 else -> Int.new($args.0)
-    print(fib_match(n))
+    args = args.parse("fib", $args, {
+        "args": (
+            {"name": "n", "default": 30, "type": Int},
+        ),
+        "flags": (
+            {"name": "slow"},
+        )
+    })
+
+    if args.err ->
+        print_err(args.err)
+        system.exit(1)
+
+    n = args.get("n")
+    if n $$ nil ->
+        print_err($"Expected arg N to be an int")
+        system.exit(1)
+
+    result = if args.get("slow") ->
+        print("[INFO] Running slow version (without intermediate value caching)")
+        fib_match_slow(n)
+    else ->
+        fib_match(n)
+
+    print(result)
