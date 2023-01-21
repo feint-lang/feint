@@ -20,11 +20,16 @@ pub static ITERATOR_TYPE: Lazy<gen::obj_ref_t!(IteratorType)> = Lazy::new(|| {
     let mut type_obj = type_ref.write().unwrap();
 
     type_obj.add_attrs(&[
-        // Instance Attributes -----------------------------------------
+        // Instance Methods --------------------------------------------
         gen::meth!("next", type_ref, &[], "", |this, _, _| {
             let mut this = this.write().unwrap();
             let this = this.down_to_iterator_mut().unwrap();
             Ok(this.next())
+        }),
+        gen::meth!("peek", type_ref, &[], "", |this, _, _| {
+            let this = this.write().unwrap();
+            let this = this.down_to_iterator().unwrap();
+            Ok(this.peek())
         }),
     ]);
 
@@ -47,12 +52,26 @@ impl FIIterator {
     }
 
     fn next(&mut self) -> ObjectRef {
-        if self.current < self.wrapped.len() {
-            let obj = self.wrapped.get(self.current).unwrap();
+        let obj = self.get_or_nil(self.current);
+        if self.current < self.len() {
             self.current += 1;
-            obj.clone()
-        } else {
+        }
+        obj
+    }
+
+    fn peek(&self) -> ObjectRef {
+        self.get_or_nil(self.current)
+    }
+
+    fn len(&self) -> usize {
+        self.wrapped.len()
+    }
+
+    fn get_or_nil(&self, index: usize) -> ObjectRef {
+        if index >= self.len() {
             new::nil()
+        } else {
+            self.wrapped[index].clone()
         }
     }
 }
