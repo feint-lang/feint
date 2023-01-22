@@ -1,3 +1,4 @@
+/doc/build/
 /flamegraph.svg
 /lint.out
-/target
+/target/
