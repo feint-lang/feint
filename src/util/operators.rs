@@ -188,6 +188,7 @@ impl fmt::Debug for CompareOperator {
 pub enum ShortCircuitCompareOperator {
     And,
     Or,
+    NilOr,
 }
 
 impl ShortCircuitCompareOperator {
@@ -195,6 +196,7 @@ impl ShortCircuitCompareOperator {
         let op = match token {
             Token::And => Self::And,
             Token::Or => Self::Or,
+            Token::NilOr => Self::NilOr,
             _ => {
                 return Err(format!(
                     "Unknown short-circuiting comparison operator: {token}"
@@ -210,6 +212,7 @@ impl fmt::Display for ShortCircuitCompareOperator {
         let string = match self {
             Self::And => "&&",
             Self::Or => "||",
+            Self::NilOr => "??",
         };
         write!(f, "{string}")
     }

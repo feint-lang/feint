@@ -54,6 +54,7 @@ pub enum Token {
     NotEqual,           // !=
     And,                // &&
     Or,                 // ||
+    NilOr,              // ??
     LessThan,           // <
     LessThanOrEqual,    // <=
     GreaterThan,        // >
@@ -159,6 +160,7 @@ impl Token {
             Self::NotEqual => "!=",
             Self::And => "&&",
             Self::Or => "||",
+            Self::NilOr => "??",
             Self::LessThan => "<",
             Self::LessThanOrEqual => "<=",
             Self::GreaterThan => ">",

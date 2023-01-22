@@ -715,22 +715,17 @@ impl VM {
         let b = b_ref.read().unwrap();
         let b = &*b;
         let result = match op {
-            And => {
-                if a.bool_val()? {
-                    a.and(b)?
+            And => new::bool(a.bool_val()? && a.and(b)?),
+            Or => new::bool(a.bool_val()? || a.or(b)?),
+            NilOr => {
+                if a.is_nil() {
+                    b_ref.clone()
                 } else {
-                    false
-                }
-            }
-            Or => {
-                if a.bool_val()? {
-                    true
-                } else {
-                    a.or(b)?
+                    a_ref.clone()
                 }
             }
         };
-        self.push_temp(new::bool(result));
+        self.push_temp(result);
         Ok(())
     }
 

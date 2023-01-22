@@ -47,11 +47,10 @@ $main = (...) =>
 
     args = args.parse("make-type", $args, {
         "help": "Generate a new type",
-        "args": {
-            "name": {"required": true},
-            "repr": {"required": false},
-        },
-        "flags": ("--help",)
+        "args": (
+            {"name": "name", "required": true},
+            {"name": "repr", "required": false},
+        ),
     })
 
     if args.err ->
@@ -66,7 +65,7 @@ $main = (...) =>
     singleton_type_name = $"{name.upper()}_TYPE"
     type_name = $"{name}Type"
     obj_name = name
-    repr = if repr == nil -> obj_name.lower() else -> repr
+    repr = repr ?? obj_name.lower()
 
     rule = "-".repeat(80)
     e(rule)

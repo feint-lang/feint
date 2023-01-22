@@ -79,7 +79,7 @@ parse: Map = (
                         * ->
                             result.add(name, default)
                 * ->
-                    type = spec.get("type")
+                    type = spec.get("type") ?? Str
 
                     # FIX: Assigning back to val doesn't work because
                     #      `val` on the RHS is always `nil`. The
@@ -88,7 +88,7 @@ parse: Map = (
                     #val = if type $$ nil -> val else -> type.new(val)
 
                     val = val
-                    val = if type $$ nil -> val else -> type.new(val)
+                    val = type.new(val)
                     result.add(name, val)
 
     # Map options
@@ -97,8 +97,8 @@ parse: Map = (
         loop (spec = it.next()) $! nil ->
             name = spec.get("name")
             val = options.get(name)
-            type = spec.get("type")
-            val = if type $$ nil -> val else -> type.new(val)
+            type = spec.get("type") ?? Str
+            val = type.new(val)
             result.add(name, val)
 
     # Map flags
