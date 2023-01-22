@@ -97,7 +97,6 @@ impl Default for VM {
 
 impl VM {
     pub fn new(ctx: RuntimeContext, max_call_depth: CallDepth) -> Self {
-        let sigint_flag = Arc::new(AtomicBool::new(false));
         VM {
             ctx,
             state: VMState::Idle(None),
@@ -107,8 +106,8 @@ impl VM {
             call_stack: Stack::with_capacity(max_call_depth),
             max_call_depth,
             loc: (Location::default(), Location::default()),
-            handle_sigint: sigint_flag.load(Ordering::Relaxed),
-            sigint_flag,
+            handle_sigint: false,
+            sigint_flag: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -136,29 +135,25 @@ impl VM {
         &mut self,
         module: Option<&Module>,
         code: &Code,
-        start: usize,
+        mut ip: usize,
     ) -> VMExeResult {
         use Inst::*;
 
         self.set_running();
 
-        let handle_sigint = self.handle_sigint;
-        let sigint_flag = self.sigint_flag.clone();
-        let mut sigint_counter = 0u32;
-
-        let mut ip = start;
-        let mut jump_ip = None;
-
         let len_chunk = code.len_chunk();
 
-        match start.cmp(&len_chunk) {
+        match ip.cmp(&len_chunk) {
+            cmp::Ordering::Less => (),
             cmp::Ordering::Equal => {
                 self.set_idle(None);
                 return Ok(());
             }
             cmp::Ordering::Greater => panic!("Code start index out of bounds"),
-            _ => (),
         }
+
+        let mut sigint_counter = 0u32;
+        let mut jump_ip = None;
 
         loop {
             match &code[ip] {
@@ -440,7 +435,7 @@ impl VM {
                         //      problem when the closure references
                         //      itself.
                         let func_captured = captured.contains_key(func.name());
-                        if func_captured && ip + 1 < code.len_chunk() {
+                        if func_captured && ip + 1 < len_chunk {
                             if let AssignCell(_) = &code[ip + 1] {
                                 let closure_cell =
                                     new::cell_with_value(func_ref.clone());
@@ -500,12 +495,10 @@ impl VM {
                 }
             }
 
-            if handle_sigint {
+            if self.handle_sigint {
                 sigint_counter += 1;
-                // TODO: Maybe use a different value and/or make it
-                //       configurable.
                 if sigint_counter == 1024 {
-                    if sigint_flag.load(Ordering::Relaxed) {
+                    if self.sigint_flag.load(Ordering::Relaxed) {
                         self.handle_sigint();
                         self.set_idle(None);
                         break Ok(());
@@ -550,10 +543,12 @@ impl VM {
 
     // State -----------------------------------------------------------
 
+    #[inline]
     fn set_running(&mut self) {
         self.state = VMState::Running;
     }
 
+    #[inline]
     fn set_idle(&mut self, obj: Option<ObjectRef>) {
         self.state = VMState::Idle(obj);
     }
