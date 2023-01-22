@@ -24,3 +24,12 @@ docs:
 	@echo
 	@echo "Building other docs..."
 	cd doc && mdbook build
+
+.PHONY = profile
+profile:
+	CARGO_PROFILE_RELEASE_DEBUG=true \
+	  cargo flamegraph --root -- examples/fib.fi -- --slow 20
+
+.PHONY = profile-dev
+profile-dev:
+	cargo flamegraph --dev --root -- examples/fib.fi -- --slow 20

@@ -30,12 +30,3 @@ clap = { version = "~4.1.1", features = ["env"] }
 clap_complete = "4.1.0"
 flate2 = { version = "1.0.25", features = ["zlib"], default-features = false }
 tar = { version = "0.4.38", default-features = false }
-
-# Profiling
-#
-# - uncomment config below
-# - cargo install flamegraph
-# - cargo flamegraph --root -- example/fib.py 30
-#
-# [profile.release]
-# debug = true
