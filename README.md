@@ -28,6 +28,13 @@ MIT. See the LICENSE file.
 - [Crafting Interpreters](https://craftinginterpreters.com)
 - Python, JavaScript, Rust, and a handful of other languages
 
+## Documentation
+
+This README currently contains the most comprehensive documentation.
+Work on a dedicated documentation site is in progress:
+
+https://feint-lang.github.io/
+
 ## Building & Running
 
 FeInt is a standard Cargo project, so it can built with `cargo build`

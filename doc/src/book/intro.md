@@ -1,3 +1,0 @@
-# Introduction
-
-FeInt is...

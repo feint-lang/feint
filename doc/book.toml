@@ -1,9 +1,0 @@
-[book]
-title = "FeInt Book"
-authors = ["Wyatt Baldwin"]
-language = "en"
-multilingual = false
-src = "src/book"
-
-[build]
-build-dir = "build/book"

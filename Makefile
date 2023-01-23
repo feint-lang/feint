@@ -17,14 +17,6 @@ install-fish-completion:
 	mkdir -p $(fish_completions_dir)
 	cp $(shell dirname $(stamp))/feint.fish $(fish_completions_dir)/feint.fish
 
-.PHONY = docs
-docs:
-	@echo "Building Cargo docs..."
-	cargo doc
-	@echo
-	@echo "Building other docs..."
-	cd doc && mdbook build
-
 .PHONY = profile
 profile:
 	CARGO_PROFILE_RELEASE_DEBUG=true \
