@@ -67,38 +67,32 @@ parse: Map = (
         it = arg_specs.iter()
         loop (spec = it.next()) $! nil ->
             name = spec.get("name")
-            val = args.get(i)
+            if i < args.length ->
+                type = spec.get("type") ?? Str
+                val = args.get(i)
+                val = type.new(val)
+                result.add(name, val)
+            else ->
+                default = spec.get("default")
+                required = spec.get("required")
+                match (default, required) ->
+                    (nil, true) ->
+                        errors.add(name, Err.new(ErrType.arg, $"Arg is required"))
+                    * ->
+                        result.add(name, default)
             i += 1
-            match val ->
-                nil ->
-                    default = spec.get("default")
-                    required = spec.get("required")
-                    match (default, required) ->
-                        (nil, true) ->
-                            errors.add(name, Err.new(ErrType.arg, $"Arg is required"))
-                        * ->
-                            result.add(name, default)
-                * ->
-                    type = spec.get("type") ?? Str
-
-                    # FIX: Assigning back to val doesn't work because
-                    #      `val` on the RHS is always `nil`. The
-                    #      `val = val` hack fixes this by pulling the
-                    #      outer `val` into the local scope.
-                    #val = if type $$ nil -> val else -> type.new(val)
-
-                    val = val
-                    val = type.new(val)
-                    result.add(name, val)
 
     # Map options
     if option_specs $! nil ->
         it = option_specs.iter()
         loop (spec = it.next()) $! nil ->
             name = spec.get("name")
-            val = options.get(name)
-            type = spec.get("type") ?? Str
-            val = type.new(val)
+            val = if options.has(name) ->
+                type = spec.get("type") ?? Str
+                val = options.get(name)
+                type.new(val)
+            else ->
+                spec.get("default")
             result.add(name, val)
 
     # Map flags
