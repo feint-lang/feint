@@ -41,10 +41,8 @@ fn stamp(out_dir: &Path) -> Result<(), Error> {
 
 fn make_shell_completion_scripts(out_dir: &Path) -> Result<(), Error> {
     let mut cmd = build_cli();
-    let path = clap_complete::generate_to(shells::Bash, &mut cmd, "feint", out_dir)?;
-    println!("cargo:warning=bash completion script generated: {:?}", path);
-    let path = clap_complete::generate_to(shells::Fish, &mut cmd, "feint", out_dir)?;
-    println!("cargo:warning=fish completion script generated: {:?}", path);
+    clap_complete::generate_to(shells::Bash, &mut cmd, "feint", out_dir)?;
+    clap_complete::generate_to(shells::Fish, &mut cmd, "feint", out_dir)?;
     Ok(())
 }
 
@@ -73,14 +71,8 @@ fn make_module_archive(out_dir: &Path) -> Result<(), Error> {
                 let file_name = file.file_name().unwrap().to_str().unwrap();
                 let file_name = file_name.strip_suffix(".fi").unwrap();
                 let name = format!("{dir_name}.{file_name}");
-
-                println!(
-                    "cargo:warning=adding {:?} to module archive as {:?}",
-                    file, name
-                );
-                println!("cargo:rerun-if-changed={}", file.display());
-
                 archive.append_path_with_name(&file, name).unwrap();
+                println!("cargo:rerun-if-changed={}", file.display());
             }
         }
     };
