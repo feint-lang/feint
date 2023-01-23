@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use rustyline::config::Configurer;
 use rustyline::error::ReadlineError;
 
+use crate::compiler::CompErrKind;
 use crate::dis;
 use crate::exe::Executor;
 use crate::parser::ParseErrKind;
@@ -212,18 +213,19 @@ impl Repl {
     fn continue_on_err(&self, err: &ExeErr) -> bool {
         if let ExeErrKind::ScanErr(kind) = &err.kind {
             use ScanErrKind::*;
-            if let ExpectedBlock
-            | ExpectedIndentedBlock(_)
-            | UnmatchedOpeningBracket(_)
-            | UnterminatedStr(_) = kind
-            {
-                return true;
-            }
+            return matches!(
+                kind,
+                ExpectedBlock
+                    | ExpectedIndentedBlock(_)
+                    | UnmatchedOpeningBracket(_)
+                    | UnterminatedStr(_)
+            );
         } else if let ExeErrKind::ParseErr(kind) = &err.kind {
             use ParseErrKind::*;
-            if let ExpectedBlock(_) = kind {
-                return true;
-            }
+            return matches!(kind, ExpectedBlock(_));
+        } else if let ExeErrKind::CompErr(kind) = &err.kind {
+            use CompErrKind::*;
+            return matches!(kind, LabelNotFoundInScope(..));
         }
         false
     }
