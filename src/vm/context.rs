@@ -1,5 +1,3 @@
-use indexmap;
-
 use crate::modules::std::BUILTINS;
 use crate::types::{new, Namespace, ObjectRef, ObjectTrait};
 use crate::vm::RuntimeObjResult;
@@ -166,22 +164,11 @@ impl RuntimeContext {
         self.get_var_at_depth(depth, name)
     }
 
-    /// Get var in parent namespace or any ancestor of the parent
-    /// namespace.
-    pub fn get_outer_var(&self, name: &str) -> RuntimeObjResult {
-        let depth = self.get_outer_var_depth(name)?;
-        self.get_var_at_depth(depth, name)
-    }
-
     /// Get builtin object. This is used as a fallback when a name isn't
     /// found in the current scope.
     pub fn get_builtin(&self, name: &str) -> ObjectRef {
         let builtins = BUILTINS.read().unwrap();
         let builtins = builtins.down_to_mod().unwrap();
         builtins.get_attr(name, BUILTINS.clone())
-    }
-
-    pub fn iter_vars(&self) -> indexmap::map::Iter<'_, String, ObjectRef> {
-        self.current_ns().iter()
     }
 }
