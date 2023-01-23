@@ -26,6 +26,7 @@ pub enum ErrKind {
     ModuleNotFound,
     ModuleCouldNotBeLoaded,
     String,
+    Type,
     Ok,
 }
 
@@ -42,6 +43,7 @@ static ERR_KINDS: Lazy<Vec<ErrKind>> = Lazy::new(|| {
         ModuleNotFound,
         ModuleCouldNotBeLoaded,
         String,
+        Type,
         Ok,
     ]
 });
@@ -60,6 +62,7 @@ impl ErrKind {
             ModuleNotFound => "module_not_found",
             ModuleCouldNotBeLoaded => "module_could_not_be_loaded",
             String => "string",
+            Type => "type",
             Ok => "ok",
         }
     }
@@ -148,6 +151,7 @@ impl fmt::Display for ErrKind {
             ModuleNotFound => "Module not found",
             ModuleCouldNotBeLoaded => "Module could not be loaded",
             String => "String error",
+            Type => "Type error",
             Ok => "OK (not an error)",
         };
         write!(f, "{message}")

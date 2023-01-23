@@ -162,6 +162,10 @@ pub fn string_err<S: Into<String>>(msg: S, obj: ObjectRef) -> ObjectRef {
     err(ErrKind::String, msg, obj)
 }
 
+pub fn type_err<S: Into<String>>(msg: S, obj: ObjectRef) -> ObjectRef {
+    err(ErrKind::Type, msg, obj)
+}
+
 static OK_ERR: Lazy<obj_ref_t!(ErrObj)> = Lazy::new(|| {
     obj_ref!(ErrObj::with_responds_to_bool(ErrKind::Ok, "".to_string(), nil()))
 });
