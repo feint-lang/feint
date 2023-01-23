@@ -113,13 +113,14 @@ impl VM {
 
     pub fn execute_module(&mut self, module: &Module, start: usize) -> VMExeResult {
         self.reset();
-        self.execute_code(Some(module), module.code(), start)
+        self.execute_code(&module, module.code(), start)
     }
 
     pub fn execute_func(&mut self, func: &Func, start: usize) -> VMExeResult {
         let module = func.module();
         let module = module.read().unwrap();
-        self.execute_code(module.down_to_mod(), func.code(), start)
+        let module = module.down_to_mod().unwrap();
+        self.execute_code(module, func.code(), start)
     }
 
     /// Execute the given code object's instructions and return the VM's
@@ -133,7 +134,7 @@ impl VM {
     /// instructions.
     pub fn execute_code(
         &mut self,
-        module: Option<&Module>,
+        module: &Module,
         code: &Code,
         mut ip: usize,
     ) -> VMExeResult {
@@ -1100,18 +1101,9 @@ impl VM {
     /// isn't found. First, try getting the var from the specified
     /// `module`'s globals (if a module was specified). Otherwise, fall
     /// back to the builtins.
-    fn push_temp_from_module_or_builtins(
-        &mut self,
-        name: &str,
-        module: Option<&Module>,
-    ) {
-        if let Some(module) = module {
-            if let Some(obj) = module.get_global(name) {
-                self.push_temp(obj);
-            } else {
-                let obj = self.ctx.get_builtin(name);
-                self.push_temp(obj);
-            }
+    fn push_temp_from_module_or_builtins(&mut self, name: &str, module: &Module) {
+        if let Some(obj) = module.get_global(name) {
+            self.push_temp(obj);
         } else {
             let obj = self.ctx.get_builtin(name);
             self.push_temp(obj);
