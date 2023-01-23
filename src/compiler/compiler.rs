@@ -323,7 +323,7 @@ impl Visitor {
         Self {
             initial_scope_kind,
             check_names,
-            code: Code::new(),
+            code: Code::default(),
             scope_tree: ScopeTree::new(initial_scope_kind),
             scope_depth: 0,
             func_nodes: vec![],

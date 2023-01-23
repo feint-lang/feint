@@ -57,7 +57,13 @@ impl Module {
     }
 
     pub fn with_name(name: &str, path: &str, doc: Option<&str>) -> Self {
-        Self::new(name.to_owned(), path.to_owned(), Namespace::new(), Code::new(), doc)
+        Self::new(
+            name.to_owned(),
+            path.to_owned(),
+            Namespace::new(),
+            Code::default(),
+            doc,
+        )
     }
 
     pub fn name(&self) -> &str {

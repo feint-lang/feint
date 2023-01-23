@@ -24,6 +24,12 @@ pub struct Code {
     free_vars: Vec<FreeVarEntry>,
 }
 
+impl Default for Code {
+    fn default() -> Self {
+        Code::new(vec![], vec![], vec![])
+    }
+}
+
 impl Index<usize> for Code {
     type Output = Inst;
 
@@ -55,17 +61,18 @@ impl PartialEq for Code {
 }
 
 impl Code {
-    #[allow(clippy::new_without_default)]
-    pub fn new() -> Self {
-        Self { chunk: vec![], constants: vec![], free_vars: vec![] }
+    pub fn new(
+        chunk: Vec<Inst>,
+        constants: Vec<ObjectRef>,
+        free_vars: Vec<FreeVarEntry>,
+    ) -> Self {
+        Self { chunk, constants, free_vars }
     }
 
     /// Initialize code object with a list of instructions, also known
     /// as a chunk.
     pub fn with_chunk(chunk: Vec<Inst>) -> Self {
-        let mut code = Code::new();
-        code.chunk.extend(chunk);
-        code
+        Self::new(chunk, vec![], vec![])
     }
 
     /// Extend this `Code` object with another `Code` object:

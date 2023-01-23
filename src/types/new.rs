@@ -94,7 +94,7 @@ pub fn builtin_module(
     ns: Namespace,
     doc: &str,
 ) -> obj_ref_t!(Module) {
-    obj_ref!(Module::new(name.into(), path.into(), ns, Code::new(), Some(doc)))
+    obj_ref!(Module::new(name.into(), path.into(), ns, Code::default(), Some(doc)))
 }
 
 pub fn cell() -> ObjectRef {
