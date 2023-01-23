@@ -216,7 +216,7 @@ pub fn int_from_string<S: Into<String>>(val: S) -> ObjectRef {
     } else if let Ok(val) = val.parse::<f64>() {
         int(BigInt::from_f64(val).unwrap())
     } else {
-        nil()
+        type_err("Could not convert string to Int", str(val))
     }
 }
 
