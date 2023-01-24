@@ -374,11 +374,11 @@ impl Executor {
 
     /// Find imports at the top level of the specified AST module.
     fn find_imports(&mut self, ast_module: &ast::Module) {
-        let mut visitor = ImportVisitor::new();
+        let mut visitor = ast::visitors::ImportVisitor::new();
         visitor.visit_module(ast_module);
-        for name in visitor.imports {
-            if !self.imports.contains(&name) {
-                self.imports.push_back(name);
+        for name in visitor.imports() {
+            if !self.imports.contains(name) {
+                self.imports.push_back(name.clone());
             }
         }
     }
@@ -665,35 +665,5 @@ impl Executor {
     fn display_vm_state(&self, result: &VMExeResult) {
         eprintln!("\n{:=<79}", "VM STATE ");
         eprintln!("{:?}", result);
-    }
-}
-
-/// Find import statements in module AST.
-///
-/// XXX: Currently, this only looks at top level statements... but
-///      perhaps import should only be allowed at the top level anyway?
-struct ImportVisitor {
-    imports: Vec<String>,
-}
-
-impl ImportVisitor {
-    fn new() -> Self {
-        Self { imports: vec![] }
-    }
-
-    fn visit_module(&mut self, node: &ast::Module) {
-        self.visit_statements(&node.statements)
-    }
-
-    fn visit_statements(&mut self, statements: &[ast::Statement]) {
-        statements.iter().for_each(|s| self.visit_statement(s));
-    }
-
-    fn visit_statement(&mut self, statement: &ast::Statement) {
-        if let ast::StatementKind::Import(name) = &statement.kind {
-            if !self.imports.contains(name) {
-                self.imports.push(name.to_owned());
-            }
-        }
     }
 }
