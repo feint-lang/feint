@@ -1,8 +1,10 @@
 "Args module"
 
+
 parse: Map = (
     program_name: Str,
     argv: List<Str>,
+    description: Str,
     spec: Map,
 ) =>
     "Parse args, such as `argv` from the command line.
@@ -11,6 +13,7 @@ parse: Map = (
 
     - program_name: The executable program name
     - argv: The args that were passed on the command line
+    - description: Description of program
     - spec: The arg spec
 
     # Returns
@@ -18,7 +21,7 @@ parse: Map = (
     A Map containing args or errors.
 
     "
-    help = spec.get("help")
+    add_help = spec.get("add_help") ?? true
 
     arg_specs = spec.get("args")
     option_specs = spec.get("options")
@@ -37,6 +40,9 @@ parse: Map = (
         it = flag_specs.iter()
         loop (spec = it.next()) $! nil ->
             flag_names.push(spec.get("name"))
+
+    if add_help ->
+        flag_names.push("help")
 
     # Extract args, options, and flags.
     it = argv.iter()
@@ -115,7 +121,12 @@ parse: Map = (
             result.add(name, val)
 
     if errors.is_empty ->
-        result
+        if flags.get("help") ->
+            print($"usage: {program_name}\n")
+            print(description)
+            nil
+        else ->
+            result
     else ->
         ess = if errors.length == 1 -> "" else -> "s"
         print_err($"{errors.length} error{ess} encountered while parsing args:\n")
