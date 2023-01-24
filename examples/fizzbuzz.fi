@@ -33,7 +33,8 @@ fizz_buzz: List<Str> = (start: Int, end: Int) =>
 
 
 $main = (...) =>
-    args = args.parse("fizz-buzz", $args, {
+    "Show FizzBuzz output for range"
+    args = args.parse("fizz-buzz", $args, $main.$doc, {
         "args": (
             {"name": "start", "type": Int, "default": 1},
             {"name": "end", "type": Int, "default": 100},

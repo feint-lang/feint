@@ -33,7 +33,8 @@ fib_match_slow = (n) =>
         * -> fib_match_slow(n - 1) + fib_match_slow(n - 2)
 
 $main = (...) =>
-    args = args.parse("fib", $args, {
+    "Find the Nth Fibonacci number"
+    args = args.parse("fib", $args, $main.$doc, {
         "args": (
             {"name": "n", "default": 30, "type": Int},
         ),
