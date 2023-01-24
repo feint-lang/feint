@@ -39,7 +39,12 @@ pub struct Compiler {
 
 impl Default for Compiler {
     fn default() -> Self {
-        Self::new(HashSet::default())
+        let mut global_names = HashSet::default();
+        global_names.insert("$full_name".to_owned());
+        global_names.insert("$name".to_owned());
+        global_names.insert("$path".to_owned());
+        global_names.insert("$doc".to_owned());
+        Self::new(global_names)
     }
 }
 

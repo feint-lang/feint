@@ -47,12 +47,10 @@ impl Module {
         ns.add_obj("$full_name", new::str(name.as_str()));
         ns.add_obj("$name", new::str(name.as_str()));
         ns.add_obj("$path", new::str(path.as_str()));
-        if let Some(doc) = doc {
-            ns.add_obj("$doc", new::str(doc));
-        } else {
-            let doc = code.get_doc();
-            ns.add_obj("$doc", doc);
-        }
+        ns.add_obj(
+            "$doc",
+            if let Some(doc) = doc { new::str(doc) } else { code.get_doc() },
+        );
         Self { ns, path, name, code }
     }
 
