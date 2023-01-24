@@ -1,29 +1,57 @@
-fizz_buzz = (end) =>
+import std.args
+
+
+fizz_buzz: List<Str> = (start: Int, end: Int) =>
     "FizzBuzz
 
-    Spec:
+    # Spec
 
-        Write a program that prints the numbers from 1 to 100. But for
-        multiples of three print 'Fizz' instead of the number and for
-        the multiples of five print 'Buzz'. For numbers which are
-        multiples of both three and five print 'FizzBuzz'.
+    Write a program that prints the numbers from 1 to 100. But for
+    multiples of three print 'Fizz' instead of the number and for the
+    multiples of five print 'Buzz'. For numbers which are multiples of
+    both three and five print 'FizzBuzz'.
 
     "
-    if end < 1 ->
-        print($"Expected end to be greater than 0; got {end}")
-        nil
+    if start < 1 ->
+        return Err.new(ErrType.arg, $"Expected start={start} to be >= 1")
+
+    if end < start ->
+        return Err.new(ErrType.arg, $"Expected end={end} to be >= start={start}")
+
+    collector = []
+
     i = 1
     loop i <= end ->
         result = if i % 15 == 0 -> "FizzBuzz"
         else if i % 3 == 0 -> "Fizz"
         else if i % 5 == 0 -> "Buzz"
-        else -> i
-        print(result)
+        else -> i.to_str
+        collector.push(result)
         i += 1
-    nil
+
+    collector
 
 
 $main = (...) =>
-    end = if $args.is_empty -> 100 else -> Int.new($args.0)
-    print($"Running FizzBuzz on numbers from 1 to {end}:")
-    fizz_buzz(end)
+    args = args.parse("fizz-buzz", $args, {
+        "args": (
+            {"name": "start", "type": Int, "default": 1},
+            {"name": "end", "type": Int, "default": 100},
+        )
+    })
+
+    if args.err ->
+        return 1
+
+    start = args.get("start")
+    end = args.get("end")
+
+    print($"Running FizzBuzz on numbers from {start} to {end}:")
+
+    result = fizz_buzz(start, end)
+
+    if result.err ->
+        print_err($"\nERROR: {result}")
+        return 2
+
+    result.each((item) => print(item))
