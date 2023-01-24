@@ -122,7 +122,7 @@ impl Executor {
         name: &str,
         base_module_ref: ObjectRef,
     ) -> Result<(), ExeErr> {
-        let module = self.load_module(name, true)?;
+        let module = self.load_module(name)?;
         let mut base_module = base_module_ref.write().unwrap();
         for (name, val) in module.iter_globals() {
             base_module.ns_mut().add_obj(name, val.clone());
@@ -141,7 +141,7 @@ impl Executor {
         self.current_file_name = "<repl>".to_owned();
         let source = &mut source_from_text(text);
         let ast_module = self.parse_source(source)?;
-        let mut compiler = Compiler::new(false);
+        let mut compiler = Compiler::new();
 
         // XXX: Nested scopes are necessary to avoid deadlock.
         let (start, comp_result) = {
@@ -314,7 +314,7 @@ impl Executor {
         source: &mut Source<T>,
     ) -> Result<Module, ExeErr> {
         let ast_module = self.parse_source(source)?;
-        let mut compiler = Compiler::new(true);
+        let mut compiler = Compiler::new();
         let module = compiler
             .compile_script(
                 name,
@@ -334,10 +334,9 @@ impl Executor {
         &mut self,
         name: &str,
         source: &mut Source<T>,
-        check_names: bool,
     ) -> Result<Module, ExeErr> {
         let ast_module = self.parse_source(source)?;
-        let mut compiler = Compiler::new(check_names);
+        let mut compiler = Compiler::new();
         let module = compiler
             .compile_module(name, self.current_file_name.as_str(), ast_module)
             .map_err(|err| {
@@ -375,12 +374,12 @@ impl Executor {
     }
 
     /// Load FeInt module from file system.
-    fn load_module(&mut self, name: &str, check_names: bool) -> Result<Module, ExeErr> {
+    fn load_module(&mut self, name: &str) -> Result<Module, ExeErr> {
         let mut segments = name.split('.');
 
         if let Some(first) = segments.next() {
             return if first == "std" {
-                self.load_builtin_module(name, check_names)
+                self.load_builtin_module(name)
             } else {
                 Err(ExeErr::new(ExeErrKind::ModuleNotFound(
                     format!("{name}: Only std modules are supported currently"),
@@ -394,15 +393,11 @@ impl Executor {
         // TODO: Load site or user module
     }
 
-    fn load_builtin_module(
-        &mut self,
-        name: &str,
-        check_names: bool,
-    ) -> Result<Module, ExeErr> {
+    fn load_builtin_module(&mut self, name: &str) -> Result<Module, ExeErr> {
         if let Some(bytes) = BUILTIN_MODULES.get(name) {
             self.set_current_file_name(Path::new(name));
             let mut source = source_from_bytes(bytes);
-            let mut module = self.compile_module(name, &mut source, check_names)?;
+            let mut module = self.compile_module(name, &mut source)?;
             self.execute_module(&module, 0, self.debug, &mut source)?;
             for (name, obj) in self.vm.ctx.globals().iter() {
                 module.add_global(name, obj.clone());
@@ -421,7 +416,7 @@ impl Executor {
             let modules = modules_guard.down_to_map().unwrap();
             if !modules.contains_key(&name) {
                 drop(modules_guard); // XXX: Prevent deadlock in recursive calls
-                let module = self.load_module(&name, true)?;
+                let module = self.load_module(&name)?;
                 let modules_write = modules_ref.write().unwrap();
                 let modules_write = modules_write.down_to_map().unwrap();
                 modules_write.add(&name, obj_ref!(module));

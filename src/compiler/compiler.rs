@@ -18,8 +18,6 @@ use super::scope::{Scope, ScopeKind, ScopeTree};
 // Compiler ------------------------------------------------------------
 
 pub struct Compiler {
-    // Check names at compile time.
-    check_names: bool,
     // The visitor stack is analogous to the VM call stack.
     visitor_stack: Stack<(Visitor, usize)>, // visitor, scope tree pointer
 }
@@ -36,8 +34,8 @@ struct CaptureInfo {
 }
 
 impl Compiler {
-    pub fn new(check_names: bool) -> Self {
-        Self { check_names, visitor_stack: Stack::new() }
+    pub fn new() -> Self {
+        Self { visitor_stack: Stack::new() }
     }
 
     /// Compile AST module node as script. This will check if the module
@@ -88,7 +86,7 @@ impl Compiler {
         module_name: &str,
         module: ast::Module,
     ) -> Result<Code, CompErr> {
-        let mut visitor = Visitor::for_module(module_name, self.check_names);
+        let mut visitor = Visitor::for_module(module_name);
         visitor.visit_module(module)?;
         let global_names = visitor.scope_tree.global_names();
         assert!(
@@ -136,7 +134,7 @@ impl Compiler {
         let stack = &mut self.visitor_stack;
         let params = node.params.clone();
 
-        let mut visitor = Visitor::for_func(func_name, self.check_names);
+        let mut visitor = Visitor::for_func(func_name);
         visitor.visit_func(node)?;
 
         // Unresolved names are assumed to be builtins.
@@ -211,19 +209,12 @@ impl Compiler {
             }
         }
 
-        // XXX: Avoid lock on BUILTINS when not checking names.
-        if self.check_names {
-            let builtins = BUILTINS.read().unwrap();
-            for (addr, name, start, end) in presumed_globals.into_iter() {
-                if global_names.contains(&name) || builtins.has_global(name.as_str()) {
-                    visitor.replace(addr, Inst::LoadOuterVar(name.to_owned()));
-                } else {
-                    return Err(CompErr::name_not_found(name, start, end));
-                }
-            }
-        } else {
-            for (addr, name, ..) in presumed_globals.into_iter() {
-                visitor.replace(addr, Inst::LoadOuterVar(name.to_owned()));
+        let builtins = BUILTINS.read().unwrap();
+        for (addr, name, start, end) in presumed_globals.into_iter() {
+            if global_names.contains(&name) || builtins.has_global(&name) {
+                visitor.replace(addr, Inst::LoadOuterVar(name));
+            } else {
+                return Err(CompErr::name_not_found(name, start, end));
             }
         }
 
@@ -305,7 +296,6 @@ type VisitResult = Result<(), CompErr>;
 pub struct Visitor {
     initial_scope_kind: ScopeKind,
     name: String,
-    check_names: bool,
     code: Code,
     scope_tree: ScopeTree,
     scope_depth: usize,
@@ -318,11 +308,10 @@ pub struct Visitor {
 }
 
 impl Visitor {
-    fn new(initial_scope_kind: ScopeKind, name: &str, check_names: bool) -> Self {
+    fn new(initial_scope_kind: ScopeKind, name: &str) -> Self {
         assert!(matches!(initial_scope_kind, ScopeKind::Module | ScopeKind::Func));
         Self {
             initial_scope_kind,
-            check_names,
             code: Code::default(),
             scope_tree: ScopeTree::new(initial_scope_kind),
             scope_depth: 0,
@@ -331,12 +320,12 @@ impl Visitor {
         }
     }
 
-    fn for_module(name: &str, check_names: bool) -> Self {
-        Self::new(ScopeKind::Module, name, check_names)
+    fn for_module(name: &str) -> Self {
+        Self::new(ScopeKind::Module, name)
     }
 
-    fn for_func(name: &str, check_names: bool) -> Self {
-        Self::new(ScopeKind::Func, name, check_names)
+    fn for_func(name: &str) -> Self {
+        Self::new(ScopeKind::Func, name)
     }
 
     // Entry Point Visitors --------------------------------------------
@@ -689,7 +678,7 @@ impl Visitor {
                 if self.scope_tree.find_var_in_parent(name.as_str()).is_some() {
                     self.push(Inst::LoadOuterVar(name));
                 } else if self.is_module() {
-                    if self.has_builtin(name.as_str()) || !self.check_names {
+                    if self.has_builtin(&name) {
                         self.push(Inst::LoadOuterVar(name));
                     } else {
                         return Err(CompErr::name_not_found(name, start, end));
@@ -704,7 +693,7 @@ impl Visitor {
             // When compiling a module, all vars should resolve at this
             // point, so if the name doesn't resolve to a builtin,
             // that's an error.
-            if self.has_builtin(name.as_str()) || !self.check_names {
+            if self.has_builtin(&name) {
                 self.push(Inst::LoadVar(name));
             } else {
                 return Err(CompErr::name_not_found(name, start, end));
