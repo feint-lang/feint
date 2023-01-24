@@ -94,6 +94,14 @@ impl Statement {
     pub fn new_expr(expr: Expr, start: Location, end: Location) -> Self {
         Self::new(StatementKind::Expr(expr), start, end)
     }
+
+    pub fn expr(&self) -> Option<&Expr> {
+        if let StatementKind::Expr(expr) = &self.kind {
+            Some(expr)
+        } else {
+            None
+        }
+    }
 }
 
 impl fmt::Debug for Statement {
@@ -321,6 +329,16 @@ impl Expr {
     }
 
     // Expression type checkers ----------------------------------------
+
+    pub fn assignment(&self) -> Option<(&Expr, &Expr)> {
+        if let ExprKind::DeclarationAndAssignment(left, right) = &self.kind {
+            Some((left, right))
+        } else if let ExprKind::Assignment(left, right) = &self.kind {
+            Some((left, right))
+        } else {
+            None
+        }
+    }
 
     /// Check if expression is ellipsis.
     pub fn is_ellipsis(&self) -> bool {
