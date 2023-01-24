@@ -55,6 +55,11 @@ impl RuntimeContext {
         }
     }
 
+    pub fn reset(&mut self) {
+        self.exit_all_scopes();
+        self.ns_stack[0].clear();
+    }
+
     // Vars ------------------------------------------------------------
 
     /// Declare a new var in the current namespace. This adds a slot for

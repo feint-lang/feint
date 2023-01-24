@@ -597,7 +597,7 @@ impl VM {
         self.scope_stack.truncate(0);
         self.value_stack.truncate(0);
         self.call_stack.truncate(0);
-        self.ctx.exit_all_scopes();
+        self.ctx.reset();
     }
 
     // Handlers --------------------------------------------------------
