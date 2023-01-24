@@ -51,13 +51,13 @@ impl Compiler {
         argv: &Vec<String>,
     ) -> CompResult {
         let mut code = self.compile_module_to_code(name, ast_module)?;
-        if code.has_main() {
+        if let Some(main_index) = code.main_index() {
             let argc = argv.len();
             for arg in argv {
                 let index = code.add_const(new::str(arg));
                 code.push_inst(Inst::LoadConst(index));
             }
-            code.push_inst(Inst::LoadVar("$main".to_string()));
+            code.push_inst(Inst::LoadConst(main_index));
             code.push_inst(Inst::Call(argc));
             code.push_inst(Inst::HaltTop);
         }

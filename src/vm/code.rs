@@ -189,15 +189,21 @@ impl Code {
         self.constants.iter()
     }
 
-    pub fn has_main(&self) -> bool {
-        self.constants.iter().any(|obj_ref| {
-            let obj = obj_ref.read().unwrap();
-            if let Some(func) = obj.down_to_func() {
-                func.name() == "$main"
-            } else {
-                false
-            }
-        })
+    pub fn main_index(&self) -> Option<usize> {
+        // XXX: Find from end in case $main was redefined.
+        // TODO: Don't allow $main to be redefined?
+        self.constants
+            .iter()
+            .rev()
+            .position(|obj_ref| {
+                let obj = obj_ref.read().unwrap();
+                if let Some(func) = obj.down_to_func() {
+                    func.name() == "$main"
+                } else {
+                    false
+                }
+            })
+            .map(|index| self.constants.len() - 1 - index)
     }
 
     // Vars ------------------------------------------------------------
