@@ -43,6 +43,12 @@ pub enum Inst {
     // and so on.
     LoadVar(String, usize),
 
+    // Load module global
+    LoadGlobal(String),
+
+    // Load builtin
+    LoadBuiltin(String),
+
     // These are analogous to AssignVar and LoadVar. Assignment wraps
     // the value in a cell so that it can be shared. Loading unwraps the
     // value.

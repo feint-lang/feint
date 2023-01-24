@@ -92,6 +92,8 @@ impl Disassembler {
             LoadVar(name, offset) => {
                 self.align("LOAD_VAR", format!("{name} @ -{offset}"))
             }
+            LoadGlobal(name) => self.align("LOAD_GLOBAL", name),
+            LoadBuiltin(name) => self.align("LOAD_BUILTIN", name),
             AssignCell(name) => self.align("ASSIGN_CELL", name),
             LoadCell(name) => self.align("LOAD_CELL", name),
             LoadCaptured(name) => self.align("LOAD_CAPTURED", name),

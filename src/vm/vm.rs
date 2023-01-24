@@ -229,6 +229,43 @@ impl VM {
                         )));
                     }
                 }
+                LoadGlobal(name) => {
+                    if let Some(obj) = module.get_global(name) {
+                        self.push_temp(obj);
+                    } else if let Some(obj) = self.ctx.globals().get_obj(name) {
+                        // XXX: This branch allows a global to refer to
+                        //      itself in certain situations, such as:
+                        //
+                        //          f = () => f()
+                        //          f()
+                        //
+                        //      Inside `f`, the recursive reference to
+                        //      `f` is looked up as a global, but at the
+                        //      point of execution `f` hasn't been
+                        //      attached to its module yet, so we can't
+                        //      look it up through the module's globals.
+                        //
+                        // In simpler cases of module level globals,
+                        // such as the following:
+                        //
+                        //     x = 1
+                        //     y = x + 1
+                        //
+                        // RHS `x` on the second line is looked up as a
+                        // var in the runtime context, so the module
+                        // doesn't need to be consulted (or have `x`
+                        // initialized as a global at this point).
+                        self.push_temp(obj);
+                    } else {
+                        return Err(RuntimeErr::name_err(format!(
+                            "Global not found: {name}"
+                        )));
+                    }
+                }
+                LoadBuiltin(name) => {
+                    let obj = self.ctx.get_builtin(name);
+                    self.push_temp(obj);
+                }
                 AssignCell(name) => {
                     // Store TOS value into cell. This is similar to
                     // AssignVar except that it wraps the TOS value in

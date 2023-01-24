@@ -211,8 +211,10 @@ impl Compiler {
 
         let builtins = BUILTINS.read().unwrap();
         for (addr, name, start, end) in presumed_globals.into_iter() {
-            if global_names.contains(&name) || builtins.has_global(&name) {
-                visitor.replace(addr, Inst::LoadVar(name, 0));
+            if global_names.contains(&name) {
+                visitor.replace(addr, Inst::LoadGlobal(name));
+            } else if builtins.has_global(&name) {
+                visitor.replace(addr, Inst::LoadBuiltin(name));
             } else {
                 return Err(CompErr::name_not_found(name, start, end));
             }
@@ -689,7 +691,7 @@ impl Visitor {
                     self.push(Inst::LoadVar(name, self.scope_depth - outer_var.depth));
                 } else if self.is_module() {
                     if self.has_builtin(&name) {
-                        self.push(Inst::LoadVar(name, 1));
+                        self.push(Inst::LoadBuiltin(name));
                     } else {
                         return Err(CompErr::name_not_found(name, start, end));
                     }
@@ -704,7 +706,7 @@ impl Visitor {
             // point, so if the name doesn't resolve to a builtin,
             // that's an error.
             if self.has_builtin(&name) {
-                self.push(Inst::LoadVar(name, 0));
+                self.push(Inst::LoadBuiltin(name));
             } else {
                 return Err(CompErr::name_not_found(name, start, end));
             }
