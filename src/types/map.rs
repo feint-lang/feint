@@ -151,6 +151,14 @@ pub static MAP_TYPE: Lazy<gen::obj_ref_t!(MapType)> = Lazy::new(|| {
                 Ok(result)
             }
         ),
+        gen::meth!("has", type_ref, &["member"], "", |this, args, _| {
+            let this = this.read().unwrap();
+            let this = this.down_to_map().unwrap();
+            let arg = gen::use_arg!(args, 0);
+            let key = gen::use_arg_str!(get, key, arg);
+            let result = this.contains_key(key);
+            Ok(new::bool(result))
+        }),
     ]);
 
     type_ref.clone()
