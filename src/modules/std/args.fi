@@ -120,13 +120,12 @@ parse: Map = (
                 nil -> false
             result.add(name, val)
 
-    if errors.is_empty ->
-        if flags.get("help") ->
-            print($"usage: {program_name}\n")
-            print(description)
-            nil
-        else ->
-            result
+    if flags.get("help") ->
+        print($"usage: {program_name}\n")
+        print(description)
+        nil
+    else if errors.is_empty ->
+        result
     else ->
         ess = if errors.length == 1 -> "" else -> "s"
         print_err($"{errors.length} error{ess} encountered while parsing args:\n")
