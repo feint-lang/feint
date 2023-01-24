@@ -1,6 +1,6 @@
 //! Front end for executing code from a source on a VM.
 use std::borrow::Cow;
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, VecDeque};
 use std::fs::canonicalize;
 use std::io::{BufRead, Read};
 use std::path::Path;
@@ -137,17 +137,17 @@ impl Executor {
     /// compiled all at once and executed as a script. In the REPL, code
     /// is compiled incrementally as it's entered, which makes it
     /// somewhat more complex to deal with.
-    pub fn execute_repl(&mut self, text: &str, module_ref: ObjectRef) -> ExeResult {
+    pub fn execute_repl(&mut self, text: &str, module: ObjectRef) -> ExeResult {
         self.current_file_name = "<repl>".to_owned();
 
         // XXX: Nested scopes are necessary to avoid deadlocks.
         let (start, global_names) = {
-            let module_read_guard = module_ref.read().unwrap();
-            let module_read = module_read_guard.down_to_mod().unwrap();
-            let start = module_read.code().len_chunk();
-            let global_names: HashSet<String> =
-                module_read.iter_globals().map(|(n, _)| n.clone()).collect();
-            (start, global_names)
+            let module = module.read().unwrap();
+            let module = module.down_to_mod().unwrap();
+            (
+                module.code().len_chunk(),
+                module.iter_globals().map(|(n, _)| n.clone()).collect(),
+            )
         };
 
         let source = &mut source_from_text(text);
@@ -179,22 +179,22 @@ impl Executor {
         }
 
         {
-            let mut module_write = module_ref.write().unwrap();
-            let module_write = module_write.down_to_mod_mut().unwrap();
-            module_write.code_mut().extend(code);
+            let mut module = module.write().unwrap();
+            let module = module.down_to_mod_mut().unwrap();
+            module.code_mut().extend(code);
         }
 
         let vm_state = {
-            let module_read_guard = module_ref.read().unwrap();
-            let module_read = module_read_guard.down_to_mod().unwrap();
-            self.execute_module(module_read, start, self.debug, source)?
+            let module = module.read().unwrap();
+            let module = module.down_to_mod().unwrap();
+            self.execute_module(module, start, self.debug, source)?
         };
 
         {
-            let mut module_write = module_ref.write().unwrap();
-            let module_write = module_write.down_to_mod_mut().unwrap();
+            let mut module = module.write().unwrap();
+            let module = module.down_to_mod_mut().unwrap();
             for (name, obj) in self.vm.ctx.globals().iter() {
-                module_write.add_global(name, obj.clone());
+                module.add_global(name, obj.clone());
             }
         }
 
