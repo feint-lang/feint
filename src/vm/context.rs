@@ -8,10 +8,15 @@ pub struct RuntimeContext {
     ns_stack: Vec<Namespace>,
 }
 
+impl Default for RuntimeContext {
+    fn default() -> Self {
+        Self::new(vec![Namespace::new()])
+    }
+}
+
 impl RuntimeContext {
-    #[allow(clippy::new_without_default)]
-    pub fn new() -> Self {
-        Self { ns_stack: vec![Namespace::new()] }
+    pub fn new(ns_stack: Vec<Namespace>) -> Self {
+        Self { ns_stack }
     }
 
     #[inline]

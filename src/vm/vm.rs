@@ -91,7 +91,7 @@ unsafe impl Sync for VM {}
 
 impl Default for VM {
     fn default() -> Self {
-        VM::new(RuntimeContext::new(), DEFAULT_MAX_CALL_DEPTH)
+        VM::new(RuntimeContext::default(), DEFAULT_MAX_CALL_DEPTH)
     }
 }
 

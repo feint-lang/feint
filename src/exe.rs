@@ -72,7 +72,7 @@ impl Executor {
         dis: bool,
         debug: bool,
     ) -> Self {
-        let vm = VM::new(RuntimeContext::new(), max_call_depth);
+        let vm = VM::new(RuntimeContext::default(), max_call_depth);
 
         Self {
             vm,
