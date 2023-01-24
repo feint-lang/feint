@@ -71,7 +71,10 @@ parse: Map = (
                 type = spec.get("type") ?? Str
                 val = args.get(i)
                 val = type.new(val)
-                result.add(name, val)
+                if val.err ->
+                    errors.add(name, val)
+                else ->
+                    result.add(name, val)
             else ->
                 default = spec.get("default")
                 required = spec.get("required")
@@ -87,13 +90,18 @@ parse: Map = (
         it = option_specs.iter()
         loop (spec = it.next()) $! nil ->
             name = spec.get("name")
+
             val = if options.has(name) ->
                 type = spec.get("type") ?? Str
                 val = options.get(name)
                 type.new(val)
             else ->
                 spec.get("default")
-            result.add(name, val)
+
+            if val.err ->
+                errors.add(name, val)
+            else ->
+                result.add(name, val)
 
     # Map flags
     if flag_specs $! nil ->
@@ -110,7 +118,6 @@ parse: Map = (
         result
     else ->
         ess = if errors.length == 1 -> "" else -> "s"
-        print_err($"{errors.length} error{ess} encountered while parsing args\n")
-        argv.each((arg) => print_err(arg))
+        print_err($"{errors.length} error{ess} encountered while parsing args:\n")
         errors.each((name, err) => print_err($"{name}: {err.message}"))
         Err.new(ErrType.arg, "")
