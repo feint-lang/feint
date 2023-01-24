@@ -4,36 +4,22 @@ use std::sync::{Arc, RwLock};
 use once_cell::sync::Lazy;
 
 use crate::types::gen::obj_ref_t;
-use crate::types::{new, Module, Namespace, ObjectRef, ObjectTrait};
+use crate::types::{new, Module, ObjectRef, ObjectTrait};
 use crate::vm::RuntimeErr;
 
 pub static SYSTEM: Lazy<obj_ref_t!(Module)> = Lazy::new(|| {
-    let entries: Vec<(&str, ObjectRef)> = vec![
-        ("argv", new::empty_tuple()),
-        (
-            "modules",
-            new::map(vec![
-                (
-                    "std".to_owned(),
-                    new::builtin_module(
-                        "std",
-                        "std",
-                        Namespace::default(),
-                        "std module",
-                    ),
-                ),
-                ("std.builtins".to_owned(), super::builtins::BUILTINS.clone()),
-                ("std.system".to_owned(), new::nil()),
-                ("std.proc".to_owned(), super::proc::PROC.clone()),
-            ]),
-        ),
-    ];
+    let modules = new::map(vec![
+        ("std".to_owned(), new::builtin_module("std", "std", "std module", &[])),
+        ("std.builtins".to_owned(), super::builtins::BUILTINS.clone()),
+        ("std.system".to_owned(), new::nil()),
+        ("std.proc".to_owned(), super::proc::PROC.clone()),
+    ]);
 
     new::builtin_module(
         "std.system",
         "std.system",
-        Namespace::with_entries(&entries),
         "std.system module",
+        &[("argv", new::empty_tuple()), ("modules", modules)],
     )
 });
 

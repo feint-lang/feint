@@ -10,7 +10,8 @@ pub static BUILTINS: Lazy<types::gen::obj_ref_t!(types::module::Module)> =
         types::new::builtin_module(
             "std.builtins",
             "std.builtins",
-            types::ns::Namespace::with_entries(&[
+            "std.builtins module",
+            &[
                 ("Type", types::class::TYPE_TYPE.clone()),
                 ("Always", types::always::ALWAYS_TYPE.clone()),
                 ("Bool", types::bool::BOOL_TYPE.clone()),
@@ -30,7 +31,6 @@ pub static BUILTINS: Lazy<types::gen::obj_ref_t!(types::module::Module)> =
                 ("Nil", types::nil::NIL_TYPE.clone()),
                 ("Str", types::str::STR_TYPE.clone()),
                 ("Tuple", types::tuple::TUPLE_TYPE.clone()),
-            ]),
-            "Builtins module",
+            ],
         )
     });

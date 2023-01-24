@@ -5,7 +5,7 @@ use std::fmt::Formatter;
 use crate::ast;
 use crate::modules::std::BUILTINS;
 use crate::source::Location;
-use crate::types::{new, Module, Namespace, ObjectRef};
+use crate::types::{new, Module, ObjectRef};
 use crate::util::{
     BinaryOperator, CompareOperator, InplaceOperator, ShortCircuitCompareOperator,
     Stack, UnaryCompareOperator, UnaryOperator,
@@ -74,13 +74,7 @@ impl Compiler {
             code.push_inst(Inst::Call(argc));
             code.push_inst(Inst::HaltTop);
         }
-        Ok(Module::new(
-            name.to_owned(),
-            file_name.to_owned(),
-            Namespace::default(),
-            code,
-            None,
-        ))
+        Ok(Module::new(name.to_owned(), file_name.to_owned(), code, None))
     }
 
     /// Compile AST module node to module object.
@@ -91,8 +85,7 @@ impl Compiler {
         ast_module: ast::Module,
     ) -> CompResult {
         let code = self.compile_module_to_code(name, ast_module)?;
-        let ns = Namespace::default();
-        Ok(Module::new(name.to_owned(), file_name.to_owned(), ns, code, None))
+        Ok(Module::new(name.to_owned(), file_name.to_owned(), code, None))
     }
 
     /// Compile AST module node to code object.

@@ -109,12 +109,8 @@ mod custom {
 
     #[test]
     fn test_custom() {
-        let mod1 = new::builtin_module(
-            "test1",
-            "<test1>",
-            Namespace::default(),
-            "test module 1",
-        );
+        let mod1 = new::builtin_module("test1", "<test1>", "test module 1", &[]);
+        let mod2 = new::builtin_module("test2", "<test2>", "test module 2", &[]);
 
         let t1 = new::custom_type(mod1, "Custom1");
 
@@ -140,13 +136,6 @@ mod custom {
         check_ok(result, "Could not set `value` on t1_obj3");
         check_attr(t1_obj3.clone(), "value");
         check_attr_eq(t1_obj3.clone(), "value", new::int(1));
-
-        let mod2 = new::builtin_module(
-            "test2",
-            "<test2>",
-            Namespace::default(),
-            "test module 2",
-        );
 
         let t2 = new::custom_type(mod2, "Custom2");
         let t2_obj1 = new::custom_instance(t2, Namespace::default());

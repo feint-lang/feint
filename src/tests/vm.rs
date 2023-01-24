@@ -1,4 +1,4 @@
-use crate::types::{new, Module, Namespace};
+use crate::types::{new, Module};
 use crate::util::BinaryOperator;
 use crate::vm::*;
 
@@ -11,13 +11,7 @@ fn execute_simple_program() {
     ]);
     code.add_const(new::int(1));
     code.add_const(new::int(2));
-    let module = Module::new(
-        "test".to_owned(),
-        "test".to_owned(),
-        Namespace::default(),
-        code,
-        None,
-    );
+    let module = Module::new("test".to_owned(), "test".to_owned(), code, None);
     let mut vm = VM::default();
     assert!(matches!(vm.execute_module(&module, 0), Ok(())));
     assert!(matches!(vm.state, VMState::Idle(Some(_))));

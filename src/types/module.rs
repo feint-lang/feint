@@ -20,12 +20,12 @@ gen::type_and_impls!(ModuleType, Module);
 pub static MODULE_TYPE: Lazy<gen::obj_ref_t!(ModuleType)> =
     Lazy::new(|| gen::obj_ref!(ModuleType::new()));
 
-// Module Object ----------------------------------------------------------
+// Module Object -------------------------------------------------------
 
 pub struct Module {
+    ns: Namespace,
     name: String,
     path: String,
-    ns: Namespace,
     code: Code,
 }
 
@@ -37,31 +37,26 @@ impl Module {
     ///       the REPL module. Modules implemented in FeInt will have
     ///       their `$doc` attribute initialized from their module level
     ///       docstring.
-    pub fn new(
-        name: String,
-        path: String,
-        mut ns: Namespace,
-        code: Code,
-        doc: Option<&str>,
-    ) -> Self {
-        ns.add_obj("$full_name", new::str(name.as_str()));
-        ns.add_obj("$name", new::str(name.as_str()));
-        ns.add_obj("$path", new::str(path.as_str()));
-        ns.add_obj(
-            "$doc",
-            if let Some(doc) = doc { new::str(doc) } else { code.get_doc() },
-        );
+    pub fn new(name: String, path: String, code: Code, doc: Option<String>) -> Self {
+        let ns = Namespace::with_entries(&[
+            ("$full_name", new::str(name.as_str())),
+            ("$name", new::str(name.as_str())),
+            ("$path", new::str(path.as_str())),
+            ("$doc", if let Some(doc) = doc { new::str(doc) } else { code.get_doc() }),
+        ]);
         Self { ns, path, name, code }
     }
 
-    pub fn with_name(name: &str, path: &str, doc: Option<&str>) -> Self {
-        Self::new(
-            name.to_owned(),
-            path.to_owned(),
-            Namespace::default(),
-            Code::default(),
-            doc,
-        )
+    pub fn with_entries(
+        entries: &[(&str, ObjectRef)],
+        name: String,
+        path: String,
+        code: Code,
+        doc: Option<String>,
+    ) -> Self {
+        let mut module = Self::new(name, path, code, doc);
+        module.ns.add_entries(entries);
+        module
     }
 
     pub fn name(&self) -> &str {

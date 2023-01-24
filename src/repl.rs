@@ -10,7 +10,7 @@ use crate::exe::Executor;
 use crate::parser::ParseErrKind;
 use crate::result::{ExeErr, ExeErrKind, ExeResult};
 use crate::scanner::ScanErrKind;
-use crate::types::{new, Namespace, ObjectRef, ObjectTrait};
+use crate::types::{new, ObjectRef, ObjectTrait};
 use crate::vm::VMState;
 
 pub struct Repl {
@@ -22,12 +22,7 @@ pub struct Repl {
 
 impl Repl {
     pub fn new(history_path: Option<PathBuf>, executor: Executor) -> Self {
-        let module = new::builtin_module(
-            "$repl",
-            "$repl",
-            Namespace::default(),
-            "FeInt REPL module",
-        );
+        let module = new::builtin_module("$repl", "$repl", "FeInt REPL module", &[]);
         let mut reader =
             rustyline::Editor::<()>::new().expect("Could initialize readline");
         reader.set_indent_size(4);
