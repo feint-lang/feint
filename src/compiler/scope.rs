@@ -119,6 +119,10 @@ impl ScopeTree {
         &mut self.storage[self.pointer]
     }
 
+    fn depth(&self) -> usize {
+        self.scope_depth(self.current())
+    }
+
     /// Add nested scope to current scope then make the new scope the
     /// current scope.
     pub fn add(&mut self, kind: ScopeKind) -> usize {
@@ -136,7 +140,8 @@ impl ScopeTree {
         let name = name.into();
         let pointer = self.pointer;
         if !self.get(pointer).vars.iter().any(|v| v.name == name) {
-            self.current_mut().vars.push(Var { addr, pointer, name, assigned });
+            let depth = self.depth();
+            self.current_mut().vars.push(Var { addr, pointer, name, assigned, depth });
         }
     }
 
@@ -177,11 +182,12 @@ impl ScopeTree {
     }
 
     /// Find var in parent scope or any of its ancestor scopes.
-    pub fn find_var_in_parent(&self, name: &str) -> Option<Var> {
-        if self.pointer == 0 {
-            None
+    pub fn find_var_in_parent(&self, var: &Var) -> Option<Var> {
+        let var_scope = self.get(var.pointer);
+        if let Some(pointer) = var_scope.parent {
+            self.find_var(&var.name, Some(pointer))
         } else {
-            self.find_var(name, Some(self.pointer - 1))
+            None
         }
     }
 
@@ -215,6 +221,7 @@ pub struct Var {
     pub pointer: usize,
     pub name: String,
     pub assigned: bool,
+    pub depth: usize,
 }
 
 #[derive(Debug)]

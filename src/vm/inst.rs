@@ -35,8 +35,13 @@ pub enum Inst {
 
     DeclareVar(String),
     AssignVar(String),
-    LoadVar(String),
-    LoadOuterVar(String),
+
+    // Args: name, offset
+    //
+    // `offset` is the number of scopes above the current scope to start
+    // the search. 0 means the current scope, 1 means the parent scope,
+    // and so on.
+    LoadVar(String, usize),
 
     // These are analogous to AssignVar and LoadVar. Assignment wraps
     // the value in a cell so that it can be shared. Loading unwraps the
@@ -161,8 +166,7 @@ impl PartialEq for Inst {
             (LoadConst(a), LoadConst(b)) => a == b,
             (DeclareVar(a), DeclareVar(b)) => a == b,
             (AssignVar(a), AssignVar(b)) => a == b,
-            (LoadVar(a), LoadVar(b)) => a == b,
-            (LoadOuterVar(a), LoadOuterVar(b)) => a == b,
+            (LoadVar(a, i), LoadVar(b, j)) => (a, i) == (b, j),
             (AssignCell(a), AssignCell(b)) => a == b,
             (LoadCell(a), LoadCell(b)) => a == b,
             (LoadCaptured(a), LoadCaptured(b)) => a == b,

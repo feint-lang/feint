@@ -188,7 +188,7 @@ impl Compiler {
                                 Inst::AssignVar(n) if n == name => {
                                     info.cell_var_assignments.push(addr);
                                 }
-                                Inst::LoadVar(n) if n == name => {
+                                Inst::LoadVar(n, 0) if n == name => {
                                     info.cell_var_loads.push(addr);
                                 }
                                 _ => (),
@@ -212,7 +212,7 @@ impl Compiler {
         let builtins = BUILTINS.read().unwrap();
         for (addr, name, start, end) in presumed_globals.into_iter() {
             if global_names.contains(&name) || builtins.has_global(&name) {
-                visitor.replace(addr, Inst::LoadOuterVar(name));
+                visitor.replace(addr, Inst::LoadVar(name, 0));
             } else {
                 return Err(CompErr::name_not_found(name, start, end));
             }
@@ -666,20 +666,30 @@ impl Visitor {
         //       function. It will NOT proceed up into a function's
         //       enclosing scope, whether that's an outer function or
         //       a module.
-
-        if let Some(var) = self.scope_tree.find_var(name.as_str(), None) {
+        if let Some(var) = self.scope_tree.find_var(&name, None) {
             if var.assigned {
-                self.push(Inst::LoadVar(name));
+                self.push(Inst::LoadVar(name, self.scope_depth - var.depth));
             } else {
-                // This happens with assignments of the form `x = x`
-                // where `x` isn't already defined in the current scope.
-                // In this case the RHS `x` must be defined in an outer
-                // scope.
-                if self.scope_tree.find_var_in_parent(name.as_str()).is_some() {
-                    self.push(Inst::LoadOuterVar(name));
+                // This happens whenever an identifier appears on both
+                // sides of an assignment, e.g. `x = x`, where the LHS
+                // `x` has been declared by the assignment statement but
+                // hasn't yet been assigned (there's a kind of dead zone
+                // between declaration and assignment).
+                //
+                // Initially, the lookup of `x` on the RHS will find LHS
+                // `x`, but RHS `x` actually refers to `x` in an outer
+                // scope relative to the LHS `x`.
+                //
+                // In the simple `x = x` case, we can just search in the
+                // parent of the current scope, but in more complex
+                // cases, we have to ensure we search in the parent
+                // scope of LHS `x`, which could be multiple levels up
+                // from RHS `x`.
+                if let Some(outer_var) = self.scope_tree.find_var_in_parent(&var) {
+                    self.push(Inst::LoadVar(name, self.scope_depth - outer_var.depth));
                 } else if self.is_module() {
                     if self.has_builtin(&name) {
-                        self.push(Inst::LoadOuterVar(name));
+                        self.push(Inst::LoadVar(name, 1));
                     } else {
                         return Err(CompErr::name_not_found(name, start, end));
                     }
@@ -694,7 +704,7 @@ impl Visitor {
             // point, so if the name doesn't resolve to a builtin,
             // that's an error.
             if self.has_builtin(&name) {
-                self.push(Inst::LoadVar(name));
+                self.push(Inst::LoadVar(name, 0));
             } else {
                 return Err(CompErr::name_not_found(name, start, end));
             }
@@ -832,7 +842,7 @@ impl Visitor {
             self.visit_declaration(*lhs.clone())?;
             self.visit_assignment(*lhs, *val)?;
             let loop_addr = self.len();
-            self.push(Inst::LoadVar(name));
+            self.push(Inst::LoadVar(name, 0));
             loop_addr
         } else {
             let loop_addr = self.len();

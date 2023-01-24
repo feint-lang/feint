@@ -113,7 +113,7 @@ impl VM {
 
     pub fn execute_module(&mut self, module: &Module, start: usize) -> VMExeResult {
         self.reset();
-        self.execute_code(&module, module.code(), start)
+        self.execute_code(module, module.code(), start)
     }
 
     pub fn execute_func(&mut self, func: &Func, start: usize) -> VMExeResult {
@@ -220,18 +220,13 @@ impl VM {
                     let depth = self.ctx.assign_var(name, obj)?;
                     self.push_var(depth, name.clone())?;
                 }
-                LoadVar(name) => {
-                    if let Ok(depth) = self.ctx.get_var_depth(name.as_str(), None) {
+                LoadVar(name, offset) => {
+                    if let Ok(depth) = self.ctx.get_var_depth(name, *offset) {
                         self.push_var(depth, name.clone())?;
                     } else {
-                        self.push_temp_from_module_or_builtins(name, module);
-                    }
-                }
-                LoadOuterVar(name) => {
-                    if let Ok(depth) = self.ctx.get_outer_var_depth(name.as_str()) {
-                        self.push_var(depth, name.clone())?;
-                    } else {
-                        self.push_temp_from_module_or_builtins(name, module);
+                        return Err(RuntimeErr::name_err(format!(
+                            "Var not found: {name}"
+                        )));
                     }
                 }
                 AssignCell(name) => {
@@ -240,7 +235,7 @@ impl VM {
                     // a cell before storing it as var.
                     let value = self.pop_obj()?;
                     // Get the var, which might not already be a cell.
-                    let var_ref = self.ctx.get_var(name.as_str())?;
+                    let var_ref = self.ctx.get_var(name, 0)?;
                     let mut var = var_ref.write().unwrap();
                     let depth = if let Some(cell) = var.down_to_cell_mut() {
                         // Wrap TOS in existing cell.
@@ -260,7 +255,7 @@ impl VM {
                     // LoadVar except that it unwraps the value from the
                     // retrieved cell.
                     log::trace!("LOAD CELL: {name}");
-                    let depth = self.ctx.get_var_depth(name.as_str(), None)?;
+                    let depth = self.ctx.get_var_depth(name, 0)?;
                     let cell = self.ctx.get_var_at_depth(depth, name.as_str())?;
                     let cell = cell.read().unwrap();
                     let cell =
@@ -390,7 +385,7 @@ impl VM {
                     let mut entries = vec![];
                     for name in names.iter() {
                         log::trace!("GETTING CAPTURED: {name}");
-                        if let Ok(var_ref) = self.ctx.get_var(name) {
+                        if let Ok(var_ref) = self.ctx.get_var(name, 0) {
                             // Capture cell already exists.
                             let var = var_ref.read().unwrap();
                             if var.is_cell() {
@@ -623,7 +618,7 @@ impl VM {
                     // or isn't an index--the original attr err will be
                     // returned.
                     if result.read().unwrap().is_err() && (a.is_seq()) {
-                        let i = self.ctx.get_var(name);
+                        let i = self.ctx.get_var(name, 0);
                         if let Ok(i) = i {
                             let i = i.read().unwrap();
                             if let Some(i) = i.get_usize_val() {
@@ -1095,19 +1090,6 @@ impl VM {
             self.push(ValueStackKind::Var(obj_ref.clone(), depth, name));
         }
         Ok(())
-    }
-
-    /// This is the fallback when loading a var fails because `name`
-    /// isn't found. First, try getting the var from the specified
-    /// `module`'s globals (if a module was specified). Otherwise, fall
-    /// back to the builtins.
-    fn push_temp_from_module_or_builtins(&mut self, name: &str, module: &Module) {
-        if let Some(obj) = module.get_global(name) {
-            self.push_temp(obj);
-        } else {
-            let obj = self.ctx.get_builtin(name);
-            self.push_temp(obj);
-        }
     }
 
     fn push_temp(&mut self, obj: ObjectRef) {

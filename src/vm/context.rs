@@ -110,11 +110,10 @@ impl RuntimeContext {
     pub fn get_var_depth(
         &self,
         name: &str,
-        starting_depth: Option<usize>,
+        offset: usize,
     ) -> Result<usize, RuntimeErr> {
         let ns_stack = &self.ns_stack;
-        let mut var_depth =
-            if let Some(depth) = starting_depth { depth } else { self.current_depth() };
+        let mut var_depth = self.current_depth() - offset;
         loop {
             if ns_stack[var_depth].get_obj(name).is_some() {
                 break Ok(var_depth);
@@ -129,12 +128,28 @@ impl RuntimeContext {
 
     /// Get depth of namespace where outer var is defined (skips current
     /// namespace, starts search from parent namespace).
-    pub fn get_outer_var_depth(&self, name: &str) -> Result<usize, RuntimeErr> {
-        if self.current_depth() == 0 {
+    pub fn get_outer_var_depth(
+        &self,
+        name: &str,
+        depth_offset: usize,
+    ) -> Result<usize, RuntimeErr> {
+        let ns_stack = &self.ns_stack;
+        let current_depth = self.current_depth();
+        if depth_offset >= current_depth {
             let message = format!("Name not found: {name}");
             return Err(RuntimeErr::name_err(message));
         }
-        self.get_var_depth(name, Some(self.current_depth() - 1))
+        let mut var_depth = current_depth - depth_offset;
+        loop {
+            if ns_stack[var_depth].get_obj(name).is_some() {
+                break Ok(var_depth);
+            }
+            if var_depth == 0 {
+                let message = format!("Name not found: {name}");
+                break Err(RuntimeErr::name_err(message));
+            }
+            var_depth -= 1;
+        }
     }
 
     /// Get var from current namespace.
@@ -159,8 +174,8 @@ impl RuntimeContext {
     }
 
     /// Get var in current namespace or any ancestor namespace.
-    pub fn get_var(&self, name: &str) -> RuntimeObjResult {
-        let depth = self.get_var_depth(name, None)?;
+    pub fn get_var(&self, name: &str, offset: usize) -> RuntimeObjResult {
+        let depth = self.get_var_depth(name, offset)?;
         self.get_var_at_depth(depth, name)
     }
 

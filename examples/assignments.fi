@@ -1,0 +1,47 @@
+import std.args
+
+
+x = 1
+assert(x == 1, "", true)
+
+block ->
+    x = x
+    assert(x == 1, "", true)
+
+x = if x $$ nil -> "default" else -> "x"
+assert(x == "x", "", true)
+
+
+f = () =>
+    y = "y"
+
+    block ->
+        y = y
+        assert(y == "y", "", true)
+
+    block ->
+        y = if y $$ nil -> "default" else -> y
+        assert(y == "y", "", true)
+
+    g = () =>
+        block ->
+            y = y
+            assert(y == "y", "", true)
+
+        block ->
+            block ->
+                y = if y $$ nil -> "default" else -> y
+                assert(y == "y", "", true)
+
+
+$main = (...) =>
+    assert(x == "x", "", true)
+
+    block ->
+        x = x
+        assert(x == "x", "", true)
+
+    x = if x $$ nil -> "default" else -> x
+    assert(x == "x", "", true)
+
+    f()()

@@ -89,8 +89,9 @@ impl Disassembler {
             }
             DeclareVar(name) => self.align("DECLARE_VAR", name),
             AssignVar(name) => self.align("ASSIGN_VAR", name),
-            LoadVar(name) => self.align("LOAD_VAR", name),
-            LoadOuterVar(name) => self.align("LOAD_OUTER_VAR", name),
+            LoadVar(name, offset) => {
+                self.align("LOAD_VAR", format!("{name} @ -{offset}"))
+            }
             AssignCell(name) => self.align("ASSIGN_CELL", name),
             LoadCell(name) => self.align("LOAD_CELL", name),
             LoadCaptured(name) => self.align("LOAD_CAPTURED", name),
