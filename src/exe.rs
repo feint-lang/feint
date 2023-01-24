@@ -178,19 +178,27 @@ impl Executor {
             panic!("Expected module chunk to end with POP; got {}", last_inst);
         }
 
-        // XXX: Rather than extending the module's code object, perhaps
-        //      it would be better to compile INTO the existing module.
-        //      This would required passing the module or its code obj
-        //      into the compiler.
         {
             let mut module_write = module_ref.write().unwrap();
             let module_write = module_write.down_to_mod_mut().unwrap();
             module_write.code_mut().extend(code);
         }
 
-        let module_read_guard = module_ref.read().unwrap();
-        let module_read = module_read_guard.down_to_mod().unwrap();
-        self.execute_module(module_read, start, self.debug, source)
+        let vm_state = {
+            let module_read_guard = module_ref.read().unwrap();
+            let module_read = module_read_guard.down_to_mod().unwrap();
+            self.execute_module(module_read, start, self.debug, source)?
+        };
+
+        {
+            let mut module_write = module_ref.write().unwrap();
+            let module_write = module_write.down_to_mod_mut().unwrap();
+            for (name, obj) in self.vm.ctx.globals().iter() {
+                module_write.add_global(name, obj.clone());
+            }
+        }
+
+        Ok(vm_state)
     }
 
     /// Execute source from file as script.
