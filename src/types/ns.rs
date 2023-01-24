@@ -4,25 +4,30 @@ use indexmap::IndexMap;
 
 use super::base::ObjectRef;
 
-pub type NamespaceObjects = IndexMap<String, ObjectRef>;
+pub type Objects = IndexMap<String, ObjectRef>;
 
 /// A namespace is a container for object attributes. Note that the
 /// `Namespace` type is not a *system* type.
 pub struct Namespace {
-    objects: NamespaceObjects,
+    objects: Objects,
 }
 
 unsafe impl Send for Namespace {}
 unsafe impl Sync for Namespace {}
 
+impl Default for Namespace {
+    fn default() -> Self {
+        Self::new(IndexMap::default())
+    }
+}
+
 impl Namespace {
-    #[allow(clippy::new_without_default)]
-    pub fn new() -> Self {
-        Self { objects: IndexMap::new() }
+    pub fn new(objects: Objects) -> Self {
+        Self { objects }
     }
 
     pub fn with_entries(entries: &[(&str, ObjectRef)]) -> Self {
-        let mut ns = Self::new();
+        let mut ns = Self::default();
         ns.add_entries(entries);
         ns
     }

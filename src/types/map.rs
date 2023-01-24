@@ -167,7 +167,7 @@ gen::standard_object_impls!(Map);
 
 impl Map {
     pub fn new(entries: IndexMap<String, ObjectRef>) -> Self {
-        Self { ns: Namespace::new(), entries: RwLock::new(entries) }
+        Self { ns: Namespace::default(), entries: RwLock::new(entries) }
     }
 
     pub fn len(&self) -> usize {

@@ -109,7 +109,7 @@ gen::standard_object_impls!(ErrTypeObj);
 
 impl ErrTypeObj {
     pub fn new(kind: ErrKind) -> Self {
-        Self { ns: Namespace::new(), kind }
+        Self { ns: Namespace::default(), kind }
     }
 
     pub fn kind(&self) -> &ErrKind {

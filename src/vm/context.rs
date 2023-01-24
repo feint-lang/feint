@@ -10,7 +10,7 @@ pub struct RuntimeContext {
 
 impl Default for RuntimeContext {
     fn default() -> Self {
-        Self::new(vec![Namespace::new()])
+        Self::new(vec![Namespace::default()])
     }
 }
 
@@ -38,7 +38,7 @@ impl RuntimeContext {
     }
 
     pub fn enter_scope(&mut self) {
-        self.ns_stack.push(Namespace::new());
+        self.ns_stack.push(Namespace::default());
     }
 
     pub fn exit_scope(&mut self) {

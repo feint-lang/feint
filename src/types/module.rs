@@ -60,7 +60,7 @@ impl Module {
         Self::new(
             name.to_owned(),
             path.to_owned(),
-            Namespace::new(),
+            Namespace::default(),
             Code::default(),
             doc,
         )

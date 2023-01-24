@@ -31,7 +31,7 @@ gen::standard_object_impls!(Nil);
 impl Nil {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
-        Self { ns: Namespace::new() }
+        Self { ns: Namespace::default() }
     }
 }
 

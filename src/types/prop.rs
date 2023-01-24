@@ -31,7 +31,7 @@ gen::standard_object_impls!(Prop);
 
 impl Prop {
     pub fn new(getter: ObjectRef) -> Self {
-        Self { ns: Namespace::new(), getter }
+        Self { ns: Namespace::default(), getter }
     }
 
     pub fn getter(&self) -> ObjectRef {

@@ -29,7 +29,7 @@ gen::standard_object_impls!(Always);
 impl Always {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
-        Self { ns: Namespace::new() }
+        Self { ns: Namespace::default() }
     }
 }
 

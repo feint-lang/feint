@@ -32,7 +32,7 @@ gen::standard_object_impls!(Cell);
 impl Cell {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
-        Self { ns: Namespace::new(), value: new::nil() }
+        Self { ns: Namespace::default(), value: new::nil() }
     }
 
     pub fn with_value(value: ObjectRef) -> Self {

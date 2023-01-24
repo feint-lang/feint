@@ -62,7 +62,7 @@ impl Compiler {
         Ok(Module::new(
             name.to_owned(),
             file_name.to_owned(),
-            Namespace::new(),
+            Namespace::default(),
             code,
             None,
         ))
@@ -76,7 +76,7 @@ impl Compiler {
         ast_module: ast::Module,
     ) -> CompResult {
         let code = self.compile_module_to_code(name, ast_module)?;
-        let ns = Namespace::new();
+        let ns = Namespace::default();
         Ok(Module::new(name.to_owned(), file_name.to_owned(), ns, code, None))
     }
 

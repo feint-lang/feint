@@ -142,7 +142,7 @@ gen::standard_object_impls!(List);
 
 impl List {
     pub fn new(items: Vec<ObjectRef>) -> Self {
-        Self { ns: Namespace::new(), items: RwLock::new(items) }
+        Self { ns: Namespace::default(), items: RwLock::new(items) }
     }
 
     pub fn len(&self) -> usize {

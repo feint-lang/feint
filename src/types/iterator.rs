@@ -48,7 +48,7 @@ gen::standard_object_impls!(FIIterator);
 
 impl FIIterator {
     pub fn new(wrapped: Vec<ObjectRef>) -> Self {
-        Self { ns: Namespace::new(), wrapped, current: 0 }
+        Self { ns: Namespace::default(), wrapped, current: 0 }
     }
 
     fn next(&mut self) -> ObjectRef {

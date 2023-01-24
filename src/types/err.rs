@@ -113,7 +113,7 @@ impl ErrObj {
     pub fn new(kind: ErrKind, message: String, obj: ObjectRef) -> Self {
         let bool_val = kind != ErrKind::Ok;
         Self {
-            ns: Namespace::new(),
+            ns: Namespace::default(),
             kind,
             message,
             obj,

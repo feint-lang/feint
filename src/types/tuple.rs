@@ -107,7 +107,7 @@ gen::standard_object_impls!(Tuple);
 
 impl Tuple {
     pub fn new(items: Vec<ObjectRef>) -> Self {
-        Self { ns: Namespace::new(), items }
+        Self { ns: Namespace::default(), items }
     }
 
     pub fn iter(&self) -> Iter<'_, ObjectRef> {

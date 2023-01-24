@@ -25,7 +25,7 @@ impl Repl {
         let module = new::builtin_module(
             "$repl",
             "$repl",
-            Namespace::new(),
+            Namespace::default(),
             "FeInt REPL module",
         );
         let mut reader =

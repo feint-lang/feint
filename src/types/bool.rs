@@ -31,7 +31,7 @@ gen::standard_object_impls!(Bool);
 
 impl Bool {
     pub fn new(value: bool) -> Self {
-        Self { ns: Namespace::new(), value }
+        Self { ns: Namespace::default(), value }
     }
 
     pub fn value(&self) -> &bool {

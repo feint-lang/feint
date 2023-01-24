@@ -76,7 +76,7 @@ gen::standard_object_impls!(Float);
 
 impl Float {
     pub fn new(value: f64) -> Self {
-        Self { ns: Namespace::new(), value }
+        Self { ns: Namespace::default(), value }
     }
 
     pub fn value(&self) -> &f64 {

@@ -83,7 +83,7 @@ gen::standard_object_impls!(Int);
 
 impl Int {
     pub fn new(value: BigInt) -> Self {
-        Self { ns: Namespace::new(), value }
+        Self { ns: Namespace::default(), value }
     }
 
     pub fn value(&self) -> &BigInt {
