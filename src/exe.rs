@@ -1,6 +1,6 @@
 //! Front end for executing code from a source on a VM.
 use std::borrow::Cow;
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs::canonicalize;
 use std::io::{BufRead, Read};
 use std::path::Path;
@@ -139,19 +139,21 @@ impl Executor {
     /// somewhat more complex to deal with.
     pub fn execute_repl(&mut self, text: &str, module_ref: ObjectRef) -> ExeResult {
         self.current_file_name = "<repl>".to_owned();
-        let source = &mut source_from_text(text);
-        let ast_module = self.parse_source(source)?;
-        let mut compiler = Compiler::new();
 
-        // XXX: Nested scopes are necessary to avoid deadlock.
-        let (start, comp_result) = {
+        // XXX: Nested scopes are necessary to avoid deadlocks.
+        let (start, global_names) = {
             let module_read_guard = module_ref.read().unwrap();
             let module_read = module_read_guard.down_to_mod().unwrap();
-            (
-                module_read.code().len_chunk(),
-                compiler.compile_module_to_code(module_read.name(), ast_module),
-            )
+            let start = module_read.code().len_chunk();
+            let global_names: HashSet<String> =
+                module_read.iter_globals().map(|(n, _)| n.clone()).collect();
+            (start, global_names)
         };
+
+        let source = &mut source_from_text(text);
+        let ast_module = self.parse_source(source)?;
+        let mut compiler = Compiler::new(global_names);
+        let comp_result = compiler.compile_module_to_code("$repl", ast_module);
 
         let mut code = comp_result.map_err(|err| {
             self.handle_comp_err(&err, source);
@@ -314,7 +316,7 @@ impl Executor {
         source: &mut Source<T>,
     ) -> Result<Module, ExeErr> {
         let ast_module = self.parse_source(source)?;
-        let mut compiler = Compiler::new();
+        let mut compiler = Compiler::default();
         let module = compiler
             .compile_script(
                 name,
@@ -336,7 +338,7 @@ impl Executor {
         source: &mut Source<T>,
     ) -> Result<Module, ExeErr> {
         let ast_module = self.parse_source(source)?;
-        let mut compiler = Compiler::new();
+        let mut compiler = Compiler::default();
         let module = compiler
             .compile_module(name, self.current_file_name.as_str(), ast_module)
             .map_err(|err| {

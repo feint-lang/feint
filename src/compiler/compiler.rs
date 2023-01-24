@@ -17,11 +17,6 @@ use super::scope::{Scope, ScopeKind, ScopeTree};
 
 // Compiler ------------------------------------------------------------
 
-pub struct Compiler {
-    // The visitor stack is analogous to the VM call stack.
-    visitor_stack: Stack<(Visitor, usize)>, // visitor, scope tree pointer
-}
-
 struct CaptureInfo {
     name: String,
     free_var_addr: usize,
@@ -33,9 +28,24 @@ struct CaptureInfo {
     cell_var_loads: Vec<usize>,       // address
 }
 
+pub struct Compiler {
+    // The visitor stack is analogous to the VM call stack.
+    visitor_stack: Stack<(Visitor, usize)>, // visitor, scope tree pointer
+    // Known global names. This can be used in contexts where globals
+    // are known to exist but aren't available to the compiler (e.g., in
+    // the REPL).
+    global_names: HashSet<String>,
+}
+
+impl Default for Compiler {
+    fn default() -> Self {
+        Self::new(HashSet::default())
+    }
+}
+
 impl Compiler {
-    pub fn new() -> Self {
-        Self { visitor_stack: Stack::new() }
+    pub fn new(global_names: HashSet<String>) -> Self {
+        Self { visitor_stack: Stack::new(), global_names }
     }
 
     /// Compile AST module node as script. This will check if the module
@@ -86,9 +96,13 @@ impl Compiler {
         module_name: &str,
         module: ast::Module,
     ) -> Result<Code, CompErr> {
-        let mut visitor = Visitor::for_module(module_name);
+        let mut visitor = Visitor::for_module(module_name, self.global_names.clone());
         visitor.visit_module(module)?;
-        let global_names = visitor.scope_tree.global_names();
+        self.global_names = self
+            .global_names
+            .union(&visitor.scope_tree.global_names())
+            .cloned()
+            .collect();
         assert!(
             visitor.scope_tree.in_global_scope(),
             "Expected to be in global scope after compiling module"
@@ -103,7 +117,6 @@ impl Compiler {
                 addr,
                 scope_tree_pointer,
                 node,
-                &global_names,
             )?;
         }
         let mut visitor = self.visitor_stack.pop().unwrap().0;
@@ -126,15 +139,11 @@ impl Compiler {
         // the correct scope in the parent visitor.
         parent_scope_pointer: usize,
         node: ast::Func,
-        // Global names in the module containing the function used for
-        // name-checking free vars that aren't found in an outer
-        // function.
-        global_names: &HashSet<String>,
     ) -> VisitResult {
         let stack = &mut self.visitor_stack;
         let params = node.params.clone();
 
-        let mut visitor = Visitor::for_func(func_name);
+        let mut visitor = Visitor::for_func(func_name, self.global_names.clone());
         visitor.visit_func(node)?;
 
         // Unresolved names are assumed to be builtins.
@@ -211,7 +220,7 @@ impl Compiler {
 
         let builtins = BUILTINS.read().unwrap();
         for (addr, name, start, end) in presumed_globals.into_iter() {
-            if global_names.contains(&name) {
+            if self.global_names.contains(&name) {
                 visitor.replace(addr, Inst::LoadGlobal(name));
             } else if builtins.has_global(&name) {
                 visitor.replace(addr, Inst::LoadBuiltin(name));
@@ -274,7 +283,6 @@ impl Compiler {
                 addr,
                 scope_tree_pointer,
                 node,
-                global_names,
             )?;
         }
         let visitor = self.visitor_stack.pop().unwrap().0;
@@ -307,27 +315,33 @@ pub struct Visitor {
         usize,  // scope tree pointer
         ast::Func,
     )>,
+    global_names: HashSet<String>,
 }
 
 impl Visitor {
-    fn new(initial_scope_kind: ScopeKind, name: &str) -> Self {
+    fn new(
+        initial_scope_kind: ScopeKind,
+        name: &str,
+        global_names: HashSet<String>,
+    ) -> Self {
         assert!(matches!(initial_scope_kind, ScopeKind::Module | ScopeKind::Func));
         Self {
             initial_scope_kind,
+            name: name.to_owned(),
             code: Code::default(),
             scope_tree: ScopeTree::new(initial_scope_kind),
             scope_depth: 0,
             func_nodes: vec![],
-            name: name.to_owned(),
+            global_names,
         }
     }
 
-    fn for_module(name: &str) -> Self {
-        Self::new(ScopeKind::Module, name)
+    fn for_module(name: &str, global_names: HashSet<String>) -> Self {
+        Self::new(ScopeKind::Module, name, global_names)
     }
 
-    fn for_func(name: &str) -> Self {
-        Self::new(ScopeKind::Func, name)
+    fn for_func(name: &str, global_names: HashSet<String>) -> Self {
+        Self::new(ScopeKind::Func, name, global_names)
     }
 
     // Entry Point Visitors --------------------------------------------
@@ -690,7 +704,9 @@ impl Visitor {
                 if let Some(outer_var) = self.scope_tree.find_var_in_parent(&var) {
                     self.push(Inst::LoadVar(name, self.scope_depth - outer_var.depth));
                 } else if self.is_module() {
-                    if self.has_builtin(&name) {
+                    if self.global_names.contains(&name) {
+                        self.push(Inst::LoadGlobal(name));
+                    } else if self.has_builtin(&name) {
                         self.push(Inst::LoadBuiltin(name));
                     } else {
                         return Err(CompErr::name_not_found(name, start, end));
@@ -705,7 +721,9 @@ impl Visitor {
             // When compiling a module, all vars should resolve at this
             // point, so if the name doesn't resolve to a builtin,
             // that's an error.
-            if self.has_builtin(&name) {
+            if self.global_names.contains(&name) {
+                self.push(Inst::LoadGlobal(name));
+            } else if self.has_builtin(&name) {
                 self.push(Inst::LoadBuiltin(name));
             } else {
                 return Err(CompErr::name_not_found(name, start, end));
