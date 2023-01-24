@@ -4,3 +4,4 @@ pub(crate) use result::{CompErr, CompErrKind};
 mod compiler;
 mod result;
 mod scope;
+mod visitor;

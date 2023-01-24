@@ -2,6 +2,7 @@ use crate::source::Location;
 use crate::types::Module;
 
 pub type CompResult = Result<Module, CompErr>;
+pub type VisitResult = Result<(), CompErr>;
 
 #[derive(Clone, Debug)]
 pub struct CompErr {
