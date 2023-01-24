@@ -27,13 +27,6 @@ if args.err || system.err ->
     system.exit(1)
 
 
-# Exit with message
-exit = (...) =>
-    if $args.length > 0 ->
-        print_err($args.join(" "))
-    system.exit(1)
-
-
 make_rule: Str = (...) =>
     "Make a horizontal rule that."
     count = 72 - 3 - ($args.length)
@@ -41,26 +34,45 @@ make_rule: Str = (...) =>
     "-".repeat(count)
 
 
-$main = (...) =>
-    p = print
-    e = print_err
+EXIT_CODES = {
+    "arg_err": 1,
+    "template_err": 2,
+}
 
-    args = args.parse("make-type", $args, {
-        "help": "Generate a new type",
+
+$main = (...) =>
+    "Generate a new builtin type
+
+    This takes a type name and optional string representation and prints
+    out the type definition, which can be redirected into a file:
+
+        feint make-type Name >src/types/name.rs
+
+    "
+    args = args.parse("make-type", $args, $main.$doc, {
         "args": (
             {"name": "name", "required": true},
             {"name": "repr", "required": false},
         ),
     })
 
+    # nil is returned for --help, etc
+    if args $$ nil ->
+        return 0
+
     if args.err ->
-        exit()
+        return EXIT_CODES.get("arg_err")
 
     name = args.get("name")
     repr = args.get("repr")
 
-    if name.err -> exit(name.err)
-    if repr.err -> exit(repr.err)
+    if name.err ->
+        print_err(name.err)
+        return EXIT_CODES.get("arg_err")
+
+    if repr.err ->
+        print_err(repr.err)
+        return EXIT_CODES.get("arg_err")
 
     singleton_type_name = $"{name.upper()}_TYPE"
     type_name = $"{name}Type"
@@ -68,31 +80,31 @@ $main = (...) =>
     repr = repr ?? obj_name.lower()
 
     rule = "-".repeat(80)
-    e(rule)
-    e($"Creating new type:\n")
-    e($"singleton type name = {singleton_type_name}")
-    e($"type name =  {type_name}")
-    e($"object name = {obj_name}")
-    e($"display repr = {repr}")
-    e("\nAfter creation tasks:\n")
-    e($"- Add `pub(crate) mod {name.lower()};` to types/mod.rs")
-    e($"- Add constructor to types/new.rs")
-    e($"- Add entry to `BUILTINS` in modules/builtins.rs")
-    e($"- Add type-related methods in types/base.rs")
-    e($"- Add Display and Debug impls in types/base.rs")
-    e($"- Customize implementation")
-    e($"- Handle in scanner/parser/compiler/VM")
-    e(rule, "\n\n")
+    print_err(rule)
+    print_err($"Creating new type:\n")
+    print_err($"singleton type name = {singleton_type_name}")
+    print_err($"type name =  {type_name}")
+    print_err($"object name = {obj_name}")
+    print_err($"display repr = {repr}")
+    print_err("\nAfter creation tasks:\n")
+    print_err($"- Add `pub(crate) mod {name.lower()};` to types/mod.rs")
+    print_err($"- Add constructor to types/new.rs")
+    print_err($"- Add entry to `BUILTINS` in modules/builtins.rs")
+    print_err($"- Add type-related methods in types/base.rs")
+    print_err($"- Add Display and Debug impls in types/base.rs")
+    print_err($"- Customize implementation")
+    print_err($"- Handle in scanner/parser/compiler/VM (if applicable)")
+    print_err(rule, "\n\n")
 
     template_file = File.new("./scripts/type.template")
     if template_file.err ->
-        e(template_file.err)
-        exit()
+        print_err(template_file.err)
+        return EXIT_CODES.get("template_err")
 
     template = template_file.text
     if template.err ->
-        e(template.err)
-        exit()
+        print_err(template.err)
+        return EXIT_CODES.get("template_err")
 
     output = template.render({
         "singleton_type_name": singleton_type_name,
@@ -104,7 +116,7 @@ $main = (...) =>
     })
 
     if output.err ->
-        e(output.err)
-        exit()
+        print_err(output.err)
+        return EXIT_CODES.get("template_err")
 
-    p(output)
+    print(output)
