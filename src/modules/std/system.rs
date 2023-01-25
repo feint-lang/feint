@@ -9,10 +9,12 @@ use crate::vm::RuntimeErr;
 
 pub static SYSTEM: Lazy<obj_ref_t!(Module)> = Lazy::new(|| {
     let modules = new::map(vec![
-        ("std".to_owned(), new::builtin_module("std", "std", "std module", &[])),
+        ("std".to_owned(), new::builtin_stub_module("std")),
+        ("std.args".to_owned(), new::builtin_stub_module("std.args")),
         ("std.builtins".to_owned(), super::builtins::BUILTINS.clone()),
-        ("std.system".to_owned(), new::nil()),
         ("std.proc".to_owned(), super::proc::PROC.clone()),
+        ("std.system".to_owned(), new::nil()),
+        ("std.test".to_owned(), new::builtin_stub_module("std.test")),
     ]);
 
     new::builtin_module(

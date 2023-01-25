@@ -1,12 +1,13 @@
+use core::fmt;
+use std::fmt::Formatter;
+
 use crate::compiler::CompErrKind;
 use crate::parser::ParseErrKind;
 use crate::scanner::ScanErrKind;
 use crate::vm::{RuntimeErrKind, VMState};
-use core::fmt;
-use std::fmt::Formatter;
 
 /// Result type used by top level program executor.
-pub(crate) type ExeResult = Result<VMState, ExeErr>;
+pub type ExeResult = Result<VMState, ExeErr>;
 
 #[derive(Debug)]
 pub struct ExeErr {

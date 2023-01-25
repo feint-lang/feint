@@ -103,6 +103,10 @@ pub fn builtin_module(
     ))
 }
 
+pub fn builtin_stub_module(name: &str) -> obj_ref_t!(Module) {
+    builtin_module(name, name, name, &[])
+}
+
 pub fn cell() -> ObjectRef {
     obj_ref!(Cell::new())
 }

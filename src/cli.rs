@@ -82,12 +82,8 @@ pub fn build_cli() -> Command {
                 .arg(&no_history_arg)
                 .arg(&argv_arg),
             // Subcommand: test
-            Command::new("test").about("Run test").arg(
-                Arg::new("what")
-                    .short('w')
-                    .long("what")
-                    .action(ArgAction::SetTrue)
-                    .help("Specify what to test"),
-            ),
+            Command::new("test")
+                .about("Run test")
+                .arg(Arg::new("argv").index(1).trailing_var_arg(true).num_args(0..)),
         ])
 }

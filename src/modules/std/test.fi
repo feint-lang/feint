@@ -1,0 +1,4 @@
+$main = (...) =>
+    arg_str = $args.map((arg) => $"'{arg}'").join(" ")
+    print($"Running tests with args: {arg_str}")
+    $args.length

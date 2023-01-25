@@ -7,6 +7,7 @@ use clap::{parser::ValueSource, ArgMatches};
 use feint::cli;
 use feint::exe::Executor;
 use feint::repl::Repl;
+use feint::result::ExeResult;
 use feint::vm::{CallDepth, VMState, DEFAULT_MAX_CALL_DEPTH};
 
 /// Interpret a file if one is specified. Otherwise, run the REPL.
@@ -63,18 +64,22 @@ fn handle_run(matches: &ArgMatches, max_call_depth: CallDepth, debug: bool) -> u
 
     let mut exe = Executor::new(max_call_depth, argv, incremental, dis, debug);
 
-    // XXX: Stop clippy from erroneously suggesting `exe.bootstrap()?`.
-    #[allow(clippy::question_mark)]
-    let exe_result = if let Err(err) = exe.bootstrap() {
-        Err(err)
-    } else if let Some(code) = code {
+    if let Err(err) = exe.bootstrap() {
+        return handle_exe_result(Err(err));
+    }
+
+    let exe_result = if let Some(code) = code {
         exe.execute_text(code)
     } else if let Some(file_name) = file_name {
         if file_name == "-" {
             exe.execute_stdin()
         } else {
             let path = get_script_file_path(file_name);
-            exe.execute_file(path.as_path())
+            if path.is_file() {
+                exe.execute_file(path.as_path())
+            } else {
+                exe.execute_module_as_script(file_name)
+            }
         }
     } else {
         let history_path = create_repl_history_file(&save_repl_history, history_path);
@@ -83,31 +88,21 @@ fn handle_run(matches: &ArgMatches, max_call_depth: CallDepth, debug: bool) -> u
         repl.run()
     };
 
-    match exe_result {
-        Ok(vm_state) => match vm_state {
-            VMState::Running => {
-                eprintln!("VM should be idle or halted, not running");
-                255
-            }
-            VMState::Idle(_) => 0,
-            VMState::Halted(0) => 0,
-            VMState::Halted(code) => code,
-        },
-        Err(err) => {
-            if let Some(exit_code) = err.exit_code() {
-                exit_code
-            } else {
-                eprintln!("{err}");
-                255
-            }
-        }
-    }
+    handle_exe_result(exe_result)
 }
 
 /// Subcommand: test
-fn handle_test(_matches: &ArgMatches, _max_call_depth: CallDepth, _debug: bool) -> u8 {
-    println!("Command test not yet implemented");
-    0
+fn handle_test(matches: &ArgMatches, max_call_depth: CallDepth, debug: bool) -> u8 {
+    let argv: Vec<String> = matches
+        .get_many::<String>("argv")
+        .unwrap_or_default()
+        .map(|v| v.to_string())
+        .collect();
+    let mut exe = Executor::new(max_call_depth, argv, false, false, debug);
+    if let Err(err) = exe.bootstrap() {
+        return handle_exe_result(Err(err));
+    }
+    handle_exe_result(exe.execute_module_as_script("std.test"))
 }
 
 // Utilities -----------------------------------------------------------
@@ -177,6 +172,28 @@ fn create_repl_history_file(cond: &bool, path: Option<&String>) -> Option<PathBu
         }
     } else {
         Some(path)
+    }
+}
+
+fn handle_exe_result(exe_result: ExeResult) -> u8 {
+    match exe_result {
+        Ok(vm_state) => match vm_state {
+            VMState::Running => {
+                eprintln!("VM should be idle or halted, not running");
+                255
+            }
+            VMState::Idle(_) => 0,
+            VMState::Halted(0) => 0,
+            VMState::Halted(code) => code,
+        },
+        Err(err) => {
+            if let Some(exit_code) = err.exit_code() {
+                exit_code
+            } else {
+                eprintln!("{err}");
+                255
+            }
+        }
     }
 }
 

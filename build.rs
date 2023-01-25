@@ -58,6 +58,7 @@ fn make_module_archive(out_dir: &Path) -> Result<(), Error> {
 
     let mut add_modules = |dir_name| {
         let dir_path = Path::new("src").join("modules").join(dir_name);
+        println!("cargo:rerun-if-changed={}", dir_path.display());
 
         let mut files = fs::read_dir(dir_path)
             .unwrap()

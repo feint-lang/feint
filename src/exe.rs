@@ -11,7 +11,8 @@ use once_cell::sync::Lazy;
 use tar::Archive as TarArchive;
 
 use crate::compiler::{CompErr, CompErrKind, Compiler};
-use crate::modules::std::{BUILTINS, SYSTEM};
+use crate::modules::get_module;
+use crate::modules::std::SYSTEM;
 use crate::parser::{ParseErr, ParseErrKind, Parser};
 use crate::result::{ExeErr, ExeErrKind, ExeResult};
 use crate::scanner::{ScanErr, ScanErrKind, Scanner, Token, TokenWithLocation};
@@ -109,21 +110,31 @@ impl Executor {
         }
 
         self.add_module("std.system", SYSTEM.clone())?;
-        self.extend_base_module("std.builtins", BUILTINS.clone())?;
-        self.extend_base_module("std.system", SYSTEM.clone())?;
+
+        // NOTE: std.builtins needs to be extended first.
+        self.extend_base_module("std.builtins")?;
+
+        self.extend_base_module("std.args")?;
+        self.extend_base_module("std.test")?;
+        self.extend_base_module("std.system")?;
 
         Ok(())
     }
 
     /// Extend module implemented in Rust with module implemented in
     /// FeInt.
-    fn extend_base_module(
-        &mut self,
-        name: &str,
-        base_module_ref: ObjectRef,
-    ) -> Result<(), ExeErr> {
+    fn extend_base_module(&mut self, name: &str) -> Result<(), ExeErr> {
+        let base_module = match get_module(name) {
+            Ok(base_module) => base_module,
+            Err(_) => {
+                return Err(ExeErr::new(ExeErrKind::ModuleNotFound(
+                    name.to_owned(),
+                    None,
+                )))
+            }
+        };
         let module = self.load_module(name)?;
-        let mut base_module = base_module_ref.write().unwrap();
+        let mut base_module = base_module.write().unwrap();
         for (name, val) in module.iter_globals() {
             base_module.ns_mut().add_obj(name, val.clone());
         }
@@ -254,6 +265,24 @@ impl Executor {
             Ok(VMState::Halted(0))
         } else {
             self.execute_module(module, 0, self.debug, source)
+        }
+    }
+
+    pub fn execute_module_as_script(&mut self, name: &str) -> ExeResult {
+        let module = self.load_module(name)?;
+        let result = self.vm.execute_module_as_script(&module, &self.argv);
+        match result {
+            Ok(()) => Ok(self.vm.state.clone()),
+            Err(err) => {
+                if let RuntimeErrKind::Exit(_) = err.kind {
+                    Err(ExeErr::new(ExeErrKind::RuntimeErr(err.kind)))
+                } else {
+                    let start = self.vm.loc().0;
+                    self.print_err_line(start.line, "<source line not available>");
+                    self.handle_runtime_err(&err);
+                    Err(ExeErr::new(ExeErrKind::RuntimeErr(err.kind)))
+                }
+            }
         }
     }
 

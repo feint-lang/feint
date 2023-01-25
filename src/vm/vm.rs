@@ -114,6 +114,25 @@ impl VM {
         self.execute_code(module, module.code(), start)
     }
 
+    pub fn execute_module_as_script(
+        &mut self,
+        module: &Module,
+        argv: &[String],
+    ) -> VMExeResult {
+        self.reset();
+        let result = self.execute_code(module, module.code(), 0);
+        let main = module.get_global("$main");
+        if let Some(main) = main {
+            let main = main.read().unwrap();
+            let main = main.down_to_func().unwrap();
+            let args = argv.iter().map(new::str).collect();
+            self.call_func(main, None, args, None)?;
+            self.halt_top()
+        } else {
+            result
+        }
+    }
+
     pub fn execute_func(&mut self, func: &Func, start: usize) -> VMExeResult {
         let module = func.module();
         let module = module.read().unwrap();
@@ -503,13 +522,7 @@ impl VM {
                     return self.halt(*return_code);
                 }
                 HaltTop => {
-                    let obj = self.pop_obj()?;
-                    let obj = obj.read().unwrap();
-                    let return_code = match obj.get_int_val() {
-                        Some(int) => int.to_u8().unwrap_or(0),
-                        None => 0,
-                    };
-                    return self.halt(return_code);
+                    return self.halt_top();
                 }
                 // Placeholders
                 Placeholder(addr, inst, message) => {
@@ -607,6 +620,16 @@ impl VM {
         self.reset();
         self.state = VMState::Halted(exit_code);
         Err(RuntimeErr::exit(exit_code))
+    }
+
+    fn halt_top(&mut self) -> VMExeResult {
+        let obj = self.pop_obj()?;
+        let obj = obj.read().unwrap();
+        let return_code = match obj.get_int_val() {
+            Some(int) => int.to_u8().unwrap_or(0),
+            None => 0,
+        };
+        self.halt(return_code)
     }
 
     /// Completely reset internal state.
