@@ -5,7 +5,6 @@ use std::sync::{Arc, RwLock};
 use once_cell::sync::{Lazy, OnceCell};
 
 use crate::modules::get_module;
-use crate::modules::std::SYSTEM;
 use crate::vm::VM;
 
 use super::gen;
@@ -101,14 +100,7 @@ impl ObjectTrait for BuiltinFunc {
     gen::object_trait_header!(BUILTIN_FUNC_TYPE);
 
     fn module(&self) -> ObjectRef {
-        let result = self.module.get_or_try_init(|| get_module(&self.module_name));
-        match result {
-            Ok(module) => module.clone(),
-            Err(err) => new::module_could_not_be_loaded(
-                format!("{}: {err}", self.module_name),
-                SYSTEM.clone(),
-            ),
-        }
+        self.module.get_or_init(|| get_module(&self.module_name)).clone()
     }
 }
 

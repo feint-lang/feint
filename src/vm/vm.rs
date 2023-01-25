@@ -223,7 +223,7 @@ impl VM {
                 }
                 // Modules
                 LoadModule(name) => {
-                    let module = get_module(name.as_str())?;
+                    let module = get_module(name.as_str());
                     self.push_temp(module);
                 }
                 // Vars

@@ -161,7 +161,7 @@ pub fn module_not_found_err<S: Into<String>>(msg: S, obj: ObjectRef) -> ObjectRe
     err(ErrKind::ModuleNotFound, msg, obj)
 }
 
-pub fn module_could_not_be_loaded<S: Into<String>>(
+pub fn _module_could_not_be_loaded<S: Into<String>>(
     msg: S,
     obj: ObjectRef,
 ) -> ObjectRef {

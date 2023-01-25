@@ -5,7 +5,6 @@ use std::sync::{Arc, RwLock};
 use once_cell::sync::{Lazy, OnceCell};
 
 use crate::modules::get_module;
-use crate::modules::std::SYSTEM;
 use crate::vm::Code;
 
 use super::gen;
@@ -98,14 +97,7 @@ impl ObjectTrait for Func {
     gen::object_trait_header!(FUNC_TYPE);
 
     fn module(&self) -> ObjectRef {
-        let result = self.module.get_or_try_init(|| get_module(&self.module_name));
-        match result {
-            Ok(module) => module.clone(),
-            Err(err) => new::module_could_not_be_loaded(
-                format!("{}: {err}", self.module_name),
-                SYSTEM.clone(),
-            ),
-        }
+        self.module.get_or_init(|| get_module(&self.module_name)).clone()
     }
 
     fn is_equal(&self, rhs: &dyn ObjectTrait) -> bool {

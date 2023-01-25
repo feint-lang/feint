@@ -11,7 +11,6 @@ use once_cell::sync::Lazy;
 use tar::Archive as TarArchive;
 
 use crate::compiler::{CompErr, CompErrKind, Compiler};
-use crate::modules::get_module;
 use crate::modules::std::SYSTEM;
 use crate::parser::{ParseErr, ParseErrKind, Parser};
 use crate::result::{ExeErr, ExeErrKind, ExeResult};
@@ -29,7 +28,7 @@ use crate::vm::{
 use crate::{ast, dis};
 
 /// At build time, a compressed archive is created containing the
-/// builtin module files (see `build.rs`).
+/// builtin .fi module files (see `build.rs`).
 ///
 /// At runtime, the module file data is read out and stored in a map
 /// (lazily). When a builtin module is imported, the file data is read
@@ -39,7 +38,7 @@ use crate::{ast, dis};
 /// copies the builtin module files into some location on the file
 /// system based on the location of the current executable or anything
 /// like that.
-static BUILTIN_MODULES: Lazy<HashMap<String, Vec<u8>>> = Lazy::new(|| {
+static BUILTIN_FI_MODULES: Lazy<HashMap<String, Vec<u8>>> = Lazy::new(|| {
     let archive_bytes: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/modules.tgz"));
     let decoder = GzDecoder::new(archive_bytes);
     let mut archive = TarArchive::new(decoder);
@@ -103,41 +102,60 @@ impl Executor {
 
     /// Bootstrap and return error on failure.
     pub fn bootstrap(&mut self) -> Result<(), ExeErr> {
+        log::trace!("bootstrap");
         {
             let mut system = SYSTEM.write().unwrap();
             let argv = new::tuple(self.argv.iter().map(new::str).collect());
             system.ns_mut().add_obj("argv", argv);
         }
 
-        self.add_module("std.system", SYSTEM.clone())?;
+        self.add_module("std.system", SYSTEM.clone());
 
         // NOTE: std.builtins needs to be extended first.
-        self.extend_base_module("std.builtins")?;
+        self.extend_or_add_builtin_module(
+            "std.builtins",
+            BUILTIN_FI_MODULES.get("std.builtins").unwrap(),
+        )?;
 
-        self.extend_base_module("std.args")?;
-        self.extend_base_module("std.test")?;
-        self.extend_base_module("std.system")?;
+        for (name, file_data) in BUILTIN_FI_MODULES.iter() {
+            if name != "std.builtins" {
+                self.extend_or_add_builtin_module(name, file_data)?;
+            }
+        }
 
         Ok(())
     }
 
-    /// Extend module implemented in Rust with module implemented in
-    /// FeInt.
-    fn extend_base_module(&mut self, name: &str) -> Result<(), ExeErr> {
-        let base_module = match get_module(name) {
-            Ok(base_module) => base_module,
-            Err(_) => {
-                return Err(ExeErr::new(ExeErrKind::ModuleNotFound(
-                    name.to_owned(),
-                    None,
-                )))
+    /// For the specified builtin .fi module, extend the corresponding
+    /// base module (implemented in Rust) *or* create a new module in
+    /// `system.modules` if there's no corresponding base module.
+    fn extend_or_add_builtin_module(
+        &mut self,
+        name: &str,
+        file_data: &Vec<u8>,
+    ) -> Result<(), ExeErr> {
+        self.set_current_file_name(Path::new(name));
+
+        let mut source = source_from_bytes(file_data);
+        let mut module = self.compile_module(name, &mut source)?;
+
+        self.execute_module(&module, 0, self.debug, &mut source)?;
+        for (name, obj) in self.vm.ctx.globals().iter() {
+            module.add_global(name, obj.clone());
+        }
+
+        match self.get_module(name) {
+            Some(base_module) => {
+                let mut base_module = base_module.write().unwrap();
+                for (name, val) in module.iter_globals() {
+                    base_module.ns_mut().add_obj(name, val.clone());
+                }
+            }
+            None => {
+                self.add_module(name, obj_ref!(module));
             }
         };
-        let module = self.load_module(name)?;
-        let mut base_module = base_module.write().unwrap();
-        for (name, val) in module.iter_globals() {
-            base_module.ns_mut().add_obj(name, val.clone());
-        }
+
         Ok(())
     }
 
@@ -250,7 +268,7 @@ impl Executor {
         let module = self.compile_script("$main", source)?;
         let module_ref = obj_ref!(module);
 
-        self.add_module("$main", module_ref.clone())?;
+        self.add_module("$main", module_ref.clone());
 
         let module = module_ref.read().unwrap();
         let module = module.down_to_mod().unwrap();
@@ -269,8 +287,15 @@ impl Executor {
     }
 
     pub fn execute_module_as_script(&mut self, name: &str) -> ExeResult {
-        let module = self.load_module(name)?;
-        let result = self.vm.execute_module_as_script(&module, &self.argv);
+        let module = match self.get_or_load_module(name) {
+            Some(module) => module,
+            None => {
+                return Err(ExeErr::new(ExeErrKind::ModuleNotFound(name.to_owned())))
+            }
+        };
+        let module = module.read().unwrap();
+        let module = module.down_to_mod().unwrap();
+        let result = self.vm.execute_module_as_script(module, &self.argv);
         match result {
             Ok(()) => Ok(self.vm.state.clone()),
             Err(err) => {
@@ -388,17 +413,37 @@ impl Executor {
     // Modules/Imports -------------------------------------------------
 
     /// Add a module to `system.modules`.
-    pub fn add_module(&mut self, name: &str, module: ObjectRef) -> Result<(), ExeErr> {
+    pub fn add_module(&mut self, name: &str, module: ObjectRef) {
         let system = SYSTEM.read().unwrap();
         let modules = system.get_attr("modules", SYSTEM.clone());
         let modules = modules.write().unwrap();
-        if let Some(modules) = modules.down_to_map() {
-            modules.add(name, module);
-            Ok(())
-        } else {
-            let msg = format!("Expected system.modules to be a Map; got {modules}");
-            Err(ExeErr::new(ExeErrKind::Bootstrap(msg)))
-        }
+        let modules = modules.down_to_map().unwrap();
+        modules.add(name, module);
+    }
+
+    /// Get module from `system.modules` or return `None` if it isn't
+    /// present.
+    fn get_module(&self, name: &str) -> Option<ObjectRef> {
+        let system = SYSTEM.read().unwrap();
+        let modules = system.get_attr("modules", SYSTEM.clone());
+        let modules = modules.read().unwrap();
+        let modules = modules.down_to_map().unwrap();
+        modules.get(name)
+    }
+
+    /// Load .fi module from file system, compile it, and add it to
+    /// `system.modules`.
+    fn load_module(&self, _name: &str) -> Option<ObjectRef> {
+        // TODO: Locate module file, compile it, and add it to
+        //       system.modules.
+        // let modules = SYSTEM.write().unwrap();
+        // let modules = modules.down_to_map().unwrap();
+        // modules.add(&name, obj_ref!(module));
+        None
+    }
+
+    fn get_or_load_module(&self, name: &str) -> Option<ObjectRef> {
+        self.get_module(name).or_else(|| self.load_module(name))
     }
 
     /// Find imports at the top level of the specified AST module.
@@ -412,53 +457,20 @@ impl Executor {
         }
     }
 
-    /// Load FeInt module from file system.
-    fn load_module(&mut self, name: &str) -> Result<Module, ExeErr> {
-        let mut segments = name.split('.');
-
-        if let Some(first) = segments.next() {
-            return if first == "std" {
-                self.load_builtin_module(name)
-            } else {
-                Err(ExeErr::new(ExeErrKind::ModuleNotFound(
-                    format!("{name}: Only std modules are supported currently"),
-                    None,
-                )))
-            };
-        } else {
-            unreachable!("Empty module name should not be possible");
-        };
-
-        // TODO: Load site or user module
-    }
-
-    fn load_builtin_module(&mut self, name: &str) -> Result<Module, ExeErr> {
-        if let Some(bytes) = BUILTIN_MODULES.get(name) {
-            self.set_current_file_name(Path::new(name));
-            let mut source = source_from_bytes(bytes);
-            let mut module = self.compile_module(name, &mut source)?;
-            self.execute_module(&module, 0, self.debug, &mut source)?;
-            for (name, obj) in self.vm.ctx.globals().iter() {
-                module.add_global(name, obj.clone());
-            }
-            Ok(module)
-        } else {
-            Err(ExeErr::new(ExeErrKind::ModuleNotFound(name.to_owned(), None)))
-        }
-    }
-
+    /// Load modules imported by the current module. Note that this
+    /// doesn't apply to builtin modules since they're all loaded into
+    /// `system.modules` during bootstrapping.
     fn load_imported_modules(&mut self) -> Result<(), ExeErr> {
-        let system = SYSTEM.read().unwrap();
-        let modules_ref = system.get_attr("modules", SYSTEM.clone());
         while let Some(name) = self.imports.pop_front() {
-            let modules_guard = modules_ref.read().unwrap();
-            let modules = modules_guard.down_to_map().unwrap();
-            if !modules.contains_key(&name) {
-                drop(modules_guard); // XXX: Prevent deadlock in recursive calls
-                let module = self.load_module(&name)?;
-                let modules_write = modules_ref.write().unwrap();
-                let modules_write = modules_write.down_to_map().unwrap();
-                modules_write.add(&name, obj_ref!(module));
+            // NOTE: Checking BUILTIN_FI_MODULES first is a slight
+            //       optimization, but note that it doesn't contain
+            //       entries for *all* builtin modules (only those that
+            //       have a corresponding .fi module).
+            if BUILTIN_FI_MODULES.contains_key(&name) {
+                continue;
+            }
+            if self.get_or_load_module(&name).is_none() {
+                return Err(ExeErr::new(ExeErrKind::ModuleNotFound(name)));
             }
         }
         Ok(())

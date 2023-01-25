@@ -36,7 +36,7 @@ impl Repl {
         self.load_history();
         println!("Type .exit or .quit to exit");
 
-        self.executor.add_module("$repl", self.module.clone())?;
+        self.executor.add_module("$repl", self.module.clone());
 
         let result = loop {
             match self.read_line("→ ", true) {
