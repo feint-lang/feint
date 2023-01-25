@@ -1,9 +1,9 @@
 use num_bigint::BigInt;
 
 use crate::ast;
+use crate::op::BinaryOperator;
 use crate::scanner::Scanner;
 use crate::source::{source_from_text, Location};
-use crate::util::BinaryOperator;
 
 use crate::parser::*;
 

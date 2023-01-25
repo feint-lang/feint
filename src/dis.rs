@@ -105,15 +105,21 @@ impl Disassembler {
                 let kind = if *forward { "forward" } else { "backward" };
                 self.align("JUMP_PUSH_NIL", format!("{rel_addr} ({kind})"))
             }
+            JumpIf(rel_addr, forward, _) => {
+                let kind = if *forward { "forward" } else { "backward" };
+                self.align("JUMP_IF", format!("{rel_addr} ({kind})"))
+            }
             JumpIfNot(rel_addr, forward, _) => {
                 let kind = if *forward { "forward" } else { "backward" };
                 self.align("JUMP_IF_NOT", format!("{rel_addr} ({kind})"))
             }
+            JumpIfNotNil(rel_addr, forward, _) => {
+                let kind = if *forward { "forward" } else { "backward" };
+                self.align("JUMP_IF_NIL", format!("{rel_addr} ({kind})"))
+            }
             UnaryOp(op) => self.align("UNARY_OP", op),
-            UnaryCompareOp(op) => self.align("UNARY_COMPARE_OP", op),
             BinaryOp(op) => self.align("BINARY_OP", op),
             CompareOp(op) => self.align("COMPARE_OP", op),
-            ShortCircuitCompareOp(op) => self.align("SHORT_CIRCUIT_COMPARE_OP", op),
             InplaceOp(op) => self.align("INPLACE_OP", op),
             Call(num_args) => self.align("CALL", num_args),
             Return => self.align("RETURN", ""),

@@ -7,6 +7,7 @@ extern crate bitflags;
 pub mod cli;
 pub mod dis;
 pub mod exe;
+pub mod op;
 pub mod repl;
 pub mod result;
 pub mod source;

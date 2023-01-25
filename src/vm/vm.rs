@@ -12,14 +12,12 @@ use ctrlc;
 use num_traits::ToPrimitive;
 
 use crate::modules::get_module;
+use crate::op::{BinaryOperator, CompareOperator, InplaceOperator, UnaryOperator};
 use crate::source::Location;
 use crate::types::{
     new, Args, BuiltinFunc, Func, FuncTrait, Module, ObjectRef, ThisOpt,
 };
-use crate::util::{
-    BinaryOperator, CompareOperator, InplaceOperator, ShortCircuitCompareOperator,
-    Stack, UnaryCompareOperator, UnaryOperator,
-};
+use crate::util::Stack;
 
 use super::code::Code;
 use super::context::RuntimeContext;
@@ -335,6 +333,18 @@ impl VM {
                         jump_ip = Some(ip - *addr);
                     }
                 }
+                JumpIf(addr, forward, scope_exit_count) => {
+                    self.exit_scopes(*scope_exit_count);
+                    let obj = self.peek_obj()?;
+                    let obj = obj.read().unwrap();
+                    if obj.bool_val()? {
+                        if *forward {
+                            jump_ip = Some(ip + *addr);
+                        } else {
+                            jump_ip = Some(ip - *addr);
+                        }
+                    }
+                }
                 JumpIfNot(addr, forward, scope_exit_count) => {
                     self.exit_scopes(*scope_exit_count);
                     let obj = self.peek_obj()?;
@@ -347,21 +357,28 @@ impl VM {
                         }
                     }
                 }
+                JumpIfNotNil(addr, forward, scope_exit_count) => {
+                    self.exit_scopes(*scope_exit_count);
+                    let obj = self.peek_obj()?;
+                    let obj = obj.read().unwrap();
+                    let nil = &self.global_constants[globals::NIL_INDEX];
+                    if !obj.is(&*nil.read().unwrap()) {
+                        if *forward {
+                            jump_ip = Some(ip + *addr);
+                        } else {
+                            jump_ip = Some(ip - *addr);
+                        }
+                    }
+                }
                 // Operations
                 UnaryOp(op) => {
                     self.handle_unary_op(op)?;
-                }
-                UnaryCompareOp(op) => {
-                    self.handle_unary_compare_op(op)?;
                 }
                 BinaryOp(op) => {
                     self.handle_binary_op(op)?;
                 }
                 CompareOp(op) => {
                     self.handle_compare_op(op)?;
-                }
-                ShortCircuitCompareOp(op) => {
-                    self.handle_short_circuit_compare_op(op)?;
                 }
                 InplaceOp(op) => {
                     self.handle_inplace_op(op)?;
@@ -606,24 +623,17 @@ impl VM {
         use UnaryOperator::*;
         let a_kind = self.pop()?;
         let a_ref = self.get_obj(&a_kind);
-        let result = match op {
-            Plus => a_ref, // no-op
-            Negate => a_ref.read().unwrap().negate()?,
-        };
-        self.push_temp(result);
-        Ok(())
-    }
-
-    fn handle_unary_compare_op(&mut self, op: &UnaryCompareOperator) -> RuntimeResult {
-        use UnaryCompareOperator::*;
-        let a_kind = self.pop()?;
-        let a_ref = self.get_obj(&a_kind);
         let a = a_ref.read().unwrap();
         let result = match op {
-            AsBool => a.bool_val()?,
-            Not => a.not()?,
+            Plus => {
+                drop(a);
+                a_ref // no-op
+            }
+            Negate => a.negate()?,
+            AsBool => new::bool(a.bool_val()?),
+            Not => new::bool(a.not()?),
         };
-        self.push_temp(new::bool(result));
+        self.push_temp(result);
         Ok(())
     }
 
@@ -731,34 +741,6 @@ impl VM {
             GreaterThanOrEqual => a.greater_than(b)? || a.is_equal(b),
         };
         self.push_temp(new::bool(result));
-        Ok(())
-    }
-
-    fn handle_short_circuit_compare_op(
-        &mut self,
-        op: &ShortCircuitCompareOperator,
-    ) -> RuntimeResult {
-        // TODO: This provides a place to handle short-circuiting ops,
-        //       but currently short-circuiting is NOT implemented.
-        use ShortCircuitCompareOperator::*;
-        let b_ref = self.pop_obj()?;
-        let a_kind = self.pop()?;
-        let a_ref = self.get_obj(&a_kind);
-        let a = a_ref.read().unwrap();
-        let b = b_ref.read().unwrap();
-        let b = &*b;
-        let result = match op {
-            And => new::bool(a.bool_val()? && a.and(b)?),
-            Or => new::bool(a.bool_val()? || a.or(b)?),
-            NilOr => {
-                if a.is_nil() {
-                    b_ref.clone()
-                } else {
-                    a_ref.clone()
-                }
-            }
-        };
-        self.push_temp(result);
         Ok(())
     }
 

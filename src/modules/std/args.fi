@@ -57,10 +57,7 @@ parse: Map = (
             flag_name = if is_inverse -> name.remove_prefix("no_") else -> name
             flag_val = !is_inverse
 
-            if maybe_val $$ nil || flag_names.has(flag_name) ->
-                flags.add(flag_name, flag_val)
-            # FIX: Boolean expressions don't short circuit.
-            else if maybe_val.starts_with("--") ->
+            if maybe_val $$ nil || flag_names.has(flag_name) || maybe_val.starts_with("--") ->
                 flags.add(flag_name, flag_val)
             else ->
                 options.add(name, maybe_val)

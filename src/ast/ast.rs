@@ -2,13 +2,13 @@ use std::fmt;
 
 use num_bigint::BigInt;
 
+use crate::op::{
+    BinaryOperator, CompareOperator, InplaceOperator, ShortCircuitCompareOperator,
+    UnaryOperator,
+};
 use crate::scanner::Token;
 use crate::source::Location;
 use crate::types::Params;
-use crate::util::{
-    BinaryOperator, CompareOperator, InplaceOperator, ShortCircuitCompareOperator,
-    UnaryCompareOperator, UnaryOperator,
-};
 
 /// Module - A self-contained list of statements.
 #[derive(PartialEq)]
@@ -152,7 +152,6 @@ pub enum ExprKind {
     DeclarationAndAssignment(Box<Expr>, Box<Expr>),
     Assignment(Box<Expr>, Box<Expr>),
     UnaryOp(UnaryOperator, Box<Expr>),
-    UnaryCompareOp(UnaryCompareOperator, Box<Expr>),
     BinaryOp(Box<Expr>, BinaryOperator, Box<Expr>),
     CompareOp(Box<Expr>, CompareOperator, Box<Expr>),
     ShortCircuitCompareOp(Box<Expr>, ShortCircuitCompareOperator, Box<Expr>),
@@ -295,11 +294,8 @@ impl Expr {
         start: Location,
         end: Location,
     ) -> Self {
-        use ExprKind::{UnaryCompareOp, UnaryOp};
         let kind = if let Ok(op) = UnaryOperator::from_token(op_token) {
-            UnaryOp(op, Box::new(a))
-        } else if let Ok(op) = UnaryCompareOperator::from_token(op_token) {
-            UnaryCompareOp(op, Box::new(a))
+            ExprKind::UnaryOp(op, Box::new(a))
         } else {
             panic!("Unknown unary operator: {op_token}");
         };
@@ -343,6 +339,11 @@ impl Expr {
     /// Check if expression is ellipsis.
     pub fn is_ellipsis(&self) -> bool {
         matches!(&self.kind, ExprKind::Literal(Literal { kind: LiteralKind::Ellipsis }))
+    }
+
+    /// Check if expression is literal bool (`true` or `false`).
+    pub fn is_bool(&self) -> bool {
+        matches!(&self.kind, ExprKind::Literal(Literal { kind: LiteralKind::Bool(_) }))
     }
 
     /// Check if expression is literal `true`.
@@ -442,7 +443,6 @@ impl fmt::Debug for ExprKind {
             Self::Func(func) => write!(f, "{func:?}"),
             Self::Call(func) => write!(f, "{func:?}"),
             Self::UnaryOp(op, a) => write!(f, "({op:?}{a:?})"),
-            Self::UnaryCompareOp(op, a) => write!(f, "({op:?}{a:?})"),
             Self::BinaryOp(a, op, b) => write!(f, "({a:?} {op:?} {b:?})"),
             Self::CompareOp(a, op, b) => write!(f, "({a:?} {op:?} {b:?})"),
             Self::ShortCircuitCompareOp(a, op, b) => write!(f, "({a:?} {op:?} {b:?})"),

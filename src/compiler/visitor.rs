@@ -5,12 +5,12 @@ use std::fmt::Formatter;
 
 use crate::ast;
 use crate::modules::std::BUILTINS;
+use crate::op::{
+    BinaryOperator, CompareOperator, InplaceOperator, ShortCircuitCompareOperator,
+    UnaryOperator,
+};
 use crate::source::Location;
 use crate::types::{new, ObjectRef};
-use crate::util::{
-    BinaryOperator, CompareOperator, InplaceOperator, ShortCircuitCompareOperator,
-    UnaryCompareOperator, UnaryOperator,
-};
 use crate::vm::{globals, Code, Inst, PrintFlags};
 
 use super::result::{CompErr, VisitResult};
@@ -113,8 +113,7 @@ impl Visitor {
             self.push_nil();
         }
 
-        let return_addr = self.len();
-        self.push(Inst::Return);
+        let return_addr = self.push(Inst::Return);
 
         // Update jump targets for labels.
         self.fix_jumps()?;
@@ -166,12 +165,10 @@ impl Visitor {
             Kind::Continue => self.visit_continue()?,
             Kind::Import(path) => self.visit_import(path)?,
             Kind::Jump(name) => {
-                let jump_addr = self.len();
-                self.push(Inst::Placeholder(
-                    0,
-                    Box::new(Inst::Jump(0, true, 0)),
-                    "Jump address not set to label address".to_owned(),
-                ));
+                let jump_addr = self.push_placeholder(
+                    Inst::Jump(0, true, 0),
+                    "Jump address not set to label address",
+                );
                 self.scope_tree.add_jump(name.as_str(), jump_addr);
             }
             Kind::Label(name, expr) => {
@@ -290,20 +287,17 @@ impl Visitor {
             Kind::Loop(expr, block) => self.visit_loop(*expr, block)?,
             Kind::Func(func) => {
                 let name = name.map_or_else(|| "<anonymous>".to_owned(), |name| name);
-                let addr = self.len();
+                let addr = self.push_placeholder(
+                    Inst::LoadConst(0),
+                    "Function constant index not updated",
+                );
                 let pointer = self.scope_tree.pointer();
                 self.func_nodes.push((name, addr, pointer, func));
-                self.push(Inst::Placeholder(
-                    addr,
-                    Box::new(Inst::LoadConst(0)),
-                    "Function constant index not updated".to_owned(),
-                ));
                 self.push(Inst::CaptureSet(vec![]));
                 self.push(Inst::MakeFunc);
             }
             Kind::Call(call) => self.visit_call(call)?,
             Kind::UnaryOp(op, b) => self.visit_unary_op(op, *b)?,
-            Kind::UnaryCompareOp(op, b) => self.visit_unary_compare_op(op, *b)?,
             Kind::BinaryOp(a, op, b) => self.visit_binary_op(*a, op, *b)?,
             Kind::CompareOp(a, op, b) => self.visit_compare_op(*a, op, *b)?,
             Kind::ShortCircuitCompareOp(a, op, b) => {
@@ -496,12 +490,10 @@ impl Visitor {
             self.visit_expr(expr, None)?;
 
             // Placeholder for jump if branch condition is false.
-            let jump_index = self.len();
-            self.push(Inst::Placeholder(
-                jump_index,
-                Box::new(Inst::JumpIfNot(0, true, 0)),
-                "Branch condition jump not set".to_owned(),
-            ));
+            let jump_index = self.push_placeholder(
+                Inst::JumpIfNot(0, true, 0),
+                "Branch condition jump not set",
+            );
 
             // Pop result of branch condition evaluation.
             self.push(Inst::Pop);
@@ -512,13 +504,9 @@ impl Visitor {
 
             // Placeholder for jump out of conditional suite if this
             // branch is selected.
-            let jump_out_addr = self.len();
+            let jump_out_addr = self
+                .push_placeholder(Inst::Jump(0, true, 0), "Branch jump out not set");
             jump_out_addrs.push(jump_out_addr);
-            self.push(Inst::Placeholder(
-                jump_out_addr,
-                Box::new(Inst::Jump(0, true, 0)),
-                "Branch jump out not set".to_owned(),
-            ));
 
             // Set jump target for when branch condition is false.
             let rel_addr = self.len() - jump_index;
@@ -574,9 +562,7 @@ impl Visitor {
             };
             self.visit_declaration(*lhs.clone())?;
             self.visit_assignment(*lhs, *val)?;
-            let loop_addr = self.len();
-            self.push(Inst::LoadVar(name, 0));
-            loop_addr
+            self.push(Inst::LoadVar(name, 0))
         } else {
             let loop_addr = self.len();
             if expr.is_false() {
@@ -588,12 +574,8 @@ impl Visitor {
         };
 
         // Placeholder for jump-out if loop expression evaluates false.
-        let jump_out_addr = self.len();
-        self.push(Inst::Placeholder(
-            jump_out_addr,
-            Box::new(Inst::JumpIfNot(0, true, 0)),
-            "Jump-out for loop not set".to_owned(),
-        ));
+        let jump_out_addr = self
+            .push_placeholder(Inst::JumpIfNot(0, true, 0), "Jump-out for loop not set");
 
         // Pop result of loop condition evaluation.
         self.push(Inst::Pop);
@@ -639,16 +621,6 @@ impl Visitor {
     fn visit_unary_op(&mut self, op: UnaryOperator, expr: ast::Expr) -> VisitResult {
         self.visit_expr(expr, None)?;
         self.push(Inst::UnaryOp(op));
-        Ok(())
-    }
-
-    fn visit_unary_compare_op(
-        &mut self,
-        op: UnaryCompareOperator,
-        expr: ast::Expr,
-    ) -> VisitResult {
-        self.visit_expr(expr, None)?;
-        self.push(Inst::UnaryCompareOp(op));
         Ok(())
     }
 
@@ -740,9 +712,67 @@ impl Visitor {
         op: ShortCircuitCompareOperator,
         expr_b: ast::Expr,
     ) -> VisitResult {
+        use ShortCircuitCompareOperator::*;
+
+        // LHS is always evaluated
+        let lhs_is_bool = expr_a.is_bool();
         self.visit_expr(expr_a, None)?;
-        self.visit_expr(expr_b, None)?;
-        self.push(Inst::ShortCircuitCompareOp(op));
+
+        match op {
+            And => {
+                // Force LHS to bool
+                if !lhs_is_bool {
+                    self.push(Inst::UnaryOp(UnaryOperator::AsBool));
+                }
+
+                // Skip RHS evaluation if LHS is false
+                let jump_addr = self.push_placeholder(
+                    Inst::JumpIfNot(0, true, 0),
+                    "Jump target for && not updated",
+                );
+
+                // RHS evaluation
+                self.visit_expr(expr_b, None)?;
+                self.push(Inst::UnaryOp(UnaryOperator::AsBool));
+
+                let jump_target = self.push(Inst::NoOp) - jump_addr;
+                self.replace(jump_addr, Inst::JumpIfNot(jump_target, true, 0));
+
+                self.push(Inst::NoOp);
+            }
+            Or => {
+                // Force LHS to bool
+                if !lhs_is_bool {
+                    self.push(Inst::UnaryOp(UnaryOperator::AsBool));
+                }
+
+                // Skip RHS evaluation if LHS is true
+                let jump_addr = self.push_placeholder(
+                    Inst::JumpIf(0, true, 0),
+                    "Jump target for || not updated",
+                );
+
+                // RHS evaluation
+                self.visit_expr(expr_b, None)?;
+                self.push(Inst::UnaryOp(UnaryOperator::AsBool));
+
+                let jump_target = self.push(Inst::NoOp) - jump_addr;
+                self.replace(jump_addr, Inst::JumpIf(jump_target, true, 0));
+            }
+            NilOr => {
+                // Skip RHS evaluation if LHS is not nil
+                let jump_addr = self.push_placeholder(
+                    Inst::JumpIfNotNil(0, true, 0),
+                    "Jump target for ?? not updated",
+                );
+
+                // RHS evaluation
+                self.visit_expr(expr_b, None)?;
+
+                let jump_target = self.push(Inst::NoOp) - jump_addr;
+                self.replace(jump_addr, Inst::JumpIfNotNil(jump_target, true, 0));
+            }
+        }
         Ok(())
     }
 
@@ -776,54 +806,61 @@ impl Visitor {
         self.scope_tree.in_global_scope()
     }
 
+    fn has_builtin(&self, name: &str) -> bool {
+        BUILTINS.read().unwrap().has_global(name)
+    }
+
     fn len(&self) -> usize {
         self.code.len_chunk()
     }
 
-    pub(crate) fn push(&mut self, inst: Inst) {
+    /// Push instruction and return its address.
+    pub(crate) fn push(&mut self, inst: Inst) -> usize {
+        let addr = self.len();
         self.code.push_inst(inst);
+        addr
     }
 
     pub(crate) fn replace(&mut self, addr: usize, inst: Inst) {
         self.code.replace_inst(addr, inst);
     }
 
-    fn has_builtin(&self, name: &str) -> bool {
-        BUILTINS.read().unwrap().has_global(name)
+    fn push_placeholder(&mut self, inst: Inst, msg: &str) -> usize {
+        self.push(Inst::Placeholder(self.len(), Box::new(inst), msg.to_owned()))
     }
 
     // Global constants ------------------------------------------------
 
     fn push_nil(&mut self) {
-        self.push(Inst::LoadNil)
+        self.push(Inst::LoadNil);
     }
 
     fn push_true(&mut self) {
-        self.push(Inst::LoadTrue)
+        self.push(Inst::LoadTrue);
     }
 
     fn push_false(&mut self) {
-        self.push(Inst::LoadFalse)
+        self.push(Inst::LoadFalse);
     }
 
     fn push_always(&mut self) {
-        self.push(Inst::LoadAlways)
+        self.push(Inst::LoadAlways);
     }
 
     fn push_empty_str(&mut self) {
-        self.push(Inst::LoadEmptyStr)
+        self.push(Inst::LoadEmptyStr);
     }
 
     fn push_newline(&mut self) {
-        self.push(Inst::LoadNewline)
+        self.push(Inst::LoadNewline);
     }
 
     fn push_empty_tuple(&mut self) {
-        self.push(Inst::LoadEmptyTuple)
+        self.push(Inst::LoadEmptyTuple);
     }
 
     fn push_global_const(&mut self, index: usize) {
-        self.push(Inst::LoadGlobalConst(index))
+        self.push(Inst::LoadGlobalConst(index));
     }
 
     // Code unit constants ---------------------------------------------

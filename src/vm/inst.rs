@@ -1,8 +1,5 @@
+use crate::op::{BinaryOperator, CompareOperator, InplaceOperator, UnaryOperator};
 use crate::source::Location;
-use crate::util::{
-    BinaryOperator, CompareOperator, InplaceOperator, ShortCircuitCompareOperator,
-    UnaryCompareOperator, UnaryOperator,
-};
 
 /// NOTE: When adding or removing instructions, the PartialEq impl
 ///       below must also be updated.
@@ -76,15 +73,18 @@ pub enum Inst {
     // Jump unconditionally and push nil onto stack.
     JumpPushNil(usize, bool, usize),
 
+    // If top of stack is true, jump to address. Otherwise, continue.
+    JumpIf(usize, bool, usize),
+
     // If top of stack is false, jump to address. Otherwise, continue.
     JumpIfNot(usize, bool, usize),
 
-    UnaryOp(UnaryOperator),
-    UnaryCompareOp(UnaryCompareOperator),
+    // If top of stack is NOT nil, jump to address. Otherwise, continue.
+    JumpIfNotNil(usize, bool, usize),
 
+    UnaryOp(UnaryOperator),
     BinaryOp(BinaryOperator),
     CompareOp(CompareOperator),
-    ShortCircuitCompareOp(ShortCircuitCompareOperator),
     InplaceOp(InplaceOperator),
 
     // Call function with N values from top of stack. The args are
@@ -180,7 +180,6 @@ impl PartialEq for Inst {
             (JumpPushNil(a, b, c), JumpPushNil(d, e, f)) => (a, b, c) == (d, e, f),
             (JumpIfNot(a, b, c), JumpIfNot(d, e, f)) => (a, b, c) == (d, e, f),
             (UnaryOp(a), UnaryOp(b)) => a == b,
-            (UnaryCompareOp(a), UnaryCompareOp(b)) => a == b,
             (BinaryOp(a), BinaryOp(b)) => a == b,
             (CompareOp(a), CompareOp(b)) => a == b,
             (InplaceOp(a), InplaceOp(b)) => a == b,

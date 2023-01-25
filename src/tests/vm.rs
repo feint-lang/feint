@@ -1,5 +1,5 @@
+use crate::op::BinaryOperator;
 use crate::types::{new, Module};
-use crate::util::BinaryOperator;
 use crate::vm::*;
 
 #[test]

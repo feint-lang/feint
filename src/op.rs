@@ -10,6 +10,8 @@ use crate::scanner::Token;
 pub enum UnaryOperator {
     Plus,
     Negate,
+    Not,
+    AsBool,
 }
 
 impl UnaryOperator {
@@ -17,6 +19,8 @@ impl UnaryOperator {
         let op = match token {
             Token::Plus => Self::Plus,
             Token::Minus => Self::Negate,
+            Token::Bang => Self::Not,
+            Token::BangBang => Self::AsBool,
             _ => return Err(format!("Unknown unary operator: {token}")),
         };
         Ok(op)
@@ -28,38 +32,6 @@ impl fmt::Display for UnaryOperator {
         let string = match self {
             Self::Plus => "+",
             Self::Negate => "-",
-        };
-        write!(f, "{string}")
-    }
-}
-
-impl fmt::Debug for UnaryOperator {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{self}")
-    }
-}
-
-/// Unary comparison operators.
-#[derive(Clone, Eq, PartialEq)]
-pub enum UnaryCompareOperator {
-    Not,
-    AsBool,
-}
-
-impl UnaryCompareOperator {
-    pub fn from_token(token: &Token) -> Result<Self, String> {
-        let op = match token {
-            Token::Bang => Self::Not,
-            Token::BangBang => Self::AsBool,
-            _ => return Err(format!("Unknown unary comparison operator: {token}")),
-        };
-        Ok(op)
-    }
-}
-
-impl fmt::Display for UnaryCompareOperator {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let string = match self {
             Self::Not => "!",
             Self::AsBool => "!!",
         };
@@ -67,7 +39,7 @@ impl fmt::Display for UnaryCompareOperator {
     }
 }
 
-impl fmt::Debug for UnaryCompareOperator {
+impl fmt::Debug for UnaryOperator {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{self}")
     }
