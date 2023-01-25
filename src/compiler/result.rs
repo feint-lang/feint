@@ -53,6 +53,14 @@ impl CompErr {
         Self::new(CompErrKind::CannotAssignSpecialIdent(name, start, end))
     }
 
+    pub fn cannot_reassign_special_ident(
+        name: String,
+        start: Location,
+        end: Location,
+    ) -> Self {
+        Self::new(CompErrKind::CannotReassignSpecialIdent(name, start, end))
+    }
+
     pub fn main_must_be_func(start: Location, end: Location) -> Self {
         Self::new(CompErrKind::MainMustBeFunc(start, end))
     }
@@ -82,6 +90,7 @@ impl CompErr {
             DuplicateLabelInScope(_, start, end) => (start, end),
             ExpectedIdent(start, end) => (start, end),
             CannotAssignSpecialIdent(_, start, end) => (start, end),
+            CannotReassignSpecialIdent(_, start, end) => (start, end),
             MainMustBeFunc(start, end) => (start, end),
             GlobalNotFound(_, start, end) => (start, end),
             VarArgsMustBeLast(start, end) => (start, end),
@@ -100,6 +109,7 @@ pub enum CompErrKind {
     DuplicateLabelInScope(String, Location, Location),
     ExpectedIdent(Location, Location),
     CannotAssignSpecialIdent(String, Location, Location),
+    CannotReassignSpecialIdent(String, Location, Location),
     MainMustBeFunc(Location, Location),
     GlobalNotFound(String, Location, Location),
     VarArgsMustBeLast(Location, Location),

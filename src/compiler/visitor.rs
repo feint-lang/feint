@@ -654,6 +654,13 @@ impl Visitor {
             name
         } else if let Some(name) = ident_expr.is_special_ident() {
             if name == "$main" && self.in_global_scope() {
+                if self.scope_tree.find_var("$main", Some(0)).is_some() {
+                    return Err(CompErr::cannot_reassign_special_ident(
+                        name,
+                        ident_expr.start,
+                        ident_expr.end,
+                    ));
+                }
                 name
             } else {
                 return Err(CompErr::cannot_assign_special_ident(

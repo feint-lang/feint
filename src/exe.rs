@@ -610,6 +610,9 @@ impl Executor {
             CannotAssignSpecialIdent(name, ..) => {
                 format!("cannot assign to special name: {name}")
             }
+            CannotReassignSpecialIdent(name, ..) => {
+                format!("cannot reassign special name: {name}")
+            }
             MainMustBeFunc(..) => {
                 "$main must be a function".to_owned()
             }
