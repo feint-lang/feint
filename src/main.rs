@@ -1,3 +1,4 @@
+use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -73,13 +74,10 @@ fn handle_run(matches: &ArgMatches, max_call_depth: CallDepth, debug: bool) -> u
     } else if let Some(file_name) = file_name {
         if file_name == "-" {
             exe.execute_stdin()
+        } else if let Some(path) = get_script_file_path(file_name) {
+            exe.execute_file(path.as_path())
         } else {
-            let path = get_script_file_path(file_name);
-            if path.is_file() {
-                exe.execute_file(path.as_path())
-            } else {
-                exe.execute_module_as_script(file_name)
-            }
+            exe.execute_module_as_script(file_name)
         }
     } else {
         let history_path = create_repl_history_file(&save_repl_history, history_path);
@@ -107,27 +105,38 @@ fn handle_test(matches: &ArgMatches, max_call_depth: CallDepth, debug: bool) -> 
 
 // Utilities -----------------------------------------------------------
 
-/// Get script file path from `name`. If `name` refers to an existing
-/// file path _or_ is absolute _or_ has an extension, return a path
-/// object for `name`.
+/// Get script file path from `name`.
+///
+/// If `name` refers to an existing file path _or_ is absolute _or_ has
+/// a `.fi` extension, return `Path` for `name`.
+///
+/// If `name` is "main", unconditionally return `Path` for main script
+/// at `./src/main.fi`. If there's no main script, this will cause an
+/// error.
 ///
 /// Otherwise, try to find a script in `./scripts`. If this fails,
-/// return a path object for `name`.
-fn get_script_file_path(name: &String) -> PathBuf {
+/// return `None`.
+fn get_script_file_path(name: &String) -> Option<PathBuf> {
     let path = Path::new(name);
     let path = path.to_path_buf();
 
-    if path.is_file() || path.is_absolute() || path.extension().is_some() {
-        return path;
-    }
-
-    let mut script_path = Path::new("./scripts").join(&path);
-    script_path.set_extension("fi");
-
-    if script_path.is_file() {
-        script_path
+    if path.is_file()
+        || path.is_absolute()
+        || path.extension() == Some(OsStr::new("fi"))
+    {
+        Some(path)
+    } else if name == "main" {
+        // NOTE: main can only refer to src/main.fi and not a script
+        let main_path = Path::new("./src").join("main.fi");
+        Some(main_path)
     } else {
-        path
+        let mut script_path = Path::new("./scripts").join(name);
+        script_path.set_extension("fi");
+        if script_path.is_file() {
+            Some(script_path)
+        } else {
+            None
+        }
     }
 }
 
