@@ -48,30 +48,6 @@ impl Compiler {
         Self { visitor_stack: Stack::new(), global_names }
     }
 
-    /// Compile AST module node as script. This will check if the module
-    /// has a `$main` function and, if it does, add instructions to call
-    /// it.
-    pub fn compile_script(
-        &mut self,
-        name: &str,
-        file_name: &str,
-        ast_module: ast::Module,
-        argv: &Vec<String>,
-    ) -> CompResult {
-        let mut code = self.compile_module_to_code(name, ast_module)?;
-        if let Some(main_index) = code.main_index() {
-            let argc = argv.len();
-            for arg in argv {
-                let index = code.add_const(new::str(arg));
-                code.push_inst(Inst::LoadConst(index));
-            }
-            code.push_inst(Inst::LoadConst(main_index));
-            code.push_inst(Inst::Call(argc));
-            code.push_inst(Inst::HaltTop);
-        }
-        Ok(Module::new(name.to_owned(), file_name.to_owned(), code, None))
-    }
-
     /// Compile AST module node to module object.
     pub fn compile_module(
         &mut self,

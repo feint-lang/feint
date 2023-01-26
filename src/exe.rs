@@ -139,7 +139,8 @@ impl Executor {
         let mut source = source_from_bytes(file_data);
         let mut module = self.compile_module(name, &mut source)?;
 
-        self.execute_module(&module, 0, self.debug, &mut source)?;
+        self.execute_module(&module, 0, &mut source, false)?;
+
         for (name, obj) in self.vm.ctx.globals().iter() {
             module.add_global(name, obj.clone());
         }
@@ -216,7 +217,7 @@ impl Executor {
         let vm_state = {
             let module = module.read().unwrap();
             let module = module.down_to_mod().unwrap();
-            self.execute_module(module, start, self.debug, source)?
+            self.execute_module(module, start, source, false)?
         };
 
         {
@@ -265,25 +266,12 @@ impl Executor {
         &mut self,
         source: &mut Source<T>,
     ) -> ExeResult {
-        let module = self.compile_script("$main", source)?;
+        let module = self.compile_module("$main", source)?;
         let module_ref = obj_ref!(module);
-
         self.add_module("$main", module_ref.clone());
-
         let module = module_ref.read().unwrap();
         let module = module.down_to_mod().unwrap();
-
-        if self.dis {
-            let mut disassembler = dis::Disassembler::new();
-            disassembler.disassemble(module.code());
-            if self.debug {
-                println!();
-                self.display_stack();
-            }
-            Ok(VMState::Halted(0))
-        } else {
-            self.execute_module(module, 0, self.debug, source)
-        }
+        self.execute_module(module, 0, source, true)
     }
 
     pub fn execute_module_as_script(&mut self, name: &str) -> ExeResult {
@@ -295,36 +283,56 @@ impl Executor {
         };
         let module = module.read().unwrap();
         let module = module.down_to_mod().unwrap();
-        let result = self.vm.execute_module_as_script(module, &self.argv);
-        match result {
-            Ok(()) => Ok(self.vm.state.clone()),
-            Err(err) => {
-                if let RuntimeErrKind::Exit(_) = err.kind {
-                    Err(ExeErr::new(ExeErrKind::RuntimeErr(err.kind)))
-                } else {
-                    let start = self.vm.loc().0;
-                    self.print_err_line(start.line, "<source line not available>");
-                    self.handle_runtime_err(&err);
-                    Err(ExeErr::new(ExeErrKind::RuntimeErr(err.kind)))
-                }
-            }
-        }
+        self.execute_module(module, 0, &mut source_from_bytes(&vec![]), true)
     }
 
     /// Execute a module.
+    ///
+    /// NOTE: *All* execution should go through here for standardized
+    ///       handling of debugging, disassembly, and errors.
     pub fn execute_module<T: BufRead>(
         &mut self,
         module: &Module,
         start: usize,
-        debug: bool,
         source: &mut Source<T>,
+        is_main: bool,
     ) -> ExeResult {
+        if self.dis && is_main {
+            let mut disassembler = dis::Disassembler::new();
+            disassembler.disassemble(module.code());
+            if self.debug {
+                self.display_stack();
+            }
+            return Ok(VMState::Halted(0));
+        }
+
         self.load_imported_modules()?;
-        let result = self.vm.execute_module(module, start);
-        if debug {
+
+        let mut result = self.vm.execute_module(module, start);
+
+        if result.is_ok() && is_main {
+            if let Some(main) = module.get_main() {
+                let main = main.read().unwrap();
+                let args = self.argv.iter().map(new::str).collect();
+                if let Some(main) = main.down_to_func() {
+                    result = self
+                        .vm
+                        .call_func(main, None, args, None)
+                        .and_then(|_| self.vm.halt_top());
+                } else if let Some(main) = main.down_to_builtin_func() {
+                    result = self
+                        .vm
+                        .call_builtin_func(main, None, args)
+                        .and_then(|_| self.vm.halt_top());
+                }
+            }
+        }
+
+        if self.debug {
             self.display_stack();
             self.display_vm_state(&result);
         }
+
         match result {
             Ok(()) => Ok(self.vm.state.clone()),
             Err(err) => {
@@ -370,28 +378,6 @@ impl Executor {
     }
 
     // Compilation -----------------------------------------------------
-
-    /// Compile AST module node into script module object.
-    fn compile_script<T: BufRead>(
-        &mut self,
-        name: &str,
-        source: &mut Source<T>,
-    ) -> Result<Module, ExeErr> {
-        let ast_module = self.parse_source(source)?;
-        let mut compiler = Compiler::default();
-        let module = compiler
-            .compile_script(
-                name,
-                self.current_file_name.as_str(),
-                ast_module,
-                &self.argv,
-            )
-            .map_err(|err| {
-                self.handle_comp_err(&err, source);
-                ExeErr::new(ExeErrKind::CompErr(err.kind))
-            })?;
-        Ok(module)
-    }
 
     /// Compile AST module node into module object.
     fn compile_module<T: BufRead>(
@@ -462,13 +448,6 @@ impl Executor {
     /// `system.modules` during bootstrapping.
     fn load_imported_modules(&mut self) -> Result<(), ExeErr> {
         while let Some(name) = self.imports.pop_front() {
-            // NOTE: Checking BUILTIN_FI_MODULES first is a slight
-            //       optimization, but note that it doesn't contain
-            //       entries for *all* builtin modules (only those that
-            //       have a corresponding .fi module).
-            if BUILTIN_FI_MODULES.contains_key(&name) {
-                continue;
-            }
             if self.get_or_load_module(&name).is_none() {
                 return Err(ExeErr::new(ExeErrKind::ModuleNotFound(name)));
             }

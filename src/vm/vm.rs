@@ -114,25 +114,6 @@ impl VM {
         self.execute_code(module, module.code(), start)
     }
 
-    pub fn execute_module_as_script(
-        &mut self,
-        module: &Module,
-        argv: &[String],
-    ) -> VMExeResult {
-        self.reset();
-        let result = self.execute_code(module, module.code(), 0);
-        let main = module.get_global("$main");
-        if let Some(main) = main {
-            let main = main.read().unwrap();
-            let main = main.down_to_func().unwrap();
-            let args = argv.iter().map(new::str).collect();
-            self.call_func(main, None, args, None)?;
-            self.halt_top()
-        } else {
-            result
-        }
-    }
-
     pub fn execute_func(&mut self, func: &Func, start: usize) -> VMExeResult {
         let module = func.module();
         let module = module.read().unwrap();
@@ -622,7 +603,7 @@ impl VM {
         Err(RuntimeErr::exit(exit_code))
     }
 
-    fn halt_top(&mut self) -> VMExeResult {
+    pub fn halt_top(&mut self) -> VMExeResult {
         let obj = self.pop_obj()?;
         let obj = obj.read().unwrap();
         let return_code = match obj.get_int_val() {
@@ -950,7 +931,7 @@ impl VM {
         }
     }
 
-    fn call_builtin_func(
+    pub fn call_builtin_func(
         &mut self,
         func: &BuiltinFunc,
         this_opt: ThisOpt,

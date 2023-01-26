@@ -83,6 +83,13 @@ impl Module {
         self.ns.iter()
     }
 
+    pub fn get_main(&self) -> Option<ObjectRef> {
+        // XXX: If a builtin module defines $main(), it will be a
+        //      global. If a .fi module defines $main(), it may or may
+        //      not have been copied to the module's globals.
+        self.get_global("$main").or_else(|| self.code.get_main())
+    }
+
     pub fn code(&self) -> &Code {
         &self.code
     }

@@ -189,15 +189,16 @@ impl Code {
         self.constants.iter()
     }
 
-    pub fn main_index(&self) -> Option<usize> {
-        self.constants.iter().position(|obj_ref| {
+    pub fn get_main(&self) -> Option<ObjectRef> {
+        let maybe_index = self.constants.iter().position(|obj_ref| {
             let obj = obj_ref.read().unwrap();
             if let Some(func) = obj.down_to_func() {
                 func.name() == "$main"
             } else {
                 false
             }
-        })
+        });
+        maybe_index.map(|index| self.constants[index].clone())
     }
 
     // Vars ------------------------------------------------------------
