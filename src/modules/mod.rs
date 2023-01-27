@@ -14,7 +14,7 @@ static MODULES: Lazy<obj_ref_t!(Map)> = Lazy::new(|| obj_ref!(Map::default()));
 pub fn add_module(name: &str, module: ObjectRef) {
     let modules = MODULES.write().unwrap();
     let modules = modules.down_to_map().unwrap();
-    modules.add(name, module);
+    modules.insert(name, module);
 }
 
 /// Get module from `system.modules`.

@@ -2,7 +2,6 @@ use std::any::Any;
 use std::fmt;
 use std::sync::{Arc, RwLock};
 
-use indexmap::IndexMap;
 use once_cell::sync::Lazy;
 
 use super::gen;
@@ -29,13 +28,14 @@ pub struct Closure {
     name: String,
     params: Params,
     func: ObjectRef,
-    captured: IndexMap<String, ObjectRef>,
+    /// `Map<Str, Cell>` of captured vars
+    captured: ObjectRef,
 }
 
 gen::standard_object_impls!(Closure);
 
 impl Closure {
-    pub fn new(func_ref: ObjectRef, captured: IndexMap<String, ObjectRef>) -> Self {
+    pub fn new(func_ref: ObjectRef, captured: ObjectRef) -> Self {
         let func = func_ref.read().unwrap();
         let func = func.down_to_func().unwrap();
         Self {
@@ -52,8 +52,15 @@ impl Closure {
         self.func.clone()
     }
 
-    pub fn captured(&self) -> &IndexMap<String, ObjectRef> {
-        &self.captured
+    pub fn captured(&self) -> ObjectRef {
+        self.captured.clone()
+    }
+
+    /// Get cell for `name`, if `name` was captured by this closure.
+    pub fn get_captured(&self, name: &str) -> Option<ObjectRef> {
+        let captured = self.captured.read().unwrap();
+        let captured = captured.down_to_map().unwrap();
+        captured.get(name)
     }
 }
 

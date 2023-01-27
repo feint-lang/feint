@@ -410,7 +410,7 @@ impl Executor {
         let modules = system.get_attr("modules", system_ref.clone());
         let modules = modules.write().unwrap();
         let modules = modules.down_to_map().unwrap();
-        modules.add(name, module);
+        modules.insert(name, module);
     }
 
     /// Get module from `MODULES` (the `system.modules` mirror).

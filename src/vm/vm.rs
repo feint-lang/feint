@@ -9,6 +9,7 @@ use std::sync::{
 };
 
 use ctrlc;
+use indexmap::IndexMap;
 use num_traits::ToPrimitive;
 
 use crate::modules::get_module;
@@ -51,7 +52,7 @@ impl CallFrame {
         if let Some(closure) = &self.closure {
             let closure = closure.read().unwrap();
             let closure = closure.down_to_closure().unwrap();
-            if let Some(obj) = closure.captured().get(name) {
+            if let Some(obj) = closure.get_captured(name) {
                 return Ok(obj.clone());
             }
         }
@@ -430,72 +431,67 @@ impl VM {
                             vals.push(obj.clone());
                         }
                     }
-                    let entries: Vec<(String, ObjectRef)> =
-                        keys.into_iter().zip(vals).collect();
-                    let map = new::map(entries);
+                    let map = new::map_from_keys_and_vals(keys, vals);
                     self.push_temp(map);
                 }
                 CaptureSet(names) => {
-                    let mut entries = vec![];
+                    let mut capture_set = IndexMap::default();
                     for name in names.iter() {
                         log::trace!("GETTING CAPTURED: {name}");
                         if let Ok(var_ref) = self.ctx.get_var(name, 0) {
                             // Capture cell already exists.
                             let var = var_ref.read().unwrap();
                             if var.is_cell() {
-                                entries.push((name.to_owned(), var_ref.clone()));
+                                capture_set.insert(name.to_owned(), var_ref.clone());
                             } else {
                                 assert!(var.is_nil());
-                                entries.push((name.to_owned(), new::cell()));
+                                capture_set.insert(name.to_owned(), new::cell());
                             }
-                        } else {
+                        } else if let Some(frame) = self.call_stack.peek() {
                             // Capture cell does not exist.
-                            if let Some(frame) = self.call_stack.peek() {
-                                if let Some(closure) = &frame.closure {
-                                    log::trace!("CAPTURING OUTER");
-                                    let closure = closure.read().unwrap();
-                                    let closure = closure.down_to_closure().unwrap();
-                                    let result = closure
-                                        .captured()
-                                        .iter()
-                                        .find(|(n, _)| *n == name);
-                                    if let Some((name, cell)) = result {
-                                        entries.push((name.to_owned(), cell.clone()));
-                                        log::trace!(
-                                            "CAPTURED FROM OUTER: {name} = {cell:?}"
-                                        );
-                                    }
+                            if let Some(closure) = &frame.closure {
+                                log::trace!("CAPTURING OUTER");
+                                let closure = closure.read().unwrap();
+                                let closure = closure.down_to_closure().unwrap();
+                                if let Some(cell) = closure.get_captured(name) {
+                                    capture_set.insert(name.to_owned(), cell.clone());
+                                    log::trace!(
+                                        "CAPTURED FROM OUTER: {name} = {cell:?}"
+                                    );
                                 }
                             }
                         }
                     }
-                    self.push_temp(new::map(entries));
+                    self.push_temp(new::map(capture_set));
                 }
                 MakeFunc => {
-                    let capture_set = self.pop_obj()?;
-                    let capture_set = capture_set.read().unwrap();
+                    let capture_set_ref = self.pop_obj()?;
+                    let capture_set = capture_set_ref.read().unwrap();
                     let capture_set = capture_set.down_to_map().unwrap();
                     if !capture_set.is_empty() {
                         let func_ref = self.pop_obj()?;
                         let func_obj = func_ref.read().unwrap();
                         let func = func_obj.down_to_func().unwrap();
-                        let mut captured = capture_set.to_hash_map();
 
                         // XXX: This gets around a chicken-and-egg
                         //      problem when the closure references
                         //      itself.
-                        let func_captured = captured.contains_key(func.name());
+                        let func_captured = capture_set.contains_key(func.name());
                         if func_captured && ip + 1 < len_chunk {
                             if let AssignCell(_) = &code[ip + 1] {
                                 let closure_cell =
                                     new::cell_with_value(func_ref.clone());
                                 self.ctx
                                     .assign_var(func.name(), closure_cell.clone())?;
-                                captured.insert(func.name().to_owned(), closure_cell);
+                                capture_set
+                                    .insert(func.name().to_owned(), closure_cell);
                             }
                         }
 
-                        self.push_temp(new::closure(func_ref.clone(), captured));
+                        self.push_temp(new::closure(
+                            func_ref.clone(),
+                            capture_set_ref.clone(),
+                        ));
                     }
                 }
                 // VM control

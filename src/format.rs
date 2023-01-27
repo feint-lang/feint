@@ -121,7 +121,7 @@ pub fn render_template(
 
     let context = context_ref.read().unwrap();
     let context = if let Some(context) = context.down_to_map() {
-        context.to_hash_map()
+        context
     } else {
         return Ok(new::string_err(
             "Expected context to be a map",

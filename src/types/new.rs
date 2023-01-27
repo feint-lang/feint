@@ -111,7 +111,7 @@ pub fn cell_with_value(value: ObjectRef) -> ObjectRef {
     obj_ref!(Cell::with_value(value))
 }
 
-pub fn closure(func: ObjectRef, captured: IndexMap<String, ObjectRef>) -> ObjectRef {
+pub fn closure(func: ObjectRef, captured: ObjectRef) -> ObjectRef {
     obj_ref!(Closure::new(func, captured))
 }
 
@@ -223,9 +223,13 @@ pub fn list(items: Vec<ObjectRef>) -> ObjectRef {
     obj_ref!(List::new(items.to_vec()))
 }
 
-pub fn map(entries: Vec<(String, ObjectRef)>) -> ObjectRef {
-    let entries: IndexMap<String, ObjectRef> = entries.into_iter().collect();
-    obj_ref!(Map::new(entries))
+pub fn map(map: IndexMap<String, ObjectRef>) -> ObjectRef {
+    obj_ref!(Map::new(map))
+}
+
+pub fn map_from_keys_and_vals(keys: Vec<String>, vals: Vec<ObjectRef>) -> ObjectRef {
+    assert_eq!(keys.len(), vals.len());
+    obj_ref!(Map::new(IndexMap::from_iter(keys.into_iter().zip(vals))))
 }
 
 pub fn prop(getter: ObjectRef) -> ObjectRef {

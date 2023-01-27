@@ -53,7 +53,7 @@ pub static MAP_TYPE: Lazy<gen::obj_ref_t!(MapType)> = Lazy::new(|| {
                 let arg = gen::use_arg!(args, 0);
                 let key = gen::use_arg_str!(get, key, arg);
                 let val = args[1].clone();
-                this.add(key, val);
+                this.insert(key, val);
                 Ok(new::nil())
             }
         ),
@@ -194,7 +194,7 @@ impl Map {
         entries.is_empty()
     }
 
-    pub fn add<S: Into<String>>(&self, key: S, val: ObjectRef) {
+    pub fn insert<S: Into<String>>(&self, key: S, val: ObjectRef) {
         let entries = &mut self.entries.write().unwrap();
         entries.insert(key.into(), val);
     }
@@ -215,10 +215,6 @@ impl Map {
 
     pub fn entries(&self) -> &RwLock<IndexMap<String, ObjectRef>> {
         &self.entries
-    }
-
-    pub fn to_hash_map(&self) -> IndexMap<String, ObjectRef> {
-        self.entries.read().unwrap().clone()
     }
 }
 
