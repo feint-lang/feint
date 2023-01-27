@@ -231,7 +231,7 @@ impl VM {
                 LoadGlobal(name) => {
                     if let Some(obj) = module.get_global(name) {
                         self.push_temp(obj);
-                    } else if let Some(obj) = self.ctx.globals().get_obj(name) {
+                    } else if let Some(obj) = self.ctx.globals().get(name) {
                         // XXX: This branch allows a global to refer to
                         //      itself in certain situations, such as:
                         //

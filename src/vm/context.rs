@@ -68,7 +68,7 @@ impl RuntimeContext {
     pub fn declare_var(&mut self, name: &str) {
         let initial = new::nil();
         let ns = self.current_ns_mut();
-        ns.add_obj(name, initial);
+        ns.insert(name, initial);
     }
 
     /// Assign value to var in *current* namespace. This looks up the
@@ -82,7 +82,7 @@ impl RuntimeContext {
         obj: ObjectRef,
     ) -> Result<usize, RuntimeErr> {
         let ns = self.current_ns_mut();
-        if ns.set_obj(name, obj) {
+        if ns.set(name, obj) {
             Ok(self.ns_stack.len() - 1)
         } else {
             let message = format!("Name not defined in current namespace: {name}");
@@ -108,7 +108,7 @@ impl RuntimeContext {
         name: &str,
         obj: ObjectRef,
     ) -> RuntimeResult {
-        if self.ns_stack[depth].set_obj(name, obj) {
+        if self.ns_stack[depth].set(name, obj) {
             Ok(())
         } else {
             let message = format!("Name not defined at depth {depth}: {name}");
@@ -125,7 +125,7 @@ impl RuntimeContext {
         let ns_stack = &self.ns_stack;
         let mut var_depth = self.current_depth() - offset;
         loop {
-            if ns_stack[var_depth].get_obj(name).is_some() {
+            if ns_stack[var_depth].get(name).is_some() {
                 break Ok(var_depth);
             }
             if var_depth == 0 {
@@ -151,7 +151,7 @@ impl RuntimeContext {
         }
         let mut var_depth = current_depth - depth_offset;
         loop {
-            if ns_stack[var_depth].get_obj(name).is_some() {
+            if ns_stack[var_depth].get(name).is_some() {
                 break Ok(var_depth);
             }
             if var_depth == 0 {
@@ -165,7 +165,7 @@ impl RuntimeContext {
     /// Get var from current namespace.
     pub fn get_var_in_current_ns(&self, name: &str) -> RuntimeObjResult {
         let ns = self.current_ns();
-        if let Some(obj) = ns.get_obj(name) {
+        if let Some(obj) = ns.get(name) {
             Ok(obj)
         } else {
             let message = format!("Name not defined in current namespace: {name}");
@@ -175,7 +175,7 @@ impl RuntimeContext {
 
     /// Reach into the namespace at depth and get the specified var.
     pub fn get_var_at_depth(&self, depth: usize, name: &str) -> RuntimeObjResult {
-        if let Some(obj) = self.ns_stack[depth].get_obj(name) {
+        if let Some(obj) = self.ns_stack[depth].get(name) {
             Ok(obj)
         } else {
             let message = format!("Name not defined at depth {depth}: {name}");

@@ -250,11 +250,11 @@ pub trait ObjectTrait {
         //
         // Check instance then instance type.
 
-        if let Some(obj) = self.ns().get_obj(name) {
+        if let Some(obj) = self.ns().get(name) {
             return obj;
         }
 
-        if let Some(obj) = self.type_obj().read().unwrap().ns().get_obj(name) {
+        if let Some(obj) = self.type_obj().read().unwrap().ns().get(name) {
             return obj;
         }
 

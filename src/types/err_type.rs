@@ -63,7 +63,7 @@ impl ErrKind {
 
     pub fn get_obj(&self) -> Option<ObjectRef> {
         let err_type_type = ERR_TYPE_TYPE.read().unwrap();
-        err_type_type.ns.get_obj(self.name())
+        err_type_type.ns.get(self.name())
     }
 }
 

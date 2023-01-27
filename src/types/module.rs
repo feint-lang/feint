@@ -102,7 +102,7 @@ impl Module {
         doc: Option<String>,
     ) -> Self {
         let mut module = Self::new(name, path, code, doc);
-        module.ns.add_entries(entries);
+        module.ns.extend(entries);
         module
     }
 
@@ -114,7 +114,7 @@ impl Module {
         doc: Option<String>,
     ) -> Self {
         let mut module = Self::new(name, path, code, doc);
-        module.ns.add_entries_from_map(map);
+        module.ns.extend_from_map(map);
         module
     }
 
@@ -127,15 +127,15 @@ impl Module {
     }
 
     pub fn add_global(&mut self, name: &str, val: ObjectRef) {
-        self.ns.add_obj(name, val.clone());
+        self.ns.insert(name, val.clone());
     }
 
     pub fn get_global(&self, name: &str) -> Option<ObjectRef> {
-        self.ns.get_obj(name)
+        self.ns.get(name)
     }
 
     pub fn has_global(&self, name: &str) -> bool {
-        self.ns.has(name)
+        self.ns.contains_key(name)
     }
 
     pub fn iter_globals(&self) -> indexmap::map::Iter<'_, String, ObjectRef> {

@@ -49,16 +49,16 @@ macro_rules! type_and_impls {
 
             pub fn with_attrs(attrs: &[(&str, ObjectRef)]) -> Self {
                 let mut type_obj = Self::new();
-                type_obj.ns.add_entries(attrs);
+                type_obj.ns.extend(attrs);
                 type_obj
             }
 
             pub fn add_attr(&mut self, name: &str, val: ObjectRef) {
-                self.ns.add_obj(name, val);
+                self.ns.insert(name, val);
             }
 
             pub fn add_attrs(&mut self, attrs: &[(&str, ObjectRef)]) {
-                self.ns.add_entries(attrs);
+                self.ns.extend(attrs);
             }
         }
 

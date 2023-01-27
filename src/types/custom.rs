@@ -109,7 +109,7 @@ impl ObjectTrait for CustomObj {
         value: ObjectRef,
         _this: ObjectRef,
     ) -> ObjectRef {
-        self.ns.set_obj(name, value);
+        self.ns.set(name, value);
         new::nil()
     }
 

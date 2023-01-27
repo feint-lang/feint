@@ -115,15 +115,15 @@ mod custom {
         let t1 = new::custom_type(mod1, "Custom1");
 
         let mut ns = Namespace::default();
-        ns.add_obj("value", new::nil());
+        ns.insert("value", new::nil());
         let t1_obj1 = new::custom_instance(t1.clone(), ns);
 
         let mut ns = Namespace::default();
-        ns.add_obj("value", new::nil());
+        ns.insert("value", new::nil());
         let t1_obj2 = new::custom_instance(t1.clone(), ns);
 
         let mut ns = Namespace::default();
-        ns.add_obj("value", new::nil());
+        ns.insert("value", new::nil());
         let t1_obj3 = new::custom_instance(t1.clone(), ns);
 
         check_attr(t1.clone(), "$id");

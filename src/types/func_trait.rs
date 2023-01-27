@@ -14,7 +14,7 @@ pub trait FuncTrait {
     fn params(&self) -> &Params;
 
     fn get_doc(&self) -> ObjectRef {
-        self.ns().get_obj("$doc").unwrap().clone()
+        self.ns().get("$doc").unwrap().clone()
     }
 
     /// Returns the required number of args.

@@ -124,7 +124,7 @@ impl Executor {
         // it's used early (i.e., during import).
         {
             let mut system = system_ref.write().unwrap();
-            system.ns_mut().add_obj("argv", new::argv_tuple(&self.argv));
+            system.ns_mut().insert("argv", new::argv_tuple(&self.argv));
         }
 
         self.add_module("std.proc", stdlib::PROC.clone());
@@ -144,7 +144,7 @@ impl Executor {
         let fi_module = fi_module.down_to_mod().unwrap();
         let mut base_module = base_module.write().unwrap();
         for (name, val) in fi_module.iter_globals() {
-            base_module.ns_mut().add_obj(name, val.clone());
+            base_module.ns_mut().insert(name, val.clone());
         }
         Ok(())
     }

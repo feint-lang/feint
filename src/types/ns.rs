@@ -29,7 +29,7 @@ impl Namespace {
 
     pub fn with_entries(entries: &[(&str, ObjectRef)]) -> Self {
         let mut ns = Self::default();
-        ns.add_entries(entries);
+        ns.extend(entries);
         ns
     }
 
@@ -37,41 +37,31 @@ impl Namespace {
         self.objects.clear()
     }
 
+    pub fn contains_key(&self, name: &str) -> bool {
+        self.objects.contains_key(name)
+    }
+
     pub fn iter(&self) -> indexmap::map::Iter<'_, String, ObjectRef> {
         self.objects.iter()
     }
 
-    pub fn size(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.objects.len()
     }
 
-    pub fn get_obj(&self, name: &str) -> Option<ObjectRef> {
+    pub fn get(&self, name: &str) -> Option<ObjectRef> {
         self.objects.get(name).cloned()
-    }
-
-    pub fn get_last_obj(&self) -> Option<(&String, &ObjectRef)> {
-        self.objects.last()
     }
 
     /// Add an object, settings its initial value as specified (usually
     /// nil).
-    pub fn add_obj<S: Into<String>>(&mut self, name: S, obj: ObjectRef) {
+    pub fn insert<S: Into<String>>(&mut self, name: S, obj: ObjectRef) {
         self.objects.insert(name.into(), obj);
-    }
-
-    pub fn add_entries(&mut self, entries: &[(&str, ObjectRef)]) {
-        self.objects.extend(entries.iter().map(|(k, v)| (k.to_string(), v.clone())));
-    }
-
-    pub fn add_entries_from_map(&mut self, map: &Map) {
-        for (name, val) in map.entries().read().unwrap().iter() {
-            self.add_obj(name, val.clone());
-        }
     }
 
     /// Set an object's value. This will only succeed if the object
     /// already exists in the namespace.
-    pub fn set_obj(&mut self, name: &str, obj: ObjectRef) -> bool {
+    pub fn set(&mut self, name: &str, obj: ObjectRef) -> bool {
         if self.objects.contains_key(name) {
             self.objects.insert(name.to_owned(), obj);
             true
@@ -80,12 +70,18 @@ impl Namespace {
         }
     }
 
-    pub fn has(&self, name: &str) -> bool {
-        self.objects.contains_key(name)
+    pub fn extend(&mut self, entries: &[(&str, ObjectRef)]) {
+        self.objects.extend(entries.iter().map(|(k, v)| (k.to_string(), v.clone())));
+    }
+
+    pub fn extend_from_map(&mut self, map: &Map) {
+        for (name, val) in map.entries().read().unwrap().iter() {
+            self.insert(name, val.clone());
+        }
     }
 
     pub fn is_equal(&self, other: &Namespace) -> bool {
-        if self.size() != other.size() {
+        if self.len() != other.len() {
             // Namespaces have a different number of entries, so
             // they can't be equal.
             return false;
