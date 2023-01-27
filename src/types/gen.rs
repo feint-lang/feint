@@ -258,6 +258,21 @@ macro_rules! use_arg_str {
     }};
 }
 
+macro_rules! use_arg_map {
+    ( $func_name:ident, $arg_name:ident, $arg:ident ) => {{
+        if let Some(val) = $arg.get_map_val() {
+            val.clone()
+        } else {
+            let msg = format!(
+                "{}() expected {} to be a Map",
+                stringify!($func_name),
+                stringify!($arg_name)
+            );
+            return Ok(new::arg_err(msg, new::nil()));
+        }
+    }};
+}
+
 macro_rules! use_arg_usize {
     ( $func_name:ident, $arg_name:ident, $args:ident, $index:literal ) => {{
         if $index < $args.len() {
@@ -284,5 +299,6 @@ macro_rules! use_arg_usize {
 pub(crate) use meth;
 pub(crate) use prop;
 pub(crate) use use_arg;
+pub(crate) use use_arg_map;
 pub(crate) use use_arg_str;
 pub(crate) use use_arg_usize;

@@ -1,6 +1,5 @@
 pub use builtins::BUILTINS;
-pub use system::{get_module, SYSTEM};
+pub use proc::PROC;
 
 mod builtins;
 mod proc;
-mod system;

@@ -11,8 +11,10 @@ use once_cell::sync::Lazy;
 use tar::Archive as TarArchive;
 
 use crate::compiler::{CompErr, CompErrKind, Compiler};
-use crate::modules::std::SYSTEM;
+use crate::modules::std::{self as stdlib, BUILTINS};
+use crate::modules::{add_module, get_module, maybe_get_module};
 use crate::parser::{ParseErr, ParseErrKind, Parser};
+use crate::result::ExeErrKind::ModuleNotFound;
 use crate::result::{ExeErr, ExeErrKind, ExeResult};
 use crate::scanner::{ScanErr, ScanErrKind, Scanner, Token, TokenWithLocation};
 use crate::source::{
@@ -102,61 +104,48 @@ impl Executor {
 
     /// Bootstrap and return error on failure.
     pub fn bootstrap(&mut self) -> Result<(), ExeErr> {
-        log::trace!("bootstrap");
+        // Add the `builtins` module first because any other module may
+        // rely on it, including `system`.
+        self.extend_builtin_module(BUILTINS.clone(), "std.builtins")?;
+        add_module("std.builtins", BUILTINS.clone());
+
+        // Add the `system` module next because other modules may rely
+        // on it (except for `builtins`), and its where we store system
+        // information, such as loaded modules, `argv`, etc.
+        let system_ref = self.load_module("std.system")?;
+        self.add_module("std.system", system_ref.clone());
+
+        // This may look redundant, but it adds the builtins module to
+        // `system.modules`, which we can't do above because the
+        // `system` module hasn't been loaded/created/registered yet.
+        self.add_module("std.builtins", BUILTINS.clone());
+
+        // Set `system.argv` before adding any other modules in case
+        // it's used early (i.e., during import).
         {
-            let mut system = SYSTEM.write().unwrap();
-            let argv = new::tuple(self.argv.iter().map(new::str).collect());
-            system.ns_mut().add_obj("argv", argv);
+            let mut system = system_ref.write().unwrap();
+            system.ns_mut().add_obj("argv", new::argv_tuple(&self.argv));
         }
 
-        self.add_module("std.system", SYSTEM.clone());
-
-        // NOTE: std.builtins needs to be extended first.
-        self.extend_or_add_builtin_module(
-            "std.builtins",
-            BUILTIN_FI_MODULES.get("std.builtins").unwrap(),
-        )?;
-
-        for (name, file_data) in BUILTIN_FI_MODULES.iter() {
-            if name != "std.builtins" {
-                self.extend_or_add_builtin_module(name, file_data)?;
-            }
-        }
+        self.add_module("std.proc", stdlib::PROC.clone());
 
         Ok(())
     }
 
-    /// For the specified builtin .fi module, extend the corresponding
-    /// base module (implemented in Rust) *or* create a new module in
-    /// `system.modules` if there's no corresponding base module.
-    fn extend_or_add_builtin_module(
+    /// Extend builtin module (implemented in Rust) with global objects
+    /// from corresponding FeInt module.
+    fn extend_builtin_module(
         &mut self,
+        base_module: ObjectRef,
         name: &str,
-        file_data: &Vec<u8>,
     ) -> Result<(), ExeErr> {
-        self.set_current_file_name(Path::new(name));
-
-        let mut source = source_from_bytes(file_data);
-        let mut module = self.compile_module(name, &mut source)?;
-
-        self.execute_module(&module, 0, &mut source, false)?;
-
-        for (name, obj) in self.vm.ctx.globals().iter() {
-            module.add_global(name, obj.clone());
+        let fi_module = self.load_module(name)?;
+        let fi_module = fi_module.read().unwrap();
+        let fi_module = fi_module.down_to_mod().unwrap();
+        let mut base_module = base_module.write().unwrap();
+        for (name, val) in fi_module.iter_globals() {
+            base_module.ns_mut().add_obj(name, val.clone());
         }
-
-        match self.get_module(name) {
-            Some(base_module) => {
-                let mut base_module = base_module.write().unwrap();
-                for (name, val) in module.iter_globals() {
-                    base_module.ns_mut().add_obj(name, val.clone());
-                }
-            }
-            None => {
-                self.add_module(name, obj_ref!(module));
-            }
-        };
-
         Ok(())
     }
 
@@ -275,12 +264,7 @@ impl Executor {
     }
 
     pub fn execute_module_as_script(&mut self, name: &str) -> ExeResult {
-        let module = match self.get_or_load_module(name) {
-            Some(module) => module,
-            None => {
-                return Err(ExeErr::new(ExeErrKind::ModuleNotFound(name.to_owned())))
-            }
-        };
+        let module = self.get_or_add_module(name)?;
         let module = module.read().unwrap();
         let module = module.down_to_mod().unwrap();
         self.execute_module(module, 0, &mut source_from_bytes(&vec![]), true)
@@ -398,38 +382,56 @@ impl Executor {
 
     // Modules/Imports -------------------------------------------------
 
-    /// Add a module to `system.modules`.
+    /// Load .fi module from file system and compile it to a `Module`.
+    ///
+    /// XXX: This will load the module regardless of whether it has
+    ///      already been loaded.
+    fn load_module(&mut self, name: &str) -> Result<ObjectRef, ExeErr> {
+        // TODO: Handle non-std modules
+        if let Some(file_data) = BUILTIN_FI_MODULES.get(name) {
+            self.set_current_file_name(Path::new(&format!("<{name}>")));
+            let mut source = source_from_bytes(file_data);
+            let mut module = self.compile_module(name, &mut source)?;
+            self.execute_module(&module, 0, &mut source, false)?;
+            for (name, obj) in self.vm.ctx.globals().iter() {
+                module.add_global(name, obj.clone());
+            }
+            Ok(obj_ref!(module))
+        } else {
+            Err(ExeErr::new(ModuleNotFound(name.to_owned())))
+        }
+    }
+
+    /// Add a module to both `MODULES` and `system.modules`.
     pub fn add_module(&mut self, name: &str, module: ObjectRef) {
-        let system = SYSTEM.read().unwrap();
-        let modules = system.get_attr("modules", SYSTEM.clone());
+        add_module(name, module.clone());
+        let system_ref = get_module("std.system");
+        let system = system_ref.read().unwrap();
+        let modules = system.get_attr("modules", system_ref.clone());
         let modules = modules.write().unwrap();
         let modules = modules.down_to_map().unwrap();
         modules.add(name, module);
     }
 
-    /// Get module from `system.modules` or return `None` if it isn't
-    /// present.
-    fn get_module(&self, name: &str) -> Option<ObjectRef> {
-        let system = SYSTEM.read().unwrap();
-        let modules = system.get_attr("modules", SYSTEM.clone());
-        let modules = modules.read().unwrap();
-        let modules = modules.down_to_map().unwrap();
-        modules.get(name)
+    /// Get module from `MODULES` (the `system.modules` mirror).
+    fn get_module(&mut self, name: &str) -> Result<ObjectRef, ExeErr> {
+        if let Some(module) = maybe_get_module(name) {
+            Ok(module)
+        } else {
+            Err(ExeErr::new(ModuleNotFound(name.to_owned())))
+        }
     }
 
-    /// Load .fi module from file system, compile it, and add it to
-    /// `system.modules`.
-    fn load_module(&self, _name: &str) -> Option<ObjectRef> {
-        // TODO: Locate module file, compile it, and add it to
-        //       system.modules.
-        // let modules = SYSTEM.write().unwrap();
-        // let modules = modules.down_to_map().unwrap();
-        // modules.add(&name, obj_ref!(module));
-        None
-    }
-
-    fn get_or_load_module(&self, name: &str) -> Option<ObjectRef> {
-        self.get_module(name).or_else(|| self.load_module(name))
+    /// Get module or load it from file system and add it to both
+    /// `MODULES` and `system.modules`.
+    fn get_or_add_module(&mut self, name: &str) -> Result<ObjectRef, ExeErr> {
+        if let Ok(module) = self.get_module(name) {
+            Ok(module)
+        } else {
+            let module = self.load_module(name)?;
+            self.add_module(name, module.clone());
+            Ok(module)
+        }
     }
 
     /// Find imports at the top level of the specified AST module.
@@ -443,14 +445,10 @@ impl Executor {
         }
     }
 
-    /// Load modules imported by the current module. Note that this
-    /// doesn't apply to builtin modules since they're all loaded into
-    /// `system.modules` during bootstrapping.
+    /// Load modules imported by the current module.
     fn load_imported_modules(&mut self) -> Result<(), ExeErr> {
         while let Some(name) = self.imports.pop_front() {
-            if self.get_or_load_module(&name).is_none() {
-                return Err(ExeErr::new(ExeErrKind::ModuleNotFound(name)));
-            }
+            self.get_or_add_module(&name)?;
         }
         Ok(())
     }

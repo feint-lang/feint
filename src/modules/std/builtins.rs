@@ -9,7 +9,7 @@ pub static BUILTINS: Lazy<types::gen::obj_ref_t!(types::module::Module)> =
     Lazy::new(|| {
         types::new::builtin_module(
             "std.builtins",
-            "std.builtins",
+            "<std.builtins>",
             "std.builtins module",
             &[
                 ("Type", types::class::TYPE_TYPE.clone()),

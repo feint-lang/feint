@@ -1,3 +1,9 @@
+# NOTE: Populated during bootstrap.
+argv = ()
+
+# NOTE: Populated during bootstrap.
+modules = {}
+
 exit = (...) =>
     "Exit program with return code."
     code = match $args.length ->

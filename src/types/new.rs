@@ -103,10 +103,6 @@ pub fn builtin_module(
     ))
 }
 
-pub fn builtin_stub_module(name: &str) -> obj_ref_t!(Module) {
-    builtin_module(name, name, name, &[])
-}
-
 pub fn cell() -> ObjectRef {
     obj_ref!(Cell::new())
 }
@@ -155,17 +151,6 @@ pub fn file_unreadable_err<S: Into<String>>(msg: S, obj: ObjectRef) -> ObjectRef
 
 pub fn index_out_of_bounds_err(index: usize, obj: ObjectRef) -> ObjectRef {
     err(ErrKind::IndexOutOfBounds, index.to_string(), obj)
-}
-
-pub fn module_not_found_err<S: Into<String>>(msg: S, obj: ObjectRef) -> ObjectRef {
-    err(ErrKind::ModuleNotFound, msg, obj)
-}
-
-pub fn _module_could_not_be_loaded<S: Into<String>>(
-    msg: S,
-    obj: ObjectRef,
-) -> ObjectRef {
-    err(ErrKind::ModuleCouldNotBeLoaded, msg, obj)
 }
 
 pub fn string_err<S: Into<String>>(msg: S, obj: ObjectRef) -> ObjectRef {
@@ -264,6 +249,10 @@ pub fn tuple(items: Vec<ObjectRef>) -> ObjectRef {
     } else {
         obj_ref!(Tuple::new(items))
     }
+}
+
+pub fn argv_tuple(argv: &[String]) -> ObjectRef {
+    obj_ref!(Tuple::new(argv.iter().map(str).collect()))
 }
 
 // Custom type constructor ---------------------------------------------

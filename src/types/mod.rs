@@ -1,5 +1,6 @@
 // Objects
 pub(crate) use base::{ObjectRef, ObjectTrait};
+pub(crate) use map::Map;
 
 // Namespacing
 pub(crate) use module::Module;

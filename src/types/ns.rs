@@ -3,6 +3,7 @@ use std::fmt;
 use indexmap::IndexMap;
 
 use super::base::ObjectRef;
+use super::map::Map;
 
 pub type Objects = IndexMap<String, ObjectRef>;
 
@@ -60,6 +61,12 @@ impl Namespace {
 
     pub fn add_entries(&mut self, entries: &[(&str, ObjectRef)]) {
         self.objects.extend(entries.iter().map(|(k, v)| (k.to_string(), v.clone())));
+    }
+
+    pub fn add_entries_from_map(&mut self, map: &Map) {
+        for (name, val) in map.entries().read().unwrap().iter() {
+            self.add_obj(name, val.clone());
+        }
     }
 
     /// Set an object's value. This will only succeed if the object

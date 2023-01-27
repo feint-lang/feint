@@ -9,7 +9,7 @@ use crate::types::{new, Module};
 pub static PROC: Lazy<obj_ref_t!(Module)> = Lazy::new(|| {
     new::builtin_module(
         "std.proc",
-        "std.proc",
+        "<std.proc>",
         "Proc module",
         &[
             // TODO:

@@ -173,6 +173,12 @@ pub struct Map {
 
 gen::standard_object_impls!(Map);
 
+impl Default for Map {
+    fn default() -> Self {
+        Self { ns: Namespace::default(), entries: RwLock::new(IndexMap::default()) }
+    }
+}
+
 impl Map {
     pub fn new(entries: IndexMap<String, ObjectRef>) -> Self {
         Self { ns: Namespace::default(), entries: RwLock::new(entries) }
