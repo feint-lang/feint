@@ -12,7 +12,7 @@ use tar::Archive as TarArchive;
 
 use crate::compiler::{CompErr, CompErrKind, Compiler};
 use crate::modules::std::{self as stdlib, BUILTINS};
-use crate::modules::{add_module, get_module, maybe_get_module};
+use crate::modules::{add_module, maybe_get_module, MODULES};
 use crate::parser::{ParseErr, ParseErrKind, Parser};
 use crate::result::ExeErrKind::ModuleNotFound;
 use crate::result::{ExeErr, ExeErrKind, ExeResult};
@@ -107,7 +107,7 @@ impl Executor {
         // Add the `builtins` module first because any other module may
         // rely on it, including `system`.
         self.extend_builtin_module(BUILTINS.clone(), "std.builtins")?;
-        add_module("std.builtins", BUILTINS.clone());
+        self.add_module("std.builtins", BUILTINS.clone());
 
         // Add the `system` module next because other modules may rely
         // on it (except for `builtins`), and its where we store system
@@ -115,15 +115,11 @@ impl Executor {
         let system_ref = self.load_module("std.system")?;
         self.add_module("std.system", system_ref.clone());
 
-        // This may look redundant, but it adds the builtins module to
-        // `system.modules`, which we can't do above because the
-        // `system` module hasn't been loaded/created/registered yet.
-        self.add_module("std.builtins", BUILTINS.clone());
-
         // Set `system.argv` before adding any other modules in case
         // it's used early (i.e., during import).
         {
             let mut system = system_ref.write().unwrap();
+            system.ns_mut().insert("modules", MODULES.clone());
             system.ns_mut().insert("argv", new::argv_tuple(&self.argv));
         }
 
@@ -405,12 +401,6 @@ impl Executor {
     /// Add a module to both `MODULES` and `system.modules`.
     pub fn add_module(&mut self, name: &str, module: ObjectRef) {
         add_module(name, module.clone());
-        let system_ref = get_module("std.system");
-        let system = system_ref.read().unwrap();
-        let modules = system.get_attr("modules", system_ref.clone());
-        let modules = modules.write().unwrap();
-        let modules = modules.down_to_map().unwrap();
-        modules.insert(name, module);
     }
 
     /// Get module from `MODULES` (the `system.modules` mirror).

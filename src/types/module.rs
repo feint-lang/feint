@@ -33,12 +33,14 @@ pub static MODULE_TYPE: Lazy<gen::obj_ref_t!(ModuleType)> = Lazy::new(|| {
 
         - name: Str
         - path: Str
+        - doc: Str
+        - attrs: Map
 
         # Returns
 
         Module",
         |_, args, _| {
-            if let Err(err) = check_args("new", &args, false, 3, Some(3)) {
+            if let Err(err) = check_args("new", &args, false, 4, Some(4)) {
                 return Ok(err);
             };
 

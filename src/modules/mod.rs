@@ -8,7 +8,7 @@ pub mod std;
 
 /// This mirrors `system.modules`. It provides a way to access
 /// modules in Rust code (e.g., in the VM).
-static MODULES: Lazy<obj_ref_t!(Map)> = Lazy::new(|| obj_ref!(Map::default()));
+pub static MODULES: Lazy<obj_ref_t!(Map)> = Lazy::new(|| obj_ref!(Map::default()));
 
 /// Add module to `std.system.modules`.
 pub fn add_module(name: &str, module: ObjectRef) {
