@@ -1,4 +1,4 @@
-use crate::types::{new, Namespace, ObjectRef};
+use crate::types::{new, ObjectRef};
 
 fn check_ok<S: Into<String>>(obj: ObjectRef, msg: S) {
     assert!(!obj.read().unwrap().is_err(), "{}", msg.into())
@@ -105,26 +105,40 @@ mod list {
 }
 
 mod custom {
+    use indexmap::IndexMap;
+
+    use crate::vm::{RuntimeObjResult, VM};
+
     use super::*;
+
+    fn instance(
+        type_obj: ObjectRef,
+        attrs: &[(&str, ObjectRef)],
+        vm: &mut VM,
+    ) -> RuntimeObjResult {
+        let attrs = new::map(IndexMap::from_iter(
+            attrs.into_iter().map(|(n, v)| (n.to_string(), v.clone())),
+        ));
+        let new = type_obj.read().unwrap().get_attr("new", type_obj.clone());
+        let new = new.read().unwrap();
+        let new = new.down_to_builtin_func().unwrap();
+        let new = new.func();
+        new(type_obj.clone(), vec![attrs], vm)
+    }
 
     #[test]
     fn test_custom() {
+        let vm = &mut VM::default();
+
         let mod1 = new::builtin_module("test1", "<test1>", "test module 1", &[]);
-        let mod2 = new::builtin_module("test2", "<test2>", "test module 2", &[]);
-
         let t1 = new::custom_type(mod1, "Custom1");
+        let t1_obj1 = instance(t1.clone(), &[("value", new::nil())], vm).unwrap();
+        let t1_obj2 = instance(t1.clone(), &[("value", new::nil())], vm).unwrap();
+        let t1_obj3 = instance(t1.clone(), &[("value", new::nil())], vm).unwrap();
 
-        let mut ns = Namespace::default();
-        ns.insert("value", new::nil());
-        let t1_obj1 = new::custom_instance(t1.clone(), ns);
-
-        let mut ns = Namespace::default();
-        ns.insert("value", new::nil());
-        let t1_obj2 = new::custom_instance(t1.clone(), ns);
-
-        let mut ns = Namespace::default();
-        ns.insert("value", new::nil());
-        let t1_obj3 = new::custom_instance(t1.clone(), ns);
+        let mod2 = new::builtin_module("test2", "<test2>", "test module 2", &[]);
+        let t2 = new::custom_type(mod2, "Custom2");
+        let t2_obj1 = instance(t2.clone(), &[], vm).unwrap();
 
         check_attr(t1.clone(), "$id");
         check_attr(t1.clone(), "$type");
@@ -136,9 +150,6 @@ mod custom {
         check_ok(result, "Could not set `value` on t1_obj3");
         check_attr(t1_obj3.clone(), "value");
         check_attr_eq(t1_obj3.clone(), "value", new::int(1));
-
-        let t2 = new::custom_type(mod2, "Custom2");
-        let t2_obj1 = new::custom_instance(t2, Namespace::default());
 
         // An object should be equal to itself.
         check_eq(t1_obj1.clone(), t1_obj1.clone());

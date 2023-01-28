@@ -7,31 +7,36 @@ use super::new;
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
 use super::class::TYPE_TYPE;
-use super::module::Module;
 use super::ns::Namespace;
 
 // Custom Type ---------------------------------------------------------
 
+/// TODO: This shouldn't need to be cloneable
+#[derive(Clone)]
 pub struct CustomType {
     ns: Namespace,
-    module: gen::obj_ref_t!(Module),
+    module: ObjectRef,
     name: String,
     full_name: String,
 }
 
 impl CustomType {
-    pub fn new(module: gen::obj_ref_t!(Module), name: String) -> Self {
-        let full_name = format!("{}.{name}", module.read().unwrap().name());
-        Self {
+    pub fn new(module_ref: ObjectRef, name: String) -> Self {
+        let module = module_ref.read().unwrap();
+        let module = module.down_to_mod().unwrap();
+        let full_name = format!("{}.{name}", module.name());
+        let type_ref = Self {
             ns: Namespace::with_entries(&[
                 // Class Attributes
-                ("$name", new::str(name.as_str())),
-                ("$full_name", new::str(full_name.as_str())),
+                ("$module_name", new::str(module.name())),
+                ("$full_name", new::str(&full_name)),
+                ("$name", new::str(&name)),
             ]),
-            module,
+            module: module_ref.clone(),
             name,
             full_name,
-        }
+        };
+        type_ref
     }
 }
 
@@ -55,22 +60,53 @@ impl TypeTrait for CustomType {
     }
 }
 
+/// NOTE: This is customized so the module is correct.
 impl ObjectTrait for CustomType {
-    gen::object_trait_header!(TYPE_TYPE);
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+
+    fn class(&self) -> TypeRef {
+        TYPE_TYPE.clone()
+    }
+
+    fn type_obj(&self) -> ObjectRef {
+        TYPE_TYPE.clone()
+    }
+
+    fn ns(&self) -> &Namespace {
+        &self.ns
+    }
+
+    fn ns_mut(&mut self) -> &mut Namespace {
+        &mut self.ns
+    }
+
+    fn as_type(&self) -> Option<&dyn TypeTrait> {
+        Some(self)
+    }
+
+    fn module(&self) -> ObjectRef {
+        self.module.clone()
+    }
 }
 
 // Custom Object -------------------------------------------------------
 
 pub struct CustomObj {
-    class: gen::obj_ref_t!(CustomType),
+    type_obj: gen::obj_ref_t!(CustomType),
     ns: Namespace,
 }
 
 gen::standard_object_impls!(CustomObj);
 
 impl CustomObj {
-    pub fn new(class: gen::obj_ref_t!(CustomType), attrs: Namespace) -> Self {
-        Self { class, ns: attrs }
+    pub fn new(type_obj: gen::obj_ref_t!(CustomType), attrs: Namespace) -> Self {
+        Self { type_obj, ns: attrs }
     }
 }
 
@@ -84,11 +120,11 @@ impl ObjectTrait for CustomObj {
     }
 
     fn class(&self) -> TypeRef {
-        self.class.clone()
+        self.type_obj.clone()
     }
 
     fn type_obj(&self) -> ObjectRef {
-        self.class.clone()
+        self.type_obj.clone()
     }
 
     fn ns(&self) -> &Namespace {
@@ -120,10 +156,22 @@ impl ObjectTrait for CustomObj {
 
 // Display -------------------------------------------------------------
 
+impl fmt::Display for CustomType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<type {}>", self.full_name())
+    }
+}
+
+impl fmt::Debug for CustomType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{self}")
+    }
+}
+
 impl fmt::Display for CustomObj {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // TODO: Check for $string attr and use that value if present
-        let class = self.class.read().unwrap();
+        let class = self.class();
+        let class = class.read().unwrap();
         write!(f, "<{}> object @ {}", class.full_name(), self.id())
     }
 }

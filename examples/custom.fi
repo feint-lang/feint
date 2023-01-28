@@ -1,0 +1,29 @@
+import std.system
+
+mod = Module.new("mod", "<mod>", "mod doc", {})
+system.modules.add(mod.$name, mod)
+
+expected_full_name = "mod.T"
+T = new_type(mod, "T")
+assert(
+    T.$module $$ mod,
+    $"expected T's module to be {mod}; got {T.$module}",
+    true,
+)
+assert(
+    T.$full_name == expected_full_name,
+    $"expected T's full name to be {expected_full_name}, got {T.$full_name}",
+    true,
+)
+
+t = T.new({})
+assert(
+    t.$module $$ T.$module,
+    $"expected t object's module to be {T.$module}; got {t.$module}",
+    true,
+)
+assert(
+    t.$full_name == expected_full_name,
+    $"expected t object's full name to be {expected_full_name}, got {t.$full_name}",
+    true,
+)

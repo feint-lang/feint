@@ -9,6 +9,9 @@ pub type Objects = IndexMap<String, ObjectRef>;
 
 /// A namespace is a container for object attributes. Note that the
 /// `Namespace` type is not a *system* type.
+///
+/// TODO: This shouldn't need to be cloneable
+#[derive(Clone)]
 pub struct Namespace {
     objects: Objects,
 }

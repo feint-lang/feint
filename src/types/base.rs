@@ -403,9 +403,6 @@ pub trait ObjectTrait {
         self.type_obj().read().unwrap().is_type_type()
     }
 
-    // XXX: Currently, everything but `Cell`s are immutable. This
-    //      anticipates types that are likely to be made mutable in the
-    //      future.
     fn is_immutable(&self) -> bool {
         !(self.is_cell() || self.is_file() || self.is_list() || self.is_map())
     }
@@ -425,6 +422,7 @@ pub trait ObjectTrait {
     make_down_to!(down_to_builtin_func_type, BuiltinFuncType);
     make_down_to!(down_to_cell_type, CellType);
     make_down_to!(down_to_closure_type, ClosureType);
+    make_down_to!(down_to_custom_type, CustomType);
     make_down_to!(down_to_err_type, ErrType);
     make_down_to!(down_to_err_type_type, ErrTypeType);
     make_down_to!(down_to_file_type, FileType);

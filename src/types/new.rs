@@ -10,10 +10,10 @@ use indexmap::IndexMap;
 use once_cell::sync::Lazy;
 
 use crate::util::format_doc;
-use crate::vm::{globals, Code};
+use crate::vm::{globals, Code, RuntimeErr};
 
-use super::base::ObjectRef;
-use super::gen::{obj_ref, obj_ref_t};
+use super::base::{ObjectRef, ObjectTrait};
+use super::gen::{obj_ref, obj_ref_t, use_arg};
 use super::result::Params;
 
 use super::bound_func::BoundFunc;
@@ -261,12 +261,45 @@ pub fn argv_tuple(argv: &[String]) -> ObjectRef {
 
 // Custom type constructor ---------------------------------------------
 
-#[allow(dead_code)]
-pub fn custom_type(module: obj_ref_t!(Module), name: &str) -> obj_ref_t!(CustomType) {
-    obj_ref!(CustomType::new(module, name.into()))
-}
+pub fn custom_type(module: ObjectRef, name: &str) -> ObjectRef {
+    let class_ref = obj_ref!(CustomType::new(module.clone(), name.to_owned()));
 
-#[allow(dead_code)]
-pub fn custom_instance(class: obj_ref_t!(CustomType), attrs: Namespace) -> ObjectRef {
-    obj_ref!(CustomObj::new(class, attrs))
+    {
+        let mut class = class_ref.write().unwrap();
+        let ns = class.ns_mut();
+        ns.insert(
+            "new",
+            builtin_func(
+                module.read().unwrap().down_to_mod().unwrap().name(),
+                name,
+                Some(class_ref.clone()),
+                &["attrs"],
+                "Create a new custom type.
+
+                # Args
+
+                - class: TypeRef
+                - type_obj: ObjectRef
+                - attributes: Map
+
+                ",
+                |this, args, _| {
+                    let attrs_arg = use_arg!(args, 0);
+                    let attrs = attrs_arg.down_to_map().unwrap();
+                    let mut ns = Namespace::default();
+                    ns.extend_from_map(attrs);
+
+                    // XXX: Cloning the inner object is wonky
+                    let type_obj = this.read().unwrap();
+                    let type_obj = type_obj.down_to_custom_type().unwrap();
+                    let type_obj = obj_ref!(type_obj.clone());
+
+                    let instance = CustomObj::new(type_obj, ns);
+                    Ok(obj_ref!(instance))
+                },
+            ),
+        );
+    }
+
+    class_ref
 }
