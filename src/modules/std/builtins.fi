@@ -88,6 +88,7 @@ assert: Bool | Err = (condition: Bool, ...) =>
             *   -> Err.new(ErrType.assertion, Str.new(msg))
 
         if $args.get(1) ->
+            print_err(err)
             $halt 1
 
         err
