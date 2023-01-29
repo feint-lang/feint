@@ -428,8 +428,8 @@ impl Executor {
     fn find_imports(&mut self, ast_module: &ast::Module) {
         let mut visitor = ast::visitors::ImportVisitor::new();
         visitor.visit_module(ast_module);
-        for name in visitor.imports() {
-            if !self.imports.contains(name) {
+        for (name, _as_name) in visitor.imports() {
+            if !self.imports.iter().any(|n| n == name) {
                 self.imports.push_back(name.clone());
             }
         }

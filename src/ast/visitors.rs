@@ -8,7 +8,7 @@ use std::collections::HashSet;
 /// XXX: Currently, this only looks at top level statements... but
 ///      perhaps import should only be allowed at the top level anyway?
 pub struct ImportVisitor {
-    imports: Vec<String>,
+    imports: Vec<(String, Option<String>)>,
 }
 
 impl ImportVisitor {
@@ -16,7 +16,7 @@ impl ImportVisitor {
         Self { imports: vec![] }
     }
 
-    pub fn imports(&self) -> &Vec<String> {
+    pub fn imports(&self) -> &Vec<(String, Option<String>)> {
         &self.imports
     }
 
@@ -29,9 +29,9 @@ impl ImportVisitor {
     }
 
     fn visit_statement(&mut self, statement: &ast::Statement) {
-        if let ast::StatementKind::Import(name) = &statement.kind {
-            if !self.imports.contains(name) {
-                self.imports.push(name.to_owned());
+        if let ast::StatementKind::Import(name, as_name) = &statement.kind {
+            if !self.imports.iter().any(|(n, _)| n == name) {
+                self.imports.push((name.to_owned(), as_name.to_owned()));
             }
         }
     }
@@ -80,8 +80,12 @@ impl GlobalsNamesVisitor {
     }
 
     fn visit_statement(&mut self, statement: &ast::Statement) {
-        if let ast::StatementKind::Import(name) = &statement.kind {
-            let declared_name = name.split('.').last().unwrap();
+        if let ast::StatementKind::Import(name, as_name) = &statement.kind {
+            let declared_name = if let Some(as_name) = as_name {
+                as_name
+            } else {
+                name.split('.').last().unwrap()
+            };
             self.global_names.insert(declared_name.to_owned());
         } else if let Some(expr) = statement.expr() {
             if let Some((left, _right)) = expr.assignment() {

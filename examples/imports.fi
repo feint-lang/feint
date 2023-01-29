@@ -1,0 +1,13 @@
+import std
+import std as x
+
+assert(std $$ x, $"expected {std} to be {x}", true)
+
+import std.args
+import std.args as y
+
+assert(args $$ y, $"expected {args} to be {y}", true)
+
+# NOTE: This would fail during parsing, so we can't test it here.
+# f = () =>
+#     import std

@@ -163,7 +163,7 @@ impl Visitor {
         match node.kind {
             Kind::Break(expr) => self.visit_break(expr)?,
             Kind::Continue => self.visit_continue()?,
-            Kind::Import(path) => self.visit_import(path)?,
+            Kind::Import(path, as_name) => self.visit_import(path, as_name)?,
             Kind::Jump(name) => {
                 let jump_addr = self.push_placeholder(
                     Inst::Jump(0, true, 0),
@@ -199,15 +199,22 @@ impl Visitor {
         Ok(())
     }
 
-    fn visit_import(&mut self, path: String) -> VisitResult {
-        let var_name = path
-            .split('.')
-            .last()
-            .expect("Import path should have at least one segment");
-        self.scope_tree.add_var(self.len(), var_name, true);
-        self.push(Inst::DeclareVar(var_name.to_owned()));
-        self.push(Inst::LoadModule(path.to_owned()));
-        self.push(Inst::AssignVar(var_name.to_owned()));
+    fn visit_import(&mut self, name: String, as_name: Option<String>) -> VisitResult {
+        if let Some(var_name) = as_name {
+            self.scope_tree.add_var(self.len(), &var_name, true);
+            self.push(Inst::DeclareVar(var_name.clone()));
+            self.push(Inst::LoadModule(name.clone()));
+            self.push(Inst::AssignVar(var_name.clone()));
+        } else {
+            let var_name = name
+                .split('.')
+                .last()
+                .expect("Import path should have at least one segment");
+            self.scope_tree.add_var(self.len(), var_name, true);
+            self.push(Inst::DeclareVar(var_name.to_owned()));
+            self.push(Inst::LoadModule(name.clone()));
+            self.push(Inst::AssignVar(var_name.to_owned()));
+        }
         Ok(())
     }
 

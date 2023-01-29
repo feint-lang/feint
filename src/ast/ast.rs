@@ -45,7 +45,7 @@ pub struct Statement {
 pub enum StatementKind {
     Break(Expr),
     Continue,
-    Import(String),
+    Import(String, Option<String>),
     Jump(String),
     Label(String, Expr),
     Return(Expr),
@@ -67,8 +67,13 @@ impl Statement {
         Self::new(StatementKind::Continue, start, end)
     }
 
-    pub fn new_import(name: String, start: Location, end: Location) -> Self {
-        Self::new(StatementKind::Import(name), start, end)
+    pub fn new_import(
+        name: String,
+        as_name: Option<String>,
+        start: Location,
+        end: Location,
+    ) -> Self {
+        Self::new(StatementKind::Import(name, as_name), start, end)
     }
 
     pub fn new_jump(name: String, start: Location, end: Location) -> Self {
@@ -115,7 +120,13 @@ impl fmt::Debug for StatementKind {
         match self {
             Self::Break(expr) => write!(f, "break {expr:?}"),
             Self::Continue => write!(f, "continue"),
-            Self::Import(name) => write!(f, "import {name:?}"),
+            Self::Import(name, as_name) => {
+                if let Some(as_name) = as_name {
+                    write!(f, "import {name:?} as {as_name:?}")
+                } else {
+                    write!(f, "import {name:?}")
+                }
+            }
             Self::Jump(label_index) => write!(f, "jump: {label_index}",),
             Self::Label(label_index, expr) => {
                 write!(f, "label: {label_index} {expr:?}")

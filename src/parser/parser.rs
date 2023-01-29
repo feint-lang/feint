@@ -181,7 +181,17 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
         let name_expr = self.expr(0)?;
         if let Some(name) = name_expr.is_ident() {
             let end = name_expr.end;
-            Ok(ast::Statement::new_import(name, start, end))
+            let as_name = if self.next_token_is(&Token::As)? {
+                let as_name_expr = self.expr(0)?;
+                if let Some(as_name) = as_name_expr.is_ident() {
+                    Some(as_name)
+                } else {
+                    return Err(self.err(ParseErrKind::ExpectedIdent(self.loc())));
+                }
+            } else {
+                None
+            };
+            Ok(ast::Statement::new_import(name, as_name, start, end))
         } else {
             Err(self.err(ParseErrKind::ExpectedIdent(self.loc())))
         }
