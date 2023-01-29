@@ -27,3 +27,5 @@ assert(
     $"expected t object's full name to be {expected_full_name}, got {t.$full_name}",
     true,
 )
+
+t = t.new({})

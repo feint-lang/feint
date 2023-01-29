@@ -156,23 +156,11 @@ impl ObjectTrait for CustomObj {
 
 // Display -------------------------------------------------------------
 
-impl fmt::Display for CustomType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "<type {}>", self.full_name())
-    }
-}
-
-impl fmt::Debug for CustomType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{self}")
-    }
-}
-
 impl fmt::Display for CustomObj {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let class = self.class();
         let class = class.read().unwrap();
-        write!(f, "<{}> object @ {}", class.full_name(), self.id())
+        write!(f, "<{} object @ {}>", class.full_name(), self.id())
     }
 }
 

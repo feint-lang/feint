@@ -566,7 +566,7 @@ pub trait ObjectTrait {
 macro_rules! write_type_instance {
     ( $f:ident, $t:ident, $($A:ty),+ ) => { $(
         if let Some(t) = $t.as_any().downcast_ref::<$A>() {
-            return write!($f, "<{}>", t.full_name());
+            return write!($f, "<type {}>", t.full_name());
         }
     )+ };
 }
@@ -574,7 +574,7 @@ macro_rules! write_type_instance {
 macro_rules! debug_type_instance {
     ( $f:ident, $t:ident, $($A:ty),+ ) => { $(
         if let Some(t) = $t.as_any().downcast_ref::<$A>() {
-            return write!($f, "<{}> @ {}", t.full_name(), ObjectTrait::id(t));
+            return write!($f, "<type {} @ {}>", t.full_name(), ObjectTrait::id(t));
         }
     )+ };
 }
@@ -597,13 +597,13 @@ macro_rules! debug_instance {
 
 impl fmt::Display for dyn TypeTrait {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "<{}>", self.full_name())
+        write!(f, "<type {}>", self.full_name())
     }
 }
 
 impl fmt::Debug for dyn TypeTrait {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "<{} @ {}>", self.full_name(), self.id())
+        write!(f, "<type {} @ {}>", self.full_name(), self.id())
     }
 }
 

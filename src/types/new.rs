@@ -289,10 +289,23 @@ pub fn custom_type(module: ObjectRef, name: &str) -> ObjectRef {
                     let mut ns = Namespace::default();
                     ns.extend_from_map(attrs);
 
-                    // XXX: Cloning the inner object is wonky
+                    // XXX: Cloning the inner object is wonky and breaks
+                    //      identity testing.
                     let type_obj = this.read().unwrap();
-                    let type_obj = type_obj.down_to_custom_type().unwrap();
-                    let type_obj = obj_ref!(type_obj.clone());
+                    let type_obj = if type_obj.is_type_object() {
+                        // Called via custom type.
+                        let type_obj = type_obj.down_to_custom_type().unwrap();
+                        obj_ref!(type_obj.clone())
+                    } else {
+                        // Called via custom instance.
+                        // XXX: This branch isn't reachable because the
+                        //      VM will panic due to the identity test
+                        //      issue noted above.
+                        let type_obj = type_obj.type_obj();
+                        let type_obj = type_obj.read().unwrap();
+                        let type_obj = type_obj.down_to_custom_type().unwrap();
+                        obj_ref!(type_obj.clone())
+                    };
 
                     let instance = CustomObj::new(type_obj, ns);
                     Ok(obj_ref!(instance))
