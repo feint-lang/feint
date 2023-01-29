@@ -24,7 +24,7 @@ use crate::source::{
 use crate::types::gen::obj_ref;
 use crate::types::{new, Module, ObjectRef, ObjectTrait};
 use crate::vm::{
-    CallDepth, Inst, PrintFlags, RuntimeContext, RuntimeErr, RuntimeErrKind,
+    CallDepth, Inst, PrintFlags, ModuleExecutionContext, RuntimeErr, RuntimeErrKind,
     VMExeResult, VMState, VM,
 };
 use crate::{ast, dis};
@@ -74,7 +74,7 @@ impl Executor {
         dis: bool,
         debug: bool,
     ) -> Self {
-        let vm = VM::new(RuntimeContext::default(), max_call_depth);
+        let vm = VM::new(ModuleExecutionContext::default(), max_call_depth);
 
         Self {
             vm,

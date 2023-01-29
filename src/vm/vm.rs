@@ -21,7 +21,7 @@ use crate::types::{
 use crate::util::Stack;
 
 use super::code::Code;
-use super::context::RuntimeContext;
+use super::context::ModuleExecutionContext;
 use super::globals;
 use super::inst::{Inst, PrintFlags};
 use super::result::{
@@ -61,7 +61,7 @@ impl CallFrame {
 }
 
 pub struct VM {
-    pub(crate) ctx: RuntimeContext,
+    pub(crate) ctx: ModuleExecutionContext,
     pub(crate) state: VMState,
     global_constants: Vec<ObjectRef>,
     // The scope stack contains pointers into the value stack. When a
@@ -90,12 +90,12 @@ unsafe impl Sync for VM {}
 
 impl Default for VM {
     fn default() -> Self {
-        VM::new(RuntimeContext::default(), DEFAULT_MAX_CALL_DEPTH)
+        VM::new(ModuleExecutionContext::default(), DEFAULT_MAX_CALL_DEPTH)
     }
 }
 
 impl VM {
-    pub fn new(ctx: RuntimeContext, max_call_depth: CallDepth) -> Self {
+    pub fn new(ctx: ModuleExecutionContext, max_call_depth: CallDepth) -> Self {
         VM {
             ctx,
             state: VMState::Idle(None),
@@ -231,7 +231,7 @@ impl VM {
                 LoadGlobal(name) => {
                     if let Some(obj) = module.get_global(name) {
                         self.push_temp(obj);
-                    } else if let Some(obj) = self.ctx.globals().get(name) {
+                    } else if let Some(obj) = self.ctx.get_global(name) {
                         // XXX: This branch allows a global to refer to
                         //      itself in certain situations, such as:
                         //
