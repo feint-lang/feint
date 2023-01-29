@@ -199,7 +199,6 @@ fn handle_exe_result(exe_result: ExeResult) -> u8 {
             if let Some(exit_code) = err.exit_code() {
                 exit_code
             } else {
-                eprintln!("{err}");
                 255
             }
         }

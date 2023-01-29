@@ -117,7 +117,6 @@ impl Repl {
                 // to add more lines *if* the error can potentially be
                 // recovered from by adding more input.
                 if !(continue_on_err && self.continue_on_err(&err)) {
-                    eprintln!("ERROR: {err}");
                     return None;
                 }
             }
