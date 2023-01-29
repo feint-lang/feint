@@ -175,6 +175,9 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
 
     /// Handle `import`.
     fn import(&mut self, start: Location) -> StatementResult {
+        if self.func_level != 0 {
+            return Err(self.err(ParseErrKind::UnexpectedImport(start)));
+        }
         let name_expr = self.expr(0)?;
         if let Some(name) = name_expr.is_ident() {
             let end = name_expr.end;

@@ -32,6 +32,7 @@ impl ParseErr {
             ExpectedIdent(loc) => loc,
             ExpectedOperand(loc) => loc,
             ExpectedToken(loc, _) => loc,
+            UnexpectedImport(loc) => loc,
             UnexpectedBlock(loc) => loc,
             UnexpectedToken(twl) => &twl.start,
             UnexpectedBreak(loc) => loc,
@@ -61,6 +62,8 @@ pub enum ParseErrKind {
     ExpectedIdent(Location),
     ExpectedOperand(Location),
     ExpectedToken(Location, Token),
+
+    UnexpectedImport(Location),
 
     UnexpectedBlock(Location),
     UnexpectedToken(TokenWithLocation),

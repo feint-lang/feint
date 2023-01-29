@@ -569,6 +569,11 @@ impl Executor {
             ExpectedIdent(loc) => {
                 format!("Parse error: expected identifier at {loc}")
             }
+            UnexpectedImport(loc) => {
+                format!(
+                    "Syntax error: unexpected import at {loc} (imports are only allowed in the global/module scope)"
+                )
+            }
             UnexpectedBreak(loc) => {
                 format!(
                     "Parse error: unexpected break at {loc} (break must be in a loop)"
