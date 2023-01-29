@@ -1,4 +1,4 @@
-"Builtins module"
+"std module (builtins)"
 
 
 print = (...) =>

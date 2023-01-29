@@ -1,5 +1,5 @@
-pub use builtins::BUILTINS;
+pub use self::std::STD;
 pub use proc::PROC;
 
-mod builtins;
 mod proc;
+mod std;

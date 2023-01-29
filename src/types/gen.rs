@@ -38,7 +38,7 @@ macro_rules! type_and_impls {
             #[allow(clippy::new_without_default)]
             pub fn new() -> Self {
                 let name = new::str(stringify!($name));
-                let full_name = new::str(concat!("builtins.", stringify!($name)));
+                let full_name = new::str(concat!("std.", stringify!($name)));
                 Self {
                     ns: Namespace::with_entries(&[
                         ("$name", name),
@@ -68,7 +68,7 @@ macro_rules! type_and_impls {
             }
 
             fn full_name(&self) -> &str {
-                concat!("builtins.", stringify!($name))
+                concat!("std.", stringify!($name))
             }
 
             fn ns(&self) -> &Namespace {
@@ -194,7 +194,7 @@ macro_rules! meth {
         (
             $name,
             new::builtin_func(
-                "std.builtins",
+                "std",
                 $name,
                 Some($this_type.clone()),
                 $params,
@@ -212,7 +212,7 @@ macro_rules! prop {
         (
             $name,
             new::prop(new::builtin_func(
-                "std.builtins",
+                "std",
                 $name,
                 Some($this_type.clone()),
                 &[],

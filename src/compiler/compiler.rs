@@ -2,7 +2,7 @@
 use std::collections::HashSet;
 
 use crate::ast;
-use crate::modules::std::BUILTINS;
+use crate::modules::std::STD;
 use crate::types::{new, Module};
 use crate::util::Stack;
 use crate::vm::{Code, Inst};
@@ -115,7 +115,7 @@ impl Compiler {
         let mut visitor = Visitor::for_func(func_name, self.global_names.clone());
         visitor.visit_func(node)?;
 
-        // Unresolved names are assumed to be builtins.
+        // Unresolved names are assumed to be globals or builtins.
         let mut presumed_globals = vec![];
 
         // Captured vars in current function. These are free vars in the
@@ -187,11 +187,11 @@ impl Compiler {
             }
         }
 
-        let builtins = BUILTINS.read().unwrap();
+        let std = STD.read().unwrap();
         for (addr, name, start, end) in presumed_globals.into_iter() {
             if self.global_names.contains(&name) {
                 visitor.replace(addr, Inst::LoadGlobal(name));
-            } else if builtins.has_global(&name) {
+            } else if std.has_global(&name) {
                 visitor.replace(addr, Inst::LoadBuiltin(name));
             } else {
                 return Err(CompErr::name_not_found(name, start, end));

@@ -4,7 +4,7 @@ use std::fmt;
 use std::fmt::Formatter;
 
 use crate::ast;
-use crate::modules::std::BUILTINS;
+use crate::modules::std::STD;
 use crate::op::{
     BinaryOperator, CompareOperator, InplaceOperator, ShortCircuitCompareOperator,
     UnaryOperator,
@@ -814,7 +814,7 @@ impl Visitor {
     }
 
     fn has_builtin(&self, name: &str) -> bool {
-        BUILTINS.read().unwrap().has_global(name)
+        STD.read().unwrap().has_global(name)
     }
 
     fn len(&self) -> usize {

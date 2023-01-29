@@ -1,4 +1,4 @@
-use crate::modules::std::BUILTINS;
+use crate::modules::std::STD;
 use crate::types::{new, Namespace, ObjectRef, ObjectTrait};
 use crate::vm::RuntimeObjResult;
 
@@ -192,8 +192,8 @@ impl RuntimeContext {
     /// Get builtin object. This is used as a fallback when a name isn't
     /// found in the current scope.
     pub fn get_builtin(&self, name: &str) -> ObjectRef {
-        let builtins = BUILTINS.read().unwrap();
-        let builtins = builtins.down_to_mod().unwrap();
-        builtins.get_attr(name, BUILTINS.clone())
+        let std = STD.read().unwrap();
+        let std = std.down_to_mod().unwrap();
+        std.get_attr(name, STD.clone())
     }
 }

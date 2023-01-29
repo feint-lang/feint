@@ -71,7 +71,11 @@ fn make_module_archive(out_dir: &Path) -> Result<(), Error> {
             if file.extension() == Some(OsStr::new("fi")) {
                 let file_name = file.file_name().unwrap().to_str().unwrap();
                 let file_name = file_name.strip_suffix(".fi").unwrap();
-                let name = format!("{dir_name}.{file_name}");
+                let name = if file_name == "std" {
+                    "std".to_owned()
+                } else {
+                    format!("{dir_name}.{file_name}")
+                };
                 archive.append_path_with_name(&file, name).unwrap();
                 println!("cargo:rerun-if-changed={}", file.display());
             }

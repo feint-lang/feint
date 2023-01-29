@@ -7,7 +7,7 @@ use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 
 use crate::dis::Disassembler;
-use crate::modules::std::BUILTINS;
+use crate::modules::std::STD;
 use crate::types::FuncTrait;
 use crate::vm::{RuntimeBoolResult, RuntimeErr, RuntimeObjResult};
 
@@ -52,7 +52,7 @@ pub trait TypeTrait {
     fn ns(&self) -> &Namespace;
 
     fn module(&self) -> ObjectRef {
-        BUILTINS.clone()
+        STD.clone()
     }
 
     fn id(&self) -> usize {
@@ -165,7 +165,7 @@ pub trait ObjectTrait {
         new::int(self.id())
     }
 
-    /// XXX: This resolves to `std.builtins` unless overridden.
+    /// XXX: This resolves to `std` unless overridden.
     fn module(&self) -> ObjectRef {
         let class = self.class();
         let class = class.read().unwrap();

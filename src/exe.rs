@@ -11,7 +11,7 @@ use once_cell::sync::Lazy;
 use tar::Archive as TarArchive;
 
 use crate::compiler::{CompErr, CompErrKind, Compiler};
-use crate::modules::std::{self as stdlib, BUILTINS};
+use crate::modules::std::{self as stdlib, STD};
 use crate::modules::{add_module, maybe_get_module, MODULES};
 use crate::parser::{ParseErr, ParseErrKind, Parser};
 use crate::result::ExeErrKind::ModuleNotFound;
@@ -30,17 +30,17 @@ use crate::vm::{
 use crate::{ast, dis};
 
 /// At build time, a compressed archive is created containing the
-/// builtin .fi module files (see `build.rs`).
+/// std .fi module files (see `build.rs`).
 ///
 /// At runtime, the module file data is read out and stored in a map
-/// (lazily). When a builtin module is imported, the file data is read
-/// from this map rather than reading from disk.
+/// (lazily). When a std module is imported, the file data is read from
+/// this map rather than reading from disk.
 ///
 /// The utility of this is that we don't need an install process that
-/// copies the builtin module files into some location on the file
-/// system based on the location of the current executable or anything
-/// like that.
-static BUILTIN_FI_MODULES: Lazy<HashMap<String, Vec<u8>>> = Lazy::new(|| {
+/// copies the std module files into some location on the file system
+/// based on the location of the current executable or anything like
+/// that.
+static STD_FI_MODULES: Lazy<HashMap<String, Vec<u8>>> = Lazy::new(|| {
     let archive_bytes: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/modules.tgz"));
     let decoder = GzDecoder::new(archive_bytes);
     let mut archive = TarArchive::new(decoder);
@@ -104,13 +104,13 @@ impl Executor {
 
     /// Bootstrap and return error on failure.
     pub fn bootstrap(&mut self) -> Result<(), ExeErr> {
-        // Add the `builtins` module first because any other module may
-        // rely on it, including `system`.
-        self.extend_builtin_module(BUILTINS.clone(), "std.builtins")?;
-        self.add_module("std.builtins", BUILTINS.clone());
+        // Add the `std` module with builtins first because any other
+        // module may rely on it, including `system`.
+        self.extend_builtin_module(STD.clone(), "std")?;
+        self.add_module("std", STD.clone());
 
         // Add the `system` module next because other modules may rely
-        // on it (except for `builtins`), and its where we store system
+        // on it (except for `std`), and its where we store system
         // information, such as loaded modules, `argv`, etc.
         let system_ref = self.load_module("std.system")?;
         self.add_module("std.system", system_ref.clone());
@@ -384,7 +384,7 @@ impl Executor {
     ///      already been loaded.
     fn load_module(&mut self, name: &str) -> Result<ObjectRef, ExeErr> {
         // TODO: Handle non-std modules
-        if let Some(file_data) = BUILTIN_FI_MODULES.get(name) {
+        if let Some(file_data) = STD_FI_MODULES.get(name) {
             self.set_current_file_name(Path::new(&format!("<{name}>")));
             let mut source = source_from_bytes(file_data);
             let mut module = self.compile_module(name, &mut source)?;

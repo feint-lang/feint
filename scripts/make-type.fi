@@ -89,7 +89,7 @@ $main = (...) =>
     print_err("\nAfter creation tasks:\n")
     print_err($"- Add `pub(crate) mod {name.lower()};` to types/mod.rs")
     print_err($"- Add constructor to types/new.rs")
-    print_err($"- Add entry to `BUILTINS` in modules/builtins.rs")
+    print_err($"- Add entry to `STD` in modules/std/std.rs")
     print_err($"- Add type-related methods in types/base.rs")
     print_err($"- Add Display and Debug impls in types/base.rs")
     print_err($"- Customize implementation")

@@ -1,4 +1,4 @@
-//! Builtins Module
+//! Root of the std module hierarchy containing builtins/prelude.
 use std::sync::{Arc, RwLock};
 
 use once_cell::sync::Lazy;
@@ -6,11 +6,11 @@ use once_cell::sync::Lazy;
 use crate::types::{self, gen, new};
 use crate::vm::RuntimeErr;
 
-pub static BUILTINS: Lazy<gen::obj_ref_t!(types::module::Module)> = Lazy::new(|| {
-    types::new::builtin_module(
-        "std.builtins",
-        "<std.builtins>",
-        "std.builtins module",
+pub static STD: Lazy<gen::obj_ref_t!(types::module::Module)> = Lazy::new(|| {
+    new::builtin_module(
+        "std",
+        "<std>",
+        "std module (builtins)",
         &[
             ("Type", types::class::TYPE_TYPE.clone()),
             ("Always", types::always::ALWAYS_TYPE.clone()),
@@ -34,7 +34,7 @@ pub static BUILTINS: Lazy<gen::obj_ref_t!(types::module::Module)> = Lazy::new(||
             (
                 "new_type",
                 new::builtin_func(
-                    "std.builtins",
+                    "std",
                     "new_type",
                     None,
                     &["module", "name"],
