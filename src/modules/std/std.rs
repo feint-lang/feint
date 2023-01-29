@@ -7,7 +7,7 @@ use crate::types::{self, gen, new};
 use crate::vm::RuntimeErr;
 
 pub static STD: Lazy<gen::obj_ref_t!(types::module::Module)> = Lazy::new(|| {
-    new::builtin_module(
+    new::intrinsic_module(
         "std",
         "<std>",
         "std module (builtins)",
@@ -16,7 +16,7 @@ pub static STD: Lazy<gen::obj_ref_t!(types::module::Module)> = Lazy::new(|| {
             ("Always", types::always::ALWAYS_TYPE.clone()),
             ("Bool", types::bool::BOOL_TYPE.clone()),
             ("BoundFunc", types::bound_func::BOUND_FUNC_TYPE.clone()),
-            ("BuiltinFunc", types::builtin_func::BUILTIN_FUNC_TYPE.clone()),
+            ("IntrinsicFunc", types::intrinsic_func::INTRINSIC_FUNC_TYPE.clone()),
             ("Closure", types::closure::CLOSURE_TYPE.clone()),
             ("Err", types::err::ERR_TYPE.clone()),
             ("ErrType", types::err_type::ERR_TYPE_TYPE.clone()),
@@ -33,7 +33,7 @@ pub static STD: Lazy<gen::obj_ref_t!(types::module::Module)> = Lazy::new(|| {
             ("Tuple", types::tuple::TUPLE_TYPE.clone()),
             (
                 "new_type",
-                new::builtin_func(
+                new::intrinsic_func(
                     "std",
                     "new_type",
                     None,

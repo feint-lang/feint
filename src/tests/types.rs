@@ -100,7 +100,7 @@ mod list {
         let list = obj_ref.read().unwrap();
         let push = list.get_attr("push", obj_ref.clone());
         check_ok(push.clone(), "list.push() is not OK");
-        assert!(push.read().unwrap().is_builtin_func());
+        assert!(push.read().unwrap().is_intrinsic_func());
     }
 }
 
@@ -121,7 +121,7 @@ mod custom {
         ));
         let new = type_obj.read().unwrap().get_attr("new", type_obj.clone());
         let new = new.read().unwrap();
-        let new = new.down_to_builtin_func().unwrap();
+        let new = new.down_to_intrinsic_func().unwrap();
         let new = new.func();
         new(type_obj.clone(), vec![attrs], vm)
     }
@@ -130,13 +130,13 @@ mod custom {
     fn test_custom() {
         let vm = &mut VM::default();
 
-        let mod1 = new::builtin_module("test1", "<test1>", "test module 1", &[]);
+        let mod1 = new::intrinsic_module("test1", "<test1>", "test module 1", &[]);
         let t1 = new::custom_type(mod1, "Custom1");
         let t1_obj1 = instance(t1.clone(), &[("value", new::nil())], vm).unwrap();
         let t1_obj2 = instance(t1.clone(), &[("value", new::nil())], vm).unwrap();
         let t1_obj3 = instance(t1.clone(), &[("value", new::nil())], vm).unwrap();
 
-        let mod2 = new::builtin_module("test2", "<test2>", "test module 2", &[]);
+        let mod2 = new::intrinsic_module("test2", "<test2>", "test module 2", &[]);
         let t2 = new::custom_type(mod2, "Custom2");
         let t2_obj1 = instance(t2.clone(), &[], vm).unwrap();
 

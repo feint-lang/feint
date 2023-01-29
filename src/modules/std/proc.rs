@@ -7,7 +7,7 @@ use crate::types::gen::obj_ref_t;
 use crate::types::{new, Module};
 
 pub static PROC: Lazy<obj_ref_t!(Module)> = Lazy::new(|| {
-    new::builtin_module(
+    new::intrinsic_module(
         "std.proc",
         "<std.proc>",
         "Proc module",

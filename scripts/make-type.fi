@@ -1,5 +1,5 @@
 #!./target/release/feint
-"Script to generate a new builtin type definition.
+"Script to generate a new intrinsic type definition.
 
 # Args
 
@@ -9,7 +9,7 @@
 
 - repr?: Str
 
-  The string representation of the type. E.g., for the builtin `Nil`
+  The string representation of the type. E.g., for the intrinsic `Nil`
   type, this would be `nil`. If the type has a complex or dynamic
   representation, the `fmt::Debug` and `fmt::Display` will need a
   custom implementation.
@@ -41,7 +41,7 @@ EXIT_CODES = {
 
 
 $main = (...) =>
-    "Generate a new builtin type
+    "Generate a new intrinsic type
 
     This takes a type name and optional string representation and prints
     out the type definition, which can be redirected into a file:

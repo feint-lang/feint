@@ -81,11 +81,10 @@ pub struct Module {
 gen::standard_object_impls!(Module);
 
 impl Module {
-    /// NOTE: The `$doc` attribute should only be passed for builtin
-    ///       modules implemented in Rust and for special cases such as
-    ///       the REPL module. Modules implemented in FeInt will have
-    ///       their `$doc` attribute initialized from their module level
-    ///       docstring.
+    /// NOTE: The `$doc` attribute should only be passed for intrinsic
+    ///       modules and for special cases such as the REPL module.
+    ///       Modules implemented in FeInt will have their `$doc`
+    ///       attribute initialized from their module level docstring.
     pub fn new(name: String, path: String, code: Code, doc: Option<String>) -> Self {
         let ns = Namespace::with_entries(&[
             ("$full_name", new::str(name.as_str())),
@@ -145,7 +144,7 @@ impl Module {
     }
 
     pub fn get_main(&self) -> Option<ObjectRef> {
-        // XXX: If a builtin module defines $main(), it will be a
+        // XXX: If an intrinsic module defines $main(), it will be a
         //      global. If a .fi module defines $main(), it may or may
         //      not have been copied to the module's globals.
         self.get_global("$main").or_else(|| self.code.get_main())

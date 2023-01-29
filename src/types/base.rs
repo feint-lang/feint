@@ -18,7 +18,6 @@ use super::ns::Namespace;
 use super::always::{Always, AlwaysType};
 use super::bool::{Bool, BoolType};
 use super::bound_func::{BoundFunc, BoundFuncType};
-use super::builtin_func::{BuiltinFunc, BuiltinFuncType};
 use super::cell::{Cell, CellType};
 use super::class::{Type, TypeType};
 use super::closure::{Closure, ClosureType};
@@ -29,6 +28,7 @@ use super::file::{File, FileType};
 use super::float::{Float, FloatType};
 use super::func::{Func, FuncType};
 use super::int::{Int, IntType};
+use super::intrinsic_func::{IntrinsicFunc, IntrinsicFuncType};
 use super::iterator::{FIIterator, IteratorType};
 use super::list::{List, ListType};
 use super::map::{Map, MapType};
@@ -358,7 +358,7 @@ pub trait ObjectTrait {
     make_type_checker!(is_always_type, AlwaysType);
     make_type_checker!(is_bool_type, BoolType);
     make_type_checker!(is_bound_func_type, BoundFuncType);
-    make_type_checker!(is_builtin_func_type, BuiltinFuncType);
+    make_type_checker!(is_intrinsic_func_type, IntrinsicFuncType);
     make_type_checker!(is_cell_type, CellType);
     make_type_checker!(is_closure_type, ClosureType);
     make_type_checker!(is_err_type, ErrType);
@@ -380,7 +380,7 @@ pub trait ObjectTrait {
     make_type_checker!(is_always, Always);
     make_type_checker!(is_bool, Bool);
     make_type_checker!(is_bound_func, BoundFunc);
-    make_type_checker!(is_builtin_func, BuiltinFunc);
+    make_type_checker!(is_intrinsic_func, IntrinsicFunc);
     make_type_checker!(is_cell, Cell);
     make_type_checker!(is_closure, Closure);
     make_type_checker!(is_err, ErrObj);
@@ -419,7 +419,7 @@ pub trait ObjectTrait {
     make_down_to!(down_to_always_type, AlwaysType);
     make_down_to!(down_to_bool_type, BoolType);
     make_down_to!(down_to_bound_func_type, BoundFuncType);
-    make_down_to!(down_to_builtin_func_type, BuiltinFuncType);
+    make_down_to!(down_to_intrinsic_func_type, IntrinsicFuncType);
     make_down_to!(down_to_cell_type, CellType);
     make_down_to!(down_to_closure_type, ClosureType);
     make_down_to!(down_to_custom_type, CustomType);
@@ -442,7 +442,7 @@ pub trait ObjectTrait {
     make_down_to!(down_to_always, Always);
     make_down_to!(down_to_bool, Bool);
     make_down_to!(down_to_bound_func, BoundFunc);
-    make_down_to!(down_to_builtin_func, BuiltinFunc);
+    make_down_to!(down_to_intrinsic_func, IntrinsicFunc);
     make_down_to!(down_to_cell, Cell);
     make_down_to_mut!(down_to_cell_mut, Cell);
     make_down_to!(down_to_closure, Closure);
@@ -465,7 +465,7 @@ pub trait ObjectTrait {
     make_down_to!(down_to_tuple, Tuple);
 
     fn as_func(&self) -> Option<&dyn FuncTrait> {
-        let f: &dyn FuncTrait = if let Some(f) = self.down_to_builtin_func() {
+        let f: &dyn FuncTrait = if let Some(f) = self.down_to_intrinsic_func() {
             f
         } else if let Some(f) = self.down_to_func() {
             f
@@ -616,7 +616,7 @@ impl fmt::Display for dyn ObjectTrait {
             AlwaysType,
             BoolType,
             BoundFuncType,
-            BuiltinFuncType,
+            IntrinsicFuncType,
             CellType,
             ClosureType,
             CustomType,
@@ -642,7 +642,7 @@ impl fmt::Display for dyn ObjectTrait {
             Always,
             Bool,
             BoundFunc,
-            BuiltinFunc,
+            IntrinsicFunc,
             Cell,
             Closure,
             CustomObj,
@@ -674,7 +674,7 @@ impl fmt::Debug for dyn ObjectTrait {
             AlwaysType,
             BoolType,
             BoundFuncType,
-            BuiltinFuncType,
+            IntrinsicFuncType,
             CellType,
             ClosureType,
             CustomType,
@@ -700,7 +700,7 @@ impl fmt::Debug for dyn ObjectTrait {
             Always,
             Bool,
             BoundFunc,
-            BuiltinFunc,
+            IntrinsicFunc,
             Cell,
             Closure,
             CustomObj,

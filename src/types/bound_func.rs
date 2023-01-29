@@ -37,16 +37,16 @@ impl BoundFunc {
     pub fn new(func: ObjectRef, this: ObjectRef) -> Self {
         let f = func.read().unwrap();
 
-        let (module_name, name, params, doc) = if let Some(f) = f.down_to_builtin_func()
-        {
-            (f.module_name(), f.name(), f.params(), f.get_doc())
-        } else if let Some(f) = f.down_to_func() {
-            (f.module_name(), f.name(), f.params(), f.get_doc())
-        } else if let Some(f) = f.down_to_closure() {
-            (f.module_name(), f.name(), f.params(), f.get_doc())
-        } else {
-            panic!("Unexpected bound func type: {f}")
-        };
+        let (module_name, name, params, doc) =
+            if let Some(f) = f.down_to_intrinsic_func() {
+                (f.module_name(), f.name(), f.params(), f.get_doc())
+            } else if let Some(f) = f.down_to_func() {
+                (f.module_name(), f.name(), f.params(), f.get_doc())
+            } else if let Some(f) = f.down_to_closure() {
+                (f.module_name(), f.name(), f.params(), f.get_doc())
+            } else {
+                panic!("Unexpected bound func type: {f}")
+            };
 
         let module_name = module_name.to_owned();
         let name = name.to_owned();

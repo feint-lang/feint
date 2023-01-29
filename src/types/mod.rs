@@ -7,9 +7,9 @@ pub(crate) use module::Module;
 pub(crate) use ns::Namespace;
 
 // Functions
-pub(crate) use builtin_func::BuiltinFunc;
 pub(crate) use func::Func;
 pub(crate) use func_trait::FuncTrait;
+pub(crate) use intrinsic_func::IntrinsicFunc;
 
 pub(crate) mod new;
 pub(crate) use result::{Args, Params, ThisOpt};
@@ -20,11 +20,10 @@ mod func_trait;
 // Namespace (not a type)
 pub(crate) mod ns;
 
-// Builtin Types
+// Intrinsic Types
 pub(crate) mod always;
 pub(crate) mod bool;
 pub(crate) mod bound_func;
-pub(crate) mod builtin_func;
 pub(crate) mod cell;
 pub(crate) mod class;
 pub(crate) mod closure;
@@ -36,6 +35,7 @@ pub(crate) mod float;
 pub(crate) mod func;
 pub(crate) mod gen;
 pub(crate) mod int;
+pub(crate) mod intrinsic_func;
 pub(crate) mod iterator;
 pub(crate) mod list;
 pub(crate) mod map;

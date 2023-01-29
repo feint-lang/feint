@@ -82,7 +82,7 @@ instructions for use with [neovim].
 
 TODO
 
-## Builtin Types
+## Intrinsic Types
 
 - Nil
 - Bool (`true` and `false` keywords, not ints)
@@ -93,7 +93,7 @@ TODO
 - List
 - Map
 - Error
-- BuiltinFunc (e.g., `print()`)
+- IntrinsicFunc (e.g., `print()`)
 - Func
 - Module
 

@@ -1,6 +1,6 @@
 //! Error Types
 //!
-//! This is a builtin type used to tag builtin `Err` instances.
+//! Builtin type used to tag builtin `Err` instances.
 use std::any::Any;
 use std::fmt;
 use std::sync::{Arc, RwLock};

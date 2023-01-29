@@ -16,7 +16,7 @@ use crate::modules::get_module;
 use crate::op::{BinaryOperator, CompareOperator, InplaceOperator, UnaryOperator};
 use crate::source::Location;
 use crate::types::{
-    new, Args, BuiltinFunc, Func, FuncTrait, Module, ObjectRef, ThisOpt,
+    new, Args, Func, FuncTrait, IntrinsicFunc, Module, ObjectRef, ThisOpt,
 };
 use crate::util::Stack;
 
@@ -688,7 +688,7 @@ impl VM {
                 };
 
                 let obj = obj_ref.read().unwrap();
-                if obj.is_builtin_func() || obj.is_func() || obj.is_closure() {
+                if obj.is_intrinsic_func() || obj.is_func() || obj.is_closure() {
                     // If `b` in `a.b` is a function, bind `b` to `a`.
 
                     // TODO: Check whether `a` is a type or an instance.
@@ -873,9 +873,9 @@ impl VM {
 
     pub fn call(&mut self, callable_ref: ObjectRef, args: Args) -> RuntimeResult {
         let callable = callable_ref.read().unwrap();
-        if let Some(func) = callable.down_to_builtin_func() {
-            log::trace!("CALL builtin func {}", func.name());
-            self.call_builtin_func(func, None, args)
+        if let Some(func) = callable.down_to_intrinsic_func() {
+            log::trace!("CALL intrinsic func {}", func.name());
+            self.call_intrinsic_func(func, None, args)
         } else if let Some(func) = callable.down_to_func() {
             log::trace!("CALL func {}", func.name());
             self.call_func(func, None, args, None)
@@ -886,9 +886,9 @@ impl VM {
             let func_ref = bound_func.func();
             let func_obj = func_ref.read().unwrap();
             let this_opt = Some(bound_func.this());
-            if let Some(func) = func_obj.down_to_builtin_func() {
+            if let Some(func) = func_obj.down_to_intrinsic_func() {
                 log::trace!(
-                    "CALL bound builtin func {} with this: {}",
+                    "CALL bound intrinsic func {} with this: {}",
                     func.name(),
                     bound_func.this().read().unwrap()
                 );
@@ -905,7 +905,7 @@ impl VM {
                         panic!("Expected this type {expected_type}; got {this_type}");
                     }
                 }
-                self.call_builtin_func(func, this_opt, args)
+                self.call_intrinsic_func(func, this_opt, args)
             } else if let Some(func) = func_obj.down_to_func() {
                 log::trace!(
                     "CALL bound func {} with this: {}",
@@ -927,9 +927,9 @@ impl VM {
         }
     }
 
-    pub fn call_builtin_func(
+    pub fn call_intrinsic_func(
         &mut self,
-        func: &BuiltinFunc,
+        func: &IntrinsicFunc,
         this_opt: ThisOpt,
         args: Args,
     ) -> RuntimeResult {

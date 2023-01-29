@@ -21,7 +21,7 @@ use super::ns::Namespace;
 // Int Type ------------------------------------------------------------
 
 static DOC: &str = "
-Builtin Int type
+Intrinsic Int type
 ";
 
 gen::type_and_impls!(IntType, Int);

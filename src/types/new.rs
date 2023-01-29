@@ -17,7 +17,6 @@ use super::gen::{obj_ref, obj_ref_t, use_arg};
 use super::result::Params;
 
 use super::bound_func::BoundFunc;
-use super::builtin_func::{BuiltinFn, BuiltinFunc};
 use super::cell::Cell;
 use super::closure::Closure;
 use super::custom::{CustomObj, CustomType};
@@ -27,6 +26,7 @@ use super::file::File;
 use super::float::Float;
 use super::func::Func;
 use super::int::Int;
+use super::intrinsic_func::{IntrinsicFn, IntrinsicFunc};
 use super::iterator::FIIterator;
 use super::list::List;
 use super::map::Map;
@@ -62,23 +62,23 @@ pub fn empty_tuple() -> ObjectRef {
     globals::EMPTY_TUPLE.clone()
 }
 
-// Builtin type constructors -------------------------------------------
+// Intrinsic type constructors ---------------------------------
 
 pub fn bound_func(func: ObjectRef, this: ObjectRef) -> ObjectRef {
     obj_ref!(BoundFunc::new(func, this))
 }
 
-pub fn builtin_func(
+pub fn intrinsic_func(
     module_name: &str,
     name: &str,
     this_type: Option<ObjectRef>,
     params: &[&str],
     doc: &str,
-    func: BuiltinFn,
+    func: IntrinsicFn,
 ) -> ObjectRef {
     let params = params.iter().map(|n| n.to_string()).collect();
     let doc = format_doc(doc);
-    obj_ref!(BuiltinFunc::new(
+    obj_ref!(IntrinsicFunc::new(
         module_name.to_owned(),
         name.to_owned(),
         this_type,
@@ -88,7 +88,7 @@ pub fn builtin_func(
     ))
 }
 
-pub fn builtin_module(
+pub fn intrinsic_module(
     name: &str,
     path: &str,
     doc: &str,
@@ -269,7 +269,7 @@ pub fn custom_type(module: ObjectRef, name: &str) -> ObjectRef {
         let ns = class.ns_mut();
         ns.insert(
             "new",
-            builtin_func(
+            intrinsic_func(
                 module.read().unwrap().down_to_mod().unwrap().name(),
                 name,
                 Some(class_ref.clone()),

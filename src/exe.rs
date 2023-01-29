@@ -106,7 +106,7 @@ impl Executor {
     pub fn bootstrap(&mut self) -> Result<(), ExeErr> {
         // Add the `std` module with builtins first because any other
         // module may rely on it, including `system`.
-        self.extend_builtin_module(STD.clone(), "std")?;
+        self.extend_intrinsic_module(STD.clone(), "std")?;
         self.add_module("std", STD.clone());
 
         // Add the `system` module next because other modules may rely
@@ -128,9 +128,9 @@ impl Executor {
         Ok(())
     }
 
-    /// Extend builtin module (implemented in Rust) with global objects
-    /// from corresponding FeInt module.
-    fn extend_builtin_module(
+    /// Extend intrinsic module with global objects from corresponding
+    /// FeInt module.
+    fn extend_intrinsic_module(
         &mut self,
         base_module: ObjectRef,
         name: &str,
@@ -299,10 +299,10 @@ impl Executor {
                         .vm
                         .call_func(main, None, args, None)
                         .and_then(|_| self.vm.halt_top());
-                } else if let Some(main) = main.down_to_builtin_func() {
+                } else if let Some(main) = main.down_to_intrinsic_func() {
                     result = self
                         .vm
-                        .call_builtin_func(main, None, args)
+                        .call_intrinsic_func(main, None, args)
                         .and_then(|_| self.vm.halt_top());
                 }
             }

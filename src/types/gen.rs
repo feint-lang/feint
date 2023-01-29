@@ -15,7 +15,7 @@ pub(crate) use obj_ref_t;
 
 // Types ---------------------------------------------------------------
 
-/// Generate a builtin type definition. This includes the type's
+/// Generate an intrinsic type definition. This includes the type's
 /// struct and impl as well as the TypeTrait, Send, and Sync impls.
 ///
 /// Args:
@@ -161,7 +161,7 @@ pub(crate) use type_and_impls;
 
 // Methods -------------------------------------------------------------
 
-/// Make a class or instance method for a builtin type.
+/// Make a class or instance method for an intrinsic type.
 ///
 /// Args:
 ///
@@ -178,7 +178,7 @@ pub(crate) use type_and_impls;
 ///     The function that implements the method. Accepts 3 args: `this`
 ///     (ObjectRef), `args` (Args), and `vm` (&mut VM).
 ///
-/// This is used for adding methods to builtin types. It reduces a bit
+/// This is used for adding methods to intrinsic types. It reduces a bit
 /// of tedium in the process of adding methods.
 ///
 /// Note that, in general, both class and instance methods are added to
@@ -186,14 +186,14 @@ pub(crate) use type_and_impls;
 /// possible to create instance-specific methods, but I'm not sure if
 /// that's useful.
 ///
-/// Returns a 2-tuple containing the method name and the builtin
+/// Returns a 2-tuple containing the method name and the intrinsic
 /// function object itself. This makes it easy to add the method to the
 /// type's namespace by calling `ns.add_obj(meth!(...))`.
 macro_rules! meth {
     ( $name:literal, $this_type:expr, $params:expr, $doc:literal, $func:expr ) => {
         (
             $name,
-            new::builtin_func(
+            new::intrinsic_func(
                 "std",
                 $name,
                 Some($this_type.clone()),
@@ -211,7 +211,7 @@ macro_rules! prop {
     ( $name:literal, $this_type:expr, $doc:literal, $func:expr ) => {
         (
             $name,
-            new::prop(new::builtin_func(
+            new::prop(new::intrinsic_func(
                 "std",
                 $name,
                 Some($this_type.clone()),
