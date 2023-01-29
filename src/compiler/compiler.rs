@@ -8,7 +8,7 @@ use crate::util::Stack;
 use crate::vm::{Code, Inst};
 
 use super::result::{CompErr, CompResult, VisitResult};
-use super::visitor::Visitor;
+use super::visitor::CompilerVisitor;
 
 // Compiler ------------------------------------------------------------
 
@@ -25,7 +25,7 @@ struct CaptureInfo {
 
 pub struct Compiler {
     // The visitor stack is analogous to the VM call stack.
-    visitor_stack: Stack<(Visitor, usize)>, // visitor, scope tree pointer
+    visitor_stack: Stack<(CompilerVisitor, usize)>, // visitor, scope tree pointer
     // Known global names. This can be used in contexts where globals
     // are known to exist but aren't available to the compiler (e.g., in
     // the REPL).
@@ -65,7 +65,8 @@ impl Compiler {
         module_name: &str,
         module: ast::Module,
     ) -> Result<Code, CompErr> {
-        let mut visitor = Visitor::for_module(module_name, self.global_names.clone());
+        let mut visitor =
+            CompilerVisitor::for_module(module_name, self.global_names.clone());
         visitor.visit_module(module)?;
         self.global_names = self
             .global_names
@@ -112,7 +113,8 @@ impl Compiler {
         let stack = &mut self.visitor_stack;
         let params = node.params.clone();
 
-        let mut visitor = Visitor::for_func(func_name, self.global_names.clone());
+        let mut visitor =
+            CompilerVisitor::for_func(func_name, self.global_names.clone());
         visitor.visit_func(node)?;
 
         // Unresolved names are assumed to be globals or builtins.
