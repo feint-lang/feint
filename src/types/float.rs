@@ -10,7 +10,7 @@ use crate::vm::{RuntimeBoolResult, RuntimeErr, RuntimeObjResult};
 use super::gen;
 
 use super::new;
-use super::util::{eq_int_float, gt_int_float, lt_int_float};
+use super::util::{eq_int_float, float_gt_int, float_lt_int};
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
 use super::class::TYPE_TYPE;
@@ -107,7 +107,7 @@ impl ObjectTrait for Float {
         if let Some(rhs) = rhs.down_to_float() {
             Ok(self.value() < rhs.value())
         } else if let Some(rhs) = rhs.down_to_int() {
-            Ok(lt_int_float(rhs, self))
+            Ok(float_lt_int(self, rhs))
         } else {
             Err(RuntimeErr::type_err(format!(
                 "Could not compare {} to {}: <",
@@ -121,7 +121,7 @@ impl ObjectTrait for Float {
         if let Some(rhs) = rhs.down_to_float() {
             Ok(self.value() > rhs.value())
         } else if let Some(rhs) = rhs.down_to_int() {
-            Ok(gt_int_float(rhs, self))
+            Ok(float_gt_int(self, rhs))
         } else {
             Err(RuntimeErr::type_err(format!(
                 "Could not compare {} to {}: >",
