@@ -226,7 +226,7 @@ pub trait ObjectTrait {
                     let mut dis = Disassembler::new();
                     dis.disassemble(f.code());
                 } else {
-                    eprintln!("Cannot disassemble bound func: {}", b);
+                    eprintln!("Cannot disassemble bound func: {b}");
                 }
             } else if let Some(c) = self.down_to_closure() {
                 let f = c.func();
@@ -235,7 +235,7 @@ pub trait ObjectTrait {
                     let mut dis = Disassembler::new();
                     dis.disassemble(f.code());
                 } else {
-                    eprintln!("Cannot disassemble closure: {}", c);
+                    eprintln!("Cannot disassemble closure: {c}");
                 }
             } else if let Some(m) = self.down_to_mod() {
                 let mut dis = Disassembler::new();

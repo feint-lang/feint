@@ -285,7 +285,7 @@ impl Scope {
                 if let Some(pos) = self.jumps.iter().position(|(n, _)| n == name) {
                     &self.jumps[pos].1
                 } else {
-                    panic!("Jump does not exist in scope: {}", name)
+                    panic!("Jump does not exist in scope: {name}")
                 }
             }
         };

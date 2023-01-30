@@ -190,7 +190,7 @@ impl Executor {
                 Some(inst) => format!("{inst:?}"),
                 None => "[EMPTY CHUNK]".to_owned(),
             };
-            panic!("Expected module chunk to end with POP; got {}", last_inst);
+            panic!("Expected module chunk to end with POP; got {last_inst}");
         }
 
         {
@@ -485,7 +485,7 @@ impl Executor {
         let col = loc.col;
         let mut message = match &err.kind {
             UnexpectedChar(c) => {
-                format!("Syntax error: Unexpected character at column {}: '{}'", col, c)
+                format!("Syntax error: Unexpected character at column {col}: '{c}'")
             }
             UnmatchedOpeningBracket(_) => {
                 format!("Unmatched open bracket at {loc}")
@@ -592,7 +592,7 @@ impl Executor {
                 "Parse error: extra match arm found after default match arm".to_string()
             }
             SyntaxErr(loc) => format!("Syntax error at {loc}"),
-            kind => format!("Unhandled parse error: {:?}", kind),
+            kind => format!("Unhandled parse error: {kind:?}"),
         };
         if self.debug {
             message = format!("PARSE ERROR: {message}");
@@ -663,7 +663,7 @@ impl Executor {
             NameErr(message) => format!("Name error: {message}"),
             TypeErr(message) => format!("Type error: {message}"),
             NotCallable(type_name) => format!("Object is not callable: {type_name}"),
-            kind => format!("Unhandled runtime error: {}", kind),
+            kind => format!("Unhandled runtime error: {kind}"),
         };
         if self.debug {
             message = format!("RUNTIME ERROR: {message}");
@@ -680,6 +680,6 @@ impl Executor {
 
     fn display_vm_state(&self, result: &VMExeResult) {
         eprintln!("\n{:=<79}", "VM STATE ");
-        eprintln!("{:?}", result);
+        eprintln!("{result:?}");
     }
 }

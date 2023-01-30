@@ -119,7 +119,7 @@ impl<T: BufRead> Source<T> {
                 }
                 Ok(n) => {
                     if n > MAX_LINE_LENGTH_USIZE {
-                        panic!("Line is too long (> {})", MAX_LINE_LENGTH);
+                        panic!("Line is too long (> {MAX_LINE_LENGTH})");
                     }
                     self.line_no += 1;
                     self.col = 0;
@@ -141,7 +141,7 @@ impl<T: BufRead> Source<T> {
                     }
                 }
                 Err(err) => {
-                    panic!("Could not read line from source: {}", err);
+                    panic!("Could not read line from source: {err}");
                 }
             };
         }

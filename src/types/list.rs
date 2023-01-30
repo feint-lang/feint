@@ -250,7 +250,7 @@ impl fmt::Display for List {
             })
             .collect();
         let items_str = items.join(", ");
-        write!(f, "[{}]", items_str)
+        write!(f, "[{items_str}]")
     }
 }
 

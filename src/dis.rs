@@ -37,7 +37,7 @@ impl Disassembler {
             if let Some(func) = obj.down_to_func() {
                 println!();
                 let heading = format!("{func:?} ");
-                println!("{:=<79}", heading);
+                println!("{heading:=<79}");
                 self.disassemble(func.code());
             }
         }

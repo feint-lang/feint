@@ -24,11 +24,8 @@ impl Module {
 
 impl fmt::Debug for Module {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let items: Vec<String> = self
-            .statements
-            .iter()
-            .map(|statement| format!("{:?}", statement))
-            .collect();
+        let items: Vec<String> =
+            self.statements.iter().map(|statement| format!("{statement:?}")).collect();
         write!(f, "{}", items.join(" ; "))
     }
 }
@@ -134,7 +131,7 @@ impl fmt::Debug for StatementKind {
             Self::Return(expr) => write!(f, "return {expr:?}"),
             Self::Halt(expr) => write!(f, "$halt {expr:?}"),
             Self::Print(expr) => write!(f, "$print {expr:?}"),
-            Self::Expr(expr) => write!(f, "{:?}", expr),
+            Self::Expr(expr) => write!(f, "{expr:?}"),
         }
     }
 }
@@ -478,11 +475,8 @@ impl StatementBlock {
 
 impl fmt::Debug for StatementBlock {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let items: Vec<String> = self
-            .statements
-            .iter()
-            .map(|statement| format!("{:?}", statement))
-            .collect();
+        let items: Vec<String> =
+            self.statements.iter().map(|statement| format!("{statement:?}")).collect();
         write!(f, "-> {}", items.join(" ; "))
     }
 }
@@ -660,6 +654,6 @@ impl fmt::Debug for IdentKind {
             Self::SpecialIdent(name) => name,
             Self::TypeIdent(name) => name,
         };
-        write!(f, "{}", name)
+        write!(f, "{name}")
     }
 }

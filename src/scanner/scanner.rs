@@ -787,7 +787,7 @@ impl<'a, T: BufRead> Scanner<'a, T> {
                 Some('o') | Some('O') => 8,
                 Some('x') | Some('X') => 16,
                 Some(t) if t.is_ascii_alphabetic() => {
-                    panic!("Unsupported numeric type: {}", t);
+                    panic!("Unsupported numeric type: {t}");
                 }
                 _ => 10,
             }

@@ -61,7 +61,7 @@ impl Repl {
                 // Unexpected error encountered while attempting to read
                 // a line.
                 Err(err) => {
-                    let msg = format!("Could not read line: {}", err);
+                    let msg = format!("Could not read line: {err}");
                     break Err(ExeErr::new(ExeErrKind::ReplErr(msg)));
                 }
             }
@@ -230,7 +230,7 @@ impl Repl {
                 println!("REPL history will be saved to {}", path.to_string_lossy());
                 match self.reader.load_history(path.as_path()) {
                     Ok(_) => (),
-                    Err(err) => eprintln!("Could not load REPL history: {}", err),
+                    Err(err) => eprintln!("Could not load REPL history: {err}"),
                 }
             }
             None => (),
@@ -244,7 +244,7 @@ impl Repl {
                 match self.reader.save_history(path.as_path()) {
                     Ok(_) => (),
                     Err(err) => {
-                        eprintln!("WARNING: Could not save REPL history: {}", err)
+                        eprintln!("WARNING: Could not save REPL history: {err}")
                     }
                 }
             }

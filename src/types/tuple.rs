@@ -169,7 +169,7 @@ impl fmt::Display for Tuple {
             self.iter().map(|item| format!("{:?}", &*item.read().unwrap())).collect();
         let items_str = items.join(", ");
         let trailing_comma = if num_items == 1 { "," } else { "" };
-        write!(f, "({}{})", items_str, trailing_comma)
+        write!(f, "({items_str}{trailing_comma})")
     }
 }
 

@@ -770,7 +770,7 @@ impl VM {
             cell.set_value(result.clone());
             self.push_temp(result);
         } else {
-            return Err(RuntimeErr::expected_var(format!("Binary op: {}", op)));
+            return Err(RuntimeErr::expected_var(format!("Binary op: {op}")));
         }
         Ok(())
     }
