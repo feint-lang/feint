@@ -1,0 +1,56 @@
+# Ported from https://github.com/RustPython/RustPython/blob/main/benches/benchmarks/mandelbrot.py
+# (not sure if it's that's the original source).
+#
+# Python runs this in ~200ms on my laptop. This version takes over
+# a second using a release build.
+#
+# The most notable issue is that a hack has to be used to reassign outer
+# vars--compute new value into temporary, reset var using `*= 0` hack,
+# reassign var to temporary value using `+=` hack. Given the number of
+# computations in the inner loop, this likely causes serious performance
+# degradation.
+$main = (...) =>
+    w = 50.0
+    h = 50.0
+    y = 0.0
+
+    loop y < h ->
+        x = 0.0
+
+        loop x < w ->
+            zr = 0.0
+            zi = 0.0
+            tr = 0.0
+            ti = 0.0
+            cr = 2 * x / w - 1.5
+            ci = 2 * y / h - 1.0
+            i = 0
+
+            loop i < 50 && tr + ti <= 4 ->
+                new_zi = 2 * zr * zi + ci
+                zi *= 0.0
+                zi += new_zi
+
+                new_zr = tr - ti + cr
+                zr *= 0
+                zr += new_zr
+
+                new_tr = zr * zr
+                tr *= 0
+                tr += new_tr
+
+                new_ti = zi * zi
+                ti *= 0
+                ti += new_ti
+
+                i += 1
+
+            # NOTE: Using $print instead of print to avoid function call
+            #       overhead in this hot loop. Additionally, print
+            #       currently always adds a newline.
+            $print(if tr + ti <= 4 -> "*" else -> ".",)
+
+            x += 1
+
+        $print("\n",)
+        y += 1
