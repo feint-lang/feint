@@ -41,13 +41,13 @@ else ->
 # Pattern matching
 obj = (1, 2)
 pat = @
-assert(obj == pat, (obj, pat), true)
+assert(obj == pat, $"{obj} != {pat}", true)
 pat = (1, @)
-assert(obj == pat, (obj, pat), true)
+assert(obj == pat, $"{obj} != {pat}", true)
 pat = (@, 2)
-assert(obj == pat, (obj, pat), true)
+assert(obj == pat, $"{obj} != {pat}", true)
 
-# This just demonstrates that if/else suite at the end of the file
+# This just demonstrates that an if/else suite at the end of the file
 # doesn't cause an error.
 if false ->
     print_err(nil)

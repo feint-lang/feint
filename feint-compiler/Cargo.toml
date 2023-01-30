@@ -1,0 +1,20 @@
+[package]
+name = "feint-compiler"
+edition.workspace = true
+version.workspace = true
+description.workspace = true
+authors.workspace = true
+readme.workspace = true
+license-file.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+[dependencies]
+feint-builtins = { path = "../feint-builtins" }
+feint-util = { path = "../feint-util" }
+
+log.workspace = true
+num-bigint.workspace = true
+num-traits.workspace = true
+once_cell.workspace = true
+regex.workspace = true

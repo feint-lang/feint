@@ -31,9 +31,9 @@ checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
 [[package]]
 name = "cc"
-version = "1.0.78"
+version = "1.0.79"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a20104e2335ce8a659d6dd92a51a767a0c062599c73b343fd152cb401e828c3d"
+checksum = "50d30906286121d95be3d479533b458f87493b30a4b5f79a607db8f5d11aa91f"
 
 [[package]]
 name = "cfg-if"
@@ -43,9 +43,9 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "clap"
-version = "4.1.1"
+version = "4.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ec7a4128863c188deefe750ac1d1dfe66c236909f845af04beed823638dc1b2"
+checksum = "f13b9c79b5d1dd500d20ef541215a6423c75829ef43117e1b4d17fd8af0b5d76"
 dependencies = [
  "bitflags",
  "clap_lex",
@@ -56,9 +56,9 @@ dependencies = [
 
 [[package]]
 name = "clap_complete"
-version = "4.1.0"
+version = "4.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce8955d4e8cd4f28f9a01c93a050194c4d131e73ca02f6636bcddbed867014d7"
+checksum = "3d6540eedc41f8a5a76cf3d8d458057dcdf817be4158a55b5f861f7a5483de75"
 dependencies = [
  "clap",
 ]
@@ -195,9 +195,9 @@ dependencies = [
 
 [[package]]
 name = "fd-lock"
-version = "3.0.8"
+version = "3.0.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bb21c69b9fea5e15dbc1049e4b77145dd0ba1c84019c488102de0dc4ea4b0a27"
+checksum = "28c0190ff0bd3b28bfdd4d0cf9f92faa12880fb0b8ae2054723dd6c76a4efd42"
 dependencies = [
  "cfg-if",
  "rustix",
@@ -205,24 +205,80 @@ dependencies = [
 ]
 
 [[package]]
-name = "feint"
+name = "feint-builtins"
 version = "0.0.0"
 dependencies = [
  "bitflags",
- "clap",
- "clap_complete",
- "ctrlc",
- "dirs",
- "env_logger",
+ "feint-code-gen",
+ "feint-util",
  "flate2",
  "indexmap",
+ "num-bigint",
+ "num-traits",
+ "once_cell",
+ "tar",
+]
+
+[[package]]
+name = "feint-cli"
+version = "0.0.0"
+dependencies = [
+ "clap",
+ "clap_complete",
+ "dirs",
+ "env_logger",
+ "feint-builtins",
+ "feint-compiler",
+ "feint-driver",
+ "feint-vm",
+ "rustyline",
+]
+
+[[package]]
+name = "feint-code-gen"
+version = "0.0.0"
+
+[[package]]
+name = "feint-compiler"
+version = "0.0.0"
+dependencies = [
+ "feint-builtins",
+ "feint-util",
  "log",
  "num-bigint",
  "num-traits",
  "once_cell",
  "regex",
- "rustyline",
- "tar",
+]
+
+[[package]]
+name = "feint-driver"
+version = "0.0.0"
+dependencies = [
+ "feint-builtins",
+ "feint-code-gen",
+ "feint-compiler",
+ "feint-util",
+ "feint-vm",
+ "once_cell",
+]
+
+[[package]]
+name = "feint-util"
+version = "0.0.0"
+
+[[package]]
+name = "feint-vm"
+version = "0.0.0"
+dependencies = [
+ "bitflags",
+ "ctrlc",
+ "env_logger",
+ "feint-builtins",
+ "feint-util",
+ "indexmap",
+ "log",
+ "num-traits",
 ]
 
 [[package]]
@@ -370,10 +426,11 @@ dependencies = [
 
 [[package]]
 name = "nix"
-version = "0.24.3"
+version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fa52e972a9a719cecb6864fb88568781eb706bac2cd1d4f04a648542dbf78069"
+checksum = "f346ff70e7dbfd675fe90590b92d59ef2de15a8779ae305ebcbfd3f0caf59be4"
 dependencies = [
+ "autocfg",
  "bitflags",
  "cfg-if",
  "libc",
@@ -520,9 +577,9 @@ dependencies = [
 
 [[package]]
 name = "rustyline"
-version = "10.0.0"
+version = "10.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d1cd5ae51d3f7bf65d7969d579d502168ef578f289452bd8ccc91de28fda20e"
+checksum = "c1e83c32c3f3c33b08496e0d1df9ea8c64d39adb8eb36a1ebb1440c690697aef"
 dependencies = [
  "bitflags",
  "cfg-if",
@@ -532,7 +589,7 @@ dependencies = [
  "libc",
  "log",
  "memchr",
- "nix 0.24.3",
+ "nix 0.25.1",
  "radix_trie",
  "scopeguard",
  "unicode-segmentation",

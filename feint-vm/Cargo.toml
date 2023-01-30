@@ -1,0 +1,21 @@
+[package]
+name = "feint-vm"
+edition.workspace = true
+version.workspace = true
+description.workspace = true
+authors.workspace = true
+readme.workspace = true
+license-file.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+[dependencies]
+feint-builtins = { path = "../feint-builtins" }
+feint-util = { path = "../feint-util" }
+
+bitflags.workspace = true
+ctrlc.workspace = true
+env_logger.workspace = true
+indexmap.workspace = true
+log.workspace = true
+num-traits.workspace = true

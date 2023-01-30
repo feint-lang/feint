@@ -1,0 +1,19 @@
+[package]
+name = "feint-driver"
+edition.workspace = true
+version.workspace = true
+description.workspace = true
+authors.workspace = true
+readme.workspace = true
+license-file.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+[dependencies]
+feint-builtins = { path = "../feint-builtins" }
+feint-code-gen = { path = "../feint-code-gen" }
+feint-compiler = { path = "../feint-compiler" }
+feint-util = { path = "../feint-util" }
+feint-vm = { path = "../feint-vm" }
+
+once_cell.workspace = true

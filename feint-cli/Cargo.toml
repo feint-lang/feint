@@ -1,0 +1,30 @@
+[package]
+name = "feint-cli"
+edition.workspace = true
+version.workspace = true
+description.workspace = true
+authors.workspace = true
+readme.workspace = true
+license-file.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+[dependencies]
+feint-builtins = { path = "../feint-builtins" }
+feint-compiler = { path = "../feint-compiler" }
+feint-driver = { path = "../feint-driver" }
+feint-vm = { path = "../feint-vm" }
+
+clap.workspace = true
+clap_complete.workspace = true
+dirs.workspace = true
+env_logger.workspace = true
+rustyline.workspace = true
+
+[build-dependencies]
+clap.workspace = true
+clap_complete.workspace = true
+
+[[bin]]
+name = "feint"
+path = "src/main.rs"

@@ -1,0 +1,11 @@
+tuple = ("a", "b", "c")
+result = []
+tuple.each((item, i) => result.push((i, item)))
+expected = [(0, "a"), (1, "b"), (2, "c")]
+assert_eq(result, expected, true)
+
+list = ["a", "b", "c"]
+result = []
+list.each((item, i) => result.push((i, item)))
+expected = [(0, "a"), (1, "b"), (2, "c")]
+assert_eq(result, expected, true)
