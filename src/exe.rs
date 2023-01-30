@@ -24,7 +24,7 @@ use crate::source::{
 use crate::types::gen::obj_ref;
 use crate::types::{new, Module, ObjectRef, ObjectTrait};
 use crate::vm::{
-    CallDepth, Inst, PrintFlags, ModuleExecutionContext, RuntimeErr, RuntimeErrKind,
+    CallDepth, Inst, ModuleExecutionContext, PrintFlags, RuntimeErr, RuntimeErrKind,
     VMExeResult, VMState, VM,
 };
 use crate::{ast, dis};
