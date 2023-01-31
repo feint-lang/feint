@@ -1,0 +1,82 @@
+# Method: Tuple.each()
+each = (fn: Func) =>
+    "Apply function to each Tuple item.
+
+    # Args
+
+    - fn: Func
+      A function that will be passed each item in turn and the index of
+      the item.
+
+    # Returns
+
+    If all calls to `fn` are successful, `nil` is returned. If a call is
+    unsuccessful, the `Err` from that call is returned.
+
+    "
+    meth = Tuple.each
+
+    result = check_arg_type(meth, "this", this, (Tuple,))
+    if result.err ->
+        return result
+
+    result = check_arg_type(meth, "fn", fn, (Func, IntrinsicFunc))
+    if result.err ->
+        return result
+
+    n_args = match fn.$arity ->
+        0 -> return Err.new(ErrType.arg, $"fn of {meth} should take at least 1 arg")
+        1 -> 1
+        * -> 2
+
+    if this.is_empty ->
+        return nil
+
+    i = 0
+    loop i < this.length ->
+        result = if n_args == 1 -> fn(this.i) else -> fn(this.i, i)
+        if result.err ->
+            return result
+        i += 1
+
+
+# Method: Tuple.map()
+map: List<Any> = (fn: Func) =>
+    "Apply function to each Tuple item and collect results.
+
+    # Args
+
+    - fn: Func
+      A function that will be passed each item in turn and the index of
+      the item.
+
+    # Returns
+
+    A list containing the result of each call, which could be an `Err`.
+
+    "
+    meth = Tuple.map
+
+    result = check_arg_type(meth, "this", this, (Tuple,))
+    if result.err ->
+        return result
+
+    result = check_arg_type(meth, "fn", fn, (Func, IntrinsicFunc))
+    if result.err ->
+        return result
+
+    results = []
+
+    if this.is_empty ->
+        return results
+
+    n_args = match fn.$arity ->
+        0 -> return Err.new(ErrType.arg, $"fn of {meth} should take at least 1 arg")
+        1 -> 1
+        * -> 2
+
+    i = 0
+    loop i < this.length ->
+        result = if n_args == 1 -> fn(this.i) else -> fn(this.i, i)
+        result.push(result)
+        i += 1

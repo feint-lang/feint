@@ -123,6 +123,7 @@ assert: Bool | Err = (condition: Bool, ...) =>
 
         err
 
+
 assert_eq: Bool | Err = (a: Any, b: Any, ...) =>
     "Check if items are equal and return error if not.
 
@@ -151,3 +152,20 @@ assert_eq: Bool | Err = (a: Any, b: Any, ...) =>
             $halt 1
 
         err
+
+
+# NOTE: This is used for manual type-checking of function args, which
+#       isn't great.
+check_arg_type = (func: Func, name: Str, arg: Any, expected_types: Tuple) =>
+    i = 0
+    loop i < expected_types.length ->
+        if arg.$type $$ expected_types.i ->
+            return nil
+        i += 1
+
+    err = Err.new(
+        ErrType.arg,
+        $"{name} of {func} expected type {expected_types.0.$name}; got {arg.$type.$name}",
+    )
+    $debug err
+    err

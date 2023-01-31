@@ -1,0 +1,56 @@
+# Method: Map.each()
+each = (fn: Func) =>
+    "Apply function to each Map item.
+
+    # Args
+
+    - fn: Func
+      A function that will be passed the key and value of each entry in
+      turn. An index is also passed.
+
+    # Returns
+
+    If all calls to `fn` are successful, `nil` is returned. If a call is
+    unsuccessful, the `Err` from that call is returned.
+
+    ```
+    → map = {'a': 'a', 'b': 'b'}
+    {'a' => 'a', 'b' => 'b'}
+    → fn = (k, v, i) => print($'{i + 1}. {k} = {v}')
+    function fn/2 @ <id>
+    → map.each(fn)
+    1. a = a
+    2. b = b
+    ```
+
+    "
+    meth = Map.each
+
+    result = check_arg_type(meth, "this", this, (Map,))
+    if result.err ->
+        return result
+
+    result = check_arg_type(meth, "fn", fn, (Func, IntrinsicFunc))
+    if result.err ->
+        return result
+
+    if this.is_empty ->
+        return nil
+
+    n_args = match fn.$arity ->
+        0 -> return Err.new(ErrType.arg, $"fn of {meth} should take at least 1 arg")
+        1 -> 1
+        2 -> 2
+        * -> 3
+
+    i = 0
+    it = this.iter()
+    loop (entry = it.next()) $! nil ->
+        key = entry.0
+        result = match n_args ->
+            1 -> fn(key)
+            2 -> fn(key, entry.1)
+            3 -> fn(key, entry.1, i)
+        if result.err ->
+            return result
+        i += 1

@@ -1,6 +1,3 @@
-pub mod code;
-pub mod new;
-
 pub use base::{ObjectRef, ObjectTrait};
 pub use func::Func;
 pub use func_trait::FuncTrait;
@@ -19,28 +16,31 @@ mod func_trait;
 // Namespace (not a type)
 pub(crate) mod ns;
 
+pub mod code;
+pub mod new;
+
 // Intrinsic Types
-pub(crate) mod always;
-pub(crate) mod bool;
-pub(crate) mod bound_func;
-pub(crate) mod cell;
-pub(crate) mod class;
-pub(crate) mod closure;
-pub(crate) mod custom;
-pub(crate) mod err;
-pub(crate) mod err_type;
-pub(crate) mod file;
-pub(crate) mod float;
-pub(crate) mod func;
-pub(crate) mod int;
-pub(crate) mod intrinsic_func;
-pub(crate) mod iterator;
-pub(crate) mod list;
-pub(crate) mod map;
-pub(crate) mod module;
-pub(crate) mod nil;
-pub(crate) mod prop;
-pub(crate) mod seq;
-pub(crate) mod str;
-pub(crate) mod tuple;
-pub(crate) mod util;
+pub mod always;
+pub mod bool;
+pub mod bound_func;
+pub mod cell;
+pub mod class;
+pub mod closure;
+pub mod custom;
+pub mod err;
+pub mod err_type;
+pub mod file;
+pub mod float;
+pub mod func;
+pub mod int;
+pub mod intrinsic_func;
+pub mod iterator;
+pub mod list;
+pub mod map;
+pub mod module;
+pub mod nil;
+pub mod prop;
+pub mod seq;
+pub mod str;
+pub mod tuple;
+pub mod util;

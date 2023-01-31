@@ -40,26 +40,6 @@ pub static TUPLE_TYPE: Lazy<obj_ref_t!(TupleType)> = Lazy::new(|| {
             seq::sum(&this.items)
         }),
         // Instance Methods --------------------------------------------
-        meth!(
-            "each",
-            type_ref,
-            &["each_fn"],
-            "Apply function to each Tuple item.
-
-            # Args
-
-            - func: Func
-
-              A function that will be passed each item in turn and, optionally, the
-              index of the item.
-
-            ",
-            |this_obj, args| {
-                let this = this_obj.read().unwrap();
-                let this = this.down_to_tuple().unwrap();
-                seq::each(&this_obj, &this.items, &args)
-            }
-        ),
         meth!("get", type_ref, &["index"], "", |this, args| {
             let this = this.read().unwrap();
             let this = this.down_to_tuple().unwrap();
@@ -84,11 +64,6 @@ pub static TUPLE_TYPE: Lazy<obj_ref_t!(TupleType)> = Lazy::new(|| {
             let this = this.down_to_tuple().unwrap();
             seq::join(&this.items, &args)
         }),
-        meth!("map", type_ref, &["map_fn"], "", |this_obj, args| {
-            let this = this_obj.read().unwrap();
-            let this = this.down_to_tuple().unwrap();
-            seq::map(&this_obj, &this.items, &args)
-        }),
     ]);
 
     type_ref.clone()
@@ -108,15 +83,15 @@ impl Tuple {
         Self { ns: Namespace::default(), items }
     }
 
-    pub fn iter(&self) -> Iter<'_, ObjectRef> {
+    pub(crate) fn iter(&self) -> Iter<'_, ObjectRef> {
         self.items.iter()
     }
 
-    pub fn len(&self) -> usize {
+    pub(crate) fn len(&self) -> usize {
         self.items.len()
     }
 
-    pub fn get(&self, index: usize) -> Option<ObjectRef> {
+    fn get(&self, index: usize) -> Option<ObjectRef> {
         if let Some(item) = self.items.get(index) {
             Some(item.clone())
         } else {

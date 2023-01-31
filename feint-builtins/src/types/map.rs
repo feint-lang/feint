@@ -56,65 +56,6 @@ pub static MAP_TYPE: Lazy<obj_ref_t!(MapType)> = Lazy::new(|| {
             }
         ),
         meth!(
-            "each",
-            type_ref,
-            &["each_fn"],
-            "Apply function to each Map entry.
-
-            # Args
-            
-            - func: Func
-
-              A function that will be passed the key and value of each entry in
-              turn.
-
-            ```
-            → map = {'a': 'a', 'b': 'b'}
-            {'a' => 'a', 'b' => 'b'}
-            → fn = (k, v) => print($'{k} = {v}')
-            function fn/2 @ <id>
-            → map.each(fn)
-            a = a
-            b = b
-            ```
-
-            ",
-            |this_obj, args| {
-                let this = this_obj.read().unwrap();
-                let this = this.down_to_map().unwrap();
-                let entries = &this.entries.read().unwrap();
-
-                if entries.is_empty() {
-                    return new::nil();
-                }
-
-                let each_fn = &args[0];
-                let n_args = if let Some(f) = each_fn.read().unwrap().as_func() {
-                    if f.has_var_args() {
-                        3
-                    } else {
-                        f.arity()
-                    }
-                } else {
-                    return new::arg_err("each/1 expects a function", this_obj.clone());
-                };
-
-                // for (i, (key, val)) in entries.iter().enumerate() {
-                //     let each = each_fn.clone();
-                //     let key = new::str(key);
-                //     if n_args == 1 {
-                //         vm.call(each, vec![key])?;
-                //     } else if n_args == 2 {
-                //         vm.call(each, vec![key, val.clone()])?;
-                //     } else {
-                //         vm.call(each, vec![key, val.clone(), new::int(i)])?;
-                //     }
-                // }
-
-                new::nil()
-            }
-        ),
-        meth!(
             "get",
             type_ref,
             &["key"],
@@ -152,6 +93,15 @@ pub static MAP_TYPE: Lazy<obj_ref_t!(MapType)> = Lazy::new(|| {
             let key = use_arg_str!(get, key, arg);
             let result = this.contains_key(key);
             new::bool(result)
+        }),
+        meth!("iter", type_ref, &[], "", |this_ref, _| {
+            let this = this_ref.read().unwrap();
+            let this = this.down_to_map().unwrap();
+            let mut items = vec![];
+            for (name, val) in this.entries.read().unwrap().iter() {
+                items.push(new::tuple(vec![new::str(name), val.clone()]))
+            }
+            new::iterator(items)
         }),
     ]);
 

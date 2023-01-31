@@ -7,36 +7,6 @@ use feint_code_gen::{use_arg, use_arg_str};
 use super::base::ObjectRef;
 use super::{new, Args};
 
-pub fn each(this: &ObjectRef, items: &[ObjectRef], args: &Args) -> ObjectRef {
-    if items.is_empty() {
-        return new::nil();
-    }
-
-    let each_fn = &args[0];
-    let f = each_fn.read().unwrap();
-    let n_args = if let Some(f) = f.as_func() {
-        if f.has_var_args() {
-            2
-        } else {
-            f.arity()
-        }
-    } else {
-        return new::arg_err("each/1 expects a function", this.clone());
-    };
-
-    // for (i, item) in items.iter().enumerate() {
-    //     let each = each_fn.clone();
-    //     let item = item.clone();
-    //     if n_args == 1 {
-    //         vm.call(each, vec![item])?;
-    //     } else {
-    //         vm.call(each, vec![item, new::int(i)])?;
-    //     }
-    // }
-
-    new::nil()
-}
-
 pub fn has(items: &[ObjectRef], args: &Args) -> ObjectRef {
     if items.is_empty() {
         return new::bool(false);
@@ -74,38 +44,6 @@ pub fn join(items: &[ObjectRef], args: &Args) -> ObjectRef {
     }
 
     new::str(string)
-}
-
-pub fn map(this: &ObjectRef, items: &[ObjectRef], args: &Args) -> ObjectRef {
-    if items.is_empty() {
-        return new::empty_tuple();
-    }
-
-    let map_fn = &args[0];
-    let f = map_fn.read().unwrap();
-    let n_args = if let Some(f) = f.as_func() {
-        if f.has_var_args() {
-            2
-        } else {
-            f.arity()
-        }
-    } else {
-        return new::arg_err("map/1 expects a function", this.clone());
-    };
-
-    let mut results = vec![];
-    // for (i, item) in items.iter().enumerate() {
-    //     let map = map_fn.clone();
-    //     let item = item.clone();
-    //     if n_args == 1 {
-    //         vm.call(map, vec![item])?;
-    //     } else {
-    //         vm.call(map, vec![item, new::int(i)])?;
-    //     }
-    //     results.push(vm.pop_obj()?);
-    // }
-
-    new::tuple(results)
 }
 
 pub fn sum(items: &[ObjectRef]) -> ObjectRef {

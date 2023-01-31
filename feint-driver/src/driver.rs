@@ -8,8 +8,11 @@ use std::sync::{Arc, RwLock};
 use feint_builtins::modules::{
     add_module, maybe_get_module, std as stdlib, MODULES, STD, STD_FI_MODULES,
 };
-use feint_builtins::types::code::{Inst, PrintFlags};
-use feint_builtins::types::{new, Module, ObjectRef, ObjectTrait};
+use feint_builtins::types::{
+    self,
+    code::{Inst, PrintFlags},
+    new, Module, ObjectRef, ObjectTrait,
+};
 use feint_code_gen::obj_ref;
 use feint_compiler::{
     ast, CompErr, CompErrKind, Compiler, ParseErr, ParseErrKind, Parser, ScanErr,
@@ -96,6 +99,10 @@ impl Driver {
 
         self.add_module("std.proc", stdlib::PROC.clone());
 
+        self.extend_intrinsic_type(types::list::LIST_TYPE.clone(), "std.list")?;
+        self.extend_intrinsic_type(types::map::MAP_TYPE.clone(), "std.map")?;
+        self.extend_intrinsic_type(types::tuple::TUPLE_TYPE.clone(), "std.tuple")?;
+
         Ok(())
     }
 
@@ -112,6 +119,23 @@ impl Driver {
         let mut base_module = base_module.write().unwrap();
         for (name, val) in fi_module.iter_globals() {
             base_module.ns_mut().insert(name, val.clone());
+        }
+        Ok(())
+    }
+
+    /// Extend intrinsic type with global objects from corresponding
+    /// FeInt module.
+    fn extend_intrinsic_type(
+        &mut self,
+        type_ref: ObjectRef,
+        module_name: &str,
+    ) -> Result<(), DriverErr> {
+        let mut ty = type_ref.write().unwrap();
+        let fi_module = self.get_or_add_module(module_name)?;
+        let fi_module = fi_module.read().unwrap();
+        let fi_module = fi_module.down_to_mod().unwrap();
+        for (name, val) in fi_module.iter_globals() {
+            ty.ns_mut().insert(name, val.clone());
         }
         Ok(())
     }

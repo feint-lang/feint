@@ -41,27 +41,6 @@ pub static LIST_TYPE: Lazy<obj_ref_t!(ListType)> = Lazy::new(|| {
         }),
         // Instance Methods --------------------------------------------
         meth!(
-            "each",
-            type_ref,
-            &["each_fn"],
-            "Apply function to each List item.
-
-            # Args
-
-            - func: Func
-
-              A function that will be passed each item in turn and, optionally, the
-              index of the item.
-
-            ",
-            |this_obj, args| {
-                let this = this_obj.read().unwrap();
-                let this = this.down_to_list().unwrap();
-                let items = &this.items.read().unwrap();
-                seq::each(&this_obj, items, &args)
-            }
-        ),
-        meth!(
             "extend",
             type_ref,
             &["items"],
@@ -92,17 +71,17 @@ pub static LIST_TYPE: Lazy<obj_ref_t!(ListType)> = Lazy::new(|| {
             let items = &this.items.read().unwrap();
             seq::has(items, &args)
         }),
+        meth!("iter", type_ref, &[], "", |this_ref, _| {
+            let this = this_ref.read().unwrap();
+            let this = this.down_to_list().unwrap();
+            let items = this.items.read().unwrap();
+            new::iterator(items.clone())
+        }),
         meth!("join", type_ref, &["sep"], "", |this, args| {
             let this = this.read().unwrap();
             let this = this.down_to_list().unwrap();
             let items = &this.items.read().unwrap();
             seq::join(items, &args)
-        }),
-        meth!("map", type_ref, &["map_fn"], "", |this_obj, args| {
-            let this = this_obj.read().unwrap();
-            let this = this.down_to_list().unwrap();
-            let items = &this.items.read().unwrap();
-            seq::map(&this_obj, items, &args)
         }),
         meth!("pop", type_ref, &[], "", |this, _| {
             let this = this.read().unwrap();
@@ -138,17 +117,17 @@ impl List {
         Self { ns: Namespace::default(), items: RwLock::new(items) }
     }
 
-    pub fn len(&self) -> usize {
+    fn len(&self) -> usize {
         let items = self.items.read().unwrap();
         items.len()
     }
 
-    pub fn push(&self, item: ObjectRef) {
+    fn push(&self, item: ObjectRef) {
         let items = &mut self.items.write().unwrap();
         items.push(item);
     }
 
-    pub fn extend(&self, obj_ref: ObjectRef) -> Option<ObjectRef> {
+    fn extend(&self, obj_ref: ObjectRef) -> Option<ObjectRef> {
         let obj = obj_ref.read().unwrap();
         let items = &mut self.items.write().unwrap();
         if let Some(list) = obj.down_to_list() {
@@ -171,7 +150,7 @@ impl List {
         None
     }
 
-    pub fn pop(&self) -> Option<ObjectRef> {
+    fn pop(&self) -> Option<ObjectRef> {
         let items = &mut self.items.write().unwrap();
         if let Some(item) = items.pop() {
             Some(item.clone())
@@ -180,7 +159,7 @@ impl List {
         }
     }
 
-    pub fn get(&self, index: usize) -> Option<ObjectRef> {
+    fn get(&self, index: usize) -> Option<ObjectRef> {
         let items = self.items.read().unwrap();
         if let Some(item) = items.get(index) {
             Some(item.clone())
