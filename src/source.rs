@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 use std::fs::File;
-use std::io::{BufRead, BufReader, Cursor, Take};
+use std::io::{BufRead, BufReader, Cursor};
 use std::path::Path;
 use std::{fmt, io};
 
@@ -64,7 +64,7 @@ pub fn source_from_stdin() -> Source<BufReader<io::Stdin>> {
 /// - Tracks current line and column.
 /// - Panics when lines are too long.
 pub struct Source<T: BufRead> {
-    stream: Take<T>,
+    stream: T,
     /// String buffer the source reader reads lines into.
     buffer: String,
     /// The queue of characters for the current line.
@@ -79,9 +79,9 @@ pub struct Source<T: BufRead> {
 }
 
 impl<T: BufRead> Source<T> {
-    pub fn new(source: T) -> Self {
+    pub fn new(stream: T) -> Self {
         let mut source = Source {
-            stream: source.take(MAX_LINE_LENGTH + 1),
+            stream,
             buffer: String::with_capacity(INITIAL_CAPACITY),
             queue: VecDeque::with_capacity(INITIAL_CAPACITY),
             line_no: 0,
