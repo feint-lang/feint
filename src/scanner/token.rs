@@ -153,7 +153,7 @@ impl Token {
             Self::Comma => ",",
 
             Self::DollarDollar => "$$",
-            Self::DollarNot => "$",
+            Self::DollarNot => "$!",
             Self::EqualEqualEqual => "===",
             Self::NotEqualEqual => "!==",
             Self::EqualEqual => "==",
