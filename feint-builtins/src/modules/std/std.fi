@@ -65,7 +65,7 @@ print_err = (...) =>
 
 type: Type = (obj: Any) =>
     "Get the type of an object."
-    print(obj.$type)
+    obj.$type
 
 
 id = (obj: Any) =>
