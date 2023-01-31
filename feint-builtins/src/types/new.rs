@@ -216,10 +216,13 @@ pub fn float(value: f64) -> ObjectRef {
     obj_ref!(Float::new(value))
 }
 
-pub fn float_from_string<S: Into<String>>(value: S) -> ObjectRef {
-    let value = value.into();
-    let value = value.parse::<f64>().unwrap();
-    float(value)
+pub fn float_from_string<S: Into<String>>(val: S) -> ObjectRef {
+    let val = val.into();
+    if let Ok(val) = val.parse::<f64>() {
+        float(val)
+    } else {
+        type_err("Could not convert string to Float", str(val))
+    }
 }
 
 pub fn func<S: Into<String>>(
