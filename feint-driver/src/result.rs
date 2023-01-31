@@ -31,15 +31,18 @@ impl DriverErr {
 
 #[derive(Debug)]
 pub enum DriverErrKind {
+    // These errors are NOT handled by the driver. They should be
+    // handled by the user of the driver (e.g., in main, REPL).
     Bootstrap(String),
+    CouldNotReadSourceFile(String),
     ModuleDirNotFound(String),
     ModuleNotFound(String),
-    CouldNotReadSourceFile(String),
+    ReplErr(String),
+    // These errors ARE handled by the driver.
     ScanErr(ScanErrKind),
     ParseErr(ParseErrKind),
     CompErr(CompErrKind),
     RuntimeErr(RuntimeErrKind),
-    ReplErr(String),
 }
 
 impl fmt::Display for DriverErr {
@@ -53,6 +56,9 @@ impl fmt::Display for DriverErrKind {
         use DriverErrKind::*;
         let msg = match self {
             Bootstrap(msg) => format!("Bootstrap process failed: {msg}"),
+            CouldNotReadSourceFile(file_name) => {
+                format!("Could not read source file: {file_name}")
+            }
             ModuleDirNotFound(path) => format!(
                 concat!(
                     "Module directory not found: {}\n",
@@ -63,14 +69,11 @@ impl fmt::Display for DriverErrKind {
             ModuleNotFound(name) => {
                 format!("Module not found: {name}")
             }
-            CouldNotReadSourceFile(file_name) => {
-                format!("Could not read source file: {file_name}")
-            }
+            ReplErr(msg) => format!("REPL error: {msg}"),
             ScanErr(kind) => format!("Scan error: {kind:?}"),
             ParseErr(kind) => format!("Parse error: {kind:?}"),
             CompErr(kind) => format!("Compilation error: {kind:?}"),
             RuntimeErr(kind) => format!("Runtime error: {kind:?}"),
-            ReplErr(msg) => format!("REPL error: {msg}"),
         };
         write!(f, "{msg}")
     }

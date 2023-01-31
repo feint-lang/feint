@@ -114,6 +114,16 @@ impl Repl {
                 // to add more lines *if* the error can potentially be
                 // recovered from by adding more input.
                 if !(continue_on_err && self.continue_on_err(&err)) {
+                    if matches!(
+                        &err.kind,
+                        DriverErrKind::Bootstrap(_)
+                            | DriverErrKind::CouldNotReadSourceFile(_)
+                            | DriverErrKind::ModuleDirNotFound(_)
+                            | DriverErrKind::ModuleNotFound(_)
+                            | DriverErrKind::ReplErr(_)
+                    ) {
+                        eprintln!("{err}");
+                    }
                     return None;
                 }
             }

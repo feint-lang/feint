@@ -11,7 +11,7 @@ use std::process::ExitCode;
 
 use clap::{parser::ValueSource, ArgMatches};
 
-use feint_driver::{Driver, DriverResult};
+use feint_driver::{Driver, DriverErrKind, DriverResult};
 use feint_vm::VMState;
 
 use repl::Repl;
@@ -210,6 +210,16 @@ fn handle_driver_result(result: DriverResult) -> u8 {
             if let Some(exit_code) = err.exit_code() {
                 exit_code
             } else {
+                if matches!(
+                    &err.kind,
+                    DriverErrKind::Bootstrap(_)
+                        | DriverErrKind::CouldNotReadSourceFile(_)
+                        | DriverErrKind::ModuleDirNotFound(_)
+                        | DriverErrKind::ModuleNotFound(_)
+                        | DriverErrKind::ReplErr(_)
+                ) {
+                    eprintln!("{err}");
+                }
                 255
             }
         }
