@@ -9,9 +9,50 @@
 # reassign var to temporary value using `+=` hack. Given the number of
 # computations in the inner loop, this likely causes serious performance
 # degradation.
+import std.args
+import std.system
+
+
+die = (code, msg) =>
+    print_err(msg)
+    system.exit(code, msg)
+
+
 $main = (...) =>
-    w = 50.0
-    h = 50.0
+    "Mandlebrot
+
+    # Args
+
+    - w: Float
+      Width
+
+    - h: Float
+      Height
+
+    - print: Bool
+      Flag indicating whether to print output to terminal
+
+    "
+    args = args.parse("mandlebrot", $args, $main.$doc, {
+        "args": (
+            {"name": "w", "default": 20.0, "type": Float},
+            {"name": "h", "default": 10.0, "type": Float},
+        ),
+        "flags": (
+            {"name": "print", "default": true},
+        )
+    })
+
+    if args.err ->
+        die(1, args.err)
+
+    if args $$ nil ->
+        system.exit(0)
+
+    w = args.get("w") ?? die(1, "Expected width to be a Float")
+    h = args.get("h") ?? die(1, "Expected height to be a Float")
+    do_print = args.get("print")
+
     y = 0.0
 
     loop y < h ->
@@ -26,7 +67,7 @@ $main = (...) =>
             ci = 2 * y / h - 1.0
             i = 0
 
-            loop i < 50 && tr + ti <= 4 ->
+            loop i < w && tr + ti <= 4 ->
                 new_zi = 2 * zr * zi + ci
                 zi *= 0.0
                 zi += new_zi
@@ -48,9 +89,12 @@ $main = (...) =>
             # NOTE: Using $print instead of print to avoid function call
             #       overhead in this hot loop. Additionally, print
             #       currently always adds a newline.
-            $print(if tr + ti <= 4 -> "*" else -> ".",)
+            if do_print ->
+                $print(if tr + ti <= 4 -> "*" else -> ".",)
 
             x += 1
 
-        $print("\n",)
+        if do_print ->
+            $print("\n",)
+
         y += 1
