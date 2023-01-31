@@ -8,7 +8,7 @@ use once_cell::sync::Lazy;
 use feint_code_gen::*;
 
 use super::new;
-use super::util::{eq_int_float, gt_int_float, lt_int_float};
+use super::util::{eq_int_float, float_gt_int, float_lt_int};
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
 use super::class::TYPE_TYPE;
@@ -105,7 +105,7 @@ impl ObjectTrait for Float {
         if let Some(rhs) = rhs.down_to_float() {
             Some(self.value() < rhs.value())
         } else if let Some(rhs) = rhs.down_to_int() {
-            Some(lt_int_float(rhs, self))
+            Some(float_lt_int(self, rhs))
         } else {
             None
         }
@@ -115,7 +115,7 @@ impl ObjectTrait for Float {
         if let Some(rhs) = rhs.down_to_float() {
             Some(self.value() > rhs.value())
         } else if let Some(rhs) = rhs.down_to_int() {
-            Some(gt_int_float(rhs, self))
+            Some(float_gt_int(self, rhs))
         } else {
             return None;
         }
