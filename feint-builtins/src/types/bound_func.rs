@@ -113,17 +113,17 @@ impl ObjectTrait for BoundFunc {
 
 impl fmt::Display for BoundFunc {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{} *BOUND* to {:?}",
-            self.func.read().unwrap(),
-            &*self.this.read().unwrap()
-        )
+        write!(f, "{}", self.func.read().unwrap())
     }
 }
 
 impl fmt::Debug for BoundFunc {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{self}")
+        write!(
+            f,
+            "{:?} *BOUND* to {:?}",
+            &*self.func.read().unwrap(),
+            &*self.this.read().unwrap()
+        )
     }
 }

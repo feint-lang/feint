@@ -99,6 +99,6 @@ impl fmt::Display for Closure {
 
 impl fmt::Debug for Closure {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{self}")
+        write!(f, "[closure] {:?}", &*self.func.read().unwrap())
     }
 }

@@ -107,12 +107,12 @@ impl ObjectTrait for IntrinsicFunc {
 
 impl fmt::Display for IntrinsicFunc {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", FuncTrait::format_string(self, Some(self.id())))
+        write!(f, "{}", FuncTrait::format_string(self, None))
     }
 }
 
 impl fmt::Debug for IntrinsicFunc {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{self}")
+        write!(f, "{}", FuncTrait::format_string(self, Some(self.id())))
     }
 }

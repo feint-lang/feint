@@ -114,12 +114,12 @@ impl ObjectTrait for Func {
 
 impl fmt::Display for Func {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", FuncTrait::format_string(self, Some(self.id())))
+        write!(f, "{}", FuncTrait::format_string(self, None))
     }
 }
 
 impl fmt::Debug for Func {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{self}")
+        write!(f, "{}", FuncTrait::format_string(self, Some(self.id())))
     }
 }
