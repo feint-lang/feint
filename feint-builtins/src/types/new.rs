@@ -86,6 +86,11 @@ pub fn empty_str() -> ObjectRef {
 }
 
 #[inline]
+pub fn newline() -> ObjectRef {
+    NEWLINE.clone()
+}
+
+#[inline]
 pub fn empty_tuple() -> ObjectRef {
     EMPTY_TUPLE.clone()
 }

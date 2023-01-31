@@ -350,10 +350,10 @@ pub enum Inst {
 bitflags! {
     #[derive(Default)]
     pub struct PrintFlags: u32 {
-        const ERR  =   0b00000001; // print to stderr
-        const NL   =   0b00000010; // print a trailing newline.
-        const REPR =   0b00000100; // print repr using fmt::Debug
-        const NO_NIL = 0b00001000; // don't print obj if it's nil
+        const STDERR = 0b00000001; // print to stderr instead of stdout
+        const NL     = 0b00000010; // print a trailing newline
+        const REPR   = 0b00000100; // print repr using fmt::Debug
+        const NO_NIL = 0b00001000; // don't print obj if it's nil (if !STDERR)
     }
 }
 

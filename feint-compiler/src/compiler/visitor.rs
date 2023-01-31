@@ -239,7 +239,7 @@ impl CompilerVisitor {
                 let obj = args[0].clone();
                 // XXX: This is kinda gnarly.
                 if n_args > 1 && args[1].is_true() {
-                    flags.insert(PrintFlags::ERR);
+                    flags.insert(PrintFlags::STDERR);
                 }
                 if n_args > 2 && args[2].is_true() {
                     flags.insert(PrintFlags::NL);
@@ -869,7 +869,7 @@ impl CompilerVisitor {
     }
 
     fn push_newline(&mut self) {
-        self.add_const(new::empty_str());
+        self.add_const(new::newline());
     }
 
     fn push_empty_tuple(&mut self) {

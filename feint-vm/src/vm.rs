@@ -800,27 +800,42 @@ impl VM {
     fn handle_print(&mut self, flags: &PrintFlags) -> RuntimeResult {
         if let Ok(obj) = self.pop_obj() {
             let obj = obj.read().unwrap();
-            if flags.contains(PrintFlags::NO_NIL) && obj.is_nil() {
-                // do nothing
-            } else if flags.contains(PrintFlags::ERR) {
-                if flags.contains(PrintFlags::REPR) {
-                    eprint!("{:?}", &*obj);
-                } else {
-                    eprint!("{obj}");
-                }
-                if flags.contains(PrintFlags::NL) {
-                    eprintln!();
-                }
-            } else {
-                if flags.contains(PrintFlags::REPR) {
+
+            let print_to_stdout = !flags.contains(PrintFlags::STDERR);
+            let no_nil = flags.contains(PrintFlags::NO_NIL);
+
+            if print_to_stdout && no_nil && obj.is_nil() {
+                return Ok(());
+            }
+
+            let is_nl = obj.get_str_val() == Some("\n");
+            let print_nl = flags.contains(PrintFlags::NL) && !is_nl;
+            let print_repr = flags.contains(PrintFlags::REPR);
+
+            if print_to_stdout {
+                if print_repr {
                     print!("{:?}", &*obj);
+                } else if is_nl {
+                    println!();
                 } else {
                     print!("{obj}");
                 }
-                if flags.contains(PrintFlags::NL) {
+                if print_nl {
                     println!();
                 }
+            } else {
+                if print_repr {
+                    eprint!("{:?}", &*obj);
+                } else if is_nl {
+                    eprintln!();
+                } else {
+                    eprint!("{obj}");
+                }
+                if print_nl {
+                    eprintln!();
+                }
             }
+
             Ok(())
         } else {
             Err(RuntimeErr::empty_stack())

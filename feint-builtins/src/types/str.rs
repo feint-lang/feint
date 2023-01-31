@@ -1,5 +1,6 @@
 use std::any::Any;
 use std::fmt;
+use std::str::EscapeDefault;
 use std::sync::{Arc, RwLock};
 
 use once_cell::sync::Lazy;
@@ -137,6 +138,12 @@ impl Str {
     pub fn value(&self) -> &str {
         self.value.as_str()
     }
+
+    /// XXX: Make this correspond to how FeInt escapes strings and
+    ///      improve FeInt's handling of escapes, particular unicode.
+    fn escape(&self) -> EscapeDefault<'_> {
+        self.value.escape_default()
+    }
 }
 
 impl ObjectTrait for Str {
@@ -193,6 +200,6 @@ impl fmt::Display for Str {
 
 impl fmt::Debug for Str {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "\"{}\"", self.value)
+        write!(f, "\"{}\"", self.escape())
     }
 }

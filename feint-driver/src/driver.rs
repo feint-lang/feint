@@ -149,10 +149,7 @@ impl Driver {
         // Assign TOS to _, print it, then pop it to clear the stack
         let last_inst = code.pop_inst();
         if let Some(Inst::Pop) = last_inst {
-            let print_flags = PrintFlags::ERR
-                | PrintFlags::NL
-                | PrintFlags::REPR
-                | PrintFlags::NO_NIL;
+            let print_flags = PrintFlags::NL | PrintFlags::REPR | PrintFlags::NO_NIL;
             code.push_inst(Inst::DeclareVar("_".to_owned()));
             code.push_inst(Inst::AssignVar("_".to_owned()));
             code.push_inst(Inst::Print(print_flags));

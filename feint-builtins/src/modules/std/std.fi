@@ -4,21 +4,51 @@
 print = (...) =>
     "Print representation of zero or more objects to stdout.
 
+    The objects will be converted to their string representations,
+    joined together with spaces, and printed out with a trailing
+    newline.
+
     # Args
 
     - objects?: Any[]
 
     "
+    # $print args:
+    #
+    # - object: Any
+    #   A single object to print
+    #
+    # - stderr: Bool
+    #   Print to stderr instead of stdout
+    #
+    # - nl: Bool
+    #   Print a newline (which will cause a flush)
+    #
+    # - repr: Bool
+    #   Print object repr rather than string (use Debug impl)
+    #
+    # - no_nil: Bool
+    #   Don't print object if it's nil (only applicable when printing
+    #   to stdout)
+    #
+    # NOTE: Though the syntax below looks call-like, $print is NOT a
+    #       function. It's compiled to a PRINT instruction, and its
+    #       operand MUST be a tuple (i.e., a trailing comma MUST be
+    #       included when none of the flags are specified).
     i = 0
     loop i < $args.length ->
         $print ($args.i, false)
         $print (" ", false)
         i += 1
-    $print ("", false, true)
+    $print ("\n", false)
 
 
 print_err = (...) =>
     "Print representation of zero or more objects to stderr.
+
+    The objects will be converted to their string representations,
+    joined together with spaces, and printed out with a trailing
+    newline.
 
     # Args
 
@@ -30,7 +60,7 @@ print_err = (...) =>
         $print ($args.i, true)
         $print (" ", true)
         i += 1
-    $print ("", true, true)
+    $print ("\n", true)
 
 
 type: Type = (obj: Any) =>
