@@ -1,5 +1,4 @@
 set debug_binary ./target/debug/feint
-set release_binary ./target/release/feint
 
 # build
 alias b="cargo build"
@@ -27,9 +26,9 @@ alias d="cargo run -- --dis --debug"
 alias l="RUST_LOG=feint=trace cargo run --"
 
 # run release binary
-alias rr="cargo build --release && $release_binary --"
-alias cr="cargo build --release && $release_binary -- --code"
-alias dr="cargo build --release && $release_binary -- --dis --debug"
+alias rr="cargo run --release --"
+alias cr="cargo run --release -- --code"
+alias dr="cargo run --release -- --dis --debug"
 
 # profile
 alias p="cargo flamegraph --root --"
