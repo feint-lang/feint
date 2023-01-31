@@ -302,11 +302,11 @@ impl VM {
                     }
                 }
                 JumpIf(addr, forward, scope_exit_count) => {
-                    self.exit_scopes(*scope_exit_count);
                     let obj = self.peek_obj()?;
                     let obj = obj.read().unwrap();
                     if let Some(should_jump) = obj.bool_val() {
                         if should_jump {
+                            self.exit_scopes(*scope_exit_count);
                             if *forward {
                                 jump_ip = Some(ip + *addr);
                             } else {
@@ -321,11 +321,11 @@ impl VM {
                     }
                 }
                 JumpIfNot(addr, forward, scope_exit_count) => {
-                    self.exit_scopes(*scope_exit_count);
                     let obj = self.peek_obj()?;
                     let obj = obj.read().unwrap();
                     if let Some(should_not_jump) = obj.bool_val() {
                         if !should_not_jump {
+                            self.exit_scopes(*scope_exit_count);
                             if *forward {
                                 jump_ip = Some(ip + *addr);
                             } else {
@@ -340,10 +340,10 @@ impl VM {
                     }
                 }
                 JumpIfNotNil(addr, forward, scope_exit_count) => {
-                    self.exit_scopes(*scope_exit_count);
                     let obj = self.peek_obj()?;
                     let obj = obj.read().unwrap();
                     if !obj.is_nil() {
+                        self.exit_scopes(*scope_exit_count);
                         if *forward {
                             jump_ip = Some(ip + *addr);
                         } else {
