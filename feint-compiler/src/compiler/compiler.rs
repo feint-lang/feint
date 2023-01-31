@@ -31,22 +31,21 @@ pub struct Compiler {
     // are known to exist but aren't available to the compiler (e.g., in
     // the REPL).
     global_names: HashSet<String>,
+    debug: bool,
 }
 
-impl Default for Compiler {
-    fn default() -> Self {
+impl Compiler {
+    pub fn new(global_names: HashSet<String>, debug: bool) -> Self {
+        Self { visitor_stack: Stack::new(), global_names, debug }
+    }
+
+    pub fn for_module(debug: bool) -> Self {
         let mut global_names = HashSet::default();
         global_names.insert("$full_name".to_owned());
         global_names.insert("$name".to_owned());
         global_names.insert("$path".to_owned());
         global_names.insert("$doc".to_owned());
-        Self::new(global_names)
-    }
-}
-
-impl Compiler {
-    pub fn new(global_names: HashSet<String>) -> Self {
-        Self { visitor_stack: Stack::new(), global_names }
+        Self::new(global_names, debug)
     }
 
     /// Compile AST module node to module object.
@@ -66,8 +65,11 @@ impl Compiler {
         module_name: &str,
         module: ast::Module,
     ) -> Result<Code, CompErr> {
-        let mut visitor =
-            CompilerVisitor::for_module(module_name, self.global_names.clone());
+        let mut visitor = CompilerVisitor::for_module(
+            module_name,
+            self.global_names.clone(),
+            self.debug,
+        );
         visitor.visit_module(module)?;
         self.global_names = self
             .global_names
@@ -115,7 +117,7 @@ impl Compiler {
         let params = node.params.clone();
 
         let mut visitor =
-            CompilerVisitor::for_func(func_name, self.global_names.clone());
+            CompilerVisitor::for_func(func_name, self.global_names.clone(), self.debug);
         visitor.visit_func(node)?;
 
         // Unresolved names are assumed to be globals or builtins.

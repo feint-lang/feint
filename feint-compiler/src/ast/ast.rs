@@ -49,6 +49,7 @@ pub enum StatementKind {
     Return(Expr),
     Halt(Expr),
     Print(Expr),
+    Debug(Expr),
     Expr(Expr),
 }
 
@@ -94,6 +95,10 @@ impl Statement {
         Self::new(StatementKind::Print(expr), start, end)
     }
 
+    pub fn new_debug(expr: Expr, start: Location, end: Location) -> Self {
+        Self::new(StatementKind::Debug(expr), start, end)
+    }
+
     pub fn new_expr(expr: Expr, start: Location, end: Location) -> Self {
         Self::new(StatementKind::Expr(expr), start, end)
     }
@@ -132,6 +137,7 @@ impl fmt::Debug for StatementKind {
             Self::Return(expr) => write!(f, "return {expr:?}"),
             Self::Halt(expr) => write!(f, "$halt {expr:?}"),
             Self::Print(expr) => write!(f, "$print {expr:?}"),
+            Self::Debug(expr) => write!(f, "$debug {expr:?}"),
             Self::Expr(expr) => write!(f, "{expr:?}"),
         }
     }

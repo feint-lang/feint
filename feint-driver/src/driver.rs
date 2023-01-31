@@ -138,7 +138,7 @@ impl Driver {
 
         let source = &mut source_from_text(text);
         let ast_module = self.parse_source(source)?;
-        let mut compiler = Compiler::new(global_names);
+        let mut compiler = Compiler::new(global_names, self.debug);
         let comp_result = compiler.compile_module_to_code("$repl", ast_module);
 
         let mut code = comp_result.map_err(|err| {
@@ -334,7 +334,7 @@ impl Driver {
         source: &mut Source<T>,
     ) -> Result<Module, DriverErr> {
         let ast_module = self.parse_source(source)?;
-        let mut compiler = Compiler::default();
+        let mut compiler = Compiler::for_module(self.debug);
         let module = compiler
             .compile_module(name, self.current_file_name.as_str(), ast_module)
             .map_err(|err| {

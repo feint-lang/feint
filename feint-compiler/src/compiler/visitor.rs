@@ -30,8 +30,9 @@ type FuncNode = (
 /// construct a `Module` or `Func` from this `Code` object.
 pub struct CompilerVisitor {
     initial_scope_kind: ScopeKind,
-    global_names: HashSet<String>,
     name: String,
+    global_names: HashSet<String>,
+    debug: bool,
     pub(crate) code: Code,
     pub(crate) scope_tree: ScopeTree,
     pub(crate) scope_depth: usize,
@@ -43,12 +44,14 @@ impl CompilerVisitor {
         initial_scope_kind: ScopeKind,
         name: &str,
         global_names: HashSet<String>,
+        debug: bool,
     ) -> Self {
         assert!(matches!(initial_scope_kind, ScopeKind::Module | ScopeKind::Func));
         Self {
             initial_scope_kind,
             name: name.to_owned(),
             global_names,
+            debug,
             code: Code::default(),
             scope_tree: ScopeTree::new(initial_scope_kind),
             scope_depth: 0,
@@ -56,12 +59,20 @@ impl CompilerVisitor {
         }
     }
 
-    pub(crate) fn for_module(name: &str, global_names: HashSet<String>) -> Self {
-        Self::new(ScopeKind::Module, name, global_names)
+    pub(crate) fn for_module(
+        name: &str,
+        global_names: HashSet<String>,
+        debug: bool,
+    ) -> Self {
+        Self::new(ScopeKind::Module, name, global_names, debug)
     }
 
-    pub(crate) fn for_func(name: &str, global_names: HashSet<String>) -> Self {
-        Self::new(ScopeKind::Func, name, global_names)
+    pub(crate) fn for_func(
+        name: &str,
+        global_names: HashSet<String>,
+        debug: bool,
+    ) -> Self {
+        Self::new(ScopeKind::Func, name, global_names, debug)
     }
 
     // Entry Point Visitors --------------------------------------------
@@ -190,6 +201,7 @@ impl CompilerVisitor {
             Kind::Return(expr) => self.visit_return(expr)?,
             Kind::Halt(expr) => self.visit_halt(expr)?,
             Kind::Print(expr) => self.visit_print(expr)?,
+            Kind::Debug(expr) => self.visit_debug(expr)?,
             Kind::Expr(expr) => self.visit_expr(expr, None)?,
         }
         Ok(())
@@ -257,10 +269,17 @@ impl CompilerVisitor {
             }
         }
         let msg = concat!(
-            "$print expects to receive at least 1 arg and no more ",
-            "than 5 args: (object, ...flags)"
+            "$print expects to receive a Tuple with at least 1 arg ",
+            "and no more than 5 args: (object, ...flags)"
         );
         Err(CompErr::print(msg, expr.start, expr.end))
+    }
+
+    fn visit_debug(&mut self, expr: ast::Expr) -> VisitResult {
+        if self.debug || cfg!(debug_assertions) {
+            self.visit_print(expr)?;
+        }
+        Ok(())
     }
 
     fn visit_return(&mut self, expr: ast::Expr) -> VisitResult {
