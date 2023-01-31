@@ -18,9 +18,14 @@ parse: Map = (
 
     # Returns
 
-    A Map containing args or errors.
+    A `Map` containing args or errors, unless help is requested, in
+    which case the program's usage will be printed and `nil` will be
+    returned.
 
     "
+    if argv.iter.err ->
+        return argv.iter
+
     add_help = spec.get("add_help") ?? true
 
     arg_specs = spec.get("args")
@@ -111,15 +116,36 @@ parse: Map = (
         it = flag_specs.iter()
         loop (spec = it.next()) $! nil ->
             name = spec.get("name")
+            default = spec.get("default") ?? false
             val = match flags.get(name) ->
                 true -> true
                 false -> false
-                nil -> false
+                nil -> default
             result.add(name, val)
 
     if flags.get("help") ->
         print($"usage: {program_name}\n")
         print(description)
+
+        if arg_specs $! nil ->
+            print("\n# Args\n")
+            it = arg_specs.iter()
+            loop (spec = it.next()) $! nil ->
+                print(spec.get("name"))
+
+        if option_specs $! nil ->
+            print("\n# Options\n")
+            it = option_specs.iter()
+            loop (spec = it.next()) $! nil ->
+                print(spec.get("name"))
+
+        if flag_specs $! nil ->
+            print("\n# Flags\n")
+            it = flag_specs.iter()
+            loop (spec = it.next()) != nil ->
+                print(spec.get("name"))
+
+
         nil
     else if errors.is_empty ->
         result
