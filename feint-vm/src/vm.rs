@@ -343,7 +343,7 @@ impl VM {
                     self.exit_scopes(*scope_exit_count);
                     let obj = self.peek_obj()?;
                     let obj = obj.read().unwrap();
-                    if obj.is_nil() {
+                    if !obj.is_nil() {
                         if *forward {
                             jump_ip = Some(ip + *addr);
                         } else {
