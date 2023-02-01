@@ -13,9 +13,10 @@ import std.args
 import std.system
 
 
-die = (code, msg) =>
-    print_err(msg)
-    system.exit(code, msg)
+die = (code, ...) =>
+    if $args.length ->
+        print_err($args.join(" "))
+    system.exit(code)
 
 
 $main = (...) =>
@@ -44,7 +45,7 @@ $main = (...) =>
     })
 
     if args.err ->
-        die(1, args.err)
+        die(1)
 
     if args $$ nil ->
         system.exit(0)
