@@ -38,7 +38,12 @@ impl Closure {
         let func = func_ref.read().unwrap();
         let func = func.down_to_func().unwrap();
         Self {
-            ns: Namespace::with_entries(&[("$doc", func.get_doc())]),
+            ns: Namespace::with_entries(&[
+                ("$params", func.get_params()),
+                ("$doc", func.get_doc()),
+                ("$arity", new::int(func.arity())),
+                ("$has_var_args", new::bool(func.has_var_args())),
+            ]),
             module_name: func.module_name().to_owned(),
             name: func.name().to_owned(),
             params: func.params().clone(),

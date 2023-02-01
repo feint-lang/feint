@@ -35,35 +35,44 @@ pub struct BoundFunc {
 standard_object_impls!(BoundFunc);
 
 impl BoundFunc {
-    pub fn new(func: ObjectRef, this: ObjectRef) -> Self {
-        let f = func.read().unwrap();
+    pub fn new(func_ref: ObjectRef, this: ObjectRef) -> Self {
+        let (module_name, name, doc, params, params_tuple, arity, has_var_args) = {
+            let func_guard = func_ref.read().unwrap();
 
-        let (module_name, name, params, doc) =
-            if let Some(f) = f.down_to_intrinsic_func() {
-                (f.module_name(), f.name(), f.params(), f.get_doc())
-            } else if let Some(f) = f.down_to_func() {
-                (f.module_name(), f.name(), f.params(), f.get_doc())
-            } else if let Some(f) = f.down_to_closure() {
-                (f.module_name(), f.name(), f.params(), f.get_doc())
-            } else {
-                panic!("Unexpected bound func type: {f}")
-            };
+            let func: &dyn FuncTrait =
+                if let Some(func) = func_guard.down_to_intrinsic_func() {
+                    func
+                } else if let Some(func) = func_guard.down_to_func() {
+                    func
+                } else if let Some(func) = func_guard.down_to_closure() {
+                    func
+                } else {
+                    panic!("Unexpected bound func type: {func_guard}")
+                };
 
-        let module_name = module_name.to_owned();
-        let name = name.to_owned();
-        let params = params.clone();
-
-        drop(f);
+            (
+                func.module_name().to_owned(),
+                func.name().to_owned(),
+                func.get_doc(),
+                func.params().clone(),
+                func.get_params(),
+                func.arity(),
+                func.has_var_args(),
+            )
+        };
 
         Self {
             ns: Namespace::with_entries(&[
                 ("$module_name", new::str(&module_name)),
                 ("$full_name", new::str(format!("{module_name}.{name}"))),
                 ("$name", new::str(&name)),
+                ("$params", params_tuple),
                 ("$doc", doc),
+                ("$arity", new::int(arity)),
+                ("$has_var_args", new::bool(has_var_args)),
             ]),
             module_name,
-            func,
+            func: func_ref,
             this,
             name,
             params,

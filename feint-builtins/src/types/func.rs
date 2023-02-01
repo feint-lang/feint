@@ -37,12 +37,15 @@ standard_object_impls!(Func);
 
 impl Func {
     pub fn new(module_name: String, name: String, params: Params, code: Code) -> Self {
-        Self {
+        let params_tuple = new::tuple(params.iter().map(new::str).collect());
+
+        let mut instance = Self {
             ns: Namespace::with_entries(&[
                 // Instance Attributes
                 ("$module_name", new::str(&module_name)),
                 ("$full_name", new::str(format!("{module_name}.{name}"))),
                 ("$name", new::str(&name)),
+                ("$params", params_tuple),
                 ("$doc", code.get_doc()),
             ]),
             module_name,
@@ -50,7 +53,14 @@ impl Func {
             name,
             params,
             code,
-        }
+        };
+
+        let arity = (&instance as &dyn FuncTrait).arity();
+        let has_var_args = (&instance as &dyn FuncTrait).has_var_args();
+        instance.ns_mut().insert("$arity", new::int(arity));
+        instance.ns_mut().insert("$has_var_args", new::bool(has_var_args));
+
+        instance
     }
 
     pub fn arg_names(&self) -> Vec<&str> {

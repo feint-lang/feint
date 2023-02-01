@@ -13,8 +13,18 @@ pub trait FuncTrait {
     fn name(&self) -> &String;
     fn params(&self) -> &Params;
 
+    fn get_params(&self) -> ObjectRef {
+        self.ns()
+            .get("$params")
+            .expect("Function type should have a $params attribute")
+            .clone()
+    }
+
     fn get_doc(&self) -> ObjectRef {
-        self.ns().get("$doc").unwrap().clone()
+        self.ns()
+            .get("$doc")
+            .expect("Function type should have a $doc attribute")
+            .clone()
     }
 
     /// Returns the required number of args.
@@ -34,8 +44,7 @@ pub trait FuncTrait {
     }
 
     /// If the function has var args, this returns the index of the var
-    /// args in the args list (which is also equal to the required
-    /// number of args).
+    /// args in the args list.
     fn var_args_index(&self) -> Option<usize> {
         let params = self.params();
         if let Some(name) = params.last() {
