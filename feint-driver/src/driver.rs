@@ -23,12 +23,11 @@ use feint_util::source::{
     Source,
 };
 use feint_vm::{
-    dis, CallDepth, ModuleExecutionContext, RuntimeErr, RuntimeErrKind, RuntimeResult,
-    VMState, VM,
+    CallDepth, Disassembler, ModuleExecutionContext, RuntimeErr, RuntimeErrKind,
+    RuntimeResult, VMState, VM,
 };
 
-use super::result::DriverErrKind::ModuleNotFound;
-use super::result::{DriverErr, DriverErrKind, DriverResult};
+use super::result::{DriverErr, DriverErrKind, DriverOptResult, DriverResult};
 
 pub struct Driver {
     vm: VM,
@@ -147,7 +146,7 @@ impl Driver {
     /// compiled all at once and executed as a script. In the REPL, code
     /// is compiled incrementally as it's entered, which makes it
     /// somewhat more complex to deal with.
-    pub fn execute_repl(&mut self, text: &str, module: ObjectRef) -> DriverResult {
+    pub fn execute_repl(&mut self, text: &str, module: ObjectRef) -> DriverOptResult {
         self.current_file_name = "<repl>".to_owned();
 
         // XXX: Nested scopes are necessary to avoid deadlocks.
@@ -191,7 +190,7 @@ impl Driver {
             module.code_mut().extend(code);
         }
 
-        let vm_state = {
+        {
             let module = module.read().unwrap();
             let module = module.down_to_mod().unwrap();
             self.execute_module(module, start, source, false)?
@@ -205,7 +204,10 @@ impl Driver {
             }
         }
 
-        Ok(vm_state)
+        match &self.vm.state {
+            VMState::Running | VMState::Idle(_) => Ok(None),
+            VMState::Halted(code) => Ok(Some(*code)),
+        }
     }
 
     /// Execute source from file as script.
@@ -270,12 +272,12 @@ impl Driver {
         is_main: bool,
     ) -> DriverResult {
         if self.dis && is_main {
-            let mut disassembler = dis::Disassembler::new();
+            let mut disassembler = Disassembler::new();
             disassembler.disassemble(module.code());
             if self.debug {
                 self.display_stack();
             }
-            return Ok(VMState::Halted(0));
+            return Ok(0);
         }
 
         self.load_imported_modules()?;
@@ -305,11 +307,19 @@ impl Driver {
             self.display_vm_state(&result);
         }
 
-        match result {
-            Ok(()) => Ok(self.vm.state.clone()),
-            Err(err) => {
+        result
+            .map(|_| match &self.vm.state {
+                VMState::Running => {
+                    eprintln!("VM should be idle or halted, not running");
+                    255
+                }
+                VMState::Idle(_) => 0,
+                VMState::Halted(0) => 0,
+                VMState::Halted(code) => *code,
+            })
+            .map_err(|err| {
                 if let RuntimeErrKind::Exit(_) = err.kind {
-                    Err(DriverErr::new(DriverErrKind::RuntimeErr(err.kind)))
+                    DriverErr::new(DriverErrKind::RuntimeErr(err.kind))
                 } else {
                     let start = self.vm.loc().0;
                     let line = source
@@ -317,10 +327,9 @@ impl Driver {
                         .unwrap_or("<source line not available>");
                     self.print_err_line(start.line, line);
                     self.handle_runtime_err(&err);
-                    Err(DriverErr::new(DriverErrKind::RuntimeErr(err.kind)))
+                    DriverErr::new(DriverErrKind::RuntimeErr(err.kind))
                 }
-            }
-        }
+            })
     }
 
     // Parsing ---------------------------------------------------------
@@ -386,7 +395,7 @@ impl Driver {
             }
             Ok(obj_ref!(module))
         } else {
-            Err(DriverErr::new(ModuleNotFound(name.to_owned())))
+            Err(DriverErr::new(DriverErrKind::ModuleNotFound(name.to_owned())))
         }
     }
 
@@ -400,7 +409,7 @@ impl Driver {
         if let Some(module) = maybe_get_module(name) {
             Ok(module)
         } else {
-            Err(DriverErr::new(ModuleNotFound(name.to_owned())))
+            Err(DriverErr::new(DriverErrKind::ModuleNotFound(name.to_owned())))
         }
     }
 
@@ -433,6 +442,15 @@ impl Driver {
             self.get_or_add_module(&name)?;
         }
         Ok(())
+    }
+
+    // Disassembly -----------------------------------------------------
+
+    pub fn disassemble_module(&self, module: ObjectRef) {
+        let module = module.read().unwrap();
+        let module = module.down_to_mod().unwrap();
+        let mut disassembler = Disassembler::new();
+        disassembler.disassemble(module.code());
     }
 
     // Error Handling --------------------------------------------------

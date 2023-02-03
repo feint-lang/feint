@@ -6,9 +6,8 @@ use rustyline::error::ReadlineError;
 
 use feint_builtins::types::{new, ObjectRef, ObjectTrait};
 use feint_compiler::{CompErrKind, ParseErrKind, ScanErrKind};
-use feint_driver::result::{DriverErr, DriverErrKind, DriverResult};
+use feint_driver::result::{DriverErr, DriverErrKind, DriverOptResult, DriverResult};
 use feint_driver::Driver;
-use feint_vm::{Disassembler, VMState};
 
 pub struct Repl {
     module: ObjectRef,
@@ -18,12 +17,15 @@ pub struct Repl {
 }
 
 impl Repl {
-    pub fn new(history_path: Option<PathBuf>, driver: Driver) -> Self {
+    pub fn new(history_path: Option<PathBuf>, mut driver: Driver) -> Self {
         let module = new::module("$repl", "<repl>", "FeInt REPL module", &[]);
+        driver.add_module("$repl", module.clone());
+
         let mut reader =
-            rustyline::Editor::<()>::new().expect("Could initialize readline");
+            rustyline::Editor::<()>::new().expect("Could not initialize readline");
         reader.set_indent_size(4);
         reader.set_tab_stop(4);
+
         Repl { module, reader, history_path, driver }
     }
 
@@ -33,8 +35,6 @@ impl Repl {
         self.load_history();
         println!("Type .exit or .quit to exit");
 
-        self.driver.add_module("$repl", self.module.clone());
-
         let result = loop {
             match self.read_line("→ ", true) {
                 Ok(None) => {
@@ -43,8 +43,11 @@ impl Repl {
                 Ok(Some(input)) => {
                     // Evaluate the input. If eval returns a result of
                     // any kind (ok or err), shut down the REPL.
-                    if let Some(result) = self.eval(input.as_str(), true) {
-                        break result;
+                    let result = self.eval(input.as_str(), true);
+                    match result {
+                        Ok(Some(code)) => break Ok(code),
+                        Ok(None) => (),
+                        Err(err) => break Err(err),
                     }
                 }
                 // User hit Ctrl-C
@@ -52,9 +55,7 @@ impl Repl {
                     println!("Use Ctrl-D or .exit to exit");
                 }
                 // User hit Ctrl-D
-                Err(ReadlineError::Eof) => {
-                    break Ok(VMState::Halted(0));
-                }
+                Err(ReadlineError::Eof) => break Ok(0),
                 // Unexpected error encountered while attempting to read
                 // a line.
                 Err(err) => {
@@ -63,6 +64,7 @@ impl Repl {
                 }
             }
         };
+
         result
     }
 
@@ -82,79 +84,70 @@ impl Repl {
     }
 
     /// Evaluate text. Returns `None` to indicate to the main loop to
-    /// continue reading and evaluating input. Returns an `DriverResult`
-    /// to indicate to the main loop to exit.
-    pub fn eval(&mut self, text: &str, continue_on_err: bool) -> Option<DriverResult> {
+    /// continue reading and evaluating input. Returns `Some(u8)` to
+    /// indicate to the main loop to exit.
+    pub fn eval(&mut self, text: &str, continue_on_err: bool) -> DriverOptResult {
         self.add_history_entry(text);
 
         if matches!(text, ".exit" | ".quit") {
-            return Some(Ok(VMState::Halted(0)));
+            return Ok(Some(0));
         } else if self.handle_command(text) {
-            return None;
+            return Ok(None);
         }
 
-        let result = self.driver.execute_repl(text, self.module.clone());
-
-        match result {
-            Ok(vm_state) => {
-                return match vm_state {
-                    VMState::Running => None,
-                    VMState::Idle(_) => None,
-                    // Halted:
-                    state => Some(Ok(state)),
-                };
+        // If there's an error executing the current input, try to add
+        // more lines *if* the error can potentially be recovered from
+        // by adding more input.
+        self.driver.execute_repl(text, self.module.clone()).or_else(|err| {
+            if let Some(code) = err.exit_code() {
+                return Ok(Some(code));
             }
-            Err(err) => {
-                // If the special Exit err is returned, exit.
-                if let Some(code) = err.exit_code() {
-                    return Some(Ok(VMState::Halted(code)));
-                }
 
-                // If there's an error executing the current input, try
-                // to add more lines *if* the error can potentially be
-                // recovered from by adding more input.
-                if !(continue_on_err && self.continue_on_err(&err)) {
-                    if matches!(
-                        &err.kind,
-                        DriverErrKind::Bootstrap(_)
-                            | DriverErrKind::CouldNotReadSourceFile(_)
-                            | DriverErrKind::ModuleDirNotFound(_)
-                            | DriverErrKind::ModuleNotFound(_)
-                            | DriverErrKind::ReplErr(_)
-                    ) {
-                        eprintln!("{err}");
+            if continue_on_err && self.continue_on_err(&err) {
+                // Add input until 2 successive blank lines are entered.
+                let mut input = text.to_owned();
+                let mut blank_line_count = 0;
+                loop {
+                    match self.read_line("+ ", false) {
+                        Ok(None) => unreachable!(
+                            "read_line should never return None in this context"
+                        ),
+                        Ok(Some(new_input)) => {
+                            input.push('\n');
+                            if new_input.is_empty() {
+                                if blank_line_count > 0 {
+                                    break self.eval(input.as_str(), false);
+                                }
+                                blank_line_count += 1;
+                            } else {
+                                input.push_str(new_input.as_str());
+                                if blank_line_count > 0 {
+                                    break self.eval(input.as_str(), false);
+                                }
+                                blank_line_count = 0;
+                            }
+                        }
+                        Err(err) => {
+                            break Err(DriverErr::new(DriverErrKind::ReplErr(
+                                format!("{err}"),
+                            )));
+                        }
                     }
-                    return None;
-                }
-            }
-        }
-
-        // Add input until 2 successive blank lines are entered.
-        let mut input = text.to_owned();
-        let mut blank_line_count = 0;
-        loop {
-            let read_line_result = self.read_line("+ ", false);
-            if let Ok(None) = read_line_result {
-                unreachable!();
-            } else if let Ok(Some(new_input)) = read_line_result {
-                input.push('\n');
-                if new_input.is_empty() {
-                    if blank_line_count > 0 {
-                        break self.eval(input.as_str(), false);
-                    }
-                    blank_line_count += 1;
-                } else {
-                    input.push_str(new_input.as_str());
-                    if blank_line_count > 0 {
-                        break self.eval(input.as_str(), false);
-                    }
-                    blank_line_count = 0;
                 }
             } else {
-                let msg = format!("{}", read_line_result.unwrap_err());
-                break Some(Err(DriverErr::new(DriverErrKind::ReplErr(msg))));
+                if matches!(
+                    &err.kind,
+                    DriverErrKind::Bootstrap(_)
+                        | DriverErrKind::CouldNotReadSourceFile(_)
+                        | DriverErrKind::ModuleDirNotFound(_)
+                        | DriverErrKind::ModuleNotFound(_)
+                        | DriverErrKind::ReplErr(_)
+                ) {
+                    eprintln!("{err}");
+                }
+                Ok(None)
             }
-        }
+        })
     }
 
     fn handle_command(&mut self, text: &str) -> bool {
@@ -192,10 +185,7 @@ impl Repl {
                 }
             }
             ".dis" => {
-                let module = self.module.read().unwrap();
-                let module = module.down_to_mod().unwrap();
-                let mut disassembler = Disassembler::new();
-                disassembler.disassemble(module.code());
+                self.driver.disassemble_module(self.module.clone());
             }
             ".stack" => {
                 self.driver.display_stack();

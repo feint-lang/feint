@@ -230,7 +230,6 @@ dependencies = [
  "feint-builtins",
  "feint-compiler",
  "feint-driver",
- "feint-vm",
  "rustyline",
 ]
 

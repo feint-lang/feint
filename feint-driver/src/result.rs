@@ -2,12 +2,13 @@ use core::fmt;
 use std::fmt::Formatter;
 
 use feint_compiler::{CompErrKind, ParseErrKind, ScanErrKind};
-use feint_vm::{RuntimeErrKind, VMState};
+use feint_vm::RuntimeErrKind;
 
 pub type CallDepth = usize;
 
 /// Result type used by top level program driver.
-pub type DriverResult = Result<VMState, DriverErr>;
+pub type DriverResult = Result<u8, DriverErr>;
+pub type DriverOptResult = Result<Option<u8>, DriverErr>;
 
 #[derive(Debug)]
 pub struct DriverErr {

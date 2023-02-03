@@ -43,8 +43,8 @@ fn eval(input: &str) {
     }
     let mut repl = Repl::new(None, driver);
     match repl.eval(input, false) {
-        Some(Ok(_)) => assert!(false),
-        Some(Err(_)) => assert!(false),
-        None => assert!(true), // eval returns None on valid input
+        Ok(Some(_)) => assert!(false),
+        Ok(None) => assert!(true), // eval returns None on valid input
+        Err(_) => assert!(false),
     }
 }

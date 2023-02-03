@@ -12,7 +12,6 @@ use std::process::ExitCode;
 use clap::{parser::ValueSource, ArgMatches};
 
 use feint_driver::{Driver, DriverErrKind, DriverResult};
-use feint_vm::VMState;
 
 use repl::Repl;
 
@@ -196,34 +195,23 @@ fn create_repl_history_file(cond: &bool, path: Option<&String>) -> Option<PathBu
 }
 
 fn handle_driver_result(result: DriverResult) -> u8 {
-    match result {
-        Ok(vm_state) => match vm_state {
-            VMState::Running => {
-                eprintln!("VM should be idle or halted, not running");
-                255
+    result.unwrap_or_else(|err| {
+        if let Some(code) = err.exit_code() {
+            code
+        } else {
+            if matches!(
+                &err.kind,
+                DriverErrKind::Bootstrap(_)
+                    | DriverErrKind::CouldNotReadSourceFile(_)
+                    | DriverErrKind::ModuleDirNotFound(_)
+                    | DriverErrKind::ModuleNotFound(_)
+                    | DriverErrKind::ReplErr(_)
+            ) {
+                eprintln!("{err}");
             }
-            VMState::Idle(_) => 0,
-            VMState::Halted(0) => 0,
-            VMState::Halted(code) => code,
-        },
-        Err(err) => {
-            if let Some(exit_code) = err.exit_code() {
-                exit_code
-            } else {
-                if matches!(
-                    &err.kind,
-                    DriverErrKind::Bootstrap(_)
-                        | DriverErrKind::CouldNotReadSourceFile(_)
-                        | DriverErrKind::ModuleDirNotFound(_)
-                        | DriverErrKind::ModuleNotFound(_)
-                        | DriverErrKind::ReplErr(_)
-                ) {
-                    eprintln!("{err}");
-                }
-                255
-            }
+            255
         }
-    }
+    })
 }
 
 /// Get path for str, expanding leading ~ to user home directory. The
