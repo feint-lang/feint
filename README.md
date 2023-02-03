@@ -265,20 +265,14 @@ loop i <- 1...10 ->
     i
 
 # Loop until condition is met
-#
-# TODO: There's a bug in this example since `loop cond` checks the OUTER
-#       `cond`. This is due to how scopes work--the inner assignment
-#       creates a new scope-local var rather than reassigning the outer
-#       `cond`. A possible fix would be to add an `outer` keyword.
+# 
+# NOTE the use of `cond <- false` rather than `cond = false`. This is
+# necessary because `cond = false` would create a new var in the loop's
+# scope such that the loop would never exit (since it checks the OUTER
+# `cond`).
 cond = true
 loop cond ->
-    cond = false
-    
-# Another fix for the above example would be to pull the outer cond into
-# the loop's scope as a local variable:
-cond = true
-loop cond = cond ->
-    cond = false
+    cond <- false
 ```
 
 ## Jumps

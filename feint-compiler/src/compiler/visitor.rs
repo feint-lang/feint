@@ -223,7 +223,7 @@ impl CompilerVisitor {
             self.scope_tree.add_var(self.len(), &var_name, true);
             self.push(Inst::DeclareVar(var_name.clone()));
             self.push(Inst::LoadModule(name.clone()));
-            self.push(Inst::AssignVar(var_name.clone()));
+            self.push(Inst::AssignVar(var_name.clone(), 0));
         } else {
             let var_name = name
                 .split('.')
@@ -232,7 +232,7 @@ impl CompilerVisitor {
             self.scope_tree.add_var(self.len(), var_name, true);
             self.push(Inst::DeclareVar(var_name.to_owned()));
             self.push(Inst::LoadModule(name.clone()));
-            self.push(Inst::AssignVar(var_name.to_owned()));
+            self.push(Inst::AssignVar(var_name.to_owned(), 0));
         }
         Ok(())
     }
@@ -312,6 +312,9 @@ impl CompilerVisitor {
             }
             Kind::Assignment(lhs_expr, value_expr) => {
                 self.visit_assignment(*lhs_expr, *value_expr)?
+            }
+            Kind::Reassignment(lhs_expr, value_expr) => {
+                self.visit_reassignment(*lhs_expr, *value_expr)?
             }
             Kind::Block(block) => self.visit_block(block)?,
             Kind::Conditional(branches, default) => {
@@ -723,8 +726,40 @@ impl CompilerVisitor {
             }
             self.visit_expr(value_expr, Some(name.clone()))?;
             self.scope_tree.mark_assigned(self.scope_tree.pointer(), name.as_str());
-            self.push(Inst::AssignVar(name));
+            self.push(Inst::AssignVar(name, 0));
             Ok(())
+        } else {
+            Err(CompErr::expected_ident(lhs_expr.start, lhs_expr.end))
+        }
+    }
+
+    fn visit_reassignment(
+        &mut self,
+        lhs_expr: ast::Expr,
+        value_expr: ast::Expr,
+    ) -> VisitResult {
+        if let Some(name) = lhs_expr.ident_name() {
+            if let Some(var) = self.scope_tree.find_var(&name, None) {
+                let depth = var.depth;
+                let offset = self.scope_depth - depth;
+                if self.is_module() && depth == 0 {
+                    let msg = format!(
+                        "Cannot reassign {name} using <- in global scope. Use = instead."
+                    );
+                    Err(CompErr::reassignment(msg, lhs_expr.start, lhs_expr.end))
+                } else if self.is_func() && offset == 0 {
+                    let msg = format!(
+                        "Cannot reassign var {name} using <- in same scope. Use = instead."
+                    );
+                    Err(CompErr::reassignment(msg, lhs_expr.start, lhs_expr.end))
+                } else {
+                    self.visit_expr(value_expr, Some(name.clone()))?;
+                    self.push(Inst::AssignVar(name, offset));
+                    Ok(())
+                }
+            } else {
+                Err(CompErr::name_not_found(name, lhs_expr.start, lhs_expr.end))
+            }
         } else {
             Err(CompErr::expected_ident(lhs_expr.start, lhs_expr.end))
         }

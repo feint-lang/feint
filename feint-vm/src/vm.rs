@@ -181,9 +181,9 @@ impl VM {
                         self.ctx.declare_var(name.as_str());
                     }
                 }
-                AssignVar(name) => {
+                AssignVar(name, offset) => {
                     let obj = self.pop_obj()?;
-                    let depth = self.ctx.assign_var(name, obj)?;
+                    let depth = self.ctx.assign_var(name, obj, *offset)?;
                     self.push_var(depth, name.clone())?;
                 }
                 LoadVar(name, offset) => {
@@ -243,12 +243,12 @@ impl VM {
                     let depth = if let Some(cell) = var.down_to_cell_mut() {
                         // Wrap TOS in existing cell.
                         cell.set_value(value.clone());
-                        self.ctx.assign_var(name, var_ref.clone())?
+                        self.ctx.assign_var(name, var_ref.clone(), 0)?
                     } else {
                         // Create new cell to wrap TOS in.
                         assert!(var.is_nil());
                         let cell_ref = new::cell_with_value(value.clone());
-                        self.ctx.assign_var(name, cell_ref)?
+                        self.ctx.assign_var(name, cell_ref, 0)?
                     };
                     // Push cell *value* to TOS.
                     self.push(ValueStackKind::CellVar(value, depth, name.to_owned()));
@@ -461,8 +461,11 @@ impl VM {
                             if let AssignCell(_) = &code[ip + 1] {
                                 let closure_cell =
                                     new::cell_with_value(func_ref.clone());
-                                self.ctx
-                                    .assign_var(func.name(), closure_cell.clone())?;
+                                self.ctx.assign_var(
+                                    func.name(),
+                                    closure_cell.clone(),
+                                    0,
+                                )?;
                                 capture_set
                                     .insert(func.name().to_owned(), closure_cell);
                             }

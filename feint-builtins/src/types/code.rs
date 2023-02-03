@@ -236,7 +236,13 @@ pub enum Inst {
     LoadConst(usize),
 
     DeclareVar(String),
-    AssignVar(String),
+
+    // Args: name, offset
+    //
+    // `offset` is the number of scopes above the current scope, where
+    // the var is defined. 0 means the current scope, 1 means the parent
+    // scope, and so on.
+    AssignVar(String, usize),
 
     // Args: name, offset
     //
@@ -369,7 +375,7 @@ impl PartialEq for Inst {
             (StatementStart(..), StatementStart(..)) => true,
             (LoadConst(a), LoadConst(b)) => a == b,
             (DeclareVar(a), DeclareVar(b)) => a == b,
-            (AssignVar(a), AssignVar(b)) => a == b,
+            (AssignVar(a, i), AssignVar(b, j)) => (a, i) == (b, j),
             (LoadVar(a, i), LoadVar(b, j)) => (a, i) == (b, j),
             (AssignCell(a), AssignCell(b)) => a == b,
             (LoadCell(a), LoadCell(b)) => a == b,

@@ -1,0 +1,47 @@
+# Reassignment using <- is allowed only to vars defined in an OUTER
+# scope, EXCLUDING globals.
+
+x = 1
+
+# This would throw a compilation error.
+# x <- 2
+
+# So would this.
+# block ->
+#     x <- 2
+
+
+# This is okay though. The rationale for this is that it provides a way
+# to dynamically initialize a global without leaking temporaries into
+# the global scope.
+y = block ->
+    a = true
+    loop a ->
+        a <- false
+
+assert_is(y, false, true)
+
+
+f = () =>
+    # This would throw throw a compilation error because x isn't defined
+    # in the function's scope.
+    # x <- 2
+    ...
+
+
+g = (x) =>
+    # This would throw throw a compilation error because the parameter x
+    # is defined in the same scope.
+    # x <- 2
+
+    block ->
+        x <- 2
+
+    cond = true
+    loop cond ->
+        # NOTE: Using = instead of <- here would cause an infinite loop.
+        cond <- false
+
+
+$main = (...) =>
+    g(1)

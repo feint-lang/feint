@@ -61,6 +61,10 @@ impl CompErr {
         Self::new(CompErrKind::CannotReassignSpecialIdent(name, start, end))
     }
 
+    pub fn reassignment(msg: String, start: Location, end: Location) -> Self {
+        Self::new(CompErrKind::Reassignment(msg, start, end))
+    }
+
     pub fn main_must_be_func(start: Location, end: Location) -> Self {
         Self::new(CompErrKind::MainMustBeFunc(start, end))
     }
@@ -91,6 +95,7 @@ impl CompErr {
             ExpectedIdent(start, end) => (start, end),
             CannotAssignSpecialIdent(_, start, end) => (start, end),
             CannotReassignSpecialIdent(_, start, end) => (start, end),
+            Reassignment(_, start, end) => (start, end),
             MainMustBeFunc(start, end) => (start, end),
             GlobalNotFound(_, start, end) => (start, end),
             VarArgsMustBeLast(start, end) => (start, end),
@@ -110,6 +115,7 @@ pub enum CompErrKind {
     ExpectedIdent(Location, Location),
     CannotAssignSpecialIdent(String, Location, Location),
     CannotReassignSpecialIdent(String, Location, Location),
+    Reassignment(String, Location, Location),
     MainMustBeFunc(Location, Location),
     GlobalNotFound(String, Location, Location),
     VarArgsMustBeLast(Location, Location),

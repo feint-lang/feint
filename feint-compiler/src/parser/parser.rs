@@ -666,6 +666,12 @@ impl<I: Iterator<Item = ScanTokenResult>> Parser<I> {
                             ast::Expr::new_assignment(lhs, value, start, end)
                         }
                     }
+                    Token::Feed => {
+                        log::trace!("BINOP: reassignment");
+                        let value = self.expr(infix_prec)?;
+                        let end = value.end;
+                        ast::Expr::new_reassignment(lhs, value, start, end)
+                    }
                     // Call
                     Token::LParen => {
                         log::trace!("BINOP: call {lhs:?}");

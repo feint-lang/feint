@@ -20,7 +20,7 @@ pub enum Token {
     Colon,    // :
     DotDot,   // ..
     Ellipsis, // ...
-    LoopFeed, // <-
+    Feed,     // <-
 
     // Fundamental types -----------------------------------------------
     At,                             // @ (used to represent the singleton Always)
@@ -128,7 +128,7 @@ impl Token {
             Self::Colon => ":",
             Self::DotDot => "..",
             Self::Ellipsis => "...",
-            Self::LoopFeed => "<-",
+            Self::Feed => "<-",
 
             // Fundamental types -----------------------------------------------
             Self::Int(_) => "Int",

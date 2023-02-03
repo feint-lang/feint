@@ -154,6 +154,36 @@ assert_eq: Bool | Err = (a: Any, b: Any, ...) =>
         err
 
 
+assert_is: Bool | Err = (a: Any, b: Any, ...) =>
+    "Check if items are the same object and return error if not.
+
+    # Args
+
+    - a: Any
+    - b: Any
+    - halt?: Bool = false
+
+    # Returns
+
+    true: if the items are the same object
+    Err: if the items are not the same and `halt` is unset
+
+    > NOTE: If `halt` is set, the program will exit immediately with an
+    > error code.
+
+    "
+    if a $$ b ->
+        true
+    else ->
+        err = Err.new(ErrType.assertion, $"{a} is not {b}")
+
+        if $args.get(0) ->
+            print_err(err)
+            $halt 1
+
+        err
+
+
 # NOTE: This is used for manual type-checking of function args, which
 #       isn't great.
 check_arg_type = (func: Func, name: Str, arg: Any, expected_types: Tuple) =>

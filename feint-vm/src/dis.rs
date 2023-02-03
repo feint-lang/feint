@@ -69,9 +69,13 @@ impl Disassembler {
                 None => self.align("LOAD_CONST", ""),
             },
             DeclareVar(name) => self.align("DECLARE_VAR", name),
-            AssignVar(name) => self.align("ASSIGN_VAR", name),
+            AssignVar(name, offset) => {
+                let offset_prefix = if *offset == 0 { "" } else { "-" };
+                self.align("ASSIGN_VAR", format!("{name} @ {offset_prefix}{offset}"))
+            }
             LoadVar(name, offset) => {
-                self.align("LOAD_VAR", format!("{name} @ -{offset}"))
+                let offset_prefix = if *offset == 0 { "" } else { "-" };
+                self.align("LOAD_VAR", format!("{name} @ {offset_prefix}{offset}"))
             }
             LoadGlobal(name) => self.align("LOAD_GLOBAL", name),
             LoadBuiltin(name) => self.align("LOAD_BUILTIN", name),

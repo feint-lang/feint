@@ -166,6 +166,7 @@ pub enum ExprKind {
     Call(Call),
     DeclarationAndAssignment(Box<Expr>, Box<Expr>),
     Assignment(Box<Expr>, Box<Expr>),
+    Reassignment(Box<Expr>, Box<Expr>),
     UnaryOp(UnaryOperator, Box<Expr>),
     BinaryOp(Box<Expr>, BinaryOperator, Box<Expr>),
     CompareOp(Box<Expr>, CompareOperator, Box<Expr>),
@@ -280,6 +281,18 @@ impl Expr {
     ) -> Self {
         Self::new(
             ExprKind::Assignment(Box::new(lhs_expr), Box::new(value_expr)),
+            start,
+            end,
+        )
+    }
+    pub fn new_reassignment(
+        lhs_expr: Expr,
+        value_expr: Expr,
+        start: Location,
+        end: Location,
+    ) -> Self {
+        Self::new(
+            ExprKind::Reassignment(Box::new(lhs_expr), Box::new(value_expr)),
             start,
             end,
         )
@@ -452,6 +465,7 @@ impl fmt::Debug for ExprKind {
                 write!(f, "{ident:?} = {expr:?}")
             }
             Self::Assignment(ident, expr) => write!(f, "{ident:?} = {expr:?}"),
+            Self::Reassignment(ident, expr) => write!(f, "{ident:?} <- {expr:?}"),
             Self::Block(block) => write!(f, "block {block:?}"),
             Self::Conditional(branches, default) => {
                 write!(f, "{branches:?} {default:?}")

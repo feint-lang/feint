@@ -110,11 +110,13 @@ impl ModuleExecutionContext {
         &mut self,
         name: &str,
         obj: ObjectRef,
+        offset: usize,
     ) -> Result<usize, RuntimeErr> {
-        let ns = self.current_mut();
+        let depth = self.current_depth() - offset;
+        let ns = self.ns_stack.get_mut(depth).unwrap();
         if ns.contains_key(name) {
             ns.insert(name.to_owned(), obj);
-            Ok(self.ns_stack.len() - 1)
+            Ok(depth)
         } else {
             let message = format!("Name not defined in current scope: {name}");
             Err(RuntimeErr::name_err(message))
@@ -128,7 +130,7 @@ impl ModuleExecutionContext {
         obj: ObjectRef,
     ) -> Result<usize, RuntimeErr> {
         self.declare_var(name);
-        self.assign_var(name, obj)
+        self.assign_var(name, obj, 0)
     }
 
     /// Assign value to var--reach into the scope at depth and set the

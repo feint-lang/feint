@@ -168,7 +168,7 @@ impl Compiler {
                                 Inst::ScopeEnd => {
                                     break;
                                 }
-                                Inst::AssignVar(n) if n == name => {
+                                Inst::AssignVar(n, 0) if n == name => {
                                     info.cell_var_assignments.push(addr);
                                 }
                                 Inst::LoadVar(n, 0) if n == name => {

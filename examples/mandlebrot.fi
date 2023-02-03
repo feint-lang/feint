@@ -69,22 +69,10 @@ $main = (...) =>
             i = 0
 
             loop i < w && tr + ti <= 4 ->
-                new_zi = 2 * zr * zi + ci
-                zi *= 0.0
-                zi += new_zi
-
-                new_zr = tr - ti + cr
-                zr *= 0
-                zr += new_zr
-
-                new_tr = zr * zr
-                tr *= 0
-                tr += new_tr
-
-                new_ti = zi * zi
-                ti *= 0
-                ti += new_ti
-
+                zi <- 2 * zr * zi + ci
+                zr <- tr - ti + cr
+                tr <- zr * zr
+                ti <- zi * zi
                 i += 1
 
             # NOTE: Using $print instead of print to avoid function call

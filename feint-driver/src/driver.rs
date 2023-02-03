@@ -174,7 +174,7 @@ impl Driver {
         if let Some(Inst::Pop) = last_inst {
             let print_flags = PrintFlags::NL | PrintFlags::REPR | PrintFlags::NO_NIL;
             code.push_inst(Inst::DeclareVar("_".to_owned()));
-            code.push_inst(Inst::AssignVar("_".to_owned()));
+            code.push_inst(Inst::AssignVar("_".to_owned(), 0));
             code.push_inst(Inst::Print(print_flags));
         } else {
             let last_inst = match last_inst {
@@ -635,6 +635,9 @@ impl Driver {
             }
             CannotReassignSpecialIdent(name, ..) => {
                 format!("cannot reassign special name: {name}")
+            }
+            Reassignment(msg, ..) => {
+                msg.to_string()
             }
             MainMustBeFunc(..) => {
                 "$main must be a function".to_owned()

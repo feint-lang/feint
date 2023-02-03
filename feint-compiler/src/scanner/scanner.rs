@@ -151,7 +151,7 @@ impl<'a, T: BufRead> Scanner<'a, T> {
             Some(('<', Some('='), _)) => {
                 self.consume_char_and_return_token(LessThanOrEqual)
             }
-            Some(('<', Some('-'), _)) => self.consume_char_and_return_token(LoopFeed),
+            Some(('<', Some('-'), _)) => self.consume_char_and_return_token(Feed),
             Some(('<', _, _)) => LessThan,
             Some(('>', Some('='), _)) => {
                 self.consume_char_and_return_token(GreaterThanOrEqual)
