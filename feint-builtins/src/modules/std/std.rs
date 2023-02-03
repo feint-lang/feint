@@ -8,7 +8,7 @@ use feint_code_gen::{obj_ref_t, use_arg, use_arg_str};
 use crate::types::{self, new};
 
 pub static STD: Lazy<obj_ref_t!(types::module::Module)> = Lazy::new(|| {
-    new::intrinsic_module(
+    new::module(
         "std",
         "<std>",
         "std module (builtins)",

@@ -95,11 +95,24 @@ pub fn empty_tuple() -> ObjectRef {
     EMPTY_TUPLE.clone()
 }
 
-// Intrinsic type constructors ---------------------------------
+// Modules -------------------------------------------------------------
 
-pub fn bound_func(func: ObjectRef, this: ObjectRef) -> ObjectRef {
-    obj_ref!(BoundFunc::new(func, this))
+pub fn module(
+    name: &str,
+    path: &str,
+    doc: &str,
+    entries: &[(&str, ObjectRef)],
+) -> obj_ref_t!(Module) {
+    obj_ref!(Module::with_entries(
+        entries,
+        name.to_owned(),
+        path.to_owned(),
+        Code::default(),
+        Some(doc.to_owned())
+    ))
 }
+
+// Function-------------------------------------------------------------
 
 pub fn intrinsic_func(
     module_name: &str,
@@ -121,19 +134,21 @@ pub fn intrinsic_func(
     ))
 }
 
-pub fn intrinsic_module(
-    name: &str,
-    path: &str,
-    doc: &str,
-    entries: &[(&str, ObjectRef)],
-) -> obj_ref_t!(Module) {
-    obj_ref!(Module::with_entries(
-        entries,
-        name.to_owned(),
-        path.to_owned(),
-        Code::default(),
-        Some(doc.to_owned())
-    ))
+pub fn func<S: Into<String>>(
+    module_name: S,
+    func_name: S,
+    params: Params,
+    code: Code,
+) -> ObjectRef {
+    obj_ref!(Func::new(module_name.into(), func_name.into(), params, code))
+}
+
+pub fn bound_func(func: ObjectRef, this: ObjectRef) -> ObjectRef {
+    obj_ref!(BoundFunc::new(func, this))
+}
+
+pub fn closure(func: ObjectRef, captured: ObjectRef) -> ObjectRef {
+    obj_ref!(Closure::new(func, captured))
 }
 
 pub fn cell() -> ObjectRef {
@@ -144,8 +159,8 @@ pub fn cell_with_value(value: ObjectRef) -> ObjectRef {
     obj_ref!(Cell::with_value(value))
 }
 
-pub fn closure(func: ObjectRef, captured: ObjectRef) -> ObjectRef {
-    obj_ref!(Closure::new(func, captured))
+pub fn argv_tuple(argv: &[String]) -> ObjectRef {
+    obj_ref!(Tuple::new(argv.iter().map(str).collect()))
 }
 
 // Errors --------------------------------------------------------------
@@ -225,15 +240,6 @@ pub fn float_from_string<S: Into<String>>(val: S) -> ObjectRef {
     }
 }
 
-pub fn func<S: Into<String>>(
-    module_name: S,
-    func_name: S,
-    params: Params,
-    code: Code,
-) -> ObjectRef {
-    obj_ref!(Func::new(module_name.into(), func_name.into(), params, code))
-}
-
 pub fn int<I: Into<BigInt>>(value: I) -> ObjectRef {
     let value = value.into();
     if value.is_positive() && &value <= Lazy::force(&SHARED_INT_MAX_BIGINT) {
@@ -293,10 +299,6 @@ pub fn tuple(items: Vec<ObjectRef>) -> ObjectRef {
     } else {
         obj_ref!(Tuple::new(items))
     }
-}
-
-pub fn argv_tuple(argv: &[String]) -> ObjectRef {
-    obj_ref!(Tuple::new(argv.iter().map(str).collect()))
 }
 
 // Custom type constructor ---------------------------------------------

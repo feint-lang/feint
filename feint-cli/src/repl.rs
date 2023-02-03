@@ -19,7 +19,7 @@ pub struct Repl {
 
 impl Repl {
     pub fn new(history_path: Option<PathBuf>, driver: Driver) -> Self {
-        let module = new::intrinsic_module("$repl", "$repl", "FeInt REPL module", &[]);
+        let module = new::module("$repl", "<repl>", "FeInt REPL module", &[]);
         let mut reader =
             rustyline::Editor::<()>::new().expect("Could initialize readline");
         reader.set_indent_size(4);

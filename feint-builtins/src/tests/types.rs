@@ -122,13 +122,13 @@ mod custom {
 
     #[test]
     fn test_custom() {
-        let mod1 = new::intrinsic_module("test1", "<test1>", "test module 1", &[]);
+        let mod1 = new::module("test1", "<test1>", "test module 1", &[]);
         let t1 = new::custom_type(mod1, "Custom1");
         let t1_obj1 = instance(t1.clone(), &[("value", new::nil())]);
         let t1_obj2 = instance(t1.clone(), &[("value", new::nil())]);
         let t1_obj3 = instance(t1.clone(), &[("value", new::nil())]);
 
-        let mod2 = new::intrinsic_module("test2", "<test2>", "test module 2", &[]);
+        let mod2 = new::module("test2", "<test2>", "test module 2", &[]);
         let t2 = new::custom_type(mod2, "Custom2");
         let t2_obj1 = instance(t2.clone(), &[]);
 
