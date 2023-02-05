@@ -166,7 +166,7 @@ impl Code {
         for (index, other_ref) in self.iter_constants().enumerate() {
             let other = other_ref.read().unwrap();
             let other_is_comparable = other.is_immutable() && !other.is_func();
-            if is_comparable && other_is_comparable && other.is_equal(val) {
+            if is_comparable && other_is_comparable && other.is_type_equal(val) {
                 return index;
             }
         }

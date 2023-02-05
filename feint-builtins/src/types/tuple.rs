@@ -130,8 +130,6 @@ impl ObjectTrait for Tuple {
     }
 }
 
-// Display -------------------------------------------------------------
-
 impl fmt::Display for Tuple {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let num_items = self.len();

@@ -6,9 +6,9 @@ use std::sync::{Arc, RwLock};
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 
-use crate::modules::get_module;
 use feint_code_gen::*;
 
+use crate::modules::get_module;
 use crate::new;
 
 use super::func_trait::FuncTrait;
@@ -269,7 +269,7 @@ pub trait ObjectTrait {
             };
         }
 
-        self.attr_not_found(name, this)
+        new::attr_not_found_err(name, this)
     }
 
     /// Set attribute.
@@ -287,11 +287,7 @@ pub trait ObjectTrait {
         this: ObjectRef,
     ) -> ObjectRef {
         // TODO: The default should be a "does not support" attr access
-        self.attr_not_found(name, this)
-    }
-
-    fn attr_not_found(&self, name: &str, obj: ObjectRef) -> ObjectRef {
-        new::attr_not_found_err(name, obj)
+        new::attr_not_found_err(name, this)
     }
 
     // Items (accessed by index) ---------------------------------------
@@ -451,7 +447,7 @@ pub trait ObjectTrait {
     }
 
     fn is_equal(&self, rhs: &dyn ObjectTrait) -> bool {
-        self.is(rhs) || rhs.is_always()
+        self.is(rhs) || self.is_always() || rhs.is_always()
     }
 
     make_bin_op!(and, "&&", bool);
