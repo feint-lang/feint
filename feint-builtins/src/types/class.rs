@@ -3,6 +3,9 @@
 //! latter is a Rust keyword.
 use std::any::Any;
 use std::fmt;
+use std::sync::{Arc, RwLock};
+
+use once_cell::sync::{Lazy, OnceCell};
 
 use feint_code_gen::*;
 
@@ -11,10 +14,15 @@ use crate::BUILTINS;
 use super::base::{ObjectRef, ObjectTrait, TypeRef};
 use super::ns::Namespace;
 
+pub static TYPE_TYPE: Lazy<TypeRef> = Lazy::new(|| obj_ref!(Type::new("std", "Type")));
+
 pub struct Type {
     module_name: String,
     name: String,
     ns: Namespace,
+    module_attr: OnceCell<ObjectRef>,
+    name_attr: OnceCell<ObjectRef>,
+    full_name_attr: OnceCell<ObjectRef>,
 }
 
 standard_object_impls!(Type);
@@ -25,6 +33,9 @@ impl Type {
             module_name: module_name.to_owned(),
             name: name.to_owned(),
             ns: Namespace::default(),
+            module_attr: OnceCell::default(),
+            name_attr: OnceCell::default(),
+            full_name_attr: OnceCell::default(),
         }
     }
 
@@ -47,11 +58,7 @@ impl ObjectTrait for Type {
     }
 
     fn class(&self) -> TypeRef {
-        BUILTINS.type_type()
-    }
-
-    fn type_obj(&self) -> ObjectRef {
-        BUILTINS.type_type()
+        TYPE_TYPE.clone()
     }
 
     fn ns(&self) -> &Namespace {
@@ -63,11 +70,18 @@ impl ObjectTrait for Type {
     }
 
     fn get_attr(&self, name: &str, this: ObjectRef) -> ObjectRef {
-        // TODO: Don't recreate attrs on every access
         match name {
-            "$module" => BUILTINS.str(&self.module_name),
-            "$name" => BUILTINS.str(&self.name),
-            "$full_name" => BUILTINS.str(format!("{}.{}", self.module_name, self.name)),
+            "$module" => self
+                .module_attr
+                .get_or_init(|| BUILTINS.get_module(self.module_name()))
+                .clone(),
+            "$name" => self.name_attr.get_or_init(|| BUILTINS.str(self.name())).clone(),
+            "$full_name" => self
+                .full_name_attr
+                .get_or_init(|| {
+                    BUILTINS.str(format!("{}.{}", self.module_name(), self.name()))
+                })
+                .clone(),
             _ => self.base_get_attr(name, this),
         }
     }

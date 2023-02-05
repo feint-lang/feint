@@ -103,14 +103,7 @@ macro_rules! make_bin_op {
 pub trait ObjectTrait {
     fn as_any(&self) -> &dyn Any;
     fn as_any_mut(&mut self) -> &mut dyn Any;
-
-    /// Get an instance's type as a type. This is needed to retrieve
-    /// type level attributes.
     fn class(&self) -> TypeRef;
-
-    /// Get an instance's type as an object. This is needed so the type
-    /// can be used in object contexts.
-    fn type_obj(&self) -> ObjectRef;
 
     /// Each object has a namespace that holds its attributes.
     fn ns(&self) -> &Namespace;
@@ -156,12 +149,12 @@ pub trait ObjectTrait {
             return self.id_obj();
         }
 
-        if name == "$module" {
-            return self.module();
-        }
+        // if name == "$module" {
+        //     return self.module();
+        // }
 
         if name == "$type" {
-            return self.type_obj();
+            return self.class();
         }
 
         if name == "$names" {
@@ -178,6 +171,7 @@ pub trait ObjectTrait {
             return BUILTINS.tuple(items);
         }
 
+        // TODO: Convert to builtin function
         // if name == "$dis" {
         //     // User functions, bound functions wrapping user functions,
         //     // and closures wrapping user functions can be disassembled.
@@ -219,7 +213,7 @@ pub trait ObjectTrait {
             return obj;
         }
 
-        if let Some(obj) = self.type_obj().read().unwrap().ns().get(name) {
+        if let Some(obj) = self.class().read().unwrap().ns().get(name) {
             return obj;
         }
 
@@ -445,9 +439,9 @@ pub trait ObjectTrait {
         if self.is(rhs) {
             return true;
         }
-        let t = self.type_obj();
+        let t = self.class();
         let t = t.read().unwrap();
-        let u = rhs.type_obj();
+        let u = rhs.class();
         let u = u.read().unwrap();
         t.is(&*u) && self.is_equal(rhs)
     }

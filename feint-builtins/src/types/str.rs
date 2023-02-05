@@ -125,7 +125,7 @@ impl Str {
             class,
             ns: Namespace::with_entries(&[
                 // Instance Attributes
-                ("length", BUILTINS.int(value.len())),
+                // ("length", BUILTINS.int(value.len())),
             ]),
             value,
         }

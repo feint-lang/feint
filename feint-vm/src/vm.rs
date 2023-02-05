@@ -14,7 +14,7 @@ use num_traits::ToPrimitive;
 
 use feint_builtins::types::code::{Code, Inst, PrintFlags};
 use feint_builtins::types::{
-    Args, Func, FuncTrait, IntrinsicFunc, Module, ObjectRef, ThisOpt,
+    Args, Func, FuncTrait, IntrinsicFunc, Module, ObjectRef, ObjectTrait, ThisOpt,
 };
 use feint_builtins::BUILTINS;
 use feint_util::op::{BinaryOperator, CompareOperator, InplaceOperator, UnaryOperator};
@@ -109,7 +109,7 @@ impl VM {
     }
 
     pub fn execute_func(&mut self, func: &Func, start: usize) -> RuntimeResult {
-        let module = func.module();
+        let module = (func as &dyn FuncTrait).module();
         let module = module.read().unwrap();
         let module = module.down_to_mod().unwrap();
         self.execute_code(module, func.code(), start)
@@ -935,7 +935,7 @@ impl VM {
                     let expected_type = &*expected_type.read().unwrap();
                     let this = bound_func.this();
                     let this = this.read().unwrap();
-                    let this_type = this.type_obj();
+                    let this_type = this.class();
                     let this_type = this_type.read().unwrap();
                     // class method || instance method
                     // XXX: Not sure this is the best way to distinguish

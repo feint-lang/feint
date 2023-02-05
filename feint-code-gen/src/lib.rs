@@ -43,10 +43,6 @@ macro_rules! object_trait_header {
             self.class.clone()
         }
 
-        fn type_obj(&self) -> ObjectRef {
-            self.class.clone()
-        }
-
         fn ns(&self) -> &Namespace {
             &self.ns
         }

@@ -39,7 +39,7 @@ pub static BUILTINS: Lazy<Builtins> = Lazy::new(Builtins::default);
 
 pub struct Builtins {
     // Modules ---------------------------------------------------------
-    pub modules: OnceCel<obj_ref_t!(Map)>,
+    pub modules: obj_ref_t!(Map),
 
     // Types -----------------------------------------------------------
     pub type_type: TypeRef,
@@ -78,37 +78,87 @@ pub struct Builtins {
 unsafe impl Send for Builtins {}
 unsafe impl Sync for Builtins {}
 
-fn new_type(name: &str) -> TypeRef {
-    obj_ref!(Type::new("std", name))
-}
-
 impl Default for Builtins {
     fn default() -> Self {
-        let builtins = Self {
-            type_type: new_type("Type"),
-            always_type: new_type("Always"),
-            bool_type: new_type("Bool"),
-            bound_func_type: new_type("BoundFunc"),
-            cell_type: new_type("Cell"),
-            closure_type: new_type("Closure"),
-            err_type: new_type("Err"),
-            err_type_type: new_type("ErrType"),
-            file_type: new_type("File"),
-            float_type: new_type("Float"),
-            func_type: new_type("Func"),
-            int_type: new_type("Int"),
-            intrinsic_func_type: new_type("IntrinsicFunc"),
-            iterator_type: new_type("Iterator"),
-            list_type: new_type("List"),
-            map_type: new_type("Map"),
-            module_type: new_type("Module"),
-            nil_type: new_type("Nil"),
-            prop_type: new_type("Prop"),
-            str_type: new_type("Str"),
-            tuple_type: new_type("Tuple"),
+        fn new_type(name: &str) -> TypeRef {
+            obj_ref!(Type::new("std", name))
+        }
+
+        let type_type = new_type("Type");
+        let always_type = new_type("Always");
+        let bool_type = new_type("Bool");
+        let bound_func_type = new_type("BoundFunc");
+        let cell_type = new_type("Cell");
+        let closure_type = new_type("Closure");
+        let err_type = new_type("Err");
+        let err_type_type = new_type("ErrType");
+        let file_type = new_type("File");
+        let float_type = new_type("Float");
+        let func_type = new_type("Func");
+        let int_type = new_type("Int");
+        let intrinsic_func_type = new_type("IntrinsicFunc");
+        let iterator_type = new_type("Iterator");
+        let list_type = new_type("List");
+        let map_type = new_type("Map");
+        let module_type = new_type("Module");
+        let nil_type = new_type("Nil");
+        let prop_type = new_type("Prop");
+        let str_type = new_type("Str");
+        let tuple_type = new_type("Tuple");
+
+        let modules = obj_ref!(Map::new(map_type.clone(), IndexMap::default()));
+
+        let nil = obj_ref!(Nil::new(nil_type.clone()));
+        let true_ = obj_ref!(Bool::new(bool_type.clone(), true));
+        let false_ = obj_ref!(Bool::new(bool_type.clone(), false));
+        let always = obj_ref!(Always::new(always_type.clone()));
+        let empty_str = obj_ref!(Str::new(str_type.clone(), "".to_owned()));
+        let newline = obj_ref!(Str::new(str_type.clone(), "\n".to_owned()));
+        let empty_tuple = obj_ref!(Tuple::new(tuple_type.clone(), vec![]));
+        let ok_err = obj_ref!(ErrObj::new(
+            err_type.clone(),
+            ErrKind::Ok,
+            "".to_string(),
+            nil.clone()
+        ));
+
+        let instance = Self {
+            // Modules ---------------------------------------------------------
+            modules,
+            // Types -----------------------------------------------------------
+            type_type,
+            always_type,
+            bool_type,
+            bound_func_type,
+            cell_type,
+            closure_type,
+            err_type,
+            err_type_type,
+            file_type,
+            float_type,
+            func_type,
+            int_type,
+            intrinsic_func_type,
+            iterator_type,
+            list_type,
+            map_type,
+            module_type,
+            nil_type,
+            prop_type,
+            str_type,
+            tuple_type,
+            // Singletons ------------------------------------------------------
+            nil,
+            true_,
+            false_,
+            always,
+            empty_str,
+            newline,
+            empty_tuple,
+            ok_err,
         };
 
-        builtins
+        instance
     }
 }
 
@@ -116,9 +166,24 @@ impl Builtins {
     // Modules ---------------------------------------------------------
 
     pub fn modules(&self) -> obj_ref_t!(Map) {
-        self.modules
-            .get_or_init(|| obj_ref!(Map::new(self.map_type(), IndexMap::default())))
-            .clone()
+        self.modules.clone()
+    }
+
+    pub fn module(
+        &self,
+        name: &str,
+        path: &str,
+        doc: &str,
+        entries: &[(&str, ObjectRef)],
+    ) -> obj_ref_t!(types::module::Module) {
+        obj_ref!(Module::with_entries(
+            self.module_type(),
+            entries,
+            name.to_owned(),
+            path.to_owned(),
+            Code::default(),
+            Some(doc.to_owned())
+        ))
     }
 
     /// Add module to `std.system.modules`.
@@ -158,108 +223,104 @@ impl Builtins {
 
     // Types -----------------------------------------------------------
 
-    fn new_type(&self, name: &str) -> TypeRef {
-        obj_ref!(Type::new("std", name))
-    }
-
     pub fn type_type(&self) -> TypeRef {
-        self.type_type.get_or_init(|| self.new_type("Type")).clone()
+        self.type_type.clone()
     }
 
     pub fn always_type(&self) -> TypeRef {
-        self.always_type.get_or_init(|| self.new_type("Always")).clone()
+        self.always_type.clone()
     }
 
     pub fn bool_type(&self) -> TypeRef {
-        self.bool_type.get_or_init(|| self.new_type("Bool")).clone()
+        self.bool_type.clone()
     }
 
     pub fn bound_func_type(&self) -> TypeRef {
-        self.bound_func_type.get_or_init(|| self.new_type("BoundFunc")).clone()
+        self.bound_func_type.clone()
     }
 
     pub fn cell_type(&self) -> TypeRef {
-        self.cell_type.get_or_init(|| self.new_type("Cell")).clone()
+        self.cell_type.clone()
     }
 
     pub fn closure_type(&self) -> TypeRef {
-        self.closure_type.get_or_init(|| self.new_type("Closure")).clone()
+        self.closure_type.clone()
     }
 
     pub fn err_type(&self) -> TypeRef {
-        self.err_type.get_or_init(|| self.new_type("Err")).clone()
+        self.err_type.clone()
         // self.err_type.get_or_init(make_err_type).clone()
     }
 
     pub fn err_type_type(&self) -> TypeRef {
-        self.err_type_type.get_or_init(|| self.new_type("ErrType")).clone()
+        self.err_type_type.clone()
     }
 
     pub fn file_type(&self) -> TypeRef {
-        self.file_type.get_or_init(|| self.new_type("File")).clone()
+        self.file_type.clone()
         // self.file_type.get_or_init(make_file_type).clone()
     }
 
     pub fn float_type(&self) -> TypeRef {
-        self.float_type.get_or_init(|| self.new_type("Float")).clone()
+        self.float_type.clone()
         // self.float_type.get_or_init(make_float_type).clone()
     }
 
     pub fn func_type(&self) -> TypeRef {
-        self.func_type.get_or_init(|| self.new_type("Func")).clone()
+        self.func_type.clone()
     }
 
     pub fn intrinsic_func_type(&self) -> TypeRef {
-        self.intrinsic_func_type.get_or_init(|| self.new_type("IntrinsicFunc")).clone()
+        self.intrinsic_func_type.clone()
     }
 
     pub fn int_type(&self) -> TypeRef {
-        self.int_type.get_or_init(|| self.new_type("Int")).clone()
+        self.int_type.clone()
         // self.int_type.get_or_init(make_int_type).clone()
     }
 
     pub fn iterator_type(&self) -> TypeRef {
-        self.iterator_type.get_or_init(|| self.new_type("Iterator")).clone()
+        self.iterator_type.clone()
         // self.iterator_type.get_or_init(make_iterator_type).clone()
     }
 
     pub fn list_type(&self) -> TypeRef {
-        self.list_type.get_or_init(|| self.new_type("List")).clone()
+        self.list_type.clone()
         // self.list_type.get_or_init(make_list_type).clone()
     }
 
     pub fn map_type(&self) -> TypeRef {
-        self.map_type.get_or_init(|| self.new_type("Map")).clone()
+        self.map_type.clone()
         // self.map_type.get_or_init(make_map_type).clone()
     }
 
     pub fn module_type(&self) -> TypeRef {
-        self.module_type.get_or_init(|| self.new_type("Module")).clone()
+        self.module_type.clone()
         // self.module_type.get_or_init(make_module_type).clone()
     }
 
     pub fn nil_type(&self) -> TypeRef {
-        self.nil_type.get_or_init(|| self.new_type("Nil")).clone()
+        self.nil_type.clone()
     }
 
     pub fn prop_type(&self) -> TypeRef {
-        self.prop_type.get_or_init(|| self.new_type("Prop")).clone()
+        self.prop_type.clone()
     }
 
     pub fn str_type(&self) -> TypeRef {
-        self.str_type.get_or_init(|| self.new_type("Str")).clone()
+        self.str_type.clone()
         // self.str_type.get_or_init(make_str_type).clone()
     }
 
     pub fn tuple_type(&self) -> TypeRef {
-        self.tuple_type.get_or_init(|| self.new_type("Tuple")).clone()
+        self.tuple_type.clone()
         // self.tuple_type.get_or_init(make_tuple_type).clone()
     }
 
     // Singletons ------------------------------------------------------
 
     pub fn nil(&self) -> ObjectRef {
-        self.nil.get_or_init(|| obj_ref!(Nil::new(self.nil_type()))).clone()
+        self.nil.clone()
     }
 
     pub fn bool(&self, val: bool) -> ObjectRef {
@@ -271,65 +332,31 @@ impl Builtins {
     }
 
     pub fn true_(&self) -> ObjectRef {
-        self.true_.get_or_init(|| obj_ref!(Bool::new(self.bool_type(), true))).clone()
+        self.true_.clone()
     }
 
     pub fn false_(&self) -> ObjectRef {
-        self.false_.get_or_init(|| obj_ref!(Bool::new(self.bool_type(), false))).clone()
+        self.false_.clone()
     }
 
     pub fn always(&self) -> ObjectRef {
-        self.always.get_or_init(|| obj_ref!(Always::new(self.always_type()))).clone()
+        self.always.clone()
     }
 
     pub fn empty_str(&self) -> ObjectRef {
-        self.empty_str
-            .get_or_init(|| obj_ref!(Str::new(self.str_type(), "".to_owned())))
-            .clone()
+        self.empty_str.clone()
     }
 
     pub fn newline(&self) -> ObjectRef {
-        self.newline
-            .get_or_init(|| obj_ref!(Str::new(self.str_type(), "\n".to_owned())))
-            .clone()
+        self.newline.clone()
     }
 
     pub fn empty_tuple(&self) -> ObjectRef {
-        self.empty_tuple
-            .get_or_init(|| obj_ref!(Tuple::new(self.tuple_type(), vec![])))
-            .clone()
+        self.empty_tuple.clone()
     }
 
     pub fn ok_err(&self) -> ObjectRef {
-        self.ok_err
-            .get_or_init(|| {
-                obj_ref!(ErrObj::new(
-                    self.err_type(),
-                    ErrKind::Ok,
-                    "".to_string(),
-                    self.nil()
-                ))
-            })
-            .clone()
-    }
-
-    // Modules -------------------------------------------------------------
-
-    pub fn module(
-        &self,
-        name: &str,
-        path: &str,
-        doc: &str,
-        entries: &[(&str, ObjectRef)],
-    ) -> obj_ref_t!(types::module::Module) {
-        obj_ref!(Module::with_entries(
-            self.module_type(),
-            entries,
-            name.to_owned(),
-            path.to_owned(),
-            Code::default(),
-            Some(doc.to_owned())
-        ))
+        self.ok_err.clone()
     }
 
     // Functions -----------------------------------------------------------
