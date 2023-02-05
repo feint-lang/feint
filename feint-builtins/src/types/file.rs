@@ -5,58 +5,56 @@ use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 
-use once_cell::sync::{Lazy, OnceCell};
+use once_cell::sync::OnceCell;
 
-use super::new;
 use feint_code_gen::*;
 
-use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
-use super::class::TYPE_TYPE;
+use crate::BUILTINS;
+
+use super::base::{ObjectRef, ObjectTrait, TypeRef};
+
 use super::ns::Namespace;
 
-// File Type ------------------------------------------------------------
+// pub fn make_file_type() -> obj_ref_t!(FileType) {
+//     let type_ref = obj_ref!(FileType::new());
+//     let mut type_obj = type_ref.write().unwrap();
+//
+//     type_obj.add_attrs(&[
+//         // Class Methods
+//         meth!("new", type_ref, &["file_name"], "", |_, args| {
+//             let arg = use_arg!(args, 0);
+//             if let Some(file_name) = arg.get_str_val() {
+//                 let path = Path::new(file_name);
+//                 if path.is_file() {
+//                     BUILTINS.file(file_name)
+//                 } else {
+//                     BUILTINS.file_not_found_err(file_name, BUILTINS.nil())
+//                 }
+//             } else {
+//                 let message = format!("File.new(file_name) expected string; got {arg}");
+//                 BUILTINS.arg_err(message, BUILTINS.nil())
+//             }
+//         }),
+//         // Instance Attributes
+//         prop!("text", type_ref, "", |this, _| {
+//             let this = this.read().unwrap();
+//             let this = this.down_to_file().unwrap();
+//             this.text()
+//         }),
+//         prop!("lines", type_ref, "", |this, _| {
+//             let this = this.read().unwrap();
+//             let this = &mut this.down_to_file().unwrap();
+//             this.lines()
+//         }),
+//     ]);
+//
+//     type_ref.clone()
+// }
 
-type_and_impls!(FileType, File);
-
-pub static FILE_TYPE: Lazy<obj_ref_t!(FileType)> = Lazy::new(|| {
-    let type_ref = obj_ref!(FileType::new());
-    let mut type_obj = type_ref.write().unwrap();
-
-    type_obj.add_attrs(&[
-        // Class Methods
-        meth!("new", type_ref, &["file_name"], "", |_, args| {
-            let arg = use_arg!(args, 0);
-            if let Some(file_name) = arg.get_str_val() {
-                let path = Path::new(file_name);
-                if path.is_file() {
-                    new::file(file_name)
-                } else {
-                    new::file_not_found_err(file_name, new::nil())
-                }
-            } else {
-                let message = format!("File.new(file_name) expected string; got {arg}");
-                new::arg_err(message, new::nil())
-            }
-        }),
-        // Instance Attributes
-        prop!("text", type_ref, "", |this, _| {
-            let this = this.read().unwrap();
-            let this = this.down_to_file().unwrap();
-            this.text()
-        }),
-        prop!("lines", type_ref, "", |this, _| {
-            let this = this.read().unwrap();
-            let this = &mut this.down_to_file().unwrap();
-            this.lines()
-        }),
-    ]);
-
-    type_ref.clone()
-});
-
-// File Object ----------------------------------------------------------
+// File ----------------------------------------------------------
 
 pub struct File {
+    class: TypeRef,
     ns: Namespace,
     file_name: String,
     path: PathBuf,
@@ -67,11 +65,12 @@ pub struct File {
 standard_object_impls!(File);
 
 impl File {
-    pub fn new(file_name: String) -> Self {
+    pub fn new(class: TypeRef, file_name: String) -> Self {
         let path = fs::canonicalize(&file_name);
         let path = path.map_or_else(|_| Path::new(&file_name).to_path_buf(), |p| p);
-        let name_obj = new::str(file_name.as_str());
+        let name_obj = BUILTINS.str(file_name.as_str());
         Self {
+            class,
             ns: Namespace::with_entries(&[("name", name_obj)]),
             file_name,
             path,
@@ -83,8 +82,10 @@ impl File {
     fn text(&self) -> ObjectRef {
         let result = self.text.get_or_try_init(|| {
             fs::read_to_string(&self.file_name)
-                .map(new::str)
-                .map_err(|err| new::file_unreadable_err(err.to_string(), new::nil()))
+                .map(|contents| BUILTINS.str(contents))
+                .map_err(|err| {
+                    BUILTINS.file_unreadable_err(err.to_string(), BUILTINS.nil())
+                })
         });
         match result {
             Ok(text) => text.clone(),
@@ -100,11 +101,13 @@ impl File {
                 let lines = reader
                     .lines()
                     // TODO: Handle lines that can't be read
-                    .map(|line| new::str(line.unwrap()))
+                    .map(|line| BUILTINS.str(line.unwrap()))
                     .collect();
-                new::tuple(lines)
+                BUILTINS.tuple(lines)
             })
-            .map_err(|err| new::file_unreadable_err(err.to_string(), new::nil()))
+            .map_err(|err| {
+                BUILTINS.file_unreadable_err(err.to_string(), BUILTINS.nil())
+            })
         });
         match result {
             Ok(lines) => lines.clone(),
@@ -114,7 +117,7 @@ impl File {
 }
 
 impl ObjectTrait for File {
-    object_trait_header!(FILE_TYPE);
+    object_trait_header!();
 
     fn bool_val(&self) -> Option<bool> {
         Some(false)

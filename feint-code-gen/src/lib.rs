@@ -12,100 +12,6 @@ macro_rules! obj_ref {
     };
 }
 
-/// Generate an intrinsic type definition. This includes the type's
-/// struct and impl as well as the TypeTrait, Send, and Sync impls.
-///
-/// Args:
-///
-/// $type_name: ident
-///     The type name. E.g., `NilType`
-///
-/// $name: ident
-///     The type's object name. E.g., `Nil`
-#[macro_export]
-macro_rules! type_and_impls {
-    ( $type_name:ident, $name:ident ) => {
-        pub struct $type_name {
-            ns: Namespace,
-        }
-
-        unsafe impl Send for $type_name {}
-        unsafe impl Sync for $type_name {}
-
-        impl $type_name {
-            #[allow(clippy::new_without_default)]
-            pub fn new() -> Self {
-                let name = new::str(stringify!($name));
-                let full_name = new::str(concat!("std.", stringify!($name)));
-                Self {
-                    ns: Namespace::with_entries(&[
-                        ("$name", name),
-                        ("$full_name", full_name),
-                    ]),
-                }
-            }
-
-            pub fn with_attrs(attrs: &[(&str, ObjectRef)]) -> Self {
-                let mut type_obj = Self::new();
-                type_obj.ns.extend(attrs);
-                type_obj
-            }
-
-            pub fn add_attr(&mut self, name: &str, val: ObjectRef) {
-                self.ns.insert(name, val);
-            }
-
-            pub fn add_attrs(&mut self, attrs: &[(&str, ObjectRef)]) {
-                self.ns.extend(attrs);
-            }
-        }
-
-        impl TypeTrait for $type_name {
-            fn name(&self) -> &str {
-                stringify!($name)
-            }
-
-            fn full_name(&self) -> &str {
-                concat!("std.", stringify!($name))
-            }
-
-            fn ns(&self) -> &Namespace {
-                &self.ns
-            }
-        }
-
-        impl ObjectTrait for $type_name {
-            fn as_any(&self) -> &dyn Any {
-                self
-            }
-
-            fn as_any_mut(&mut self) -> &mut dyn Any {
-                self
-            }
-
-            fn class(&self) -> TypeRef {
-                TYPE_TYPE.clone()
-            }
-
-            fn type_obj(&self) -> ObjectRef {
-                TYPE_TYPE.clone()
-            }
-
-            fn ns(&self) -> &Namespace {
-                &self.ns
-            }
-
-            fn ns_mut(&mut self) -> &mut Namespace {
-                &mut self.ns
-            }
-
-            fn as_type(&self) -> Option<&dyn TypeTrait> {
-                Some(self)
-            }
-        }
-    };
-}
-
 /// Generate standard obj impls.
 #[macro_export]
 macro_rules! standard_object_impls {
@@ -124,7 +30,7 @@ macro_rules! standard_object_impls {
 ///     The singleton type instance. E.g. `NIL_TYPE`.
 #[macro_export]
 macro_rules! object_trait_header {
-    ( $class:ident ) => {
+    () => {
         fn as_any(&self) -> &dyn Any {
             self
         }
@@ -134,11 +40,11 @@ macro_rules! object_trait_header {
         }
 
         fn class(&self) -> TypeRef {
-            $class.clone()
+            self.class.clone()
         }
 
         fn type_obj(&self) -> ObjectRef {
-            $class.clone()
+            self.class.clone()
         }
 
         fn ns(&self) -> &Namespace {
@@ -147,10 +53,6 @@ macro_rules! object_trait_header {
 
         fn ns_mut(&mut self) -> &mut Namespace {
             &mut self.ns
-        }
-
-        fn as_type(&self) -> Option<&dyn TypeTrait> {
-            None
         }
     };
 }
@@ -190,7 +92,7 @@ macro_rules! meth {
     ( $name:literal, $this_type:expr, $params:expr, $doc:literal, $func:expr ) => {
         (
             $name,
-            new::intrinsic_func(
+            BUILTINS.intrinsic_func(
                 "std",
                 $name,
                 Some($this_type.clone()),
@@ -209,7 +111,7 @@ macro_rules! prop {
     ( $name:literal, $this_type:expr, $doc:literal, $func:expr ) => {
         (
             $name,
-            new::prop(new::intrinsic_func(
+            BUILTINS.prop(BUILTINS.intrinsic_func(
                 "std",
                 $name,
                 Some($this_type.clone()),
@@ -235,7 +137,7 @@ macro_rules! use_arg {
         } else {
             let msg =
                 format!("{}() didn't receive enough args", stringify!($func_name));
-            return new::arg_err(msg, new::nil());
+            return BUILTINS.arg_err(msg, BUILTINS.nil());
         }
     }};
 }
@@ -254,7 +156,7 @@ macro_rules! use_arg_str {
                 stringify!($func_name),
                 stringify!($arg_name)
             );
-            return new::arg_err(msg, new::nil());
+            return BUILTINS.arg_err(msg, BUILTINS.nil());
         }
     }};
 }
@@ -270,7 +172,7 @@ macro_rules! use_arg_map {
                 stringify!($func_name),
                 stringify!($arg_name)
             );
-            return new::arg_err(msg, new::nil());
+            return BUILTINS.arg_err(msg, BUILTINS.nil());
         }
     }};
 }
@@ -288,12 +190,12 @@ macro_rules! use_arg_usize {
                     stringify!($func_name),
                     stringify!($arg_name)
                 );
-                return new::arg_err(msg, new::nil());
+                return BUILTINS.arg_err(msg, BUILTINS.nil());
             }
         } else {
             let msg =
                 format!("{}() didn't receive enough args", stringify!($func_name));
-            return new::arg_err(msg, new::nil());
+            return BUILTINS.arg_err(msg, BUILTINS.nil());
         }
     }};
 }

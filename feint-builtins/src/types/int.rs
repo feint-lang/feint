@@ -5,52 +5,49 @@ use std::sync::{Arc, RwLock};
 use num_bigint::BigInt;
 use num_traits::{FromPrimitive, ToPrimitive};
 
-use once_cell::sync::Lazy;
-
 use feint_code_gen::*;
 
-use super::new;
 use super::util::{eq_int_float, int_gt_float, int_lt_float};
+use crate::BUILTINS;
 
-use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
-use super::class::TYPE_TYPE;
+use super::base::{ObjectRef, ObjectTrait, TypeRef};
+
 use super::ns::Namespace;
 
-// Int Type ------------------------------------------------------------
+// pub fn make_int_type() -> obj_ref_t!(IntType) {
+//     eprintln!("make_int_type 1");
+//     let type_ref = obj_ref!(IntType::new());
+//
+//     eprintln!("make_int_type 2");
+//     {
+//         eprintln!("make_int_type 2.a");
+//         let mut type_obj = type_ref.write().unwrap();
+//
+//         eprintln!("make_int_type 2.b");
+//         type_obj.add_attrs(&[
+//             // Class Methods -----------------------------------------------
+//             meth!("new", type_ref, &["value"], "", |this, args| {
+//                 let arg = use_arg!(args, 0);
+//                 let int = if let Some(val) = arg.get_int_val() {
+//                     BUILTINS.int(val.clone())
+//                 } else if let Some(val) = arg.get_float_val() {
+//                     BUILTINS.int(BigInt::from_f64(*val).unwrap())
+//                 } else if let Some(val) = arg.get_str_val() {
+//                     BUILTINS.int_from_string(val)
+//                 } else {
+//                     let msg = format!("Int.new() expected number or string; got {arg}");
+//                     BUILTINS.type_err(msg, this)
+//                 };
+//                 int
+//             }),
+//         ]);
+//     }
+//
+//     eprintln!("make_int_type 3");
+//     type_ref
+// }
 
-static DOC: &str = "
-Intrinsic Int type
-";
-
-type_and_impls!(IntType, Int);
-
-pub static INT_TYPE: Lazy<obj_ref_t!(IntType)> = Lazy::new(|| {
-    let type_ref = obj_ref!(IntType::new());
-    let mut type_obj = type_ref.write().unwrap();
-
-    type_obj.add_attrs(&[
-        ("$doc", new::str(DOC)),
-        // Class Methods -----------------------------------------------
-        meth!("new", type_ref, &["value"], "", |this, args| {
-            let arg = use_arg!(args, 0);
-            let int = if let Some(val) = arg.get_int_val() {
-                new::int(val.clone())
-            } else if let Some(val) = arg.get_float_val() {
-                new::int(BigInt::from_f64(*val).unwrap())
-            } else if let Some(val) = arg.get_str_val() {
-                new::int_from_string(val)
-            } else {
-                let msg = format!("Int.new() expected number or string; got {arg}");
-                new::type_err(msg, this)
-            };
-            int
-        }),
-    ]);
-
-    type_ref.clone()
-});
-
-// Int Object ----------------------------------------------------------
+// Int ----------------------------------------------------------
 
 macro_rules! make_op {
     ( $meth:ident, $op:tt ) => {
@@ -58,11 +55,11 @@ macro_rules! make_op {
             if let Some(rhs) = rhs.down_to_int() {
                 // XXX: Return Int
                 let value = self.value() $op rhs.value();
-                Some(new::int(value))
+                Some(BUILTINS.int(value))
             } else if let Some(rhs) = rhs.down_to_float() {
                 // XXX: Return Float
                 let value = self.value().to_f64().unwrap() $op rhs.value();
-                Some(new::float(value))
+                Some(BUILTINS.float(value))
             } else {
                 None
             }
@@ -71,6 +68,7 @@ macro_rules! make_op {
 }
 
 pub struct Int {
+    class: TypeRef,
     ns: Namespace,
     value: BigInt,
 }
@@ -78,8 +76,8 @@ pub struct Int {
 standard_object_impls!(Int);
 
 impl Int {
-    pub fn new(value: BigInt) -> Self {
-        Self { ns: Namespace::default(), value }
+    pub fn new(class: TypeRef, value: BigInt) -> Self {
+        Self { class, ns: Namespace::default(), value }
     }
 
     pub fn value(&self) -> &BigInt {
@@ -101,10 +99,10 @@ impl Int {
 }
 
 impl ObjectTrait for Int {
-    object_trait_header!(INT_TYPE);
+    object_trait_header!();
 
     fn negate(&self) -> Option<ObjectRef> {
-        Some(new::int(-self.value.clone()))
+        Some(BUILTINS.int(-self.value.clone()))
     }
 
     fn is_equal(&self, rhs: &dyn ObjectTrait) -> bool {
@@ -145,14 +143,14 @@ impl ObjectTrait for Int {
             let base = self.value();
             let exp = rhs.value().to_u32().unwrap();
             let value = base.pow(exp);
-            let value = new::int(value);
+            let value = BUILTINS.int(value);
             Some(value)
         } else if let Some(rhs) = rhs.down_to_float() {
             // XXX: Return Float
             let base = self.value().to_f64().unwrap();
             let exp = *rhs.value();
             let value = base.powf(exp);
-            let value = new::float(value);
+            let value = BUILTINS.float(value);
             Some(value)
         } else {
             None
@@ -167,7 +165,7 @@ impl ObjectTrait for Int {
     // Int division *always* returns a Float
     fn div(&self, rhs: &dyn ObjectTrait) -> Option<ObjectRef> {
         if let Some(value) = self.div_f64(rhs) {
-            Some(new::float(value))
+            Some(BUILTINS.float(value))
         } else {
             None
         }
@@ -177,7 +175,7 @@ impl ObjectTrait for Int {
     fn floor_div(&self, rhs: &dyn ObjectTrait) -> Option<ObjectRef> {
         if let Some(value) = self.div_f64(rhs) {
             let value = BigInt::from_f64(value).unwrap();
-            Some(new::int(value))
+            Some(BUILTINS.int(value))
         } else {
             None
         }

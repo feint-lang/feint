@@ -10,12 +10,12 @@ use super::gen;
 use super::new;
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
-use super::class::TYPE_TYPE;
+
 use super::ns::Namespace;
 
 // {{ type_name }} Type {{ type_rule }}
 
-gen::type_and_impls!({{ type_name }}, {{ obj_name }});
+
 
 pub static {{ singleton_type_name }}: Lazy<gen::obj_ref_t!({{ type_name }})> =
     Lazy::new(|| gen::obj_ref!({{ type_name }}::new()));

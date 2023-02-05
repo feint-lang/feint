@@ -62,6 +62,20 @@ impl Namespace {
         self.objects.insert(name.into(), obj);
     }
 
+    pub fn get_or_insert<F: FnMut() -> ObjectRef>(
+        &mut self,
+        name: &str,
+        mut make_obj: F,
+    ) -> ObjectRef {
+        if let Some(obj) = self.get(name) {
+            obj.clone()
+        } else {
+            let obj = make_obj();
+            self.insert(name, obj.clone());
+            obj
+        }
+    }
+
     /// Set an object's value. This will only succeed if the object
     /// already exists in the namespace.
     pub fn set(&mut self, name: &str, obj: ObjectRef) -> bool {

@@ -3,47 +3,42 @@ use std::fmt;
 use std::sync::{Arc, RwLock};
 
 use num_traits::ToPrimitive;
-use once_cell::sync::Lazy;
 
 use feint_code_gen::*;
 
-use super::new;
 use super::util::{eq_int_float, float_gt_int, float_lt_int};
+use crate::BUILTINS;
 
-use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
-use super::class::TYPE_TYPE;
+use super::base::{ObjectRef, ObjectTrait, TypeRef};
+
 use super::ns::Namespace;
 
-// Float Type ----------------------------------------------------------
+// pub fn make_float_type() -> obj_ref_t!(FloatType) {
+//     let type_ref = obj_ref!(FloatType::new());
+//     let mut type_obj = type_ref.write().unwrap();
+//
+//     type_obj.add_attrs(&[
+//         // Class Methods -----------------------------------------------
+//         meth!("new", type_ref, &["value"], "", |this, args| {
+//             let arg = use_arg!(args, 0);
+//             let float = if let Some(val) = arg.get_float_val() {
+//                 BUILTINS.float(*val)
+//             } else if let Some(val) = arg.get_int_val() {
+//                 BUILTINS.float(val.to_f64().unwrap())
+//             } else if let Some(val) = arg.get_str_val() {
+//                 BUILTINS.float_from_string(val)
+//             } else {
+//                 let msg = format!("Float.new() expected string or float; got {arg}");
+//                 BUILTINS.type_err(msg, this)
+//             };
+//             float
+//         }),
+//     ]);
+//
+//     type_ref.clone()
+// }
 
-type_and_impls!(FloatType, Float);
-
-pub static FLOAT_TYPE: Lazy<obj_ref_t!(FloatType)> = Lazy::new(|| {
-    let type_ref = obj_ref!(FloatType::new());
-    let mut type_obj = type_ref.write().unwrap();
-
-    type_obj.add_attrs(&[
-        // Class Methods -----------------------------------------------
-        meth!("new", type_ref, &["value"], "", |this, args| {
-            let arg = use_arg!(args, 0);
-            let float = if let Some(val) = arg.get_float_val() {
-                new::float(*val)
-            } else if let Some(val) = arg.get_int_val() {
-                new::float(val.to_f64().unwrap())
-            } else if let Some(val) = arg.get_str_val() {
-                new::float_from_string(val)
-            } else {
-                let msg = format!("Float.new() expected string or float; got {arg}");
-                new::type_err(msg, this)
-            };
-            float
-        }),
-    ]);
-
-    type_ref.clone()
-});
-
-// Float Object --------------------------------------------------------
+// Float --------------------------------------------------------
 
 macro_rules! make_op {
     ( $meth:ident, $op:tt, $message:literal, $trunc:literal ) => {
@@ -59,13 +54,14 @@ macro_rules! make_op {
             if $trunc {
                 value = value.trunc();
             }
-            let value = new::float(value);
+            let value = BUILTINS.float(value);
             Some(value)
         }
     };
 }
 
 pub struct Float {
+    class: TypeRef,
     ns: Namespace,
     value: f64,
 }
@@ -73,8 +69,8 @@ pub struct Float {
 standard_object_impls!(Float);
 
 impl Float {
-    pub fn new(value: f64) -> Self {
-        Self { ns: Namespace::default(), value }
+    pub fn new(class: TypeRef, value: f64) -> Self {
+        Self { class, ns: Namespace::default(), value }
     }
 
     pub fn value(&self) -> &f64 {
@@ -83,10 +79,10 @@ impl Float {
 }
 
 impl ObjectTrait for Float {
-    object_trait_header!(FLOAT_TYPE);
+    object_trait_header!();
 
     fn negate(&self) -> Option<ObjectRef> {
-        Some(new::float(-*self.value()))
+        Some(BUILTINS.float(-*self.value()))
     }
 
     fn is_equal(&self, rhs: &dyn ObjectTrait) -> bool {
@@ -130,7 +126,7 @@ impl ObjectTrait for Float {
             return None;
         };
         let value = self.value().powf(exp);
-        let value = new::float(value);
+        let value = BUILTINS.float(value);
         Some(value)
     }
 

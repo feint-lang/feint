@@ -3,75 +3,70 @@ use std::fmt;
 use std::slice::Iter;
 use std::sync::{Arc, RwLock};
 
-use once_cell::sync::Lazy;
-
 use feint_code_gen::*;
 
-use super::new;
+use crate::BUILTINS;
 
-use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
-use super::class::TYPE_TYPE;
+use super::base::{ObjectRef, ObjectTrait, TypeRef};
+
 use super::ns::Namespace;
 use super::seq;
 
-// Tuple Type ----------------------------------------------------------
+// pub fn make_tuple_type() -> obj_ref_t!(TupleType) {
+//     let type_ref = obj_ref!(TupleType::new());
+//     let mut type_obj = type_ref.write().unwrap();
+//
+//     type_obj.add_attrs(&[
+//         // Instance Attributes -----------------------------------------
+//         prop!("length", type_ref, "", |this, _| {
+//             let this = this.read().unwrap();
+//             let this = this.down_to_tuple().unwrap();
+//             BUILTINS.int(this.len())
+//         }),
+//         prop!("is_empty", type_ref, "", |this, _| {
+//             let this = this.read().unwrap();
+//             let this = this.down_to_tuple().unwrap();
+//             BUILTINS.bool(this.len() == 0)
+//         }),
+//         prop!("sum", type_ref, "", |this, _| {
+//             let this = this.read().unwrap();
+//             let this = this.down_to_tuple().unwrap();
+//             seq::sum(&this.items)
+//         }),
+//         // Instance Methods --------------------------------------------
+//         meth!("get", type_ref, &["index"], "", |this, args| {
+//             let this = this.read().unwrap();
+//             let this = this.down_to_tuple().unwrap();
+//             let index = use_arg_usize!(get, index, args, 0);
+//             match this.get(index) {
+//                 Some(obj) => obj,
+//                 None => BUILTINS.nil(),
+//             }
+//         }),
+//         meth!("has", type_ref, &["member"], "", |this, args| {
+//             let this = this.read().unwrap();
+//             let this = this.down_to_tuple().unwrap();
+//             seq::has(&this.items, &args)
+//         }),
+//         meth!("iter", type_ref, &[], "", |this_ref, _| {
+//             let this = this_ref.read().unwrap();
+//             let this = this.down_to_tuple().unwrap();
+//             BUILTINS.iterator(this.items.clone())
+//         }),
+//         meth!("join", type_ref, &["sep"], "", |this, args| {
+//             let this = this.read().unwrap();
+//             let this = this.down_to_tuple().unwrap();
+//             seq::join(&this.items, &args)
+//         }),
+//     ]);
+//
+//     type_ref.clone()
+// }
 
-type_and_impls!(TupleType, Tuple);
-
-pub static TUPLE_TYPE: Lazy<obj_ref_t!(TupleType)> = Lazy::new(|| {
-    let type_ref = obj_ref!(TupleType::new());
-    let mut type_obj = type_ref.write().unwrap();
-
-    type_obj.add_attrs(&[
-        // Instance Attributes -----------------------------------------
-        prop!("length", type_ref, "", |this, _| {
-            let this = this.read().unwrap();
-            let this = this.down_to_tuple().unwrap();
-            new::int(this.len())
-        }),
-        prop!("is_empty", type_ref, "", |this, _| {
-            let this = this.read().unwrap();
-            let this = this.down_to_tuple().unwrap();
-            new::bool(this.len() == 0)
-        }),
-        prop!("sum", type_ref, "", |this, _| {
-            let this = this.read().unwrap();
-            let this = this.down_to_tuple().unwrap();
-            seq::sum(&this.items)
-        }),
-        // Instance Methods --------------------------------------------
-        meth!("get", type_ref, &["index"], "", |this, args| {
-            let this = this.read().unwrap();
-            let this = this.down_to_tuple().unwrap();
-            let index = use_arg_usize!(get, index, args, 0);
-            match this.get(index) {
-                Some(obj) => obj,
-                None => new::nil(),
-            }
-        }),
-        meth!("has", type_ref, &["member"], "", |this, args| {
-            let this = this.read().unwrap();
-            let this = this.down_to_tuple().unwrap();
-            seq::has(&this.items, &args)
-        }),
-        meth!("iter", type_ref, &[], "", |this_ref, _| {
-            let this = this_ref.read().unwrap();
-            let this = this.down_to_tuple().unwrap();
-            new::iterator(this.items.clone())
-        }),
-        meth!("join", type_ref, &["sep"], "", |this, args| {
-            let this = this.read().unwrap();
-            let this = this.down_to_tuple().unwrap();
-            seq::join(&this.items, &args)
-        }),
-    ]);
-
-    type_ref.clone()
-});
-
-// Tuple Object --------------------------------------------------------
+// Tuple --------------------------------------------------------
 
 pub struct Tuple {
+    class: TypeRef,
     ns: Namespace,
     items: Vec<ObjectRef>,
 }
@@ -79,8 +74,8 @@ pub struct Tuple {
 standard_object_impls!(Tuple);
 
 impl Tuple {
-    pub fn new(items: Vec<ObjectRef>) -> Self {
-        Self { ns: Namespace::default(), items }
+    pub fn new(class: TypeRef, items: Vec<ObjectRef>) -> Self {
+        Self { class, ns: Namespace::default(), items }
     }
 
     pub(crate) fn iter(&self) -> Iter<'_, ObjectRef> {
@@ -101,7 +96,7 @@ impl Tuple {
 }
 
 impl ObjectTrait for Tuple {
-    object_trait_header!(TUPLE_TYPE);
+    object_trait_header!();
 
     fn get_item(&self, index: usize, this: ObjectRef) -> ObjectRef {
         if let Some(item) = self.items.get(index) {

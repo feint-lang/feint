@@ -2,26 +2,18 @@ use std::any::Any;
 use std::fmt;
 use std::sync::{Arc, RwLock};
 
-use once_cell::sync::Lazy;
-
 use feint_code_gen::*;
 
-use super::new;
+use crate::BUILTINS;
 
-use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
-use super::class::TYPE_TYPE;
+use super::base::{ObjectRef, ObjectTrait, TypeRef};
+
 use super::ns::Namespace;
 
-// Cell Type -----------------------------------------------------------
-
-type_and_impls!(CellType, Cell);
-
-pub static CELL_TYPE: Lazy<obj_ref_t!(CellType)> =
-    Lazy::new(|| obj_ref!(CellType::new()));
-
-// Cell Object ---------------------------------------------------------
+// Cell ---------------------------------------------------------
 
 pub struct Cell {
+    class: TypeRef,
     ns: Namespace,
     value: ObjectRef,
 }
@@ -29,13 +21,12 @@ pub struct Cell {
 standard_object_impls!(Cell);
 
 impl Cell {
-    #[allow(clippy::new_without_default)]
-    pub fn new() -> Self {
-        Self { ns: Namespace::default(), value: new::nil() }
+    pub fn new(class: TypeRef) -> Self {
+        Self { class, ns: Namespace::default(), value: BUILTINS.nil() }
     }
 
-    pub fn with_value(value: ObjectRef) -> Self {
-        let mut cell = Self::new();
+    pub fn with_value(class: TypeRef, value: ObjectRef) -> Self {
+        let mut cell = Self::new(class);
         cell.set_value(value);
         cell
     }
@@ -50,7 +41,7 @@ impl Cell {
 }
 
 impl ObjectTrait for Cell {
-    object_trait_header!(CELL_TYPE);
+    object_trait_header!();
 
     fn bool_val(&self) -> Option<bool> {
         Some(false)

@@ -1,4 +1,4 @@
-pub use base::{ObjectRef, ObjectTrait};
+pub use base::{ObjectRef, ObjectTrait, TypeRef};
 pub use func::Func;
 pub use func_trait::FuncTrait;
 pub use intrinsic_func::IntrinsicFunc;
@@ -17,7 +17,6 @@ mod func_trait;
 pub(crate) mod ns;
 
 pub mod code;
-pub mod new;
 
 // Intrinsic Types
 pub mod always;

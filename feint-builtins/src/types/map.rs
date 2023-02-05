@@ -3,129 +3,120 @@ use std::fmt;
 use std::sync::{Arc, RwLock};
 
 use indexmap::IndexMap;
-use once_cell::sync::Lazy;
 
-use super::new;
 use feint_code_gen::*;
 
-use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
-use super::class::TYPE_TYPE;
+use crate::BUILTINS;
+
+use super::base::{ObjectRef, ObjectTrait, TypeRef};
+
 use super::ns::Namespace;
 
-// Map Type ------------------------------------------------------------
+// pub fn make_map_type() -> obj_ref_t!(MapType) {
+//     let type_ref = obj_ref!(MapType::new());
+//     let mut type_obj = type_ref.write().unwrap();
+//
+//     type_obj.add_attrs(&[
+//         // Instance Attributes -----------------------------------------
+//         prop!("length", type_ref, "", |this, _| {
+//             let this = this.read().unwrap();
+//             let this = this.down_to_map().unwrap();
+//             BUILTINS.int(this.len())
+//         }),
+//         prop!("is_empty", type_ref, "", |this, _| {
+//             let this = this.read().unwrap();
+//             let this = this.down_to_map().unwrap();
+//             BUILTINS.bool(this.is_empty())
+//         }),
+//         // Instance Methods --------------------------------------------
+//         meth!(
+//             "add",
+//             type_ref,
+//             &["key", "val"],
+//             "Add entry to Map.
+//
+//             # Args
+//
+//             - key: Str
+//             - value: Any
+//
+//             ",
+//             |this, args| {
+//                 let this = this.read().unwrap();
+//                 let this = this.down_to_map().unwrap();
+//                 let arg = use_arg!(args, 0);
+//                 let key = use_arg_str!(get, key, arg);
+//                 let val = args[1].clone();
+//                 this.insert(key, val);
+//                 BUILTINS.nil()
+//             }
+//         ),
+//         meth!(
+//             "get",
+//             type_ref,
+//             &["key"],
+//             "Get value for key from Map.
+//
+//             # Args
+//
+//             - key: Key
+//
+//             # Returns
+//
+//             - Any: If key is present
+//             - nil: If key is not present
+//
+//             > NOTE: There's no way to distinguish between a key that isn't present
+//             > versus a key that has `nil` as its value. To avoid ambiguity, don't
+//             > store `nil` values.
+//
+//             ",
+//             |this, args| {
+//                 let this = this.read().unwrap();
+//                 let this = this.down_to_map().unwrap();
+//                 let arg = use_arg!(args, 0);
+//                 let key = use_arg_str!(get, key, arg);
+//                 match this.get(key) {
+//                     Some(obj) => obj,
+//                     None => BUILTINS.nil(),
+//                 }
+//             }
+//         ),
+//         meth!("has", type_ref, &["member"], "", |this, args| {
+//             let this = this.read().unwrap();
+//             let this = this.down_to_map().unwrap();
+//             let arg = use_arg!(args, 0);
+//             let key = use_arg_str!(get, key, arg);
+//             let result = this.contains_key(key);
+//             BUILTINS.bool(result)
+//         }),
+//         meth!("iter", type_ref, &[], "", |this_ref, _| {
+//             let this = this_ref.read().unwrap();
+//             let this = this.down_to_map().unwrap();
+//             let mut items = vec![];
+//             for (name, val) in this.entries.read().unwrap().iter() {
+//                 items.push(BUILTINS.tuple(vec![BUILTINS.str(name), val.clone()]))
+//             }
+//             BUILTINS.iterator(items)
+//         }),
+//     ]);
+//
+//     type_ref.clone()
+// }
 
-type_and_impls!(MapType, Map);
-
-pub static MAP_TYPE: Lazy<obj_ref_t!(MapType)> = Lazy::new(|| {
-    let type_ref = obj_ref!(MapType::new());
-    let mut type_obj = type_ref.write().unwrap();
-
-    type_obj.add_attrs(&[
-        // Instance Attributes -----------------------------------------
-        prop!("length", type_ref, "", |this, _| {
-            let this = this.read().unwrap();
-            let this = this.down_to_map().unwrap();
-            new::int(this.len())
-        }),
-        prop!("is_empty", type_ref, "", |this, _| {
-            let this = this.read().unwrap();
-            let this = this.down_to_map().unwrap();
-            new::bool(this.is_empty())
-        }),
-        // Instance Methods --------------------------------------------
-        meth!(
-            "add",
-            type_ref,
-            &["key", "val"],
-            "Add entry to Map.
-
-            # Args
-
-            - key: Str
-            - value: Any
-
-            ",
-            |this, args| {
-                let this = this.read().unwrap();
-                let this = this.down_to_map().unwrap();
-                let arg = use_arg!(args, 0);
-                let key = use_arg_str!(get, key, arg);
-                let val = args[1].clone();
-                this.insert(key, val);
-                new::nil()
-            }
-        ),
-        meth!(
-            "get",
-            type_ref,
-            &["key"],
-            "Get value for key from Map.
-
-            # Args
-
-            - key: Key
-
-            # Returns
-
-            - Any: If key is present
-            - nil: If key is not present
-
-            > NOTE: There's no way to distinguish between a key that isn't present
-            > versus a key that has `nil` as its value. To avoid ambiguity, don't
-            > store `nil` values.
-
-            ",
-            |this, args| {
-                let this = this.read().unwrap();
-                let this = this.down_to_map().unwrap();
-                let arg = use_arg!(args, 0);
-                let key = use_arg_str!(get, key, arg);
-                match this.get(key) {
-                    Some(obj) => obj,
-                    None => new::nil(),
-                }
-            }
-        ),
-        meth!("has", type_ref, &["member"], "", |this, args| {
-            let this = this.read().unwrap();
-            let this = this.down_to_map().unwrap();
-            let arg = use_arg!(args, 0);
-            let key = use_arg_str!(get, key, arg);
-            let result = this.contains_key(key);
-            new::bool(result)
-        }),
-        meth!("iter", type_ref, &[], "", |this_ref, _| {
-            let this = this_ref.read().unwrap();
-            let this = this.down_to_map().unwrap();
-            let mut items = vec![];
-            for (name, val) in this.entries.read().unwrap().iter() {
-                items.push(new::tuple(vec![new::str(name), val.clone()]))
-            }
-            new::iterator(items)
-        }),
-    ]);
-
-    type_ref.clone()
-});
-
-// Map Object ----------------------------------------------------------
+// Map ----------------------------------------------------------
 
 pub struct Map {
+    class: TypeRef,
     ns: Namespace,
     entries: RwLock<IndexMap<String, ObjectRef>>,
 }
 
 standard_object_impls!(Map);
 
-impl Default for Map {
-    fn default() -> Self {
-        Self { ns: Namespace::default(), entries: RwLock::new(IndexMap::default()) }
-    }
-}
-
 impl Map {
-    pub fn new(entries: IndexMap<String, ObjectRef>) -> Self {
-        Self { ns: Namespace::default(), entries: RwLock::new(entries) }
+    pub fn new(class: TypeRef, entries: IndexMap<String, ObjectRef>) -> Self {
+        Self { class, ns: Namespace::default(), entries: RwLock::new(entries) }
     }
 
     pub fn len(&self) -> usize {
@@ -163,7 +154,7 @@ impl Map {
 }
 
 impl ObjectTrait for Map {
-    object_trait_header!(MAP_TYPE);
+    object_trait_header!();
 
     fn is_equal(&self, rhs: &dyn ObjectTrait) -> bool {
         if self.is(rhs) || rhs.is_always() {

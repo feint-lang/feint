@@ -2,28 +2,20 @@ use std::any::Any;
 use std::fmt;
 use std::sync::{Arc, RwLock};
 
-use once_cell::sync::Lazy;
-
 use feint_code_gen::*;
 
-use super::new;
+use crate::BUILTINS;
 
-use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
-use super::class::TYPE_TYPE;
+use super::base::{ObjectRef, ObjectTrait, TypeRef};
+
 use super::func_trait::FuncTrait;
 use super::ns::Namespace;
 use super::Params;
 
-// Bound Function Type -------------------------------------------------
-
-type_and_impls!(BoundFuncType, BoundFunc);
-
-pub static BOUND_FUNC_TYPE: Lazy<obj_ref_t!(BoundFuncType)> =
-    Lazy::new(|| obj_ref!(BoundFuncType::new()));
-
-// BoundFunc Object ----------------------------------------------------------
+// BoundFunc ----------------------------------------------------------
 
 pub struct BoundFunc {
+    class: TypeRef,
     ns: Namespace,
     module_name: String,
     func: ObjectRef,
@@ -35,7 +27,7 @@ pub struct BoundFunc {
 standard_object_impls!(BoundFunc);
 
 impl BoundFunc {
-    pub fn new(func_ref: ObjectRef, this: ObjectRef) -> Self {
+    pub fn new(class: TypeRef, func_ref: ObjectRef, this: ObjectRef) -> Self {
         let (module_name, name, doc, params, params_tuple, arity, has_var_args) = {
             let func_guard = func_ref.read().unwrap();
 
@@ -62,14 +54,15 @@ impl BoundFunc {
         };
 
         Self {
+            class,
             ns: Namespace::with_entries(&[
-                ("$module_name", new::str(&module_name)),
-                ("$full_name", new::str(format!("{module_name}.{name}"))),
-                ("$name", new::str(&name)),
+                ("$module_name", BUILTINS.str(&module_name)),
+                ("$full_name", BUILTINS.str(format!("{module_name}.{name}"))),
+                ("$name", BUILTINS.str(&name)),
                 ("$params", params_tuple),
                 ("$doc", doc),
-                ("$arity", new::int(arity)),
-                ("$has_var_args", new::bool(has_var_args)),
+                ("$arity", BUILTINS.int(arity)),
+                ("$has_var_args", BUILTINS.bool(has_var_args)),
             ]),
             module_name,
             func: func_ref,
@@ -111,7 +104,7 @@ impl FuncTrait for BoundFunc {
 }
 
 impl ObjectTrait for BoundFunc {
-    object_trait_header!(BOUND_FUNC_TYPE);
+    object_trait_header!();
 
     fn module(&self) -> ObjectRef {
         self.func().read().unwrap().module()

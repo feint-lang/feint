@@ -2,43 +2,39 @@ use std::any::Any;
 use std::fmt;
 use std::sync::{Arc, RwLock};
 
-use once_cell::sync::Lazy;
-
-use super::new;
 use feint_code_gen::*;
 
-use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
-use super::class::TYPE_TYPE;
+use crate::BUILTINS;
+
+use super::base::{ObjectRef, ObjectTrait, TypeRef};
+
 use super::ns::Namespace;
 
-// IteratorType Type ---------------------------------------------------
+// pub fn make_iterator_type() -> obj_ref_t!(IteratorType) {
+//     let type_ref = obj_ref!(IteratorType::new());
+//     let mut type_obj = type_ref.write().unwrap();
+//
+//     type_obj.add_attrs(&[
+//         // Instance Methods --------------------------------------------
+//         meth!("next", type_ref, &[], "", |this, _| {
+//             let mut this = this.write().unwrap();
+//             let this = this.down_to_iterator_mut().unwrap();
+//             this.next()
+//         }),
+//         meth!("peek", type_ref, &[], "", |this, _| {
+//             let this = this.write().unwrap();
+//             let this = this.down_to_iterator().unwrap();
+//             this.peek()
+//         }),
+//     ]);
+//
+//     type_ref.clone()
+// }
 
-type_and_impls!(IteratorType, Iterator);
-
-pub static ITERATOR_TYPE: Lazy<obj_ref_t!(IteratorType)> = Lazy::new(|| {
-    let type_ref = obj_ref!(IteratorType::new());
-    let mut type_obj = type_ref.write().unwrap();
-
-    type_obj.add_attrs(&[
-        // Instance Methods --------------------------------------------
-        meth!("next", type_ref, &[], "", |this, _| {
-            let mut this = this.write().unwrap();
-            let this = this.down_to_iterator_mut().unwrap();
-            this.next()
-        }),
-        meth!("peek", type_ref, &[], "", |this, _| {
-            let this = this.write().unwrap();
-            let this = this.down_to_iterator().unwrap();
-            this.peek()
-        }),
-    ]);
-
-    type_ref.clone()
-});
-
-// Iterator Object -----------------------------------------------------
+// Iterator -----------------------------------------------------
 
 pub struct FIIterator {
+    class: TypeRef,
     ns: Namespace,
     wrapped: Vec<ObjectRef>,
     current: usize,
@@ -47,8 +43,8 @@ pub struct FIIterator {
 standard_object_impls!(FIIterator);
 
 impl FIIterator {
-    pub fn new(wrapped: Vec<ObjectRef>) -> Self {
-        Self { ns: Namespace::default(), wrapped, current: 0 }
+    pub fn new(class: TypeRef, wrapped: Vec<ObjectRef>) -> Self {
+        Self { class, ns: Namespace::default(), wrapped, current: 0 }
     }
 
     fn next(&mut self) -> ObjectRef {
@@ -69,7 +65,7 @@ impl FIIterator {
 
     fn get_or_nil(&self, index: usize) -> ObjectRef {
         if index >= self.len() {
-            new::nil()
+            BUILTINS.nil()
         } else {
             self.wrapped[index].clone()
         }
@@ -77,7 +73,7 @@ impl FIIterator {
 }
 
 impl ObjectTrait for FIIterator {
-    object_trait_header!(ITERATOR_TYPE);
+    object_trait_header!();
 }
 
 // Display -------------------------------------------------------------

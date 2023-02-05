@@ -2,7 +2,8 @@
 use indexmap::IndexMap;
 
 use feint_builtins::modules::STD;
-use feint_builtins::types::{new, ObjectRef, ObjectTrait};
+use feint_builtins::types::{ObjectRef, ObjectTrait};
+use feint_builtins::BUILTINS;
 
 use crate::RuntimeObjResult;
 
@@ -96,7 +97,7 @@ impl ModuleExecutionContext {
     /// the var in the current namespace and sets its initial value to
     /// nil.
     pub(super) fn declare_var(&mut self, name: &str) {
-        let initial = new::nil();
+        let initial = BUILTINS.nil();
         let ns = self.current_mut();
         ns.insert(name.to_owned(), initial);
     }

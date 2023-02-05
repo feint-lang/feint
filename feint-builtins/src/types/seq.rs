@@ -4,25 +4,27 @@ use num_bigint::BigInt;
 
 use feint_code_gen::{use_arg, use_arg_str};
 
+use crate::BUILTINS;
+
 use super::base::ObjectRef;
-use super::{new, Args};
+use super::Args;
 
 pub fn has(items: &[ObjectRef], args: &Args) -> ObjectRef {
     if items.is_empty() {
-        return new::bool(false);
+        return BUILTINS.bool(false);
     }
     let member = use_arg!(args, 0);
     for item in items.iter() {
         if member.is_equal(&*item.read().unwrap()) {
-            return new::bool(true);
+            return BUILTINS.bool(true);
         }
     }
-    new::bool(false)
+    BUILTINS.bool(false)
 }
 
 pub fn join(items: &[ObjectRef], args: &Args) -> ObjectRef {
     if items.is_empty() {
-        return new::empty_str();
+        return BUILTINS.empty_str();
     }
 
     let n_items = items.len();
@@ -43,11 +45,11 @@ pub fn join(items: &[ObjectRef], args: &Args) -> ObjectRef {
         }
     }
 
-    new::str(string)
+    BUILTINS.str(string)
 }
 
 pub fn sum(items: &[ObjectRef]) -> ObjectRef {
-    let mut sum = new::int(BigInt::from(0));
+    let mut sum = BUILTINS.int(BigInt::from(0));
     for item in items.iter() {
         sum = {
             let a = sum.read().unwrap();
@@ -55,7 +57,7 @@ pub fn sum(items: &[ObjectRef]) -> ObjectRef {
             if let Some(new_sum) = (*a).add(&*b) {
                 new_sum
             } else {
-                return new::type_err("Could not add object to sum", item.clone());
+                return BUILTINS.type_err("Could not add object to sum", item.clone());
             }
         }
     }

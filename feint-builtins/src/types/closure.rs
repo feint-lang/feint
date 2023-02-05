@@ -2,26 +2,21 @@ use std::any::Any;
 use std::fmt;
 use std::sync::{Arc, RwLock};
 
-use once_cell::sync::Lazy;
-
 use feint_code_gen::*;
 
-use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
-use super::class::TYPE_TYPE;
+use crate::BUILTINS;
+
+use super::base::{ObjectRef, ObjectTrait, TypeRef};
+
 use super::func_trait::FuncTrait;
 use super::ns::Namespace;
-use super::{new, Params};
+use super::Params;
 
-// Closure Type --------------------------------------------------------
-
-type_and_impls!(ClosureType, Closure);
-
-pub static CLOSURE_TYPE: Lazy<obj_ref_t!(ClosureType)> =
-    Lazy::new(|| obj_ref!(ClosureType::new()));
-
-// Closure Object ------------------------------------------------------
+// Closure -------------------------------------------------------------
 
 pub struct Closure {
+    class: TypeRef,
+
     ns: Namespace,
     module_name: String,
     name: String,
@@ -34,15 +29,16 @@ pub struct Closure {
 standard_object_impls!(Closure);
 
 impl Closure {
-    pub fn new(func_ref: ObjectRef, captured: ObjectRef) -> Self {
+    pub fn new(class: TypeRef, func_ref: ObjectRef, captured: ObjectRef) -> Self {
         let func = func_ref.read().unwrap();
         let func = func.down_to_func().unwrap();
         Self {
+            class,
             ns: Namespace::with_entries(&[
                 ("$params", func.get_params()),
                 ("$doc", func.get_doc()),
-                ("$arity", new::int(func.arity())),
-                ("$has_var_args", new::bool(func.has_var_args())),
+                ("$arity", BUILTINS.int(func.arity())),
+                ("$has_var_args", BUILTINS.bool(func.has_var_args())),
             ]),
             module_name: func.module_name().to_owned(),
             name: func.name().to_owned(),
@@ -91,7 +87,7 @@ impl FuncTrait for Closure {
 }
 
 impl ObjectTrait for Closure {
-    object_trait_header!(CLOSURE_TYPE);
+    object_trait_header!();
 }
 
 // Display -------------------------------------------------------------

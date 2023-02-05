@@ -5,7 +5,8 @@ use feint_util::op::{BinaryOperator, CompareOperator, InplaceOperator, UnaryOper
 use feint_util::source::Location;
 use feint_util::string::format_doc;
 
-use crate::types::{new, FuncTrait, ObjectRef};
+use crate::types::{FuncTrait, ObjectRef};
+use crate::BUILTINS;
 
 type FreeVarEntry = (
     usize,    // address
@@ -106,11 +107,11 @@ impl Code {
             if let Some(obj_ref) = self.get_const(0) {
                 let obj = obj_ref.read().unwrap();
                 if let Some(doc) = obj.get_str_val() {
-                    return new::str(format_doc(doc));
+                    return BUILTINS.str(format_doc(doc));
                 }
             }
         }
-        new::nil()
+        BUILTINS.nil()
     }
 
     // Instructions ----------------------------------------------------

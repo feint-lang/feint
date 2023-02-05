@@ -1,27 +1,15 @@
 use std::any::Any;
 use std::fmt;
-use std::sync::{Arc, RwLock};
-
-use once_cell::sync::Lazy;
 
 use feint_code_gen::*;
 
-use super::new;
-
-use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
-use super::class::TYPE_TYPE;
+use super::base::{ObjectRef, ObjectTrait, TypeRef};
 use super::ns::Namespace;
 
-// Bool Type -----------------------------------------------------------
-
-type_and_impls!(BoolType, Bool);
-
-pub static BOOL_TYPE: Lazy<obj_ref_t!(BoolType)> =
-    Lazy::new(|| obj_ref!(BoolType::new()));
-
-// Bool Object ---------------------------------------------------------
+// Bool ----------------------------------------------------------------
 
 pub struct Bool {
+    class: TypeRef,
     ns: Namespace,
     value: bool,
 }
@@ -29,8 +17,8 @@ pub struct Bool {
 standard_object_impls!(Bool);
 
 impl Bool {
-    pub fn new(value: bool) -> Self {
-        Self { ns: Namespace::default(), value }
+    pub fn new(class: TypeRef, value: bool) -> Self {
+        Self { class, ns: Namespace::default(), value }
     }
 
     pub fn value(&self) -> &bool {
@@ -39,7 +27,7 @@ impl Bool {
 }
 
 impl ObjectTrait for Bool {
-    object_trait_header!(BOOL_TYPE);
+    object_trait_header!();
 
     // Unary operations -----------------------------------------------
 

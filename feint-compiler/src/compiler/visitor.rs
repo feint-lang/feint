@@ -3,9 +3,10 @@ use std::collections::HashSet;
 use std::fmt;
 use std::fmt::Formatter;
 
+use feint_builtins::builtins::BUILTINS;
 use feint_builtins::modules::STD;
 use feint_builtins::types::code::{Code, Inst, PrintFlags};
-use feint_builtins::types::{new, ObjectRef};
+use feint_builtins::types::ObjectRef;
 use feint_util::op::{
     BinaryOperator, CompareOperator, InplaceOperator, ShortCircuitCompareOperator,
     UnaryOperator,
@@ -381,10 +382,10 @@ impl CompilerVisitor {
             Kind::Always => self.push_always(),
             Kind::Ellipsis => self.push_nil(),
             Kind::Int(value) => {
-                self.add_const(new::int(value));
+                self.add_const(BUILTINS.int(value));
             }
             Kind::Float(value) => {
-                self.add_const(new::float(value));
+                self.add_const(BUILTINS.float(value));
             }
             Kind::String(value) => {
                 if value.is_empty() {
@@ -392,7 +393,7 @@ impl CompilerVisitor {
                 } else if value == "\n" {
                     self.push_newline();
                 } else {
-                    self.add_const(new::str(value));
+                    self.add_const(BUILTINS.str(value));
                 }
             }
         }
@@ -903,31 +904,31 @@ impl CompilerVisitor {
     // Global constants ------------------------------------------------
 
     fn push_nil(&mut self) {
-        self.add_const(new::nil());
+        self.add_const(BUILTINS.nil());
     }
 
     fn push_true(&mut self) {
-        self.add_const(new::bool(true));
+        self.add_const(BUILTINS.bool(true));
     }
 
     fn push_false(&mut self) {
-        self.add_const(new::bool(false));
+        self.add_const(BUILTINS.bool(false));
     }
 
     fn push_always(&mut self) {
-        self.add_const(new::always());
+        self.add_const(BUILTINS.always());
     }
 
     fn push_empty_str(&mut self) {
-        self.add_const(new::empty_str());
+        self.add_const(BUILTINS.empty_str());
     }
 
     fn push_newline(&mut self) {
-        self.add_const(new::newline());
+        self.add_const(BUILTINS.newline());
     }
 
     fn push_empty_tuple(&mut self) {
-        self.add_const(new::empty_tuple());
+        self.add_const(BUILTINS.empty_tuple());
     }
 
     // Code unit constants ---------------------------------------------

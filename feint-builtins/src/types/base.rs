@@ -8,61 +8,36 @@ use num_traits::ToPrimitive;
 
 use feint_code_gen::*;
 
-use crate::modules::std::STD;
+use crate::BUILTINS;
 
 use super::func_trait::FuncTrait;
-use super::new;
 use super::ns::Namespace;
 
-use super::always::{Always, AlwaysType};
-use super::bool::{Bool, BoolType};
-use super::bound_func::{BoundFunc, BoundFuncType};
-use super::cell::{Cell, CellType};
-use super::class::{Type, TypeType};
-use super::closure::{Closure, ClosureType};
-use super::custom::{CustomObj, CustomType};
-use super::err::{ErrObj, ErrType};
-use super::err_type::{ErrTypeObj, ErrTypeType};
-use super::file::{File, FileType};
-use super::float::{Float, FloatType};
-use super::func::{Func, FuncType};
-use super::int::{Int, IntType};
-use super::intrinsic_func::{IntrinsicFunc, IntrinsicFuncType};
-use super::iterator::{FIIterator, IteratorType};
-use super::list::{List, ListType};
-use super::map::{Map, MapType};
-use super::module::{Module, ModuleType};
-use super::nil::{Nil, NilType};
-use super::prop::{Prop, PropType};
-use super::str::{Str, StrType};
-use super::tuple::{Tuple, TupleType};
+use super::always::Always;
+use super::bool::Bool;
+use super::bound_func::BoundFunc;
+use super::cell::Cell;
+use super::class::Type;
+use super::closure::Closure;
+use super::custom::CustomObj;
+use super::err::ErrObj;
+use super::err_type::ErrTypeObj;
+use super::file::File;
+use super::float::Float;
+use super::func::Func;
+use super::int::Int;
+use super::intrinsic_func::IntrinsicFunc;
+use super::iterator::FIIterator;
+use super::list::List;
+use super::map::Map;
+use super::module::Module;
+use super::nil::Nil;
+use super::prop::Prop;
+use super::str::Str;
+use super::tuple::Tuple;
 
-pub type TypeRef = obj_ref_t!(dyn TypeTrait);
+pub type TypeRef = obj_ref_t!(Type);
 pub type ObjectRef = obj_ref_t!(dyn ObjectTrait);
-
-// Type Trait ----------------------------------------------------------
-
-/// Types in the system are backed by an implementation of `TypeTrait`.
-/// Each type implementation will be instantiated exactly once (i.e.,
-/// types are singletons). Example: `IntType`.
-pub trait TypeTrait {
-    fn name(&self) -> &str;
-    fn full_name(&self) -> &str;
-    fn ns(&self) -> &Namespace;
-
-    fn module(&self) -> ObjectRef {
-        STD.clone()
-    }
-
-    fn id(&self) -> usize {
-        let p = self as *const Self;
-        p as *const () as usize
-    }
-
-    fn is(&self, other: &dyn TypeTrait) -> bool {
-        self.id() == other.id()
-    }
-}
 
 // Object Trait --------------------------------------------------------
 
@@ -141,9 +116,6 @@ pub trait ObjectTrait {
     fn ns(&self) -> &Namespace;
     fn ns_mut(&mut self) -> &mut Namespace;
 
-    /// Cast object to type, if possible.
-    fn as_type(&self) -> Option<&dyn TypeTrait>;
-
     fn id(&self) -> usize {
         let p = self as *const Self;
         p as *const () as usize
@@ -151,7 +123,7 @@ pub trait ObjectTrait {
 
     fn id_obj(&self) -> ObjectRef {
         // TODO: Cache?
-        new::int(self.id())
+        BUILTINS.int(self.id())
     }
 
     /// XXX: This resolves to `std` unless overridden.
@@ -175,6 +147,10 @@ pub trait ObjectTrait {
     ///    TODO: There's probably a more elegant way to do this, but it
     ///          might require a bit of re-architecting.
     fn get_attr(&self, name: &str, this: ObjectRef) -> ObjectRef {
+        self.base_get_attr(name, this)
+    }
+
+    fn base_get_attr(&self, name: &str, this: ObjectRef) -> ObjectRef {
         // Special attributes that *cannot* be overridden --------------
         if name == "$id" {
             return self.id_obj();
@@ -198,8 +174,8 @@ pub trait ObjectTrait {
             names.extend(obj_ns.iter().map(|(n, _)| n).cloned());
             names.sort();
             names.dedup();
-            let items = names.iter().map(new::str).collect();
-            return new::tuple(items);
+            let items = names.iter().map(|n| BUILTINS.str(n)).collect();
+            return BUILTINS.tuple(items);
         }
 
         // if name == "$dis" {
@@ -232,7 +208,7 @@ pub trait ObjectTrait {
         //     } else {
         //         eprintln!("Cannot disassemble object: {}", &*this.read().unwrap());
         //     }
-        //     return new::nil();
+        //     return BUILTINS.nil();
         // }
 
         // Instance attributes -----------------------------------------
@@ -262,9 +238,9 @@ pub trait ObjectTrait {
         if name == "ok" {
             let this = this.read().unwrap();
             return if let Some(err) = this.down_to_err() {
-                new::bool(!err.retrieve_bool_val())
+                BUILTINS.bool(!err.retrieve_bool_val())
             } else {
-                new::bool(true)
+                BUILTINS.bool(true)
             };
         }
 
@@ -277,13 +253,13 @@ pub trait ObjectTrait {
         // that responds to bool is returned.
         if name == "err" {
             return if let Some(err) = this.read().unwrap().down_to_err() {
-                new::err_with_responds_to_bool(
+                BUILTINS.err_with_responds_to_bool(
                     err.kind.clone(),
                     err.message.as_str(),
                     this.clone(),
                 )
             } else {
-                new::ok_err()
+                BUILTINS.ok_err()
             };
         }
 
@@ -291,7 +267,7 @@ pub trait ObjectTrait {
             return if self.is_str() {
                 this.clone()
             } else {
-                new::str(this.read().unwrap().to_string())
+                BUILTINS.str(this.read().unwrap().to_string())
             };
         }
 
@@ -317,14 +293,14 @@ pub trait ObjectTrait {
     }
 
     fn attr_not_found(&self, name: &str, obj: ObjectRef) -> ObjectRef {
-        new::attr_not_found_err(name, obj)
+        BUILTINS.attr_not_found_err(name, obj)
     }
 
     // Items (accessed by index) ---------------------------------------
 
     fn get_item(&self, index: usize, this: ObjectRef) -> ObjectRef {
         // TODO: The default should be a "does not support" indexing err
-        new::index_out_of_bounds_err(index, this)
+        BUILTINS.index_out_of_bounds_err(index, this)
     }
 
     fn set_item(
@@ -334,36 +310,14 @@ pub trait ObjectTrait {
         _value: ObjectRef,
     ) -> ObjectRef {
         // TODO: The default should be a "does not support" indexing err
-        new::index_out_of_bounds_err(index, this)
+        BUILTINS.index_out_of_bounds_err(index, this)
     }
 
     fn index_out_of_bounds(&self, index: usize, this: ObjectRef) -> ObjectRef {
-        new::index_out_of_bounds_err(index, this)
+        BUILTINS.index_out_of_bounds_err(index, this)
     }
 
     // Type checkers ---------------------------------------------------
-
-    make_type_checker!(is_type_type, TypeType);
-    make_type_checker!(is_always_type, AlwaysType);
-    make_type_checker!(is_bool_type, BoolType);
-    make_type_checker!(is_bound_func_type, BoundFuncType);
-    make_type_checker!(is_intrinsic_func_type, IntrinsicFuncType);
-    make_type_checker!(is_cell_type, CellType);
-    make_type_checker!(is_closure_type, ClosureType);
-    make_type_checker!(is_err_type, ErrType);
-    make_type_checker!(is_err_type_type, ErrTypeType);
-    make_type_checker!(is_file_type, FileType);
-    make_type_checker!(is_float_type, FloatType);
-    make_type_checker!(is_func_type, FuncType);
-    make_type_checker!(is_int_type, IntType);
-    make_type_checker!(is_iterator_type, IteratorType);
-    make_type_checker!(is_list_type, ListType);
-    make_type_checker!(is_map_type, MapType);
-    make_type_checker!(is_mod_type, ModuleType);
-    make_type_checker!(is_nil_type, NilType);
-    make_type_checker!(is_prop_type, PropType);
-    make_type_checker!(is_str_type, StrType);
-    make_type_checker!(is_tuple_type, TupleType);
 
     make_type_checker!(is_type, Type);
     make_type_checker!(is_always, Always);
@@ -387,11 +341,6 @@ pub trait ObjectTrait {
     make_type_checker!(is_str, Str);
     make_type_checker!(is_tuple, Tuple);
 
-    /// Is this object a type object?
-    fn is_type_object(&self) -> bool {
-        self.type_obj().read().unwrap().is_type_type()
-    }
-
     fn is_immutable(&self) -> bool {
         !(self.is_cell() || self.is_file() || self.is_list() || self.is_map())
     }
@@ -403,29 +352,6 @@ pub trait ObjectTrait {
     // Downcasters -----------------------------------------------------
     //
     // These downcast object refs to their concrete types.
-
-    make_down_to!(down_to_type_type, TypeType);
-    make_down_to!(down_to_always_type, AlwaysType);
-    make_down_to!(down_to_bool_type, BoolType);
-    make_down_to!(down_to_bound_func_type, BoundFuncType);
-    make_down_to!(down_to_intrinsic_func_type, IntrinsicFuncType);
-    make_down_to!(down_to_cell_type, CellType);
-    make_down_to!(down_to_closure_type, ClosureType);
-    make_down_to!(down_to_custom_type, CustomType);
-    make_down_to!(down_to_err_type, ErrType);
-    make_down_to!(down_to_err_type_type, ErrTypeType);
-    make_down_to!(down_to_file_type, FileType);
-    make_down_to!(down_to_float_type, FloatType);
-    make_down_to!(down_to_func_type, FuncType);
-    make_down_to!(down_to_list_type, ListType);
-    make_down_to!(down_to_int_type, IntType);
-    make_down_to!(down_to_iterator_type, IteratorType);
-    make_down_to!(down_to_map_type, MapType);
-    make_down_to!(down_to_mod_type, ModuleType);
-    make_down_to!(down_to_nil_type, NilType);
-    make_down_to!(down_to_prop_type, PropType);
-    make_down_to!(down_to_str_type, StrType);
-    make_down_to!(down_to_tuple_type, TupleType);
 
     make_down_to!(down_to_type, Type);
     make_down_to!(down_to_always, Always);
@@ -546,22 +472,6 @@ pub trait ObjectTrait {
 
 // Display -------------------------------------------------------------
 
-macro_rules! write_type_instance {
-    ( $f:ident, $t:ident, $($A:ty),+ ) => { $(
-        if let Some(t) = $t.as_any().downcast_ref::<$A>() {
-            return write!($f, "<type {}>", t.full_name());
-        }
-    )+ };
-}
-
-macro_rules! debug_type_instance {
-    ( $f:ident, $t:ident, $($A:ty),+ ) => { $(
-        if let Some(t) = $t.as_any().downcast_ref::<$A>() {
-            return write!($f, "<type {} @ {}>", t.full_name(), ObjectTrait::id(t));
-        }
-    )+ };
-}
-
 macro_rules! write_instance {
     ( $f:ident, $i:ident, $($A:ty),+ ) => { $(
         if let Some(i) = $i.as_any().downcast_ref::<$A>() {
@@ -578,50 +488,11 @@ macro_rules! debug_instance {
     )+ };
 }
 
-impl fmt::Display for dyn TypeTrait {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "<type {}>", self.full_name())
-    }
-}
-
-impl fmt::Debug for dyn TypeTrait {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "<type {} @ {}>", self.full_name(), self.id())
-    }
-}
-
 impl fmt::Display for dyn ObjectTrait {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write_type_instance!(
-            f,
-            self,
-            TypeType,
-            AlwaysType,
-            BoolType,
-            BoundFuncType,
-            IntrinsicFuncType,
-            CellType,
-            ClosureType,
-            CustomType,
-            ErrType,
-            ErrTypeType,
-            FileType,
-            FloatType,
-            FuncType,
-            IntType,
-            IteratorType,
-            ListType,
-            MapType,
-            ModuleType,
-            NilType,
-            PropType,
-            StrType,
-            TupleType
-        );
         write_instance!(
             f,
             self,
-            Type,
             Always,
             Bool,
             BoundFunc,
@@ -650,32 +521,6 @@ impl fmt::Display for dyn ObjectTrait {
 
 impl fmt::Debug for dyn ObjectTrait {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        debug_type_instance!(
-            f,
-            self,
-            TypeType,
-            AlwaysType,
-            BoolType,
-            BoundFuncType,
-            IntrinsicFuncType,
-            CellType,
-            ClosureType,
-            CustomType,
-            ErrType,
-            ErrTypeType,
-            FileType,
-            FloatType,
-            FuncType,
-            IntType,
-            IteratorType,
-            ListType,
-            MapType,
-            ModuleType,
-            NilType,
-            PropType,
-            StrType,
-            TupleType
-        );
         debug_instance!(
             f,
             self,

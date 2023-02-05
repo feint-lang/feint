@@ -7,11 +7,11 @@ use std::sync::{Arc, RwLock};
 
 use once_cell::sync::Lazy;
 
-use super::new;
+use crate::BUILTINS;
 use feint_code_gen::*;
 
-use super::base::{ObjectRef, ObjectTrait, TypeRef, TypeTrait};
-use super::class::TYPE_TYPE;
+use super::base::{ObjectRef, ObjectTrait, TypeRef};
+
 use super::ns::Namespace;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -65,39 +65,40 @@ impl ErrKind {
     }
 
     pub fn get_obj(&self) -> Option<ObjectRef> {
-        let err_type_type = ERR_TYPE_TYPE.read().unwrap();
-        err_type_type.ns.get(self.name())
+        // let err_type_type = ERR_TYPE_TYPE.read().unwrap();
+        // err_type_type.ns.get(self.name())
+        None
     }
 }
 
-// ErrType Type --------------------------------------------------------
+// pub static ERR_TYPE_TYPE: Lazy<obj_ref_t!(ErrTypeType)> = Lazy::new(|| {
+//     let type_ref = obj_ref!(ErrTypeType::new());
+//     let mut type_obj = type_ref.write().unwrap();
+//
+//     // Types as class attributes
+//     for kind in ERR_KINDS.iter() {
+//         type_obj.add_attr(
+//             kind.name(),
+//             obj_ref!(ErrTypeObj::new(type_ref.clone(), kind.clone())),
+//         );
+//     }
+//
+//     type_obj.add_attrs(&[
+//         // Instance Attributes -----------------------------------------
+//         prop!("name", type_ref, "", |this, _| {
+//             let this = this.read().unwrap();
+//             let this = this.as_any().downcast_ref::<ErrTypeObj>().unwrap();
+//             BUILTINS.str(this.name())
+//         }),
+//     ]);
+//
+//     type_ref.clone()
+// });
 
-type_and_impls!(ErrTypeType, ErrType);
-
-pub static ERR_TYPE_TYPE: Lazy<obj_ref_t!(ErrTypeType)> = Lazy::new(|| {
-    let type_ref = obj_ref!(ErrTypeType::new());
-    let mut type_obj = type_ref.write().unwrap();
-
-    // Types as class attributes
-    for kind in ERR_KINDS.iter() {
-        type_obj.add_attr(kind.name(), obj_ref!(ErrTypeObj::new(kind.clone())));
-    }
-
-    type_obj.add_attrs(&[
-        // Instance Attributes -----------------------------------------
-        prop!("name", type_ref, "", |this, _| {
-            let this = this.read().unwrap();
-            let this = this.as_any().downcast_ref::<ErrTypeObj>().unwrap();
-            new::str(this.name())
-        }),
-    ]);
-
-    type_ref.clone()
-});
-
-// ErrType Object ------------------------------------------------------
+// ErrType ------------------------------------------------------
 
 pub struct ErrTypeObj {
+    class: TypeRef,
     ns: Namespace,
     kind: ErrKind,
 }
@@ -105,8 +106,8 @@ pub struct ErrTypeObj {
 standard_object_impls!(ErrTypeObj);
 
 impl ErrTypeObj {
-    pub fn new(kind: ErrKind) -> Self {
-        Self { ns: Namespace::default(), kind }
+    pub fn new(class: TypeRef, kind: ErrKind) -> Self {
+        Self { class, ns: Namespace::default(), kind }
     }
 
     pub fn kind(&self) -> &ErrKind {
@@ -119,7 +120,7 @@ impl ErrTypeObj {
 }
 
 impl ObjectTrait for ErrTypeObj {
-    object_trait_header!(ERR_TYPE_TYPE);
+    object_trait_header!();
 
     fn is_equal(&self, rhs: &dyn ObjectTrait) -> bool {
         if self.is(rhs) || rhs.is_always() {
