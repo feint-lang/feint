@@ -15,7 +15,7 @@ use super::func_trait::FuncTrait;
 use super::ns::Namespace;
 use super::Params;
 
-std_type!(BOUND_FUNC_TYPE, BoundFuncType);
+std_type!(BOUND_FUNC_TYPE, BoundFunc);
 
 pub struct BoundFunc {
     ns: Namespace,

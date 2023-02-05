@@ -16,43 +16,42 @@ use super::base::{ObjectRef, ObjectTrait, TypeRef};
 use super::class::Type;
 use super::ns::Namespace;
 
-// pub fn make_file_type() -> obj_ref_t!(FileType) {
-//     let type_ref = obj_ref!(FileType::new());
-//     let mut type_obj = type_ref.write().unwrap();
-//
-//     type_obj.add_attrs(&[
-//         // Class Methods
-//         meth!("new", type_ref, &["file_name"], "", |_, args| {
-//             let arg = use_arg!(args, 0);
-//             if let Some(file_name) = arg.get_str_val() {
-//                 let path = Path::new(file_name);
-//                 if path.is_file() {
-//                     new::file(file_name)
-//                 } else {
-//                     new::file_not_found_err(file_name, new::nil())
-//                 }
-//             } else {
-//                 let message = format!("File.new(file_name) expected string; got {arg}");
-//                 new::arg_err(message, new::nil())
-//             }
-//         }),
-//         // Instance Attributes
-//         prop!("text", type_ref, "", |this, _| {
-//             let this = this.read().unwrap();
-//             let this = this.down_to_file().unwrap();
-//             this.text()
-//         }),
-//         prop!("lines", type_ref, "", |this, _| {
-//             let this = this.read().unwrap();
-//             let this = &mut this.down_to_file().unwrap();
-//             this.lines()
-//         }),
-//     ]);
-//
-//     type_ref.clone()
-// }
+pub static FILE_TYPE: Lazy<TypeRef> = Lazy::new(|| {
+    let type_ref = obj_ref!(Type::new("std", "File"));
 
-std_type!(FILE_TYPE, FileType);
+    {
+        type_ref.write().unwrap().ns_mut().extend(&[
+            // Class Methods -------------------------------------------
+            meth!("new", type_ref, &["file_name"], "", |_, args| {
+                let arg = use_arg!(args, 0);
+                if let Some(file_name) = arg.get_str_val() {
+                    let path = Path::new(file_name);
+                    if path.is_file() {
+                        new::file(file_name)
+                    } else {
+                        new::file_not_found_err(file_name, new::nil())
+                    }
+                } else {
+                    let message =
+                        format!("File.new(file_name) expected string; got {arg}");
+                    new::arg_err(message, new::nil())
+                }
+            }),
+            // Instance Attributes -------------------------------------
+            prop!("text", type_ref, "", |this, _| {
+                let this = this.read().unwrap();
+                let this = this.down_to_file().unwrap();
+                this.text()
+            }),
+            prop!("lines", type_ref, "", |this, _| {
+                let this = this.read().unwrap();
+                let this = &mut this.down_to_file().unwrap();
+                this.lines()
+            }),
+        ]);
+    }
+    type_ref
+});
 
 pub struct File {
     ns: Namespace,

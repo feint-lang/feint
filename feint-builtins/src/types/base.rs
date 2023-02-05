@@ -149,9 +149,9 @@ pub trait ObjectTrait {
             return self.id_obj();
         }
 
-        // if name == "$module" {
-        //     return self.module();
-        // }
+        if name == "$module" {
+            return self.class().read().unwrap().module();
+        }
 
         if name == "$type" {
             return self.class();
@@ -487,6 +487,7 @@ impl fmt::Display for dyn ObjectTrait {
         write_instance!(
             f,
             self,
+            Type,
             Always,
             Bool,
             BoundFunc,

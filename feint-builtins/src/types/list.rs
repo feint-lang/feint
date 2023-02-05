@@ -14,93 +14,98 @@ use super::class::Type;
 use super::ns::Namespace;
 use super::seq;
 
-std_type!(LIST_TYPE, ListType);
+pub static LIST_TYPE: Lazy<TypeRef> = Lazy::new(|| {
+    let type_ref = obj_ref!(Type::new("std", "List"));
 
-// pub fn make_list_type() -> obj_ref_t!(ListType) {
-//     let type_ref = obj_ref!(ListType::new());
-//     let mut type_obj = type_ref.write().unwrap();
-//
-//     type_obj.add_attrs(&[
-//         // Instance Attributes -----------------------------------------
-//         prop!("length", type_ref, "", |this, _| {
-//             let this = this.read().unwrap();
-//             let this = this.down_to_list().unwrap();
-//             new::int(this.len())
-//         }),
-//         prop!("is_empty", type_ref, "", |this, _| {
-//             let this = this.read().unwrap();
-//             let this = this.down_to_list().unwrap();
-//             new::bool(this.len() == 0)
-//         }),
-//         prop!("sum", type_ref, "", |this, _| {
-//             let this = this.read().unwrap();
-//             let this = this.down_to_list().unwrap();
-//             let items = &this.items.read().unwrap();
-//             seq::sum(items)
-//         }),
-//         // Instance Methods --------------------------------------------
-//         meth!(
-//             "extend",
-//             type_ref,
-//             &["items"],
-//             "Push items and return this.",
-//             |this, args| {
-//                 let return_val = this.clone();
-//                 let this = this.read().unwrap();
-//                 let this = this.down_to_list().unwrap();
-//                 if let Some(err) = this.extend(args[0].clone()) {
-//                     return err;
-//                 }
-//                 return_val
-//             }
-//         ),
-//         meth!("get", type_ref, &["index"], "", |this, args| {
-//             let this = this.read().unwrap();
-//             let this = this.down_to_list().unwrap();
-//             let index = use_arg_usize!(get, index, args, 0);
-//             let result = match this.get(index) {
-//                 Some(obj) => obj,
-//                 None => new::nil(),
-//             };
-//             result
-//         }),
-//         meth!("has", type_ref, &["member"], "", |this, args| {
-//             let this = this.read().unwrap();
-//             let this = this.down_to_list().unwrap();
-//             let items = &this.items.read().unwrap();
-//             seq::has(items, &args)
-//         }),
-//         meth!("iter", type_ref, &[], "", |this_ref, _| {
-//             let this = this_ref.read().unwrap();
-//             let this = this.down_to_list().unwrap();
-//             let items = this.items.read().unwrap();
-//             new::iterator(items.clone())
-//         }),
-//         meth!("join", type_ref, &["sep"], "", |this, args| {
-//             let this = this.read().unwrap();
-//             let this = this.down_to_list().unwrap();
-//             let items = &this.items.read().unwrap();
-//             seq::join(items, &args)
-//         }),
-//         meth!("pop", type_ref, &[], "", |this, _| {
-//             let this = this.read().unwrap();
-//             let this = this.down_to_list().unwrap();
-//             match this.pop() {
-//                 Some(obj) => obj,
-//                 None => new::nil(),
-//             }
-//         }),
-//         meth!("push", type_ref, &["item"], "Push item and return it.", |this, args| {
-//             let this = this.read().unwrap();
-//             let this = this.down_to_list().unwrap();
-//             let arg = args[0].clone();
-//             this.push(arg.clone());
-//             arg
-//         }),
-//     ]);
-//
-//     type_ref.clone()
-// }
+    {
+        type_ref.write().unwrap().ns_mut().extend(&[
+            // Instance Attributes -------------------------------------
+            prop!("length", type_ref, "", |this, _| {
+                let this = this.read().unwrap();
+                let this = this.down_to_list().unwrap();
+                new::int(this.len())
+            }),
+            prop!("is_empty", type_ref, "", |this, _| {
+                let this = this.read().unwrap();
+                let this = this.down_to_list().unwrap();
+                new::bool(this.len() == 0)
+            }),
+            prop!("sum", type_ref, "", |this, _| {
+                let this = this.read().unwrap();
+                let this = this.down_to_list().unwrap();
+                let items = &this.items.read().unwrap();
+                seq::sum(items)
+            }),
+            // Instance Methods ----------------------------------------
+            meth!(
+                "extend",
+                type_ref,
+                &["items"],
+                "Push items and return this.",
+                |this, args| {
+                    let return_val = this.clone();
+                    let this = this.read().unwrap();
+                    let this = this.down_to_list().unwrap();
+                    if let Some(err) = this.extend(args[0].clone()) {
+                        return err;
+                    }
+                    return_val
+                }
+            ),
+            meth!("get", type_ref, &["index"], "", |this, args| {
+                let this = this.read().unwrap();
+                let this = this.down_to_list().unwrap();
+                let index = use_arg_usize!(get, index, args, 0);
+                let result = match this.get(index) {
+                    Some(obj) => obj,
+                    None => new::nil(),
+                };
+                result
+            }),
+            meth!("has", type_ref, &["member"], "", |this, args| {
+                let this = this.read().unwrap();
+                let this = this.down_to_list().unwrap();
+                let items = &this.items.read().unwrap();
+                seq::has(items, &args)
+            }),
+            meth!("iter", type_ref, &[], "", |this_ref, _| {
+                let this = this_ref.read().unwrap();
+                let this = this.down_to_list().unwrap();
+                let items = this.items.read().unwrap();
+                new::iterator(items.clone())
+            }),
+            meth!("join", type_ref, &["sep"], "", |this, args| {
+                let this = this.read().unwrap();
+                let this = this.down_to_list().unwrap();
+                let items = &this.items.read().unwrap();
+                seq::join(items, &args)
+            }),
+            meth!("pop", type_ref, &[], "", |this, _| {
+                let this = this.read().unwrap();
+                let this = this.down_to_list().unwrap();
+                match this.pop() {
+                    Some(obj) => obj,
+                    None => new::nil(),
+                }
+            }),
+            meth!(
+                "push",
+                type_ref,
+                &["item"],
+                "Push item and return it.",
+                |this, args| {
+                    let this = this.read().unwrap();
+                    let this = this.down_to_list().unwrap();
+                    let arg = args[0].clone();
+                    this.push(arg.clone());
+                    arg
+                }
+            ),
+        ]);
+    }
+
+    type_ref
+});
 
 std_type!(NIL_TYPE, NilType);
 

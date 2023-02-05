@@ -11,7 +11,6 @@ use once_cell::sync::Lazy;
 
 use feint_code_gen::*;
 
-use crate::modules::get_module;
 use crate::new;
 
 use super::base::{ObjectTrait, TypeRef};
@@ -37,7 +36,7 @@ impl Type {
             name: name.to_owned(),
             full_name,
             ns: Namespace::with_entries(&[
-                ("$module", get_module(module_name)),
+                ("$module_name", new::str(module_name)),
                 ("$name", new::str(name)),
                 ("$full_name", full_name_str),
             ]),

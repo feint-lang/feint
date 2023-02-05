@@ -11,7 +11,7 @@ use super::base::{ObjectTrait, TypeRef};
 use super::class::Type;
 use super::ns::Namespace;
 
-std_type!(BOOL_TYPE, BoolType);
+std_type!(BOOL_TYPE, Bool);
 
 pub struct Bool {
     ns: Namespace,

@@ -16,58 +16,56 @@ use super::map::Map;
 use super::ns::Namespace;
 use crate::new;
 
-std_type!(MODULE_TYPE, ModuleType);
+pub static MODULE_TYPE: Lazy<TypeRef> = Lazy::new(|| {
+    let type_ref = obj_ref!(Type::new("std", "Module"));
 
-// pub fn make_module_type() -> obj_ref_t!(ModuleType) {
-//     let type_ref = obj_ref!(ModuleType::new());
-//     let mut type_obj = type_ref.write().unwrap();
-//
-//     type_obj.add_attrs(&[meth!(
-//         "new",
-//         type_ref,
-//         &["name", "path", "doc", "attrs"],
-//         "Create a new Module
-//
-//         # Args
-//
-//         - name: Str
-//         - path: Str
-//         - doc: Str
-//         - attrs: Map
-//
-//         # Returns
-//
-//         Module",
-//         |_, args| {
-//             if let Err(err) = check_args("new", &args, false, 4, Some(4)) {
-//                 return err;
-//             };
-//
-//             let name_arg = use_arg!(args, 0);
-//             let path_arg = use_arg!(args, 1);
-//             let doc_arg = use_arg!(args, 2);
-//             let attrs_arg = use_arg!(args, 3);
-//
-//             let name = use_arg_str!(new, name, name_arg);
-//             let path = use_arg_str!(new, path, path_arg);
-//             let doc = use_arg_str!(new, doc, doc_arg);
-//             let attrs = use_arg_map!(new, attrs, attrs_arg);
-//
-//             let module = Module::with_map_entries(
-//                 new::module_type(),
-//                 attrs,
-//                 name.to_owned(),
-//                 path.to_owned(),
-//                 Code::default(),
-//                 Some(doc.to_owned()),
-//             );
-//
-//             obj_ref!(module)
-//         }
-//     )]);
-//
-//     type_ref.clone()
-// }
+    {
+        type_ref.write().unwrap().ns_mut().extend(&[meth!(
+            "new",
+            type_ref,
+            &["name", "path", "doc", "attrs"],
+            "Create a new Module
+
+        # Args
+
+        - name: Str
+        - path: Str
+        - doc: Str
+        - attrs: Map
+
+        # Returns
+
+        Module",
+            |_, args| {
+                if let Err(err) = check_args("new", &args, false, 4, Some(4)) {
+                    return err;
+                };
+
+                let name_arg = use_arg!(args, 0);
+                let path_arg = use_arg!(args, 1);
+                let doc_arg = use_arg!(args, 2);
+                let attrs_arg = use_arg!(args, 3);
+
+                let name = use_arg_str!(new, name, name_arg);
+                let path = use_arg_str!(new, path, path_arg);
+                let doc = use_arg_str!(new, doc, doc_arg);
+                let attrs = use_arg_map!(new, attrs, attrs_arg);
+
+                let module = Module::with_map_entries(
+                    attrs,
+                    name.to_owned(),
+                    path.to_owned(),
+                    Code::default(),
+                    Some(doc.to_owned()),
+                );
+
+                obj_ref!(module)
+            }
+        )]);
+    }
+
+    type_ref
+});
 
 // Module -------------------------------------------------------
 
@@ -87,13 +85,10 @@ impl Module {
     ///       attribute initialized from their module level docstring.
     pub fn new(name: String, path: String, code: Code, doc: Option<String>) -> Self {
         let ns = Namespace::with_entries(&[
-            // ("$full_name", new::str(name.as_str())),
-            // ("$name", new::str(name.as_str())),
-            // ("$path", new::str(path.as_str())),
-            // (
-            //     "$doc",
-            //     if let Some(doc) = doc { new::str(doc) } else { code.get_doc() },
-            // ),
+            ("$full_name", new::str(name.as_str())),
+            ("$name", new::str(name.as_str())),
+            ("$path", new::str(path.as_str())),
+            ("$doc", if let Some(doc) = doc { new::str(doc) } else { code.get_doc() }),
         ]);
         Self { ns, path, name, code }
     }

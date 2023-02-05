@@ -14,58 +14,57 @@ use super::class::Type;
 use super::ns::Namespace;
 use super::seq;
 
-std_type!(TUPLE_TYPE, TupleType);
+pub static TUPLE_TYPE: Lazy<TypeRef> = Lazy::new(|| {
+    let type_ref = obj_ref!(Type::new("std", "Tuple"));
 
-// pub fn make_tuple_type() -> obj_ref_t!(TupleType) {
-//     let type_ref = obj_ref!(TupleType::new());
-//     let mut type_obj = type_ref.write().unwrap();
-//
-//     type_obj.add_attrs(&[
-//         // Instance Attributes -----------------------------------------
-//         prop!("length", type_ref, "", |this, _| {
-//             let this = this.read().unwrap();
-//             let this = this.down_to_tuple().unwrap();
-//             new::int(this.len())
-//         }),
-//         prop!("is_empty", type_ref, "", |this, _| {
-//             let this = this.read().unwrap();
-//             let this = this.down_to_tuple().unwrap();
-//             new::bool(this.len() == 0)
-//         }),
-//         prop!("sum", type_ref, "", |this, _| {
-//             let this = this.read().unwrap();
-//             let this = this.down_to_tuple().unwrap();
-//             seq::sum(&this.items)
-//         }),
-//         // Instance Methods --------------------------------------------
-//         meth!("get", type_ref, &["index"], "", |this, args| {
-//             let this = this.read().unwrap();
-//             let this = this.down_to_tuple().unwrap();
-//             let index = use_arg_usize!(get, index, args, 0);
-//             match this.get(index) {
-//                 Some(obj) => obj,
-//                 None => new::nil(),
-//             }
-//         }),
-//         meth!("has", type_ref, &["member"], "", |this, args| {
-//             let this = this.read().unwrap();
-//             let this = this.down_to_tuple().unwrap();
-//             seq::has(&this.items, &args)
-//         }),
-//         meth!("iter", type_ref, &[], "", |this_ref, _| {
-//             let this = this_ref.read().unwrap();
-//             let this = this.down_to_tuple().unwrap();
-//             new::iterator(this.items.clone())
-//         }),
-//         meth!("join", type_ref, &["sep"], "", |this, args| {
-//             let this = this.read().unwrap();
-//             let this = this.down_to_tuple().unwrap();
-//             seq::join(&this.items, &args)
-//         }),
-//     ]);
-//
-//     type_ref.clone()
-// }
+    {
+        type_ref.write().unwrap().ns_mut().extend(&[
+            // Instance Attributes -------------------------------------
+            prop!("length", type_ref, "", |this, _| {
+                let this = this.read().unwrap();
+                let this = this.down_to_tuple().unwrap();
+                new::int(this.len())
+            }),
+            prop!("is_empty", type_ref, "", |this, _| {
+                let this = this.read().unwrap();
+                let this = this.down_to_tuple().unwrap();
+                new::bool(this.len() == 0)
+            }),
+            prop!("sum", type_ref, "", |this, _| {
+                let this = this.read().unwrap();
+                let this = this.down_to_tuple().unwrap();
+                seq::sum(&this.items)
+            }),
+            // Instance Methods ----------------------------------------
+            meth!("get", type_ref, &["index"], "", |this, args| {
+                let this = this.read().unwrap();
+                let this = this.down_to_tuple().unwrap();
+                let index = use_arg_usize!(get, index, args, 0);
+                match this.get(index) {
+                    Some(obj) => obj,
+                    None => new::nil(),
+                }
+            }),
+            meth!("has", type_ref, &["member"], "", |this, args| {
+                let this = this.read().unwrap();
+                let this = this.down_to_tuple().unwrap();
+                seq::has(&this.items, &args)
+            }),
+            meth!("iter", type_ref, &[], "", |this_ref, _| {
+                let this = this_ref.read().unwrap();
+                let this = this.down_to_tuple().unwrap();
+                new::iterator(this.items.clone())
+            }),
+            meth!("join", type_ref, &["sep"], "", |this, args| {
+                let this = this.read().unwrap();
+                let this = this.down_to_tuple().unwrap();
+                seq::join(&this.items, &args)
+            }),
+        ]);
+    }
+
+    type_ref
+});
 
 // Tuple --------------------------------------------------------
 

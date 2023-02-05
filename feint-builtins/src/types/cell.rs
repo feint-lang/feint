@@ -13,7 +13,7 @@ use super::base::{ObjectRef, ObjectTrait, TypeRef};
 use super::class::Type;
 use super::ns::Namespace;
 
-std_type!(CELL_TYPE, CellType);
+std_type!(CELL_TYPE, Cell);
 
 pub struct Cell {
     ns: Namespace,

@@ -3,7 +3,7 @@ use std::sync::{Arc, RwLock};
 
 use once_cell::sync::Lazy;
 
-use feint_code_gen::{obj_ref_t, use_arg, use_arg_str};
+use feint_code_gen::obj_ref_t;
 
 use crate::{new, types};
 
@@ -32,30 +32,32 @@ pub static STD: Lazy<obj_ref_t!(types::module::Module)> = Lazy::new(|| {
             ("Nil", types::nil::NIL_TYPE.clone()),
             ("Str", types::str::STR_TYPE.clone()),
             ("Tuple", types::tuple::TUPLE_TYPE.clone()),
-            // (
-            //     "new_type",
-            //     BUILTINS.intrinsic_func(
-            //         "std",
-            //         "new_type",
-            //         None,
-            //         &["module", "name"],
-            //         "Make a new custom type
-            //
-            //         # Args
-            //
-            //         - module: Module
-            //         - name: Str
-            //
-            //         ",
-            //         |_, args| {
-            //             let module = args[0].clone();
-            //             let name_arg = use_arg!(args, 1);
-            //             let name = use_arg_str!(new_type, name, name_arg);
-            //             let class = BUILTINS.custom_type(module, name);
-            //             class
-            //         },
-            //     ),
-            // ),
+            (
+                "new_type",
+                new::intrinsic_func(
+                    "std",
+                    "new_type",
+                    None,
+                    &["module", "name"],
+                    "Make a new custom type
+            
+                    # Args
+            
+                    - module: Module
+                    - name: Str
+            
+                    ",
+                    |_, _args| {
+                        // TODO:
+                        // let module = args[0].clone();
+                        // let name_arg = use_arg!(args, 1);
+                        // let name = use_arg_str!(new_type, name, name_arg);
+                        // let class = new::custom_type(module, name);
+                        // class
+                        new::nil()
+                    },
+                ),
+            ),
         ],
     )
 });

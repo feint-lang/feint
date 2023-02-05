@@ -21,7 +21,7 @@ use crate::types::cell::Cell;
 use crate::types::class::Type;
 use crate::types::closure::Closure;
 use crate::types::code::Code;
-use crate::types::custom::CustomObj;
+// use crate::types::custom::CustomObj;
 use crate::types::err::ErrObj;
 use crate::types::err_type::ErrKind;
 use crate::types::file::File;
@@ -325,7 +325,7 @@ pub fn custom_type(module_name: &str, name: &str) -> ObjectRef {
                 - attributes: Map
 
                 ",
-                |this_ref, args| {
+                |_this_ref, args| {
                     let attrs_arg = args.get(0).unwrap();
                     let attrs_arg = attrs_arg.read().unwrap();
                     let attrs = attrs_arg.down_to_map().unwrap();
@@ -333,18 +333,18 @@ pub fn custom_type(module_name: &str, name: &str) -> ObjectRef {
                     let mut ns = Namespace::default();
                     ns.extend_from_map(attrs);
 
-                    let type_obj = this_ref.read().unwrap();
-
-                    let class = if type_obj.is_type() {
-                        // Called via custom type.
-                        this_ref.clone()
-                    } else {
-                        // Called via custom instance.
-                        // XXX: This branch isn't reachable because the
-                        //      VM will panic due to the identity test
-                        //      issue noted above.
-                        type_obj.class()
-                    };
+                    // TODO:
+                    // let type_obj = this_ref.read().unwrap();
+                    // let class = if type_obj.is_type() {
+                    //     // Called via custom type.
+                    //     this_ref.clone()
+                    // } else {
+                    //     // Called via custom instance.
+                    //     // XXX: This branch isn't reachable because the
+                    //     //      VM will panic due to the identity test
+                    //     //      issue noted above.
+                    //     type_obj.class()
+                    // };
 
                     // let instance = CustomObj::new(class, ns);
                     // obj_ref!(instance)

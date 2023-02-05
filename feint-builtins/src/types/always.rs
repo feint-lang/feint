@@ -11,7 +11,7 @@ use super::base::{ObjectTrait, TypeRef};
 use super::class::Type;
 use super::ns::Namespace;
 
-std_type!(ALWAYS_TYPE, AlwaysType);
+std_type!(ALWAYS_TYPE, Always);
 
 pub struct Always {
     ns: Namespace,

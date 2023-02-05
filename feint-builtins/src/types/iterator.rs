@@ -13,28 +13,27 @@ use super::base::{ObjectRef, ObjectTrait, TypeRef};
 use super::class::Type;
 use super::ns::Namespace;
 
-std_type!(ITERATOR_TYPE, IteratorType);
+pub static ITERATOR_TYPE: Lazy<TypeRef> = Lazy::new(|| {
+    let type_ref = obj_ref!(Type::new("std", "Iterator"));
 
-// pub fn make_iterator_type() -> obj_ref_t!(IteratorType) {
-//     let type_ref = obj_ref!(IteratorType::new());
-//     let mut type_obj = type_ref.write().unwrap();
-//
-//     type_obj.add_attrs(&[
-//         // Instance Methods --------------------------------------------
-//         meth!("next", type_ref, &[], "", |this, _| {
-//             let mut this = this.write().unwrap();
-//             let this = this.down_to_iterator_mut().unwrap();
-//             this.next()
-//         }),
-//         meth!("peek", type_ref, &[], "", |this, _| {
-//             let this = this.write().unwrap();
-//             let this = this.down_to_iterator().unwrap();
-//             this.peek()
-//         }),
-//     ]);
-//
-//     type_ref.clone()
-// }
+    {
+        type_ref.write().unwrap().ns_mut().extend(&[
+            // Instance Methods ----------------------------------------
+            meth!("next", type_ref, &[], "", |this, _| {
+                let mut this = this.write().unwrap();
+                let this = this.down_to_iterator_mut().unwrap();
+                this.next()
+            }),
+            meth!("peek", type_ref, &[], "", |this, _| {
+                let this = this.write().unwrap();
+                let this = this.down_to_iterator().unwrap();
+                this.peek()
+            }),
+        ]);
+    }
+
+    type_ref
+});
 
 pub struct FIIterator {
     ns: Namespace,

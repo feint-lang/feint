@@ -16,40 +16,31 @@ use super::class::Type;
 use super::ns::Namespace;
 use super::util::{eq_int_float, int_gt_float, int_lt_float};
 
-std_type!(INT_TYPE, IntType);
+pub static INT_TYPE: Lazy<TypeRef> = Lazy::new(|| {
+    let type_ref = obj_ref!(Type::new("std", "Int"));
 
-// pub fn make_int_type() -> obj_ref_t!(IntType) {
-//     eprintln!("make_int_type 1");
-//     let type_ref = obj_ref!(IntType::new());
-//
-//     eprintln!("make_int_type 2");
-//     {
-//         eprintln!("make_int_type 2.a");
-//         let mut type_obj = type_ref.write().unwrap();
-//
-//         eprintln!("make_int_type 2.b");
-//         type_obj.add_attrs(&[
-//             // Class Methods -----------------------------------------------
-//             meth!("new", type_ref, &["value"], "", |this, args| {
-//                 let arg = use_arg!(args, 0);
-//                 let int = if let Some(val) = arg.get_int_val() {
-//                     new::int(val.clone())
-//                 } else if let Some(val) = arg.get_float_val() {
-//                     new::int(BigInt::from_f64(*val).unwrap())
-//                 } else if let Some(val) = arg.get_str_val() {
-//                     new::int_from_string(val)
-//                 } else {
-//                     let msg = format!("Int.new() expected number or string; got {arg}");
-//                     new::type_err(msg, this)
-//                 };
-//                 int
-//             }),
-//         ]);
-//     }
-//
-//     eprintln!("make_int_type 3");
-//     type_ref
-// }
+    {
+        type_ref.write().unwrap().ns_mut().extend(&[
+            // Class Methods -------------------------------------------
+            meth!("new", type_ref, &["value"], "", |this, args| {
+                let arg = use_arg!(args, 0);
+                let int = if let Some(val) = arg.get_int_val() {
+                    new::int(val.clone())
+                } else if let Some(val) = arg.get_float_val() {
+                    new::int(BigInt::from_f64(*val).unwrap())
+                } else if let Some(val) = arg.get_str_val() {
+                    new::int_from_string(val)
+                } else {
+                    let msg = format!("Int.new() expected number or string; got {arg}");
+                    new::type_err(msg, this)
+                };
+                int
+            }),
+        ]);
+    }
+
+    type_ref
+});
 
 macro_rules! make_op {
     ( $meth:ident, $op:tt ) => {

@@ -29,67 +29,66 @@ use super::class::Type;
 use super::err_type::ErrKind;
 use super::ns::Namespace;
 
-std_type!(ERR_TYPE, ErrType);
+pub static ERR_TYPE: Lazy<TypeRef> = Lazy::new(|| {
+    let type_ref = obj_ref!(Type::new("std", "Err"));
 
-// pub fn make_err_type() -> obj_ref_t!(ErrType) {
-//     let type_ref = obj_ref!(ErrType::new());
-//     let mut type_obj = type_ref.write().unwrap();
-//
-//     type_obj.add_attrs(&[
-//         // Class Methods -----------------------------------------------
-//         meth!("new", type_ref, &["type", "msg"], "", |_, args| {
-//             let name = "Err.new()";
-//
-//             let result = check_args(name, &args, false, 2, Some(2));
-//             if let Err(err) = result {
-//                 return err;
-//             }
-//
-//             let type_arg = use_arg!(args, 0);
-//             let msg_arg = use_arg!(args, 1);
-//
-//             let err_type = if let Some(err_type) = type_arg.down_to_err_type_obj() {
-//                 err_type
-//             } else {
-//                 let arg_err_msg = format!("{name} expected type to be an ErrType");
-//                 // NOTE: This is problematic because user code won't be
-//                 //       able to tell if the arg error was the result of
-//                 //       creating an arg err explicitly or the result of
-//                 //       an internal error. Note that this applies to
-//                 //       *any* user-constructible error.
-//                 //
-//                 // TODO: Figure out a solution for this, perhaps an err
-//                 //       type that is *not* user-constructible or a
-//                 //       nested err type?
-//                 return new::arg_err(arg_err_msg, new::nil());
-//             };
-//
-//             let kind = err_type.kind().clone();
-//
-//             let msg = if let Some(msg) = msg_arg.get_str_val() {
-//                 msg
-//             } else {
-//                 let arg_err_msg = format!("{name} expected message to be a Str");
-//                 return new::arg_err(arg_err_msg, new::nil());
-//             };
-//
-//             new::err(kind, msg, new::nil())
-//         }),
-//         // Instance Attributes -----------------------------------------
-//         prop!("type", type_ref, "", |this, _| {
-//             let this = this.read().unwrap();
-//             let this = this.down_to_err().unwrap();
-//             this.kind.get_obj().unwrap()
-//         }),
-//         prop!("message", type_ref, "", |this, _| {
-//             let this = this.read().unwrap();
-//             let this = this.down_to_err().unwrap();
-//             new::str(&this.message)
-//         }),
-//     ]);
-//
-//     type_ref.clone()
-// }
+    {
+        type_ref.write().unwrap().ns_mut().extend(&[
+            // Class Methods -----------------------------------------------
+            meth!("new", type_ref, &["type", "msg"], "", |_, args| {
+                let name = "Err.new()";
+
+                let result = check_args(name, &args, false, 2, Some(2));
+                if let Err(err) = result {
+                    return err;
+                }
+
+                let type_arg = use_arg!(args, 0);
+                let msg_arg = use_arg!(args, 1);
+
+                let err_type = if let Some(err_type) = type_arg.down_to_err_type_obj() {
+                    err_type
+                } else {
+                    let arg_err_msg = format!("{name} expected type to be an ErrType");
+                    // NOTE: This is problematic because user code won't be
+                    //       able to tell if the arg error was the result of
+                    //       creating an arg err explicitly or the result of
+                    //       an internal error. Note that this applies to
+                    //       *any* user-constructible error.
+                    //
+                    // TODO: Figure out a solution for this, perhaps an err
+                    //       type that is *not* user-constructible or a
+                    //       nested err type?
+                    return new::arg_err(arg_err_msg, new::nil());
+                };
+
+                let kind = err_type.kind().clone();
+
+                let msg = if let Some(msg) = msg_arg.get_str_val() {
+                    msg
+                } else {
+                    let arg_err_msg = format!("{name} expected message to be a Str");
+                    return new::arg_err(arg_err_msg, new::nil());
+                };
+
+                new::err(kind, msg, new::nil())
+            }),
+            // Instance Attributes -----------------------------------------
+            prop!("type", type_ref, "", |this, _| {
+                let this = this.read().unwrap();
+                let this = this.down_to_err().unwrap();
+                this.kind.get_obj().unwrap()
+            }),
+            prop!("message", type_ref, "", |this, _| {
+                let this = this.read().unwrap();
+                let this = this.down_to_err().unwrap();
+                new::str(&this.message)
+            }),
+        ]);
+    }
+
+    type_ref
+});
 
 // NOTE: This is named `ErrObj` instead of `Err` to avoid conflict with
 //       Rust's `Err`.

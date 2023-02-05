@@ -44,7 +44,6 @@ impl IntrinsicFunc {
         func: IntrinsicFn,
     ) -> Self {
         let params_tuple = new::tuple(params.iter().map(new::str).collect());
-        eprintln!("new");
 
         let mut instance = Self {
             ns: Namespace::with_entries(&[

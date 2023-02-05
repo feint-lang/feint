@@ -66,37 +66,35 @@ impl ErrKind {
     }
 
     pub fn get_obj(&self) -> Option<ObjectRef> {
-        // let err_type_type = ERR_TYPE_TYPE.read().unwrap();
-        // err_type_type.ns.get(self.name())
-        None
+        let err_type_type = ERR_TYPE_TYPE.read().unwrap();
+        err_type_type.ns().get(self.name())
     }
 }
 
-std_type!(ERR_TYPE_TYPE, ErrTypeType);
+pub static ERR_TYPE_TYPE: Lazy<TypeRef> = Lazy::new(|| {
+    let type_ref = obj_ref!(Type::new("std", "ErrType"));
 
-// pub static ERR_TYPE_TYPE: Lazy<obj_ref_t!(ErrTypeType)> = Lazy::new(|| {
-//     let type_ref = obj_ref!(ErrTypeType::new());
-//     let mut type_obj = type_ref.write().unwrap();
-//
-//     // Types as class attributes
-//     for kind in ERR_KINDS.iter() {
-//         type_obj.add_attr(
-//             kind.name(),
-//             obj_ref!(ErrTypeObj::new(type_ref.clone(), kind.clone())),
-//         );
-//     }
-//
-//     type_obj.add_attrs(&[
-//         // Instance Attributes -----------------------------------------
-//         prop!("name", type_ref, "", |this, _| {
-//             let this = this.read().unwrap();
-//             let this = this.as_any().downcast_ref::<ErrTypeObj>().unwrap();
-//             new::str(this.name())
-//         }),
-//     ]);
-//
-//     type_ref.clone()
-// });
+    {
+        let mut type_obj = type_ref.write().unwrap();
+        let ns = type_obj.ns_mut();
+
+        // Types as class attributes -----------------------------------
+        for kind in ERR_KINDS.iter() {
+            ns.insert(kind.name(), obj_ref!(ErrTypeObj::new(kind.clone())));
+        }
+
+        ns.extend(&[
+            // Instance Attributes -------------------------------------
+            prop!("name", type_ref, "", |this, _| {
+                let this = this.read().unwrap();
+                let this = this.as_any().downcast_ref::<ErrTypeObj>().unwrap();
+                new::str(this.name())
+            }),
+        ]);
+    }
+
+    type_ref
+});
 
 pub struct ErrTypeObj {
     ns: Namespace,

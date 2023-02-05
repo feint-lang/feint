@@ -15,7 +15,7 @@ use super::func_trait::FuncTrait;
 use super::ns::Namespace;
 use super::Params;
 
-std_type!(CLOSURE_TYPE, ClosureType);
+std_type!(CLOSURE_TYPE, Closure);
 
 pub struct Closure {
     ns: Namespace,

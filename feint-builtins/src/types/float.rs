@@ -15,32 +15,32 @@ use super::class::Type;
 use super::ns::Namespace;
 use super::util::{eq_int_float, float_gt_int, float_lt_int};
 
-std_type!(FLOAT_TYPE, FloatType);
+pub static FLOAT_TYPE: Lazy<TypeRef> = Lazy::new(|| {
+    let type_ref = obj_ref!(Type::new("std", "Float"));
 
-// pub fn make_float_type() -> obj_ref_t!(FloatType) {
-//     let type_ref = obj_ref!(FloatType::new());
-//     let mut type_obj = type_ref.write().unwrap();
-//
-//     type_obj.add_attrs(&[
-//         // Class Methods -----------------------------------------------
-//         meth!("new", type_ref, &["value"], "", |this, args| {
-//             let arg = use_arg!(args, 0);
-//             let float = if let Some(val) = arg.get_float_val() {
-//                 new::float(*val)
-//             } else if let Some(val) = arg.get_int_val() {
-//                 new::float(val.to_f64().unwrap())
-//             } else if let Some(val) = arg.get_str_val() {
-//                 new::float_from_string(val)
-//             } else {
-//                 let msg = format!("Float.new() expected string or float; got {arg}");
-//                 new::type_err(msg, this)
-//             };
-//             float
-//         }),
-//     ]);
-//
-//     type_ref.clone()
-// }
+    {
+        type_ref.write().unwrap().ns_mut().extend(&[
+            // Class Methods -----------------------------------------------
+            meth!("new", type_ref, &["value"], "", |this, args| {
+                let arg = use_arg!(args, 0);
+                let float = if let Some(val) = arg.get_float_val() {
+                    new::float(*val)
+                } else if let Some(val) = arg.get_int_val() {
+                    new::float(val.to_f64().unwrap())
+                } else if let Some(val) = arg.get_str_val() {
+                    new::float_from_string(val)
+                } else {
+                    let msg =
+                        format!("Float.new() expected string or float; got {arg}");
+                    new::type_err(msg, this)
+                };
+                float
+            }),
+        ]);
+    }
+
+    type_ref
+});
 
 macro_rules! make_op {
     ( $meth:ident, $op:tt, $message:literal, $trunc:literal ) => {
