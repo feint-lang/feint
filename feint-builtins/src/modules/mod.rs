@@ -20,7 +20,7 @@ pub use self::std::STD;
 /// modules in Rust code (e.g., in the VM).
 pub static MODULES: Lazy<obj_ref_t!(Map)> = Lazy::new(|| obj_ref!(Map::default()));
 
-/// Add module to `std.system.modules`.
+/// Add module to `system.modules`.
 pub fn add_module(name: &str, module: ObjectRef) {
     let modules = MODULES.write().unwrap();
     let modules = modules.down_to_map().unwrap();

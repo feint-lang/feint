@@ -3,7 +3,7 @@ use std::sync::{Arc, RwLock};
 
 use once_cell::sync::Lazy;
 
-use feint_code_gen::obj_ref_t;
+use feint_code_gen::{obj_ref_t, use_arg, use_arg_str};
 
 use crate::{new, types};
 
@@ -47,14 +47,13 @@ pub static STD: Lazy<obj_ref_t!(types::module::Module)> = Lazy::new(|| {
                     - name: Str
             
                     ",
-                    |_, _args| {
-                        // TODO:
-                        // let module = args[0].clone();
-                        // let name_arg = use_arg!(args, 1);
-                        // let name = use_arg_str!(new_type, name, name_arg);
-                        // let class = new::custom_type(module, name);
-                        // class
-                        new::nil()
+                    |_, args| {
+                        let module_arg = use_arg!(args, 0);
+                        let module = use_arg_str!(new_type, module_name, module_arg);
+                        let name_arg = use_arg!(args, 1);
+                        let name = use_arg_str!(new_type, name, name_arg);
+                        let class = new::custom_type(module, name);
+                        class
                     },
                 ),
             ),

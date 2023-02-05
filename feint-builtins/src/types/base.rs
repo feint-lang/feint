@@ -6,6 +6,7 @@ use std::sync::{Arc, RwLock};
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 
+use crate::modules::get_module;
 use feint_code_gen::*;
 
 use crate::new;
@@ -119,11 +120,14 @@ pub trait ObjectTrait {
         new::int(self.id())
     }
 
-    /// XXX: This resolves to `std` unless overridden.
     fn module(&self) -> ObjectRef {
-        let class = self.class();
-        let class = class.read().unwrap();
-        class.module().clone()
+        if let Some(t) = self.down_to_type() {
+            get_module(t.module_name())
+        } else {
+            let class = self.class();
+            let class = class.read().unwrap();
+            class.module()
+        }
     }
 
     // Attributes (accessed by name) -----------------------------------
@@ -150,7 +154,7 @@ pub trait ObjectTrait {
         }
 
         if name == "$module" {
-            return self.class().read().unwrap().module();
+            return self.module();
         }
 
         if name == "$type" {

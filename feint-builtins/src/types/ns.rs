@@ -36,6 +36,12 @@ impl Namespace {
         ns
     }
 
+    pub fn from_map(map: &Map) -> Self {
+        let mut ns = Self::default();
+        ns.extend_from_map(map);
+        ns
+    }
+
     pub fn clear(&mut self) {
         self.objects.clear()
     }
