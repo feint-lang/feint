@@ -1,26 +1,28 @@
-//! Intrinsic (implemented in Rust) function type.
+//! Builtin `IntrinsicFunc` type.
+//!
+//! Used to implement builtin functions in Rust.
 use std::any::Any;
 use std::fmt;
 use std::sync::{Arc, RwLock};
 
-use once_cell::sync::OnceCell;
+use once_cell::sync::{Lazy, OnceCell};
 
+use crate::modules::get_module;
 use feint_code_gen::*;
 
-use crate::BUILTINS;
+use crate::new;
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef};
-
+use super::class::Type;
 use super::func_trait::FuncTrait;
 use super::ns::Namespace;
 use super::{Args, CallResult, Params};
 
 pub type IntrinsicFn = fn(ObjectRef, Args) -> CallResult;
 
-// IntrinsicFunc ------------------------------------------------
+std_type!(INTRINSIC_FUNC_TYPE, IntrinsicFuncType);
 
 pub struct IntrinsicFunc {
-    class: TypeRef,
     ns: Namespace,
     module_name: String,
     module: OnceCell<ObjectRef>,
@@ -34,27 +36,24 @@ standard_object_impls!(IntrinsicFunc);
 
 impl IntrinsicFunc {
     pub fn new(
-        class: TypeRef,
         module_name: String,
         name: String,
         this_type: Option<ObjectRef>,
         params: Params,
-        doc: String,
+        doc: ObjectRef,
         func: IntrinsicFn,
     ) -> Self {
-        // let params_tuple =
-        //     BUILTINS.tuple(params.iter().map(|p| BUILTINS.str(p)).collect());
+        let params_tuple = new::tuple(params.iter().map(new::str).collect());
         eprintln!("new");
 
         let mut instance = Self {
-            class,
             ns: Namespace::with_entries(&[
                 // Instance Attributes
-                // ("$module_name", BUILTINS.str(module_name.as_str())),
-                // ("$full_name", BUILTINS.str(format!("{module_name}.{name}"))),
-                // ("$name", BUILTINS.str(name.as_str())),
-                // ("$params", params_tuple),
-                // ("$doc", doc),
+                ("$module_name", new::str(module_name.as_str())),
+                ("$full_name", new::str(format!("{module_name}.{name}"))),
+                ("$name", new::str(name.as_str())),
+                ("$params", params_tuple),
+                ("$doc", doc),
             ]),
             module_name,
             module: OnceCell::default(),
@@ -66,8 +65,8 @@ impl IntrinsicFunc {
 
         let arity = (&instance as &dyn FuncTrait).arity();
         let has_var_args = (&instance as &dyn FuncTrait).has_var_args();
-        // instance.ns_mut().insert("$arity", BUILTINS.int(arity));
-        // instance.ns_mut().insert("$has_var_args", BUILTINS.bool(has_var_args));
+        instance.ns_mut().insert("$arity", new::int(arity));
+        instance.ns_mut().insert("$has_var_args", new::bool(has_var_args));
 
         instance
     }
@@ -104,10 +103,10 @@ impl FuncTrait for IntrinsicFunc {
 }
 
 impl ObjectTrait for IntrinsicFunc {
-    object_trait_header!();
+    object_trait_header!(INTRINSIC_FUNC_TYPE);
 
     fn module(&self) -> ObjectRef {
-        self.module.get_or_init(|| BUILTINS.get_module(&self.module_name)).clone()
+        self.module.get_or_init(|| get_module(&self.module_name)).clone()
     }
 }
 

@@ -8,7 +8,7 @@ use num_traits::ToPrimitive;
 
 use feint_code_gen::*;
 
-use crate::BUILTINS;
+use crate::new;
 
 use super::func_trait::FuncTrait;
 use super::ns::Namespace;
@@ -116,7 +116,7 @@ pub trait ObjectTrait {
 
     fn id_obj(&self) -> ObjectRef {
         // TODO: Cache?
-        BUILTINS.int(self.id())
+        new::int(self.id())
     }
 
     /// XXX: This resolves to `std` unless overridden.
@@ -167,8 +167,8 @@ pub trait ObjectTrait {
             names.extend(obj_ns.iter().map(|(n, _)| n).cloned());
             names.sort();
             names.dedup();
-            let items = names.iter().map(|n| BUILTINS.str(n)).collect();
-            return BUILTINS.tuple(items);
+            let items = names.iter().map(new::str).collect();
+            return new::tuple(items);
         }
 
         // TODO: Convert to builtin function
@@ -202,7 +202,7 @@ pub trait ObjectTrait {
         //     } else {
         //         eprintln!("Cannot disassemble object: {}", &*this.read().unwrap());
         //     }
-        //     return BUILTINS.nil();
+        //     return new::nil();
         // }
 
         // Instance attributes -----------------------------------------
@@ -232,9 +232,9 @@ pub trait ObjectTrait {
         if name == "ok" {
             let this = this.read().unwrap();
             return if let Some(err) = this.down_to_err() {
-                BUILTINS.bool(!err.retrieve_bool_val())
+                new::bool(!err.retrieve_bool_val())
             } else {
-                BUILTINS.bool(true)
+                new::bool(true)
             };
         }
 
@@ -247,13 +247,13 @@ pub trait ObjectTrait {
         // that responds to bool is returned.
         if name == "err" {
             return if let Some(err) = this.read().unwrap().down_to_err() {
-                BUILTINS.err_with_responds_to_bool(
+                new::err_with_responds_to_bool(
                     err.kind.clone(),
                     err.message.as_str(),
                     this.clone(),
                 )
             } else {
-                BUILTINS.ok_err()
+                new::ok_err()
             };
         }
 
@@ -261,7 +261,7 @@ pub trait ObjectTrait {
             return if self.is_str() {
                 this.clone()
             } else {
-                BUILTINS.str(this.read().unwrap().to_string())
+                new::str(this.read().unwrap().to_string())
             };
         }
 
@@ -287,14 +287,14 @@ pub trait ObjectTrait {
     }
 
     fn attr_not_found(&self, name: &str, obj: ObjectRef) -> ObjectRef {
-        BUILTINS.attr_not_found_err(name, obj)
+        new::attr_not_found_err(name, obj)
     }
 
     // Items (accessed by index) ---------------------------------------
 
     fn get_item(&self, index: usize, this: ObjectRef) -> ObjectRef {
         // TODO: The default should be a "does not support" indexing err
-        BUILTINS.index_out_of_bounds_err(index, this)
+        new::index_out_of_bounds_err(index, this)
     }
 
     fn set_item(
@@ -304,11 +304,11 @@ pub trait ObjectTrait {
         _value: ObjectRef,
     ) -> ObjectRef {
         // TODO: The default should be a "does not support" indexing err
-        BUILTINS.index_out_of_bounds_err(index, this)
+        new::index_out_of_bounds_err(index, this)
     }
 
     fn index_out_of_bounds(&self, index: usize, this: ObjectRef) -> ObjectRef {
-        BUILTINS.index_out_of_bounds_err(index, this)
+        new::index_out_of_bounds_err(index, this)
     }
 
     // Type checkers ---------------------------------------------------

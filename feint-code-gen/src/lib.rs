@@ -12,10 +12,18 @@ macro_rules! obj_ref {
     };
 }
 
+#[macro_export]
+macro_rules! std_type {
+    ( $name:ident, $class_name:ident ) => {
+        pub static $name: Lazy<TypeRef> =
+            Lazy::new(|| obj_ref!(Type::new("std", stringify!($class_name))));
+    };
+}
+
 /// Generate standard obj impls.
 #[macro_export]
 macro_rules! standard_object_impls {
-    (  $name:ident ) => {
+    ( $name:ident ) => {
         unsafe impl Send for $name {}
         unsafe impl Sync for $name {}
     };
@@ -30,7 +38,7 @@ macro_rules! standard_object_impls {
 ///     The singleton type instance. E.g. `NIL_TYPE`.
 #[macro_export]
 macro_rules! object_trait_header {
-    () => {
+    ( $class:ident ) => {
         fn as_any(&self) -> &dyn Any {
             self
         }
@@ -40,7 +48,7 @@ macro_rules! object_trait_header {
         }
 
         fn class(&self) -> TypeRef {
-            self.class.clone()
+            $class.clone()
         }
 
         fn ns(&self) -> &Namespace {
@@ -88,7 +96,7 @@ macro_rules! meth {
     ( $name:literal, $this_type:expr, $params:expr, $doc:literal, $func:expr ) => {
         (
             $name,
-            BUILTINS.intrinsic_func(
+            new::intrinsic_func(
                 "std",
                 $name,
                 Some($this_type.clone()),
@@ -107,7 +115,7 @@ macro_rules! prop {
     ( $name:literal, $this_type:expr, $doc:literal, $func:expr ) => {
         (
             $name,
-            BUILTINS.prop(BUILTINS.intrinsic_func(
+            new::prop(new::intrinsic_func(
                 "std",
                 $name,
                 Some($this_type.clone()),
@@ -133,7 +141,7 @@ macro_rules! use_arg {
         } else {
             let msg =
                 format!("{}() didn't receive enough args", stringify!($func_name));
-            return BUILTINS.arg_err(msg, BUILTINS.nil());
+            return new::arg_err(msg, new::nil());
         }
     }};
 }
@@ -152,7 +160,7 @@ macro_rules! use_arg_str {
                 stringify!($func_name),
                 stringify!($arg_name)
             );
-            return BUILTINS.arg_err(msg, BUILTINS.nil());
+            return new::arg_err(msg, new::nil());
         }
     }};
 }
@@ -168,7 +176,7 @@ macro_rules! use_arg_map {
                 stringify!($func_name),
                 stringify!($arg_name)
             );
-            return BUILTINS.arg_err(msg, BUILTINS.nil());
+            return new::arg_err(msg, new::nil());
         }
     }};
 }
@@ -186,12 +194,12 @@ macro_rules! use_arg_usize {
                     stringify!($func_name),
                     stringify!($arg_name)
                 );
-                return BUILTINS.arg_err(msg, BUILTINS.nil());
+                return new::arg_err(msg, new::nil());
             }
         } else {
             let msg =
                 format!("{}() didn't receive enough args", stringify!($func_name));
-            return BUILTINS.arg_err(msg, BUILTINS.nil());
+            return new::arg_err(msg, new::nil());
         }
     }};
 }

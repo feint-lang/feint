@@ -1,5 +1,5 @@
+use crate::new;
 use crate::types::{Args, ObjectRef};
-use crate::BUILTINS;
 
 /// Check args and return info.
 ///
@@ -51,7 +51,7 @@ pub(crate) fn check_args(
         n_args = n_args - 1 + n_var_args;
         (n_var_args, var_args_ref.clone())
     } else {
-        (0, BUILTINS.empty_tuple())
+        (0, new::empty_tuple())
     };
 
     // NOTE: Slightly hacky, but it's extremely unlikely anyone would
@@ -66,7 +66,7 @@ pub(crate) fn check_args(
         } else {
             format!("{name} expected {min} to {max} args; got {n_args}")
         };
-        return Err(BUILTINS.arg_err(msg, BUILTINS.nil()));
+        return Err(new::arg_err(msg, new::nil()));
     }
 
     Ok((n_args, n_var_args, var_args))

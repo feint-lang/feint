@@ -1,41 +1,46 @@
-//! "Class" and "type" are used interchangeably and mean exactly the
-//! same thing. Lower case "class" is used instead of "type" because the
-//! latter is a Rust keyword.
+//! Builtin `Type` type--the base of the type hierarchy.
+//!
+//! "Class" and "type" are synonymous and used interchangeably. Lower
+//! case "class" is used instead of "type" because the latter is a Rust
+//! keyword.
 use std::any::Any;
 use std::fmt;
 use std::sync::{Arc, RwLock};
 
-use once_cell::sync::{Lazy, OnceCell};
+use once_cell::sync::Lazy;
 
 use feint_code_gen::*;
 
-use crate::BUILTINS;
+use crate::modules::get_module;
+use crate::new;
 
-use super::base::{ObjectRef, ObjectTrait, TypeRef};
+use super::base::{ObjectTrait, TypeRef};
 use super::ns::Namespace;
 
-pub static TYPE_TYPE: Lazy<TypeRef> = Lazy::new(|| obj_ref!(Type::new("std", "Type")));
+std_type!(TYPE_TYPE, Type);
 
 pub struct Type {
     module_name: String,
     name: String,
+    full_name: String,
     ns: Namespace,
-    module_attr: OnceCell<ObjectRef>,
-    name_attr: OnceCell<ObjectRef>,
-    full_name_attr: OnceCell<ObjectRef>,
 }
 
 standard_object_impls!(Type);
 
 impl Type {
     pub fn new(module_name: &str, name: &str) -> Self {
+        let full_name = format!("{module_name}.{name}");
+        let full_name_str = new::str(&full_name);
         Self {
             module_name: module_name.to_owned(),
             name: name.to_owned(),
-            ns: Namespace::default(),
-            module_attr: OnceCell::default(),
-            name_attr: OnceCell::default(),
-            full_name_attr: OnceCell::default(),
+            full_name,
+            ns: Namespace::with_entries(&[
+                ("$module", get_module(module_name)),
+                ("$name", new::str(name)),
+                ("$full_name", full_name_str),
+            ]),
         }
     }
 
@@ -46,45 +51,14 @@ impl Type {
     pub fn name(&self) -> &String {
         &self.name
     }
+
+    pub fn full_name(&self) -> &String {
+        &self.full_name
+    }
 }
 
 impl ObjectTrait for Type {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-
-    fn class(&self) -> TypeRef {
-        TYPE_TYPE.clone()
-    }
-
-    fn ns(&self) -> &Namespace {
-        &self.ns
-    }
-
-    fn ns_mut(&mut self) -> &mut Namespace {
-        &mut self.ns
-    }
-
-    fn get_attr(&self, name: &str, this: ObjectRef) -> ObjectRef {
-        match name {
-            "$module" => self
-                .module_attr
-                .get_or_init(|| BUILTINS.get_module(self.module_name()))
-                .clone(),
-            "$name" => self.name_attr.get_or_init(|| BUILTINS.str(self.name())).clone(),
-            "$full_name" => self
-                .full_name_attr
-                .get_or_init(|| {
-                    BUILTINS.str(format!("{}.{}", self.module_name(), self.name()))
-                })
-                .clone(),
-            _ => self.base_get_attr(name, this),
-        }
-    }
+    object_trait_header!(TYPE_TYPE);
 }
 
 impl fmt::Display for Type {
@@ -95,6 +69,6 @@ impl fmt::Display for Type {
 
 impl fmt::Debug for Type {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "<type {}.{} @ {}>", self.module_name, self.name, self.id())
+        write!(f, "<type {} @ {}>", self.full_name(), self.id())
     }
 }

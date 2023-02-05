@@ -2,9 +2,9 @@
 use std::collections::HashSet;
 
 use feint_builtins::modules::STD;
+use feint_builtins::new;
 use feint_builtins::types::code::{Code, Inst};
 use feint_builtins::types::Module;
-use feint_builtins::BUILTINS;
 use feint_util::stack::Stack;
 
 use crate::ast;
@@ -57,13 +57,7 @@ impl Compiler {
         ast_module: ast::Module,
     ) -> CompResult {
         let code = self.compile_module_to_code(name, ast_module)?;
-        Ok(Module::new(
-            BUILTINS.module_type(),
-            name.to_owned(),
-            file_name.to_owned(),
-            code,
-            None,
-        ))
+        Ok(Module::new(name.to_owned(), file_name.to_owned(), code, None))
     }
 
     /// Compile AST module node to code object.
@@ -270,7 +264,7 @@ impl Compiler {
 
         // END Inner Functions -----------------------------------------
 
-        let func = BUILTINS.func(module_name, func_name, params, visitor.code);
+        let func = new::func(module_name, func_name, params, visitor.code);
         let parent_visitor = &mut self.visitor_stack.peek_mut().unwrap().0;
         let const_index = parent_visitor.code.add_const(func);
 

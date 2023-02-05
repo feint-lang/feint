@@ -1,18 +1,22 @@
+//! Builtin `Int` type.
 use std::any::Any;
 use std::fmt;
 use std::sync::{Arc, RwLock};
 
 use num_bigint::BigInt;
 use num_traits::{FromPrimitive, ToPrimitive};
+use once_cell::sync::Lazy;
 
 use feint_code_gen::*;
 
-use super::util::{eq_int_float, int_gt_float, int_lt_float};
-use crate::BUILTINS;
+use crate::new;
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef};
-
+use super::class::Type;
 use super::ns::Namespace;
+use super::util::{eq_int_float, int_gt_float, int_lt_float};
+
+std_type!(INT_TYPE, IntType);
 
 // pub fn make_int_type() -> obj_ref_t!(IntType) {
 //     eprintln!("make_int_type 1");
@@ -29,14 +33,14 @@ use super::ns::Namespace;
 //             meth!("new", type_ref, &["value"], "", |this, args| {
 //                 let arg = use_arg!(args, 0);
 //                 let int = if let Some(val) = arg.get_int_val() {
-//                     BUILTINS.int(val.clone())
+//                     new::int(val.clone())
 //                 } else if let Some(val) = arg.get_float_val() {
-//                     BUILTINS.int(BigInt::from_f64(*val).unwrap())
+//                     new::int(BigInt::from_f64(*val).unwrap())
 //                 } else if let Some(val) = arg.get_str_val() {
-//                     BUILTINS.int_from_string(val)
+//                     new::int_from_string(val)
 //                 } else {
 //                     let msg = format!("Int.new() expected number or string; got {arg}");
-//                     BUILTINS.type_err(msg, this)
+//                     new::type_err(msg, this)
 //                 };
 //                 int
 //             }),
@@ -47,19 +51,17 @@ use super::ns::Namespace;
 //     type_ref
 // }
 
-// Int ----------------------------------------------------------
-
 macro_rules! make_op {
     ( $meth:ident, $op:tt ) => {
         fn $meth(&self, rhs: &dyn ObjectTrait) -> Option<ObjectRef> {
             if let Some(rhs) = rhs.down_to_int() {
                 // XXX: Return Int
                 let value = self.value() $op rhs.value();
-                Some(BUILTINS.int(value))
+                Some(new::int(value))
             } else if let Some(rhs) = rhs.down_to_float() {
                 // XXX: Return Float
                 let value = self.value().to_f64().unwrap() $op rhs.value();
-                Some(BUILTINS.float(value))
+                Some(new::float(value))
             } else {
                 None
             }
@@ -68,7 +70,6 @@ macro_rules! make_op {
 }
 
 pub struct Int {
-    class: TypeRef,
     ns: Namespace,
     value: BigInt,
 }
@@ -76,8 +77,8 @@ pub struct Int {
 standard_object_impls!(Int);
 
 impl Int {
-    pub fn new(class: TypeRef, value: BigInt) -> Self {
-        Self { class, ns: Namespace::default(), value }
+    pub fn new(value: BigInt) -> Self {
+        Self { ns: Namespace::default(), value }
     }
 
     pub fn value(&self) -> &BigInt {
@@ -99,10 +100,10 @@ impl Int {
 }
 
 impl ObjectTrait for Int {
-    object_trait_header!();
+    object_trait_header!(INT_TYPE);
 
     fn negate(&self) -> Option<ObjectRef> {
-        Some(BUILTINS.int(-self.value.clone()))
+        Some(new::int(-self.value.clone()))
     }
 
     fn is_equal(&self, rhs: &dyn ObjectTrait) -> bool {
@@ -143,14 +144,14 @@ impl ObjectTrait for Int {
             let base = self.value();
             let exp = rhs.value().to_u32().unwrap();
             let value = base.pow(exp);
-            let value = BUILTINS.int(value);
+            let value = new::int(value);
             Some(value)
         } else if let Some(rhs) = rhs.down_to_float() {
             // XXX: Return Float
             let base = self.value().to_f64().unwrap();
             let exp = *rhs.value();
             let value = base.powf(exp);
-            let value = BUILTINS.float(value);
+            let value = new::float(value);
             Some(value)
         } else {
             None
@@ -165,7 +166,7 @@ impl ObjectTrait for Int {
     // Int division *always* returns a Float
     fn div(&self, rhs: &dyn ObjectTrait) -> Option<ObjectRef> {
         if let Some(value) = self.div_f64(rhs) {
-            Some(BUILTINS.float(value))
+            Some(new::float(value))
         } else {
             None
         }
@@ -175,14 +176,12 @@ impl ObjectTrait for Int {
     fn floor_div(&self, rhs: &dyn ObjectTrait) -> Option<ObjectRef> {
         if let Some(value) = self.div_f64(rhs) {
             let value = BigInt::from_f64(value).unwrap();
-            Some(BUILTINS.int(value))
+            Some(new::int(value))
         } else {
             None
         }
     }
 }
-
-// Display -------------------------------------------------------------
 
 impl fmt::Display for Int {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

@@ -2,16 +2,21 @@ use std::any::Any;
 use std::fmt;
 use std::sync::{Arc, RwLock};
 
+use once_cell::sync::Lazy;
+
 use feint_code_gen::*;
 
 use crate::util::check_args;
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef};
 
+use super::class::Type;
 use super::code::Code;
 use super::map::Map;
 use super::ns::Namespace;
-use crate::BUILTINS;
+use crate::new;
+
+std_type!(MODULE_TYPE, ModuleType);
 
 // pub fn make_module_type() -> obj_ref_t!(ModuleType) {
 //     let type_ref = obj_ref!(ModuleType::new());
@@ -49,7 +54,7 @@ use crate::BUILTINS;
 //             let attrs = use_arg_map!(new, attrs, attrs_arg);
 //
 //             let module = Module::with_map_entries(
-//                 BUILTINS.module_type(),
+//                 new::module_type(),
 //                 attrs,
 //                 name.to_owned(),
 //                 path.to_owned(),
@@ -67,7 +72,6 @@ use crate::BUILTINS;
 // Module -------------------------------------------------------
 
 pub struct Module {
-    class: TypeRef,
     ns: Namespace,
     name: String,
     path: String,
@@ -81,47 +85,39 @@ impl Module {
     ///       modules and for special cases such as the REPL module.
     ///       Modules implemented in FeInt will have their `$doc`
     ///       attribute initialized from their module level docstring.
-    pub fn new(
-        class: TypeRef,
-        name: String,
-        path: String,
-        code: Code,
-        doc: Option<String>,
-    ) -> Self {
+    pub fn new(name: String, path: String, code: Code, doc: Option<String>) -> Self {
         let ns = Namespace::with_entries(&[
-            // ("$full_name", BUILTINS.str(name.as_str())),
-            // ("$name", BUILTINS.str(name.as_str())),
-            // ("$path", BUILTINS.str(path.as_str())),
+            // ("$full_name", new::str(name.as_str())),
+            // ("$name", new::str(name.as_str())),
+            // ("$path", new::str(path.as_str())),
             // (
             //     "$doc",
-            //     if let Some(doc) = doc { BUILTINS.str(doc) } else { code.get_doc() },
+            //     if let Some(doc) = doc { new::str(doc) } else { code.get_doc() },
             // ),
         ]);
-        Self { class, ns, path, name, code }
+        Self { ns, path, name, code }
     }
 
     pub fn with_entries(
-        class: TypeRef,
         entries: &[(&str, ObjectRef)],
         name: String,
         path: String,
         code: Code,
         doc: Option<String>,
     ) -> Self {
-        let mut module = Self::new(class, name, path, code, doc);
+        let mut module = Self::new(name, path, code, doc);
         module.ns.extend(entries);
         module
     }
 
     pub fn with_map_entries(
-        class: TypeRef,
         map: &Map,
         name: String,
         path: String,
         code: Code,
         doc: Option<String>,
     ) -> Self {
-        let mut module = Self::new(class, name, path, code, doc);
+        let mut module = Self::new(name, path, code, doc);
         module.ns.extend_from_map(map);
         module
     }
@@ -171,7 +167,7 @@ impl Module {
 }
 
 impl ObjectTrait for Module {
-    object_trait_header!();
+    object_trait_header!(MODULE_TYPE);
 }
 
 // Display -------------------------------------------------------------

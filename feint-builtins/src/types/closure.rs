@@ -1,22 +1,23 @@
+//! Builtin `Closure` type.
 use std::any::Any;
 use std::fmt;
 use std::sync::{Arc, RwLock};
 
+use once_cell::sync::Lazy;
+
 use feint_code_gen::*;
 
-use crate::BUILTINS;
+use crate::new;
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef};
-
+use super::class::Type;
 use super::func_trait::FuncTrait;
 use super::ns::Namespace;
 use super::Params;
 
-// Closure -------------------------------------------------------------
+std_type!(CLOSURE_TYPE, ClosureType);
 
 pub struct Closure {
-    class: TypeRef,
-
     ns: Namespace,
     module_name: String,
     name: String,
@@ -29,16 +30,15 @@ pub struct Closure {
 standard_object_impls!(Closure);
 
 impl Closure {
-    pub fn new(class: TypeRef, func_ref: ObjectRef, captured: ObjectRef) -> Self {
+    pub fn new(func_ref: ObjectRef, captured: ObjectRef) -> Self {
         let func = func_ref.read().unwrap();
         let func = func.down_to_func().unwrap();
         Self {
-            class,
             ns: Namespace::with_entries(&[
                 ("$params", func.get_params()),
                 ("$doc", func.get_doc()),
-                ("$arity", BUILTINS.int(func.arity())),
-                ("$has_var_args", BUILTINS.bool(func.has_var_args())),
+                ("$arity", new::int(func.arity())),
+                ("$has_var_args", new::bool(func.has_var_args())),
             ]),
             module_name: func.module_name().to_owned(),
             name: func.name().to_owned(),
@@ -87,10 +87,8 @@ impl FuncTrait for Closure {
 }
 
 impl ObjectTrait for Closure {
-    object_trait_header!();
+    object_trait_header!(CLOSURE_TYPE);
 }
-
-// Display -------------------------------------------------------------
 
 impl fmt::Display for Closure {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

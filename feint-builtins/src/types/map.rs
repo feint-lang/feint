@@ -3,14 +3,17 @@ use std::fmt;
 use std::sync::{Arc, RwLock};
 
 use indexmap::IndexMap;
+use once_cell::sync::Lazy;
 
 use feint_code_gen::*;
 
-use crate::BUILTINS;
+use crate::new;
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef};
-
+use super::class::Type;
 use super::ns::Namespace;
+
+std_type!(MAP_TYPE, MapType);
 
 // pub fn make_map_type() -> obj_ref_t!(MapType) {
 //     let type_ref = obj_ref!(MapType::new());
@@ -107,16 +110,21 @@ use super::ns::Namespace;
 // Map ----------------------------------------------------------
 
 pub struct Map {
-    class: TypeRef,
     ns: Namespace,
     entries: RwLock<IndexMap<String, ObjectRef>>,
 }
 
 standard_object_impls!(Map);
 
+impl Default for Map {
+    fn default() -> Self {
+        Self { ns: Namespace::default(), entries: RwLock::new(IndexMap::default()) }
+    }
+}
+
 impl Map {
-    pub fn new(class: TypeRef, entries: IndexMap<String, ObjectRef>) -> Self {
-        Self { class, ns: Namespace::default(), entries: RwLock::new(entries) }
+    pub fn new(entries: IndexMap<String, ObjectRef>) -> Self {
+        Self { ns: Namespace::default(), entries: RwLock::new(entries) }
     }
 
     pub fn len(&self) -> usize {
@@ -154,7 +162,7 @@ impl Map {
 }
 
 impl ObjectTrait for Map {
-    object_trait_header!();
+    object_trait_header!(MAP_TYPE);
 
     fn is_equal(&self, rhs: &dyn ObjectTrait) -> bool {
         if self.is(rhs) || rhs.is_always() {

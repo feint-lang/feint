@@ -5,12 +5,15 @@ use std::io::BufRead;
 use std::path::Path;
 use std::sync::{Arc, RwLock};
 
-use feint_builtins::modules::{STD, STD_FI_MODULES};
+use feint_builtins::modules::{
+    add_module, maybe_get_module, MODULES, STD, STD_FI_MODULES,
+};
+use feint_builtins::new;
 use feint_builtins::types::{
+    self,
     code::{Inst, PrintFlags},
     Module, ObjectRef, ObjectTrait,
 };
-use feint_builtins::BUILTINS;
 use feint_code_gen::obj_ref;
 use feint_compiler::{
     ast, CompErr, CompErrKind, Compiler, ParseErr, ParseErrKind, Parser, ScanErr,
@@ -90,13 +93,13 @@ impl Driver {
         // it's used early (i.e., during import).
         {
             let mut system = system_ref.write().unwrap();
-            system.ns_mut().insert("modules", BUILTINS.modules());
-            system.ns_mut().insert("argv", BUILTINS.argv_tuple(&self.argv));
+            system.ns_mut().insert("modules", MODULES.clone());
+            system.ns_mut().insert("argv", new::argv_tuple(&self.argv));
         }
 
-        self.extend_intrinsic_type(BUILTINS.list_type(), "std.list")?;
-        self.extend_intrinsic_type(BUILTINS.map_type(), "std.map")?;
-        self.extend_intrinsic_type(BUILTINS.tuple_type(), "std.tuple")?;
+        self.extend_intrinsic_type(types::list::LIST_TYPE.clone(), "std.list")?;
+        self.extend_intrinsic_type(types::map::MAP_TYPE.clone(), "std.map")?;
+        self.extend_intrinsic_type(types::tuple::TUPLE_TYPE.clone(), "std.tuple")?;
 
         Ok(())
     }
@@ -283,7 +286,7 @@ impl Driver {
         if result.is_ok() && is_main {
             if let Some(main) = module.get_main() {
                 let main = main.read().unwrap();
-                let args = self.argv.iter().map(|a| BUILTINS.str(a)).collect();
+                let args = self.argv.iter().map(new::str).collect();
                 if let Some(main) = main.down_to_func() {
                     result = self
                         .vm
@@ -397,12 +400,12 @@ impl Driver {
 
     /// Add a module to both `MODULES` and `system.modules`.
     pub fn add_module(&mut self, name: &str, module: ObjectRef) {
-        BUILTINS.add_module(name, module.clone());
+        add_module(name, module.clone());
     }
 
     /// Get module from `MODULES` (the `system.modules` mirror).
     fn get_module(&mut self, name: &str) -> Result<ObjectRef, DriverErr> {
-        if let Some(module) = BUILTINS.maybe_get_module(name) {
+        if let Some(module) = maybe_get_module(name) {
             Ok(module)
         } else {
             Err(DriverErr::new(DriverErrKind::ModuleNotFound(name.to_owned())))

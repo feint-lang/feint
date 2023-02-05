@@ -1,24 +1,25 @@
+//! Builtin `Func` type.
 use std::any::Any;
 use std::fmt;
 use std::sync::{Arc, RwLock};
 
-use once_cell::sync::OnceCell;
+use once_cell::sync::{Lazy, OnceCell};
 
 use feint_code_gen::*;
 
-use crate::BUILTINS;
+use crate::modules::get_module;
+use crate::new;
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef};
-
+use super::class::Type;
 use super::code::Code;
 use super::func_trait::FuncTrait;
 use super::ns::Namespace;
 use super::Params;
 
-// Func ----------------------------------------------------------
+std_type!(FUNC_TYPE, FuncType);
 
 pub struct Func {
-    class: TypeRef,
     ns: Namespace,
     module_name: String,
     module: OnceCell<ObjectRef>,
@@ -30,23 +31,15 @@ pub struct Func {
 standard_object_impls!(Func);
 
 impl Func {
-    pub fn new(
-        class: TypeRef,
-        module_name: String,
-        name: String,
-        params: Params,
-        code: Code,
-    ) -> Self {
-        let params_tuple =
-            BUILTINS.tuple(params.iter().map(|p| BUILTINS.str(p)).collect());
+    pub fn new(module_name: String, name: String, params: Params, code: Code) -> Self {
+        let params_tuple = new::tuple(params.iter().map(new::str).collect());
 
         let mut instance = Self {
-            class,
             ns: Namespace::with_entries(&[
                 // Instance Attributes
-                ("$module_name", BUILTINS.str(&module_name)),
-                ("$full_name", BUILTINS.str(format!("{module_name}.{name}"))),
-                ("$name", BUILTINS.str(&name)),
+                ("$module_name", new::str(&module_name)),
+                ("$full_name", new::str(format!("{module_name}.{name}"))),
+                ("$name", new::str(&name)),
                 ("$params", params_tuple),
                 ("$doc", code.get_doc()),
             ]),
@@ -59,8 +52,8 @@ impl Func {
 
         let arity = (&instance as &dyn FuncTrait).arity();
         let has_var_args = (&instance as &dyn FuncTrait).has_var_args();
-        instance.ns_mut().insert("$arity", BUILTINS.int(arity));
-        instance.ns_mut().insert("$has_var_args", BUILTINS.bool(has_var_args));
+        instance.ns_mut().insert("$arity", new::int(arity));
+        instance.ns_mut().insert("$has_var_args", new::bool(has_var_args));
 
         instance
     }
@@ -105,10 +98,10 @@ impl FuncTrait for Func {
 }
 
 impl ObjectTrait for Func {
-    object_trait_header!();
+    object_trait_header!(FUNC_TYPE);
 
     fn module(&self) -> ObjectRef {
-        self.module.get_or_init(|| BUILTINS.get_module(&self.module_name)).clone()
+        self.module.get_or_init(|| get_module(&self.module_name)).clone()
     }
 
     fn is_equal(&self, rhs: &dyn ObjectTrait) -> bool {
@@ -121,8 +114,6 @@ impl ObjectTrait for Func {
         }
     }
 }
-
-// Display -------------------------------------------------------------
 
 impl fmt::Display for Func {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

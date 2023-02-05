@@ -4,8 +4,8 @@ use std::path::PathBuf;
 use rustyline::config::Configurer;
 use rustyline::error::ReadlineError;
 
+use feint_builtins::new;
 use feint_builtins::types::{ObjectRef, ObjectTrait};
-use feint_builtins::BUILTINS;
 use feint_compiler::{CompErrKind, ParseErrKind, ScanErrKind};
 use feint_driver::result::{DriverErr, DriverErrKind, DriverOptResult, DriverResult};
 use feint_driver::Driver;
@@ -19,7 +19,7 @@ pub struct Repl {
 
 impl Repl {
     pub fn new(history_path: Option<PathBuf>, mut driver: Driver) -> Self {
-        let module = BUILTINS.module("$repl", "<repl>", "FeInt REPL module", &[]);
+        let module = new::module("$repl", "<repl>", "FeInt REPL module", &[]);
         driver.add_module("$repl", module.clone());
 
         let mut reader =

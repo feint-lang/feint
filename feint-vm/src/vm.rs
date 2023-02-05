@@ -9,14 +9,15 @@ use std::sync::{
 };
 
 use ctrlc;
+use feint_builtins::modules::get_module;
 use indexmap::IndexMap;
 use num_traits::ToPrimitive;
 
+use feint_builtins::new;
 use feint_builtins::types::code::{Code, Inst, PrintFlags};
 use feint_builtins::types::{
     Args, Func, FuncTrait, IntrinsicFunc, Module, ObjectRef, ObjectTrait, ThisOpt,
 };
-use feint_builtins::BUILTINS;
 use feint_util::op::{BinaryOperator, CompareOperator, InplaceOperator, UnaryOperator};
 use feint_util::source::Location;
 use feint_util::stack::Stack;
@@ -172,7 +173,7 @@ impl VM {
                 }
                 // Modules
                 LoadModule(name) => {
-                    let module = BUILTINS.get_module(name.as_str());
+                    let module = get_module(name.as_str());
                     self.push_temp(module);
                 }
                 // Vars
@@ -247,7 +248,7 @@ impl VM {
                     } else {
                         // Create new cell to wrap TOS in.
                         assert!(var.is_nil());
-                        let cell_ref = BUILTINS.cell_with_value(value.clone());
+                        let cell_ref = new::cell_with_value(value.clone());
                         self.ctx.assign_var(name, cell_ref, 0)?
                     };
                     // Push cell *value* to TOS.
@@ -293,7 +294,7 @@ impl VM {
                     }
                 }
                 JumpPushNil(addr, forward, scope_exit_count) => {
-                    self.push_temp(BUILTINS.nil());
+                    self.push_temp(new::nil());
                     self.exit_scopes(*scope_exit_count);
                     if *forward {
                         jump_ip = Some(ip + *addr);
@@ -385,17 +386,17 @@ impl VM {
                         let obj = obj.read().unwrap();
                         string.push_str(obj.to_string().as_str());
                     }
-                    let string_obj = BUILTINS.str(string);
+                    let string_obj = new::str(string);
                     self.push_temp(string_obj);
                 }
                 MakeTuple(n) => {
                     let objects = self.pop_n_obj(*n)?;
-                    let tuple = BUILTINS.tuple(objects);
+                    let tuple = new::tuple(objects);
                     self.push_temp(tuple);
                 }
                 MakeList(n) => {
                     let objects = self.pop_n_obj(*n)?;
-                    let list = BUILTINS.list(objects);
+                    let list = new::list(objects);
                     self.push_temp(list);
                 }
                 MakeMap(n) => {
@@ -411,7 +412,7 @@ impl VM {
                             vals.push(obj.clone());
                         }
                     }
-                    let map = BUILTINS.map_from_keys_and_vals(keys, vals);
+                    let map = new::map_from_keys_and_vals(keys, vals);
                     self.push_temp(map);
                 }
                 CaptureSet(names) => {
@@ -425,7 +426,7 @@ impl VM {
                                 capture_set.insert(name.to_owned(), var_ref.clone());
                             } else {
                                 assert!(var.is_nil());
-                                capture_set.insert(name.to_owned(), BUILTINS.cell());
+                                capture_set.insert(name.to_owned(), new::cell());
                             }
                         } else if let Some(frame) = self.call_stack.peek() {
                             // Capture cell does not exist.
@@ -442,7 +443,7 @@ impl VM {
                             }
                         }
                     }
-                    self.push_temp(BUILTINS.map(capture_set));
+                    self.push_temp(new::map(capture_set));
                 }
                 MakeFunc => {
                     let capture_set_ref = self.pop_obj()?;
@@ -460,7 +461,7 @@ impl VM {
                         if func_captured && ip + 1 < len_chunk {
                             if let AssignCell(_) = &code[ip + 1] {
                                 let closure_cell =
-                                    BUILTINS.cell_with_value(func_ref.clone());
+                                    new::cell_with_value(func_ref.clone());
                                 self.ctx.assign_var(
                                     func.name(),
                                     closure_cell.clone(),
@@ -471,9 +472,10 @@ impl VM {
                             }
                         }
 
-                        self.push_temp(
-                            BUILTINS.closure(func_ref.clone(), capture_set_ref.clone()),
-                        );
+                        self.push_temp(new::closure(
+                            func_ref.clone(),
+                            capture_set_ref.clone(),
+                        ));
                     }
                 }
                 // VM control
@@ -616,21 +618,21 @@ impl VM {
                 if let Some(result) = a.negate() {
                     result
                 } else {
-                    BUILTINS.type_err(format!("- not defined for {a}"), a_ref.clone())
+                    new::type_err(format!("- not defined for {a}"), a_ref.clone())
                 }
             }
             AsBool => {
                 if let Some(result) = a.bool_val() {
-                    BUILTINS.bool(result)
+                    new::bool(result)
                 } else {
-                    BUILTINS.type_err(format!("!! not defined for {a}"), a_ref.clone())
+                    new::type_err(format!("!! not defined for {a}"), a_ref.clone())
                 }
             }
             Not => {
                 if let Some(result) = a.not() {
-                    BUILTINS.bool(result)
+                    new::bool(result)
                 } else {
-                    BUILTINS.type_err(format!("! not defined for {a}"), a_ref.clone())
+                    new::type_err(format!("! not defined for {a}"), a_ref.clone())
                 }
             }
         };
@@ -682,7 +684,7 @@ impl VM {
                     // XXX: This can happen for a construct like `1.()`,
                     //      but that should probably be a syntax error
                     //      that's caught early.
-                    BUILTINS.attr_err(
+                    new::attr_err(
                         format!("Not an attribute name or index: {b:?}"),
                         a_ref.clone(),
                     )
@@ -695,7 +697,7 @@ impl VM {
 
                         // TODO: Check whether `a` is a type or an instance.
 
-                        BUILTINS.bound_func(obj_ref.clone(), a_ref.clone())
+                        new::bound_func(obj_ref.clone(), a_ref.clone())
                     } else if let Some(prop) = obj.down_to_prop() {
                         // If `b` in `a.b` is a property, bind `b`'s getter
                         // to `a` then call the bound getter.
@@ -704,7 +706,7 @@ impl VM {
                         //       and return the property itself when `a` is
                         //       a type.
 
-                        let func = BUILTINS.bound_func(prop.getter(), a_ref.clone());
+                        let func = new::bound_func(prop.getter(), a_ref.clone());
                         if a.is_type() {
                             func
                         } else {
@@ -722,10 +724,10 @@ impl VM {
         if let Some(result) = result {
             self.push_temp(result);
         } else {
-            self.push_temp(
-                BUILTINS
-                    .type_err(format!("Operation not defined for {b}"), a_ref.clone()),
-            );
+            self.push_temp(new::type_err(
+                format!("Operation not defined for {b}"),
+                a_ref.clone(),
+            ));
         }
 
         Ok(())
@@ -753,7 +755,7 @@ impl VM {
             GreaterThan => a.greater_than(b).unwrap_or(false),
             GreaterThanOrEqual => a.greater_than(b).unwrap_or(false) || a.is_equal(b),
         };
-        self.push_temp(BUILTINS.bool(result));
+        self.push_temp(new::bool(result));
         Ok(())
     }
 
@@ -777,10 +779,10 @@ impl VM {
         let result = if let Some(result) = result {
             result
         } else {
-            self.push_temp(
-                BUILTINS
-                    .type_err(format!("Operation not defined for {b}"), a_ref.clone()),
-            );
+            self.push_temp(new::type_err(
+                format!("Operation not defined for {b}"),
+                a_ref.clone(),
+            ));
             return Ok(());
         };
 
@@ -905,7 +907,7 @@ impl VM {
                 return this.clone();
             }
         }
-        BUILTINS.nil()
+        new::nil()
     }
 
     // Function calls --------------------------------------------------
@@ -959,11 +961,11 @@ impl VM {
                 );
                 self.call_closure(func_ref.clone(), this_opt, args)
             } else {
-                self.push_temp(BUILTINS.not_callable_err(callable_ref.clone()));
+                self.push_temp(new::not_callable_err(callable_ref.clone()));
                 Ok(())
             }
         } else {
-            self.push_temp(BUILTINS.not_callable_err(callable_ref.clone()));
+            self.push_temp(new::not_callable_err(callable_ref.clone()));
             Ok(())
         }
     }
@@ -998,7 +1000,7 @@ impl VM {
         //      better to track which params are captured. See related
         //      note in push_var().
         for (name, arg) in func.arg_names().iter().zip(args) {
-            let cell = BUILTINS.cell_with_value(arg);
+            let cell = new::cell_with_value(arg);
             self.ctx.declare_and_assign_var(name, cell)?;
         }
         match self.execute_func(func, 0) {
@@ -1043,7 +1045,7 @@ impl VM {
             self.check_arity(name, arity, n_args, this_opt)?;
             let mut args = args.clone();
             let var_args_items = args.split_off(var_args_index);
-            let var_args = BUILTINS.tuple(var_args_items);
+            let var_args = new::tuple(var_args_items);
             args.push(var_args);
             Ok(args)
         } else {

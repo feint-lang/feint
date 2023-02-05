@@ -1,14 +1,19 @@
+//! Builtin `Iterator` type.
 use std::any::Any;
 use std::fmt;
 use std::sync::{Arc, RwLock};
 
+use once_cell::sync::Lazy;
+
 use feint_code_gen::*;
 
-use crate::BUILTINS;
+use crate::new;
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef};
-
+use super::class::Type;
 use super::ns::Namespace;
+
+std_type!(ITERATOR_TYPE, IteratorType);
 
 // pub fn make_iterator_type() -> obj_ref_t!(IteratorType) {
 //     let type_ref = obj_ref!(IteratorType::new());
@@ -31,10 +36,7 @@ use super::ns::Namespace;
 //     type_ref.clone()
 // }
 
-// Iterator -----------------------------------------------------
-
 pub struct FIIterator {
-    class: TypeRef,
     ns: Namespace,
     wrapped: Vec<ObjectRef>,
     current: usize,
@@ -43,8 +45,8 @@ pub struct FIIterator {
 standard_object_impls!(FIIterator);
 
 impl FIIterator {
-    pub fn new(class: TypeRef, wrapped: Vec<ObjectRef>) -> Self {
-        Self { class, ns: Namespace::default(), wrapped, current: 0 }
+    pub fn new(wrapped: Vec<ObjectRef>) -> Self {
+        Self { ns: Namespace::default(), wrapped, current: 0 }
     }
 
     fn next(&mut self) -> ObjectRef {
@@ -65,7 +67,7 @@ impl FIIterator {
 
     fn get_or_nil(&self, index: usize) -> ObjectRef {
         if index >= self.len() {
-            BUILTINS.nil()
+            new::nil()
         } else {
             self.wrapped[index].clone()
         }
@@ -73,10 +75,8 @@ impl FIIterator {
 }
 
 impl ObjectTrait for FIIterator {
-    object_trait_header!();
+    object_trait_header!(ITERATOR_TYPE);
 }
-
-// Display -------------------------------------------------------------
 
 impl fmt::Display for FIIterator {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

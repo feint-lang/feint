@@ -3,14 +3,18 @@ use std::fmt;
 use std::slice::Iter;
 use std::sync::{Arc, RwLock};
 
+use once_cell::sync::Lazy;
+
 use feint_code_gen::*;
 
-use crate::BUILTINS;
+use crate::new;
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef};
-
+use super::class::Type;
 use super::ns::Namespace;
 use super::seq;
+
+std_type!(TUPLE_TYPE, TupleType);
 
 // pub fn make_tuple_type() -> obj_ref_t!(TupleType) {
 //     let type_ref = obj_ref!(TupleType::new());
@@ -21,12 +25,12 @@ use super::seq;
 //         prop!("length", type_ref, "", |this, _| {
 //             let this = this.read().unwrap();
 //             let this = this.down_to_tuple().unwrap();
-//             BUILTINS.int(this.len())
+//             new::int(this.len())
 //         }),
 //         prop!("is_empty", type_ref, "", |this, _| {
 //             let this = this.read().unwrap();
 //             let this = this.down_to_tuple().unwrap();
-//             BUILTINS.bool(this.len() == 0)
+//             new::bool(this.len() == 0)
 //         }),
 //         prop!("sum", type_ref, "", |this, _| {
 //             let this = this.read().unwrap();
@@ -40,7 +44,7 @@ use super::seq;
 //             let index = use_arg_usize!(get, index, args, 0);
 //             match this.get(index) {
 //                 Some(obj) => obj,
-//                 None => BUILTINS.nil(),
+//                 None => new::nil(),
 //             }
 //         }),
 //         meth!("has", type_ref, &["member"], "", |this, args| {
@@ -51,7 +55,7 @@ use super::seq;
 //         meth!("iter", type_ref, &[], "", |this_ref, _| {
 //             let this = this_ref.read().unwrap();
 //             let this = this.down_to_tuple().unwrap();
-//             BUILTINS.iterator(this.items.clone())
+//             new::iterator(this.items.clone())
 //         }),
 //         meth!("join", type_ref, &["sep"], "", |this, args| {
 //             let this = this.read().unwrap();
@@ -66,7 +70,6 @@ use super::seq;
 // Tuple --------------------------------------------------------
 
 pub struct Tuple {
-    class: TypeRef,
     ns: Namespace,
     items: Vec<ObjectRef>,
 }
@@ -74,8 +77,8 @@ pub struct Tuple {
 standard_object_impls!(Tuple);
 
 impl Tuple {
-    pub fn new(class: TypeRef, items: Vec<ObjectRef>) -> Self {
-        Self { class, ns: Namespace::default(), items }
+    pub fn new(items: Vec<ObjectRef>) -> Self {
+        Self { ns: Namespace::default(), items }
     }
 
     pub(crate) fn iter(&self) -> Iter<'_, ObjectRef> {
@@ -96,7 +99,7 @@ impl Tuple {
 }
 
 impl ObjectTrait for Tuple {
-    object_trait_header!();
+    object_trait_header!(TUPLE_TYPE);
 
     fn get_item(&self, index: usize, this: ObjectRef) -> ObjectRef {
         if let Some(item) = self.items.get(index) {

@@ -1,4 +1,4 @@
-//! # Error Type
+//! Builtin `Error` type.
 //!
 //! The error type represents _recoverable_ runtime errors that can be
 //! checked in user code using this pattern:
@@ -17,15 +17,19 @@ use std::any::Any;
 use std::fmt;
 use std::sync::{Arc, RwLock};
 
+use once_cell::sync::Lazy;
+
 use feint_code_gen::*;
 
+use crate::new;
 use crate::util::check_args;
-use crate::BUILTINS;
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef};
-
+use super::class::Type;
 use super::err_type::ErrKind;
 use super::ns::Namespace;
+
+std_type!(ERR_TYPE, ErrType);
 
 // pub fn make_err_type() -> obj_ref_t!(ErrType) {
 //     let type_ref = obj_ref!(ErrType::new());
@@ -57,7 +61,7 @@ use super::ns::Namespace;
 //                 // TODO: Figure out a solution for this, perhaps an err
 //                 //       type that is *not* user-constructible or a
 //                 //       nested err type?
-//                 return BUILTINS.arg_err(arg_err_msg, BUILTINS.nil());
+//                 return new::arg_err(arg_err_msg, new::nil());
 //             };
 //
 //             let kind = err_type.kind().clone();
@@ -66,10 +70,10 @@ use super::ns::Namespace;
 //                 msg
 //             } else {
 //                 let arg_err_msg = format!("{name} expected message to be a Str");
-//                 return BUILTINS.arg_err(arg_err_msg, BUILTINS.nil());
+//                 return new::arg_err(arg_err_msg, new::nil());
 //             };
 //
-//             BUILTINS.err(kind, msg, BUILTINS.nil())
+//             new::err(kind, msg, new::nil())
 //         }),
 //         // Instance Attributes -----------------------------------------
 //         prop!("type", type_ref, "", |this, _| {
@@ -80,19 +84,16 @@ use super::ns::Namespace;
 //         prop!("message", type_ref, "", |this, _| {
 //             let this = this.read().unwrap();
 //             let this = this.down_to_err().unwrap();
-//             BUILTINS.str(&this.message)
+//             new::str(&this.message)
 //         }),
 //     ]);
 //
 //     type_ref.clone()
 // }
 
-// Error --------------------------------------------------------
-
 // NOTE: This is named `ErrObj` instead of `Err` to avoid conflict with
 //       Rust's `Err`.
 pub struct ErrObj {
-    class: TypeRef,
     ns: Namespace,
     pub kind: ErrKind,
     pub message: String,
@@ -104,10 +105,9 @@ pub struct ErrObj {
 standard_object_impls!(ErrObj);
 
 impl ErrObj {
-    pub fn new(class: TypeRef, kind: ErrKind, message: String, obj: ObjectRef) -> Self {
+    pub fn new(kind: ErrKind, message: String, obj: ObjectRef) -> Self {
         let bool_val = kind != ErrKind::Ok;
         Self {
-            class,
             ns: Namespace::default(),
             kind,
             message,
@@ -118,12 +118,11 @@ impl ErrObj {
     }
 
     pub fn with_responds_to_bool(
-        class: TypeRef,
         kind: ErrKind,
         message: String,
         obj: ObjectRef,
     ) -> Self {
-        let mut instance = Self::new(class, kind, message, obj);
+        let mut instance = Self::new(kind, message, obj);
         instance.responds_to_bool = true;
         instance
     }
@@ -134,7 +133,7 @@ impl ErrObj {
 }
 
 impl ObjectTrait for ErrObj {
-    object_trait_header!();
+    object_trait_header!(ERR_TYPE);
 
     fn bool_val(&self) -> Option<bool> {
         if self.responds_to_bool {
@@ -161,8 +160,6 @@ impl ObjectTrait for ErrObj {
         Some(lhs && rhs)
     }
 }
-
-// Display -------------------------------------------------------------
 
 impl fmt::Display for ErrObj {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

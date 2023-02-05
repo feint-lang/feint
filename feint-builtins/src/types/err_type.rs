@@ -1,4 +1,4 @@
-//! Error Types
+//! Builtin error types
 //!
 //! Builtin type used to tag builtin `Err` instances.
 use std::any::Any;
@@ -7,11 +7,12 @@ use std::sync::{Arc, RwLock};
 
 use once_cell::sync::Lazy;
 
-use crate::BUILTINS;
 use feint_code_gen::*;
 
-use super::base::{ObjectRef, ObjectTrait, TypeRef};
+use crate::new;
 
+use super::base::{ObjectRef, ObjectTrait, TypeRef};
+use super::class::Type;
 use super::ns::Namespace;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -71,6 +72,8 @@ impl ErrKind {
     }
 }
 
+std_type!(ERR_TYPE_TYPE, ErrTypeType);
+
 // pub static ERR_TYPE_TYPE: Lazy<obj_ref_t!(ErrTypeType)> = Lazy::new(|| {
 //     let type_ref = obj_ref!(ErrTypeType::new());
 //     let mut type_obj = type_ref.write().unwrap();
@@ -88,17 +91,14 @@ impl ErrKind {
 //         prop!("name", type_ref, "", |this, _| {
 //             let this = this.read().unwrap();
 //             let this = this.as_any().downcast_ref::<ErrTypeObj>().unwrap();
-//             BUILTINS.str(this.name())
+//             new::str(this.name())
 //         }),
 //     ]);
 //
 //     type_ref.clone()
 // });
 
-// ErrType ------------------------------------------------------
-
 pub struct ErrTypeObj {
-    class: TypeRef,
     ns: Namespace,
     kind: ErrKind,
 }
@@ -106,8 +106,8 @@ pub struct ErrTypeObj {
 standard_object_impls!(ErrTypeObj);
 
 impl ErrTypeObj {
-    pub fn new(class: TypeRef, kind: ErrKind) -> Self {
-        Self { class, ns: Namespace::default(), kind }
+    pub fn new(kind: ErrKind) -> Self {
+        Self { ns: Namespace::default(), kind }
     }
 
     pub fn kind(&self) -> &ErrKind {
@@ -120,7 +120,7 @@ impl ErrTypeObj {
 }
 
 impl ObjectTrait for ErrTypeObj {
-    object_trait_header!();
+    object_trait_header!(ERR_TYPE_TYPE);
 
     fn is_equal(&self, rhs: &dyn ObjectTrait) -> bool {
         if self.is(rhs) || rhs.is_always() {
@@ -132,8 +132,6 @@ impl ObjectTrait for ErrTypeObj {
         }
     }
 }
-
-// Display -------------------------------------------------------------
 
 impl fmt::Display for ErrKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

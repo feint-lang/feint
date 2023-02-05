@@ -1,16 +1,13 @@
+//! Builtin `CustomType` type.
 use std::any::Any;
 use std::fmt;
-use std::sync::{Arc, RwLock};
 
 use feint_code_gen::*;
 
-use crate::BUILTINS;
+use crate::new;
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef};
-
 use super::ns::Namespace;
-
-// Custom Type ---------------------------------------------------------
 
 pub struct CustomObj {
     class: TypeRef,
@@ -26,7 +23,25 @@ impl CustomObj {
 }
 
 impl ObjectTrait for CustomObj {
-    object_trait_header!();
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+
+    fn class(&self) -> TypeRef {
+        self.class.clone()
+    }
+
+    fn ns(&self) -> &Namespace {
+        &self.ns
+    }
+
+    fn ns_mut(&mut self) -> &mut Namespace {
+        &mut self.ns
+    }
 
     fn set_attr(
         &mut self,
@@ -35,7 +50,7 @@ impl ObjectTrait for CustomObj {
         _this: ObjectRef,
     ) -> ObjectRef {
         self.ns.set(name, value);
-        BUILTINS.nil()
+        new::nil()
     }
 
     fn is_equal(&self, rhs: &dyn ObjectTrait) -> bool {
@@ -43,19 +58,18 @@ impl ObjectTrait for CustomObj {
     }
 }
 
-// Display -------------------------------------------------------------
-
 impl fmt::Display for CustomObj {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // let class = self.class();
-        // let class = class.read().unwrap();
-        // write!(f, "<{} object @ {}>", class.full_name(), self.id())
-        write!(f, "<object @ {}>", self.id())
+        let class = self.class();
+        let class = class.read().unwrap();
+        write!(f, "<{} object>", class.name())
     }
 }
 
 impl fmt::Debug for CustomObj {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{self}")
+        let class = self.class();
+        let class = class.read().unwrap();
+        write!(f, "<{} object @ {}>", class.full_name(), self.id())
     }
 }

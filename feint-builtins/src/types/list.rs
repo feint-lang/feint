@@ -1,15 +1,20 @@
+//! Builtin `List` type.
 use std::any::Any;
 use std::fmt;
 use std::sync::{Arc, RwLock};
 
+use once_cell::sync::Lazy;
+
 use feint_code_gen::*;
 
-use crate::BUILTINS;
+use crate::new;
 
 use super::base::{ObjectRef, ObjectTrait, TypeRef};
-
+use super::class::Type;
 use super::ns::Namespace;
 use super::seq;
+
+std_type!(LIST_TYPE, ListType);
 
 // pub fn make_list_type() -> obj_ref_t!(ListType) {
 //     let type_ref = obj_ref!(ListType::new());
@@ -20,12 +25,12 @@ use super::seq;
 //         prop!("length", type_ref, "", |this, _| {
 //             let this = this.read().unwrap();
 //             let this = this.down_to_list().unwrap();
-//             BUILTINS.int(this.len())
+//             new::int(this.len())
 //         }),
 //         prop!("is_empty", type_ref, "", |this, _| {
 //             let this = this.read().unwrap();
 //             let this = this.down_to_list().unwrap();
-//             BUILTINS.bool(this.len() == 0)
+//             new::bool(this.len() == 0)
 //         }),
 //         prop!("sum", type_ref, "", |this, _| {
 //             let this = this.read().unwrap();
@@ -55,7 +60,7 @@ use super::seq;
 //             let index = use_arg_usize!(get, index, args, 0);
 //             let result = match this.get(index) {
 //                 Some(obj) => obj,
-//                 None => BUILTINS.nil(),
+//                 None => new::nil(),
 //             };
 //             result
 //         }),
@@ -69,7 +74,7 @@ use super::seq;
 //             let this = this_ref.read().unwrap();
 //             let this = this.down_to_list().unwrap();
 //             let items = this.items.read().unwrap();
-//             BUILTINS.iterator(items.clone())
+//             new::iterator(items.clone())
 //         }),
 //         meth!("join", type_ref, &["sep"], "", |this, args| {
 //             let this = this.read().unwrap();
@@ -82,7 +87,7 @@ use super::seq;
 //             let this = this.down_to_list().unwrap();
 //             match this.pop() {
 //                 Some(obj) => obj,
-//                 None => BUILTINS.nil(),
+//                 None => new::nil(),
 //             }
 //         }),
 //         meth!("push", type_ref, &["item"], "Push item and return it.", |this, args| {
@@ -97,10 +102,9 @@ use super::seq;
 //     type_ref.clone()
 // }
 
-// List ---------------------------------------------------------
+std_type!(NIL_TYPE, NilType);
 
 pub struct List {
-    class: TypeRef,
     ns: Namespace,
     items: RwLock<Vec<ObjectRef>>,
 }
@@ -108,8 +112,8 @@ pub struct List {
 standard_object_impls!(List);
 
 impl List {
-    pub fn new(class: TypeRef, items: Vec<ObjectRef>) -> Self {
-        Self { class, ns: Namespace::default(), items: RwLock::new(items) }
+    pub fn new(items: Vec<ObjectRef>) -> Self {
+        Self { ns: Namespace::default(), items: RwLock::new(items) }
     }
 
     fn len(&self) -> usize {
@@ -140,7 +144,7 @@ impl List {
                 "List.extend() expected List or Tuple; got {}",
                 obj.class().read().unwrap()
             );
-            return Some(BUILTINS.type_err(msg, obj_ref.clone()));
+            return Some(new::type_err(msg, obj_ref.clone()));
         }
         None
     }
@@ -165,7 +169,7 @@ impl List {
 }
 
 impl ObjectTrait for List {
-    object_trait_header!();
+    object_trait_header!(LIST_TYPE);
 
     fn get_item(&self, index: usize, this: ObjectRef) -> ObjectRef {
         if let Some(item) = self.get(index) {

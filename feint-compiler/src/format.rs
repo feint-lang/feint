@@ -1,5 +1,5 @@
+use feint_builtins::new;
 use feint_builtins::types::ObjectRef;
-use feint_builtins::BUILTINS;
 use feint_util::source::source_from_text;
 
 use crate::scanner::{ScanTokensResult, Scanner, Token, TokenWithLocation as TWL};
@@ -121,8 +121,7 @@ pub fn render_template(template_ref: ObjectRef, context_ref: ObjectRef) -> Objec
     let context = if let Some(context) = context.down_to_map() {
         context
     } else {
-        return BUILTINS
-            .string_err("Expected context to be a map", template_ref.clone());
+        return new::string_err("Expected context to be a map", template_ref.clone());
     };
 
     let scan_result = scan_format_string(template.as_str(), Some(("{{", "}}")));
@@ -131,7 +130,7 @@ pub fn render_template(template_ref: ObjectRef, context_ref: ObjectRef) -> Objec
         Ok(tokens) => tokens,
         Err(err) => {
             let msg = format!("Could not parse template: {err:?}");
-            return BUILTINS.string_err(msg, template_ref.clone());
+            return new::string_err(msg, template_ref.clone());
         }
     };
 
@@ -150,7 +149,7 @@ pub fn render_template(template_ref: ObjectRef, context_ref: ObjectRef) -> Objec
                         output.push_str(val.as_str());
                     } else {
                         let msg = format!("Name not found in context: {name}");
-                        return BUILTINS.string_err(msg, template_ref.clone());
+                        return new::string_err(msg, template_ref.clone());
                     }
                 }
                 _ => {
@@ -159,11 +158,11 @@ pub fn render_template(template_ref: ObjectRef, context_ref: ObjectRef) -> Objec
                     let msg = format!(
                         "Template is contains an invalid expression: {tokens:?}"
                     );
-                    return BUILTINS.string_err(msg, template_ref.clone());
+                    return new::string_err(msg, template_ref.clone());
                 }
             },
         }
     }
 
-    BUILTINS.str(output)
+    new::str(output)
 }
