@@ -894,7 +894,7 @@ impl<'a, T: BufRead> Scanner<'a, T> {
                     '\'' => string.push('\''),
 
                     // This also seems to be a standard.
-                    '\"' => string.push('\"'),
+                    '"' => string.push('"'),
 
                     // Any other escaped char resolves to the
                     // original *escaped* version of itself.
