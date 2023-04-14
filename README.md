@@ -65,22 +65,26 @@ instructions for use with [neovim].
 - Everything is an object of some type
 - Strong typing
 - Lexical scoping
-- Everything is an expression or acts like an expression; every
+- Everything is an expression or acts like an expression--every
   statement returns some value
 - Significant whitespace (by default, but maybe consider `{...}` blocks
   for certain special cases like passing functions)
-- No this/self on methods but this/self is required to access attributes
-- Disallow arbitrary attachment of attributes (???)
-- Everything is immutable by default (???)
 - Implicit return of last evaluated expression (like Rust); this applies
   to *all* blocks/scopes
-- Custom types can implement operators by defining methods such as `+`
 - Only booleans and `nil` can be used in boolean contexts by default;
   custom types can implement the `!!` operator
+- Everything is immutable by default (idea: use `=` for `const` and `<-`
+  for `var`)
+- No this/self in method definitions but this/self is required to access
+  attributes
+- Disallow arbitrary attachment of attributes
+- Custom types can implement operators by defining methods such as `+`
+- No inheritance (???)
 
 ## Memory Management
 
-TODO
+The current implementation uses reference counting via Rust's `Arc`, but
+memory can leak if there are cycles.
 
 ## Intrinsic Types
 
@@ -100,21 +104,27 @@ TODO
 ## Vars
 
 Variables are defined without the use of any keywords, like Python or
-Ruby.
+Ruby. Vars can be reassigned within a given scope using `=`. Vars in
+outer scopes can be reassigned using `<-`.
 
 ```
-a = true
-b = nil
-
 a = true
 block ->
     print(a)  # outer a
     
-a = true
+b = true
 block ->
-    a = false
-    print(a)  # block a
-print(a) # outer a
+    # This creates a new `b` in the block.
+    b = false
+
+# After exiting the block, `b` is `true`
+
+c = 1
+block ->
+    # This reassigns the outer `c`
+    c <- 2
+
+# After exiting the block, `c` is `2`
 ```
 
 ## Type Hints
@@ -133,8 +143,7 @@ f: Str = (s: Str, count: Int) =>
 
 ## Format Strings
 
-Similar to f-strings in Python. Sometimes called $-strings since they
-use a `$` to mark strings as format strings.
+Similar to $-strings in F# and f-strings in Python.
 
 ```
 x = 1
@@ -154,7 +163,7 @@ block_val = block ->
     y = 2
     x + y
 
-block_val == 4
+assert(block_val == 4)
 ```
 
 ## Scopes
@@ -164,6 +173,8 @@ scope.
 
 Blocks are denoted by `->` and always return (so to speak) a value,
 which may be `nil`.
+
+Function blocks are denoted by `=>` to resolve a parsing ambiguity.
 
 ## Conditionals
 
@@ -210,11 +221,13 @@ can be written more succinctly as:
 
 ```
 x = "abc"
+
 result = match x ->
     "a"   -> 1
     "ab"  -> 2
     "abc" -> 3
     *     -> 4
+
 print(result)  # -> 3
 ```
 
@@ -227,19 +240,21 @@ branch and no match is found, the `match` block will return `nil`.
 ## Pattern Matching
 
 Pattern matching can be done using the builtin `Always` singleton `@`.
-`@` always evaluates as `true` can be compared for equality with
+`@` always evaluates as `true`. It can be compared for equality with
 _anything_ and the comparison will _always_ be `true`.
 
 ```
 r = match (1, 2) ->
     (1, @) -> true
     * -> false
-print(r)  # -> true
+
+assert(r == true)
 
 r = match (1, 2) ->
     (@, 2) -> true
     * -> false
-print(r)  # -> true
+
+assert(r == true)
 ```
 
 ## Loops
@@ -280,7 +295,8 @@ loop cond ->
 - Forward jumps support the jump-to-exit pattern
 - Backward jumps are disallowed (so no looping via goto)
 - Labels can only be placed at the beginning of a line or directly
-  after a scope start marker
+  after a scope start marker (although the latter isn't particularly
+  useful)
 - Labels are fenced by colons e.g. `:my_label:` (this differentiates
   labels from identifiers with type hints)
 - Labels can't be redefined in a scope
@@ -320,7 +336,8 @@ my_func(() => nil)
 
 Functions can be defined with a var args parameter in the last position,
 which can be accessed in the body of the function as `$args`. `$args`
-is always a tuple and will be empty if there are no var args.
+is always defined, is always a tuple, and will be empty if there are no
+var args.
 
 ```
 # $main is special; $args is argv
@@ -332,10 +349,7 @@ f = (x, y, ...) => print(x, y, $args)
 ### Closures
 
 Closures work pretty much like Python or JavaScript. One difference is
-that names defined *after* a function won't be captured. Allowing this
-seems a bit wonky in the first place and also adds a bit of complexity
-for no apparent benefit (or, at least, I'm not sure what the benefit of
-this capability is off the top of my head.)
+that names defined *after* a function won't be captured.
 
 Here's an extremely artificial example:
 
